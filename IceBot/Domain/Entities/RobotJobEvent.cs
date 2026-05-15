@@ -3,7 +3,7 @@ using Domain.Enums;
 
 namespace Domain.Entities;
 
-public partial class RobotJobEvent : RobotRuntimeEventEntity
+public partial class RobotJobEvent : AppendOnlySyncEntity
 {
     public Guid RobotJobId { get; set; }
 

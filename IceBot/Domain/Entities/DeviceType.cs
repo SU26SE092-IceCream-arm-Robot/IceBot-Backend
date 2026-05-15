@@ -9,6 +9,4 @@ public partial class DeviceType : CatalogEntity
     public bool RequiresKioskAssignment { get; set; } = true;
 
     public virtual ICollection<DeviceModel> DeviceModels { get; set; } = new List<DeviceModel>();
-
-    public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
 }

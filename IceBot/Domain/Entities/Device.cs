@@ -29,8 +29,6 @@ public partial class Device : BusinessEntity
 
     public string? MetadataJson { get; set; }
 
-    public virtual ICollection<DeviceEvent> DeviceEvents { get; set; } = new List<DeviceEvent>();
-
     public virtual DeviceModel? DeviceModel { get; set; }
 
     public virtual DeviceType DeviceType { get; set; } = null!;
@@ -38,8 +36,4 @@ public partial class Device : BusinessEntity
     public virtual ICollection<IngredientDispenserState> IngredientDispenserStates { get; set; } = new List<IngredientDispenserState>();
 
     public virtual Kiosk? Kiosk { get; set; }
-
-    public virtual ICollection<RobotProgram> RobotPrograms { get; set; } = new List<RobotProgram>();
-
-    public virtual ICollection<RobotJob> RobotJobs { get; set; } = new List<RobotJob>();
 }

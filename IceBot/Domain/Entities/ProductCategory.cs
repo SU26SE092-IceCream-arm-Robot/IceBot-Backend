@@ -13,6 +13,4 @@ public partial class ProductCategory : CatalogEntity
     public virtual ProductCategory? ParentCategory { get; set; }
 
     public virtual ICollection<ProductCategory> ChildCategories { get; set; } = new List<ProductCategory>();
-
-    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 }

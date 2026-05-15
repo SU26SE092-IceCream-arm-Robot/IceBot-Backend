@@ -3,7 +3,7 @@ using Domain.Enums;
 
 namespace Domain.Entities;
 
-public partial class KioskHeartbeat : RobotRuntimeEventEntity
+public partial class KioskHeartbeat : AppendOnlySyncEntity
 {
     public Guid KioskId { get; set; }
 

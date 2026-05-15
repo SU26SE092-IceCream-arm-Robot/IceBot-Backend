@@ -23,8 +23,4 @@ public partial class Ingredient : BusinessEntity
     public int? ShelfLifeDays { get; set; }
 
     public string? MetadataJson { get; set; }
-
-    public virtual ICollection<IngredientDispenserState> IngredientDispenserStates { get; set; } = new List<IngredientDispenserState>();
-
-    public virtual ICollection<RecipeItem> RecipeItems { get; set; } = new List<RecipeItem>();
 }

@@ -7,6 +7,4 @@ public partial class Role : CatalogEntity
     public bool IsSystemRole { get; set; }
 
     public int Priority { get; set; }
-
-    public virtual ICollection<Account> Accounts { get; set; } = new List<Account>();
 }

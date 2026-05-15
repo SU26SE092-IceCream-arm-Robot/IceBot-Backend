@@ -4,8 +4,10 @@ using Domain.Payments.Entities;
 
 namespace Domain.Entities;
 
-public partial class Order : BusinessEntity
+public partial class Order : BusinessEntity, IStoreScoped
 {
+    public Guid? OrganizationId { get; set; }
+
     public Guid KioskId { get; set; }
 
     public Guid? StoreId { get; set; }
@@ -54,17 +56,11 @@ public partial class Order : BusinessEntity
 
     public virtual Kiosk Kiosk { get; set; } = null!;
 
+    public virtual Organization? Organization { get; set; }
+
     public virtual Store? Store { get; set; }
 
-    public virtual ICollection<OperationLog> OperationLogs { get; set; } = new List<OperationLog>();
-
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
-
-    public virtual ICollection<OrderStatusHistory> OrderStatusHistories { get; set; } = new List<OrderStatusHistory>();
-
-    public virtual ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();
-
-    public virtual ICollection<RobotJob> RobotJobs { get; set; } = new List<RobotJob>();
 
     public OrderItem AddItem(
         Guid productId,

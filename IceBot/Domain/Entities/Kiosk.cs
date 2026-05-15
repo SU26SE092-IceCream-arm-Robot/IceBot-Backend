@@ -3,8 +3,10 @@ using Domain.Enums;
 
 namespace Domain.Entities;
 
-public partial class Kiosk : BusinessEntity
+public partial class Kiosk : BusinessEntity, IOrganizationScoped
 {
+    public Guid? OrganizationId { get; set; }
+
     public Guid StoreId { get; set; }
 
     public string Code { get; set; } = null!;
@@ -33,27 +35,13 @@ public partial class Kiosk : BusinessEntity
 
     public long ConfigurationVersion { get; set; }
 
-    public string? SettingsJson { get; set; }
+    public int SettingsSchemaVersion { get; set; } = 1;
 
-    public virtual ICollection<Alert> Alerts { get; set; } = new List<Alert>();
+    public string? SettingsJson { get; set; }
 
     public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
 
+    public virtual Organization? Organization { get; set; }
+
     public virtual Store Store { get; set; } = null!;
-
-    public virtual ICollection<MaintenanceTicket> MaintenanceTickets { get; set; } = new List<MaintenanceTicket>();
-
-    public virtual ICollection<OperationLog> OperationLogs { get; set; } = new List<OperationLog>();
-
-    public virtual ICollection<Order> Orders { get; set; } = new List<Order>();
-
-    public virtual ICollection<RobotJob> RobotJobs { get; set; } = new List<RobotJob>();
-
-    public virtual ICollection<RobotProgram> RobotPrograms { get; set; } = new List<RobotProgram>();
-
-    public virtual ICollection<KioskHeartbeat> KioskHeartbeats { get; set; } = new List<KioskHeartbeat>();
-
-    public virtual ICollection<SyncEventInbox> SyncEventInboxes { get; set; } = new List<SyncEventInbox>();
-
-    public virtual ICollection<SyncDeadLetter> SyncDeadLetters { get; set; } = new List<SyncDeadLetter>();
 }

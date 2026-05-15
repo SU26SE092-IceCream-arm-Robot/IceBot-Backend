@@ -4,7 +4,7 @@ using Domain.Identity.Entities;
 
 namespace Domain.Entities;
 
-public partial class RobotProgram : RobotConfigurationEntity
+public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 {
     public Guid? OrganizationId { get; set; }
 
@@ -22,7 +22,7 @@ public partial class RobotProgram : RobotConfigurationEntity
 
     public string Name { get; set; } = null!;
 
-    public RobotProgramScopeType ScopeType { get; set; } = RobotProgramScopeType.Global;
+    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
 
     public string ProductType { get; set; } = "IceCream";
 
@@ -46,9 +46,15 @@ public partial class RobotProgram : RobotConfigurationEntity
 
     public string? Description { get; set; }
 
+    public int ProgramPayloadSchemaVersion { get; set; } = 1;
+
     public string? ProgramPayloadJson { get; set; }
 
+    public int CalibrationDataSchemaVersion { get; set; } = 1;
+
     public string? CalibrationDataJson { get; set; }
+
+    public int SafetyZoneSchemaVersion { get; set; } = 1;
 
     public string? SafetyZoneJson { get; set; }
 
@@ -76,13 +82,7 @@ public partial class RobotProgram : RobotConfigurationEntity
 
     public virtual Account? CalibratedByAccount { get; set; }
 
-    public virtual ICollection<RobotProgram> DerivedPrograms { get; set; } = new List<RobotProgram>();
-
-    public virtual ICollection<RobotJob> RobotJobs { get; set; } = new List<RobotJob>();
-
     public virtual ICollection<RobotProgramStep> RobotProgramSteps { get; set; } = new List<RobotProgramStep>();
-
-    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 
     public RobotProgramStep AddStep(
         int stepNumber,

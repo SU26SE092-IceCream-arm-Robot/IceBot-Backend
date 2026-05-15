@@ -18,3 +18,10 @@ public abstract class AppendOnlyEntity : GuidEntity, IAuditable
     public Guid? CreatedByAccountId { get; set; }
     public Guid? UpdatedByAccountId { get; set; }
 }
+
+public abstract class AppendOnlySyncEntity : AppendOnlyEntity, IRobotSyncEntity
+{
+    public Guid OriginNodeId { get; set; }
+    public long Version { get; set; }
+    public DateTimeOffset? SyncedAt { get; set; }
+}

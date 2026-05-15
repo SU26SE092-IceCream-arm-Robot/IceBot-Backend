@@ -21,3 +21,18 @@ public interface IRobotSyncEntity
     long Version { get; set; }
     DateTimeOffset? SyncedAt { get; set; }
 }
+
+public interface IOrganizationScoped
+{
+    Guid? OrganizationId { get; set; }
+}
+
+public interface IStoreScoped : IOrganizationScoped
+{
+    Guid? StoreId { get; set; }
+}
+
+public interface IKioskScoped : IStoreScoped
+{
+    Guid? KioskId { get; set; }
+}

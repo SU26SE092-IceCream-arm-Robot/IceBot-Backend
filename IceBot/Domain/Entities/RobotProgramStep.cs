@@ -20,7 +20,11 @@ public partial class RobotProgramStep : RobotConfigurationEntity
 
     public string Command { get; set; } = null!;
 
+    public int ParametersSchemaVersion { get; set; } = 1;
+
     public string? ParametersJson { get; set; }
+
+    public int ParametersOverrideSchemaVersion { get; set; } = 1;
 
     public string? ParametersOverrideJson { get; set; }
 
@@ -58,6 +62,8 @@ public partial class RobotProgramStep : RobotConfigurationEntity
 
     public int? ExpectedDurationMs { get; set; }
 
+    public int RetryPolicySchemaVersion { get; set; } = 1;
+
     public string? RetryPolicyJson { get; set; }
 
     public bool IsRequired { get; set; } = true;
@@ -66,7 +72,11 @@ public partial class RobotProgramStep : RobotConfigurationEntity
 
     public int? NextOnFailureStepNumber { get; set; }
 
+    public int CalibrationDataSchemaVersion { get; set; } = 1;
+
     public string? CalibrationDataJson { get; set; }
+
+    public int ValidationResultSchemaVersion { get; set; } = 1;
 
     public string? ValidationResultJson { get; set; }
 
@@ -77,10 +87,6 @@ public partial class RobotProgramStep : RobotConfigurationEntity
     public virtual RobotProgramStep? TemplateStep { get; set; }
 
     public virtual Account? CalibratedByAccount { get; set; }
-
-    public virtual ICollection<RobotProgramStep> DerivedSteps { get; set; } = new List<RobotProgramStep>();
-
-    public virtual ICollection<RobotJobStep> RobotJobSteps { get; set; } = new List<RobotJobStep>();
 
     public virtual RobotProgram RobotProgram { get; set; } = null!;
 

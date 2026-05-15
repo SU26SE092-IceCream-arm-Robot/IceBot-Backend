@@ -1,10 +1,15 @@
 using Domain.Common;
+using Domain.Enums;
 
 namespace Domain.Entities;
 
-public partial class ProductOption : BusinessEntity
+public partial class ProductOption : BusinessEntity, IOrganizationScoped
 {
+    public Guid? OrganizationId { get; set; }
+
     public long OptionGroupId { get; set; }
+
+    public Guid? TemplateProductOptionId { get; set; }
 
     public string Code { get; set; } = null!;
 
@@ -24,9 +29,11 @@ public partial class ProductOption : BusinessEntity
 
     public string? MetadataJson { get; set; }
 
+    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
+
+    public virtual Organization? Organization { get; set; }
+
+    public virtual ProductOption? TemplateProductOption { get; set; }
+
     public virtual OptionGroup OptionGroup { get; set; } = null!;
-
-    public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
-
-    public virtual ICollection<Product> Products { get; set; } = new List<Product>();
 }

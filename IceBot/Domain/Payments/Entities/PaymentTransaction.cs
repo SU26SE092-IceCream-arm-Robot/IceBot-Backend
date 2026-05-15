@@ -60,11 +60,7 @@ public partial class PaymentTransaction : BusinessEntity
 
     public virtual Order Order { get; set; } = null!;
 
-    public virtual ICollection<PaymentCallback> PaymentCallbacks { get; set; } = new List<PaymentCallback>();
-
     public virtual PaymentMethod PaymentMethod { get; set; } = null!;
-
-    public virtual ICollection<Refund> Refunds { get; set; } = new List<Refund>();
 
     public void MarkAttempted(DateTimeOffset attemptedAt)
     {

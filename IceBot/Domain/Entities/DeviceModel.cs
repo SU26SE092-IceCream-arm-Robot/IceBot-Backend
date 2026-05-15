@@ -16,11 +16,11 @@ public partial class DeviceModel : BusinessEntity
 
     public string? FirmwareFamily { get; set; }
 
+    public int CapabilitiesSchemaVersion { get; set; } = 1;
+
     public string? CapabilitiesJson { get; set; }
 
     public string? MetadataJson { get; set; }
 
     public virtual DeviceType DeviceType { get; set; } = null!;
-
-    public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
 }

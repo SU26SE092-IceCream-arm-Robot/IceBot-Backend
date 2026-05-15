@@ -15,6 +15,8 @@ public partial class RobotJobStep : RobotRuntimeAggregateEntity
 
     public string Command { get; set; } = null!;
 
+    public int ParametersSchemaVersion { get; set; } = 1;
+
     public string? ParametersJson { get; set; }
 
     public RobotJobStepStatus Status { get; set; } = RobotJobStepStatus.Pending;
@@ -39,8 +41,6 @@ public partial class RobotJobStep : RobotRuntimeAggregateEntity
 
     public virtual RobotJob RobotJob { get; set; } = null!;
 
-    public virtual ICollection<RobotJobEvent> RobotJobEvents { get; set; } = new List<RobotJobEvent>();
-
     public virtual RobotProgramStep? RobotProgramStep { get; set; }
 
     public static RobotJobStep CreateFromProgramStep(RobotProgramStep programStep)
@@ -56,6 +56,9 @@ public partial class RobotJobStep : RobotRuntimeAggregateEntity
             StepNumber = programStep.StepNumber,
             StepCode = programStep.StepCode,
             Command = programStep.Command,
+            ParametersSchemaVersion = programStep.ParametersOverrideJson is not null
+                ? programStep.ParametersOverrideSchemaVersion
+                : programStep.ParametersSchemaVersion,
             ParametersJson = programStep.ParametersOverrideJson ?? programStep.ParametersJson,
             MaxRetries = 3
         };

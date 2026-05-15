@@ -1,9 +1,18 @@
 using Domain.Common;
+using Domain.Enums;
 
 namespace Domain.Entities;
 
-public partial class Product : BusinessEntity
+public partial class Product : BusinessEntity, IKioskScoped
 {
+    public Guid? OrganizationId { get; set; }
+
+    public Guid? StoreId { get; set; }
+
+    public Guid? KioskId { get; set; }
+
+    public Guid? TemplateProductId { get; set; }
+
     public long? CategoryId { get; set; }
 
     public string Code { get; set; } = null!;
@@ -28,13 +37,19 @@ public partial class Product : BusinessEntity
 
     public string? MetadataJson { get; set; }
 
-    public virtual ProductCategory? Category { get; set; }
+    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
 
-    public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+    public virtual Organization? Organization { get; set; }
+
+    public virtual Store? Store { get; set; }
+
+    public virtual Kiosk? Kiosk { get; set; }
+
+    public virtual Product? TemplateProduct { get; set; }
+
+    public virtual ProductCategory? Category { get; set; }
 
     public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
 
     public virtual ICollection<ProductOption> ProductOptions { get; set; } = new List<ProductOption>();
-
-    public virtual ICollection<RobotProgram> RobotPrograms { get; set; } = new List<RobotProgram>();
 }

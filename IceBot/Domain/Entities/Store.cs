@@ -34,13 +34,11 @@ public partial class Store : BusinessEntity
 
     public string? Email { get; set; }
 
+    public int OpeningHoursSchemaVersion { get; set; } = 1;
+
     public string? OpeningHoursJson { get; set; }
 
     public virtual ICollection<Kiosk> Kiosks { get; set; } = new List<Kiosk>();
 
-    public virtual ICollection<RobotProgram> RobotPrograms { get; set; } = new List<RobotProgram>();
-
     public virtual Organization? Organization { get; set; }
-
-    public virtual ICollection<Account> Accounts { get; set; } = new List<Account>();
 }

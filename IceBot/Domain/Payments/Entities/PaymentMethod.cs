@@ -10,7 +10,7 @@ public partial class PaymentMethod : CatalogEntity
 
     public bool IsOnline { get; set; } = true;
 
-    public string? ConfigJson { get; set; }
+    public int ConfigSchemaVersion { get; set; } = 1;
 
-    public virtual ICollection<PaymentTransaction> PaymentTransactions { get; set; } = new List<PaymentTransaction>();
+    public string? ConfigJson { get; set; }
 }

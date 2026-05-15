@@ -23,7 +23,5 @@ public partial class Organization : BusinessEntity
 
     public string? MetadataJson { get; set; }
 
-    public virtual ICollection<RobotProgram> RobotPrograms { get; set; } = new List<RobotProgram>();
-
     public virtual ICollection<Store> Stores { get; set; } = new List<Store>();
 }

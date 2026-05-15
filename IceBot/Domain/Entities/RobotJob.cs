@@ -33,6 +33,8 @@ public partial class RobotJob : RobotRuntimeAggregateEntity
 
     public int? RecipeVersion { get; set; }
 
+    public int RecipeSnapshotSchemaVersion { get; set; } = 1;
+
     public string? RecipeSnapshotJson { get; set; }
 
     public DateTimeOffset RequestedAt { get; set; }
@@ -66,10 +68,6 @@ public partial class RobotJob : RobotRuntimeAggregateEntity
     public virtual OrderItem? OrderItem { get; set; }
 
     public virtual Recipe? Recipe { get; set; }
-
-    public virtual ICollection<DeviceEvent> DeviceEvents { get; set; } = new List<DeviceEvent>();
-
-    public virtual ICollection<RobotJobEvent> RobotJobEvents { get; set; } = new List<RobotJobEvent>();
 
     public virtual ICollection<RobotJobStep> RobotJobSteps { get; set; } = new List<RobotJobStep>();
 

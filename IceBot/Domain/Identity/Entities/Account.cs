@@ -52,22 +52,6 @@ public partial class Account : BusinessEntity
 
     public virtual ICollection<AccountDevice> AccountDevices { get; set; } = new List<AccountDevice>();
 
-    public virtual ICollection<Alert> Alerts { get; set; } = new List<Alert>();
-
-    public virtual ICollection<MaintenanceTicket> MaintenanceTicketAssignedToAccounts { get; set; } = new List<MaintenanceTicket>();
-
-    public virtual ICollection<MaintenanceTicket> MaintenanceTicketCreatedByAccounts { get; set; } = new List<MaintenanceTicket>();
-
-    public virtual ICollection<OperationLog> OperationLogs { get; set; } = new List<OperationLog>();
-
-    public virtual ICollection<OrderStatusHistory> OrderStatusHistories { get; set; } = new List<OrderStatusHistory>();
-
-    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
-
-    public virtual ICollection<Refund> Refunds { get; set; } = new List<Refund>();
-
-    public virtual ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
-
     public virtual ICollection<Role> Roles { get; set; } = new List<Role>();
 
     public virtual ICollection<Store> Stores { get; set; } = new List<Store>();

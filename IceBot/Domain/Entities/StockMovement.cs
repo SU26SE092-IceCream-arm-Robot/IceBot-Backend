@@ -3,11 +3,15 @@ using Domain.Identity.Entities;
 
 namespace Domain.Entities;
 
-public partial class StockMovement : RobotRuntimeEventEntity
+public partial class StockMovement : AppendOnlySyncEntity, IStoreScoped
 {
     public Guid IngredientDispenserStateId { get; set; }
 
+    public Guid? OrganizationId { get; set; }
+
     public Guid? KioskId { get; set; }
+
+    public Guid? StoreId { get; set; }
 
     public Guid? DeviceId { get; set; }
 
@@ -41,6 +45,10 @@ public partial class StockMovement : RobotRuntimeEventEntity
 
     public virtual Account? CreatedByAccount { get; set; }
 
+    public virtual Organization? Organization { get; set; }
+
+    public virtual Store? Store { get; set; }
+
     public virtual Kiosk? Kiosk { get; set; }
 
     public virtual Device? Device { get; set; }
@@ -51,6 +59,8 @@ public partial class StockMovement : RobotRuntimeEventEntity
 
     public static StockMovement Create(
         Guid ingredientDispenserStateId,
+        Guid? organizationId,
+        Guid? storeId,
         Guid? kioskId,
         Guid? deviceId,
         Guid? ingredientId,
@@ -83,6 +93,8 @@ public partial class StockMovement : RobotRuntimeEventEntity
         return new StockMovement
         {
             IngredientDispenserStateId = ingredientDispenserStateId,
+            OrganizationId = organizationId,
+            StoreId = storeId,
             KioskId = kioskId,
             DeviceId = deviceId,
             IngredientId = ingredientId,

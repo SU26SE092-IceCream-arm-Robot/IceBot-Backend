@@ -4,7 +4,7 @@ using Domain.Identity.Entities;
 
 namespace Domain.Entities;
 
-public partial class OperationLog : RobotRuntimeEventEntity
+public partial class OperationLog : AppendOnlySyncEntity
 {
     public Guid? AccountId { get; set; }
 

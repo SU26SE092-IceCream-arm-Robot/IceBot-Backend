@@ -112,7 +112,7 @@ public enum RefundStatus
     Cancelled = 6
 }
 
-public enum RobotProgramScopeType
+public enum TenantScopeType
 {
     Global = 1,
     Organization = 2,

@@ -23,6 +23,4 @@ public partial class AccountDevice : BusinessEntity
     public DateTimeOffset? RevokedAt { get; set; }
 
     public virtual Account Account { get; set; } = null!;
-
-    public virtual ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

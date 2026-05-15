@@ -21,6 +21,8 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
 
     public string Unit { get; set; } = "gram";
 
+    public int LevelToQuantityProfileSchemaVersion { get; set; } = 1;
+
     public string? LevelToQuantityProfileJson { get; set; }
 
     public DateTimeOffset LastMeasuredAt { get; set; }
@@ -36,8 +38,6 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
     public virtual Kiosk? Kiosk { get; set; }
 
     public virtual Ingredient Ingredient { get; set; } = null!;
-
-    public virtual ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
 
     public void ConfigureContainer(decimal? capacityQuantity, string unit, string? levelToQuantityProfileJson = null)
     {
@@ -199,6 +199,8 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
     {
         var movement = StockMovement.Create(
             Id,
+            null,
+            null,
             KioskId,
             DeviceId,
             IngredientId,
@@ -213,7 +215,6 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
             sourceEventId,
             isEstimated);
 
-        StockMovements.Add(movement);
         return movement;
     }
 }
