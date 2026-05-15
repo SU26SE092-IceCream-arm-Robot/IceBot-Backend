@@ -51,6 +51,16 @@ public enum OrderStatus
     Failed = 9
 }
 
+public enum OrderChannel
+{
+    Tablet = 1,
+    Kiosk = 2,
+    MobileApp = 3,
+    Web = 4,
+    Admin = 5,
+    External = 6
+}
+
 public enum PaymentStatus
 {
     Unpaid = 1,
@@ -221,4 +231,12 @@ public enum KioskHeartbeatStatus
     Online = 1,
     Degraded = 2,
     Offline = 3
+}
+
+public enum IngredientLevelStatus
+{
+    Unknown = 0,
+    Low = 1,
+    Medium = 2,
+    Full = 3
 }

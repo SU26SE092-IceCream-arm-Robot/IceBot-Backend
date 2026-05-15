@@ -25,6 +25,8 @@ public partial class StockMovement : RobotRuntimeEventEntity
 
     public decimal? BalanceAfter { get; set; }
 
+    public bool IsEstimated { get; set; }
+
     public string Unit { get; set; } = "gram";
 
     public string? ReasonCode { get; set; }
@@ -60,7 +62,8 @@ public partial class StockMovement : RobotRuntimeEventEntity
         string? reasonCode = null,
         string? referenceType = null,
         Guid? referenceId = null,
-        Guid? sourceEventId = null)
+        Guid? sourceEventId = null,
+        bool isEstimated = false)
     {
         if (ingredientDispenserStateId == Guid.Empty)
         {
@@ -86,6 +89,7 @@ public partial class StockMovement : RobotRuntimeEventEntity
             MovementType = movementType.Trim(),
             Quantity = quantity,
             BalanceAfter = balanceAfter,
+            IsEstimated = isEstimated,
             Unit = string.IsNullOrWhiteSpace(unit) ? "unit" : unit.Trim(),
             OccurredAt = occurredAt,
             ReasonCode = reasonCode,

@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Enums;
 
 namespace Domain.Entities;
 
@@ -12,17 +13,15 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
 
     public string ContainerCode { get; set; } = null!;
 
-    public decimal CurrentQuantity { get; set; }
+    public IngredientLevelStatus CurrentLevelStatus { get; set; } = IngredientLevelStatus.Unknown;
 
-    public decimal CapacityQuantity { get; set; }
+    public decimal? EstimatedQuantity { get; set; }
+
+    public decimal? CapacityQuantity { get; set; }
 
     public string Unit { get; set; } = "gram";
 
-    public decimal? LowThreshold { get; set; }
-
-    public decimal? CriticalThreshold { get; set; }
-
-    public string? CurrentLevelStatus { get; set; }
+    public string? LevelToQuantityProfileJson { get; set; }
 
     public DateTimeOffset LastMeasuredAt { get; set; }
 
@@ -40,11 +39,11 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
 
     public virtual ICollection<StockMovement> StockMovements { get; set; } = new List<StockMovement>();
 
-    public void ConfigureCapacity(decimal capacityQuantity, string unit, decimal? lowThreshold = null, decimal? criticalThreshold = null)
+    public void ConfigureContainer(decimal? capacityQuantity, string unit, string? levelToQuantityProfileJson = null)
     {
-        if (capacityQuantity <= 0)
+        if (capacityQuantity.HasValue && capacityQuantity.Value <= 0)
         {
-            throw new DomainRuleException("Dispenser capacity must be greater than zero.");
+            throw new DomainRuleException("Dispenser capacity must be greater than zero when provided.");
         }
 
         if (string.IsNullOrWhiteSpace(unit))
@@ -52,96 +51,140 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
             throw new DomainRuleException("Dispenser unit is required.");
         }
 
-        if (lowThreshold.HasValue && lowThreshold.Value < 0)
-        {
-            throw new DomainRuleException("Low threshold cannot be negative.");
-        }
-
-        if (criticalThreshold.HasValue && criticalThreshold.Value < 0)
-        {
-            throw new DomainRuleException("Critical threshold cannot be negative.");
-        }
-
-        if (criticalThreshold.HasValue && lowThreshold.HasValue && criticalThreshold.Value > lowThreshold.Value)
-        {
-            throw new DomainRuleException("Critical threshold cannot be greater than low threshold.");
-        }
-
         CapacityQuantity = capacityQuantity;
         Unit = unit.Trim();
-        LowThreshold = lowThreshold;
-        CriticalThreshold = criticalThreshold;
+        LevelToQuantityProfileJson = levelToQuantityProfileJson;
     }
 
-    public StockMovement Refill(decimal quantity, DateTimeOffset occurredAt, string? reasonCode = "REFILL", Guid? sourceEventId = null)
+    public void RecordSensorLevel(
+        IngredientLevelStatus levelStatus,
+        DateTimeOffset measuredAt,
+        string? sensorPayloadJson = null,
+        decimal? estimatedQuantity = null)
+    {
+        if (estimatedQuantity.HasValue && estimatedQuantity.Value < 0)
+        {
+            throw new DomainRuleException("Estimated quantity cannot be negative.");
+        }
+
+        if (estimatedQuantity.HasValue && CapacityQuantity.HasValue && estimatedQuantity.Value > CapacityQuantity.Value)
+        {
+            throw new DomainRuleException("Estimated quantity exceeds dispenser capacity.");
+        }
+
+        CurrentLevelStatus = levelStatus;
+        EstimatedQuantity = estimatedQuantity;
+        LastMeasuredAt = measuredAt;
+        SensorPayloadJson = sensorPayloadJson;
+    }
+
+    public StockMovement Refill(
+        decimal quantity,
+        DateTimeOffset occurredAt,
+        string? reasonCode = "REFILL",
+        Guid? sourceEventId = null,
+        IngredientLevelStatus? reportedLevelAfter = IngredientLevelStatus.Full)
     {
         if (quantity <= 0)
         {
             throw new DomainRuleException("Refill quantity must be greater than zero.");
         }
 
-        var newQuantity = CurrentQuantity + quantity;
-
-        if (CapacityQuantity > 0 && newQuantity > CapacityQuantity)
+        if (EstimatedQuantity.HasValue)
         {
-            throw new DomainRuleException("Refill quantity exceeds dispenser capacity.");
+            var newEstimatedQuantity = EstimatedQuantity.Value + quantity;
+
+            if (CapacityQuantity.HasValue && newEstimatedQuantity > CapacityQuantity.Value)
+            {
+                throw new DomainRuleException("Refill quantity exceeds dispenser capacity estimate.");
+            }
+
+            EstimatedQuantity = newEstimatedQuantity;
         }
 
-        CurrentQuantity = newQuantity;
+        if (reportedLevelAfter.HasValue)
+        {
+            CurrentLevelStatus = reportedLevelAfter.Value;
+        }
+
         LastRefilledAt = occurredAt;
         LastMeasuredAt = occurredAt;
-        UpdateLevelStatus();
 
         return AddMovement("REFILL", quantity, occurredAt, reasonCode, sourceEventId: sourceEventId);
     }
 
-    public StockMovement Consume(decimal quantity, DateTimeOffset occurredAt, string? referenceType = null, Guid? referenceId = null, Guid? sourceEventId = null)
+    public StockMovement Consume(
+        decimal quantity,
+        DateTimeOffset occurredAt,
+        string? referenceType = null,
+        Guid? referenceId = null,
+        Guid? sourceEventId = null,
+        IngredientLevelStatus? reportedLevelAfter = null)
     {
         if (quantity <= 0)
         {
             throw new DomainRuleException("Consumed quantity must be greater than zero.");
         }
 
-        if (CurrentQuantity < quantity)
+        if (EstimatedQuantity.HasValue)
         {
-            throw new DomainRuleException("Not enough ingredient quantity in dispenser.");
+            if (EstimatedQuantity.Value < quantity)
+            {
+                throw new DomainRuleException("Not enough estimated ingredient quantity in dispenser.");
+            }
+
+            EstimatedQuantity -= quantity;
         }
 
-        CurrentQuantity -= quantity;
+        if (reportedLevelAfter.HasValue)
+        {
+            CurrentLevelStatus = reportedLevelAfter.Value;
+        }
+
         LastMeasuredAt = occurredAt;
-        UpdateLevelStatus();
 
         return AddMovement("CONSUME", -quantity, occurredAt, null, referenceType, referenceId, sourceEventId);
     }
 
-    public StockMovement Adjust(decimal newQuantity, DateTimeOffset occurredAt, string reasonCode, Guid? sourceEventId = null)
+    public StockMovement AdjustEstimate(
+        decimal estimatedQuantity,
+        DateTimeOffset occurredAt,
+        string reasonCode,
+        Guid? sourceEventId = null,
+        IngredientLevelStatus? reportedLevelAfter = null)
     {
-        if (newQuantity < 0)
+        if (estimatedQuantity < 0)
         {
-            throw new DomainRuleException("Adjusted quantity cannot be negative.");
+            throw new DomainRuleException("Estimated quantity cannot be negative.");
         }
 
-        if (CapacityQuantity > 0 && newQuantity > CapacityQuantity)
+        if (CapacityQuantity.HasValue && estimatedQuantity > CapacityQuantity.Value)
         {
-            throw new DomainRuleException("Adjusted quantity exceeds dispenser capacity.");
+            throw new DomainRuleException("Estimated quantity exceeds dispenser capacity.");
         }
 
-        var delta = newQuantity - CurrentQuantity;
-        CurrentQuantity = newQuantity;
+        var previousEstimate = EstimatedQuantity;
+        var delta = previousEstimate.HasValue ? estimatedQuantity - previousEstimate.Value : estimatedQuantity;
+
+        EstimatedQuantity = estimatedQuantity;
         LastMeasuredAt = occurredAt;
-        UpdateLevelStatus();
 
-        return AddMovement("ADJUST", delta, occurredAt, reasonCode, sourceEventId: sourceEventId);
+        if (reportedLevelAfter.HasValue)
+        {
+            CurrentLevelStatus = reportedLevelAfter.Value;
+        }
+
+        return AddMovement("ADJUST_ESTIMATE", delta, occurredAt, reasonCode, sourceEventId: sourceEventId, isEstimated: true);
     }
 
     public bool IsLow()
     {
-        return LowThreshold.HasValue && CurrentQuantity <= LowThreshold.Value;
+        return CurrentLevelStatus == IngredientLevelStatus.Low;
     }
 
-    public bool IsCritical()
+    public bool IsFull()
     {
-        return CriticalThreshold.HasValue && CurrentQuantity <= CriticalThreshold.Value;
+        return CurrentLevelStatus == IngredientLevelStatus.Full;
     }
 
     private StockMovement AddMovement(
@@ -151,7 +194,8 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
         string? reasonCode = null,
         string? referenceType = null,
         Guid? referenceId = null,
-        Guid? sourceEventId = null)
+        Guid? sourceEventId = null,
+        bool isEstimated = false)
     {
         var movement = StockMovement.Create(
             Id,
@@ -160,24 +204,16 @@ public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
             IngredientId,
             movementType,
             quantity,
-            CurrentQuantity,
+            EstimatedQuantity,
             Unit,
             occurredAt,
             reasonCode,
             referenceType,
             referenceId,
-            sourceEventId);
+            sourceEventId,
+            isEstimated);
 
         StockMovements.Add(movement);
         return movement;
-    }
-
-    private void UpdateLevelStatus()
-    {
-        CurrentLevelStatus = IsCritical()
-            ? "Critical"
-            : IsLow()
-                ? "Low"
-                : "Normal";
     }
 }

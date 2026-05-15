@@ -18,7 +18,9 @@ public partial class Order : BusinessEntity
 
     public Guid? CorrelationId { get; set; }
 
-    public string Channel { get; set; } = "Tablet";
+    public OrderChannel Channel { get; set; } = OrderChannel.Tablet;
+
+    public string? ExternalChannel { get; set; }
 
     public OrderStatus Status { get; set; } = OrderStatus.Draft;
 
