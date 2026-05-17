@@ -1,11 +1,19 @@
-using System.Linq.Expressions;
+using Domain.Catalog.Entities;
 using Domain.Common;
-using Domain.Entities;
+using Domain.Devices.Entities;
 using Domain.Identity.Entities;
 using Domain.Identity.ValueObjects;
+using Domain.Inventory.Entities;
+using Domain.Operations.Entities;
+using Domain.Orders.Entities;
 using Domain.Payments.Entities;
+using Domain.RobotConfiguration.Entities;
+using Domain.RobotRuntime.Entities;
+using Domain.Sync.Entities;
+using Domain.Tenants.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using System.Linq.Expressions;
 
 namespace Infrastructure.Data;
 

@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.Enums;
+using Domain.Payments.Enums;
 
 namespace Domain.Payments.Entities;
 

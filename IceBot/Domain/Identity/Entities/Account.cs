@@ -1,8 +1,7 @@
 using Domain.Common;
-using Domain.Entities;
-using Domain.Enums;
+using Domain.Identity.Enums;
 using Domain.Identity.ValueObjects;
-using Domain.Payments.Entities;
+using Domain.Tenants.Entities;
 
 namespace Domain.Identity.Entities;
 

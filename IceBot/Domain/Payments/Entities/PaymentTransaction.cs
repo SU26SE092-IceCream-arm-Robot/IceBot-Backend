@@ -1,6 +1,6 @@
 using Domain.Common;
-using Domain.Entities;
-using Domain.Enums;
+using Domain.Orders.Entities;
+using Domain.Payments.Enums;
 
 namespace Domain.Payments.Entities;
 
