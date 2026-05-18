@@ -1,4 +1,4 @@
-﻿namespace Application.Exceptions
+﻿namespace Application.Shared.Exceptions
 {
     public class AppException : Exception
     {

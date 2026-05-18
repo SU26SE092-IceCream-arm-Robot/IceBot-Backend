@@ -1,5 +1,5 @@
-﻿using Application.Exceptions;
-using Application.Wrappers;
+﻿using Application.Shared.Exceptions;
+using Application.Shared.Wrappers;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Context;

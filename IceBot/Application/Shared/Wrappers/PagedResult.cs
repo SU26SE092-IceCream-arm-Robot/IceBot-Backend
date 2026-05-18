@@ -1,4 +1,4 @@
-﻿namespace Application.Wrappers
+﻿namespace Application.Shared.Wrappers
 {
     public class PagedResult<T> : ApiResult<IEnumerable<T>>
     {

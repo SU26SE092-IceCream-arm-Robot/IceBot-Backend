@@ -1,0 +1,63 @@
+# AGENTS.md
+
+Operational rules for coding agents working in this repository.
+
+## Source Of Truth
+
+- Architecture decisions: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Domain context map: [docs/BOUNDARY_CONTEXTS.md](docs/BOUNDARY_CONTEXTS.md)
+- Dependency boundaries: [docs/DEPENDENCY_RULES.md](docs/DEPENDENCY_RULES.md)
+
+Do not duplicate long architecture explanations here. This file is for execution rules.
+
+## Change Guardrails
+
+- Preserve existing API route contracts unless the user explicitly asks to change them.
+- Keep changes scoped to the requested work.
+- Do not perform broad renames, namespace moves, or folder reshuffles unless requested.
+- Do not create EF Core migrations unless the user explicitly asks for migrations.
+- Do not use destructive git commands unless explicitly requested.
+- Work with existing uncommitted changes; do not revert user changes.
+
+## Domain And Application Rules
+
+- Place new domain concepts in the owning bounded context.
+- Keep context-specific enums inside that context.
+- Put only genuinely shared primitives in `Domain.Common`.
+- Prefer ids and snapshots across contexts instead of large navigation graphs.
+- Do not introduce generic repository/service/controller layers for domain workflows.
+- Use EF Core `DbContext` as the default unit of work; add focused repositories only when they have clear value.
+- Keep actor concerns in WebAPI/auth, not in Application folder organization.
+
+## Refactor Checklist
+
+- Keep class names, file names, namespaces, and `using` references consistent.
+- Update interface and implementation signatures together.
+- Update DI registrations when service contracts change.
+- Scan for stale identifiers before finishing; prefer `rg`.
+- Re-run build after code changes.
+
+## Verification
+
+Default build command:
+
+```powershell
+dotnet build IceBot\IceBot.slnx
+```
+
+Do not run build for documentation-only changes unless the user explicitly asks for verification.
+
+For EF model checks, prefer design-time commands that do not mutate the database unless the user asked for migration/database changes.
+
+If a required tool is unavailable, report exactly what could not be verified.
+
+## Bulk And Distributed Workflow Rules
+
+- Transaction behavior must be explicit.
+- If a bulk requirement says item-level atomicity, rollback only the failed item, commit successful items, and return partial-failure details.
+- Public commands that can be retried need idempotency behavior.
+- Payment callbacks, sync ingestion, robot events, and stock movements should use typed retry/idempotency fields rather than parsed JSON state.
+
+## Ambiguity
+
+Make reasonable assumptions when they are low risk and consistent with the existing codebase. Ask for clarification only when the choice would change public contracts, data model ownership, migrations, or workflow semantics.

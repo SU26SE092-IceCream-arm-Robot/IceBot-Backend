@@ -1,4 +1,4 @@
-﻿using Application.Utils;
+﻿using Application.Shared.Utils;
 using Serilog.Context;
 using System.Diagnostics;
 using System.Text;

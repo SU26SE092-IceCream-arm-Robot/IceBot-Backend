@@ -1,9 +1,9 @@
-using Application.Constants;
-using Application.Wrappers;
+using Application.Shared.Constants;
+using Application.Shared.Wrappers;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
-namespace Application.Extensions
+namespace Application.Shared.Extensions
 {
     public static class QueryablePagingExtensions
     {

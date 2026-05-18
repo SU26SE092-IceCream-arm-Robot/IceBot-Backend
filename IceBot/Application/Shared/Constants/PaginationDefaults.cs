@@ -1,4 +1,4 @@
-﻿namespace Application.Constants
+﻿namespace Application.Shared.Constants
 {
     public class PaginationDefaults
     {

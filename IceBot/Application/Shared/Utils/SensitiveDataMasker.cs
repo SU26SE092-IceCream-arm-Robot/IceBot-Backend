@@ -1,7 +1,7 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 
-namespace Application.Utils
+namespace Application.Shared.Utils
 {
     public static class SensitiveDataMasker
     {

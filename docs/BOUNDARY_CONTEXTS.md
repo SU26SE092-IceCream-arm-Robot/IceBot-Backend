@@ -190,12 +190,7 @@ Do not place context-specific enums here.
 
 ## Dependency Rules
 
-- Prefer references by id across contexts unless the relationship is needed for aggregate behavior.
-- Avoid large navigation graphs across contexts.
-- Runtime contexts should use snapshots for historical truth.
-- Append-only events and payload JSON should not become hidden source-of-truth models.
-- Context-specific enums should live beside the context that owns the lifecycle.
-- Shared enums are allowed only when they represent a stable cross-context primitive.
+Dependency and cross-layer rules live in [Dependency Rules](DEPENDENCY_RULES.md). This file only defines bounded-context ownership and intentional cross-context references.
 
 ## Current Intentional Cross-Context References
 
@@ -207,3 +202,11 @@ Do not place context-specific enums here.
 - Operations references Accounts, Devices, Orders, Robot Runtime, and Tenants as operational evidence.
 
 These references are acceptable because the current project uses one database and one Domain assembly. They should still be treated as bounded-context boundaries in application services and APIs.
+
+## Related Docs
+
+- [Architecture](../ARCHITECTURE.md)
+- [Dependency Rules](DEPENDENCY_RULES.md)
+- [Multi-Tenancy Notes](../IceBot/Domain/MULTI_TENANCY_NOTES.md)
+- [Idempotency and Retry Notes](../IceBot/Domain/IDEMPOTENCY_RETRY_NOTES.md)
+- [JSON Field Rules](../IceBot/Domain/JSON_FIELD_NOTES.md)
