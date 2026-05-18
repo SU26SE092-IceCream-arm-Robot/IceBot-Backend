@@ -14,7 +14,9 @@ Do not duplicate long architecture explanations here. This file is for execution
 
 - Preserve existing API route contracts unless the user explicitly asks to change them.
 - Keep changes scoped to the requested work.
+- When the user asks to inspect or adjust an existing abstraction, preserve it and repair it first. Do not delete it just because it is currently unused or copied from another project.
 - Do not perform broad renames, namespace moves, or folder reshuffles unless requested.
+- Do not remove files, abstractions, or extension points unless the user explicitly asks for removal, or the file is proven obsolete and the removal is stated as part of the intended fix before editing.
 - Do not create EF Core migrations unless the user explicitly asks for migrations.
 - Do not use destructive git commands unless explicitly requested.
 - Work with existing uncommitted changes; do not revert user changes.
@@ -26,11 +28,14 @@ Do not duplicate long architecture explanations here. This file is for execution
 - Put only genuinely shared primitives in `Domain.Common`.
 - Prefer ids and snapshots across contexts instead of large navigation graphs.
 - Do not introduce generic repository/service/controller layers for domain workflows.
-- Use EF Core `DbContext` as the default unit of work; add focused repositories only when they have clear value.
+- Use EF Core `DbContext` as the default unit of work; keep repositories thin when they exist.
+- Repository abstractions should support handler-composed queries and focused persistence operations. They must not become CRUD service layers with hidden business rules.
 - Keep actor concerns in WebAPI/auth, not in Application folder organization.
 
 ## Refactor Checklist
 
+- Read the current implementation and search all usages before changing an abstraction.
+- Identify whether the request is to repair, reshape, or remove. Default to repair/reshape when removal is not explicit.
 - Keep class names, file names, namespaces, and `using` references consistent.
 - Update interface and implementation signatures together.
 - Update DI registrations when service contracts change.

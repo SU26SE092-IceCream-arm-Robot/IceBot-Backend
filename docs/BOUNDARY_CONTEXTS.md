@@ -207,6 +207,7 @@ These references are acceptable because the current project uses one database an
 
 - [Architecture](../ARCHITECTURE.md)
 - [Dependency Rules](DEPENDENCY_RULES.md)
-- [Multi-Tenancy Notes](../IceBot/Domain/MULTI_TENANCY_NOTES.md)
-- [Idempotency and Retry Notes](../IceBot/Domain/IDEMPOTENCY_RETRY_NOTES.md)
-- [JSON Field Rules](../IceBot/Domain/JSON_FIELD_NOTES.md)
+- [Naming Rules](NAMING_RULES.md)
+- [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
+- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](JSON_FIELD_RULES.md)

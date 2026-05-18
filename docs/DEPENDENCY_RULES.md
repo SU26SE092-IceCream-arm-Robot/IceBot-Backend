@@ -59,6 +59,16 @@ Application should not contain:
 
 DbContext can be used directly by handlers if the project chooses pragmatic EF access. Add repositories only when they express a real persistence boundary or complex reusable query.
 
+When a repository abstraction exists, keep it thin:
+
+- It may expose query composition entry points such as `IQueryable`.
+- It may provide basic persistence operations such as add, update, remove, and soft delete.
+- It should not own business decisions, workflow transitions, authorization, or response shaping.
+- It should not hard-code one base entity shape if the domain uses multiple entity id/audit patterns.
+- It should not hide eager-loading behavior behind string include lists.
+
+Do not delete an existing repository abstraction during cleanup unless removal is explicitly requested or agreed as part of the fix. Prefer reshaping the abstraction to match the current architecture.
+
 ## Infrastructure Rules
 
 Infrastructure owns:
@@ -108,6 +118,7 @@ Controllers should be thin. They should call application handlers/services and r
 
 - [Architecture](../ARCHITECTURE.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [Multi-Tenancy Notes](../IceBot/Domain/MULTI_TENANCY_NOTES.md)
-- [Idempotency and Retry Notes](../IceBot/Domain/IDEMPOTENCY_RETRY_NOTES.md)
-- [JSON Field Rules](../IceBot/Domain/JSON_FIELD_NOTES.md)
+- [Naming Rules](NAMING_RULES.md)
+- [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
+- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](JSON_FIELD_RULES.md)

@@ -1,4 +1,4 @@
-# Multi-Tenancy Notes
+# Multi-Tenancy Rules
 
 ## Tenant Root
 

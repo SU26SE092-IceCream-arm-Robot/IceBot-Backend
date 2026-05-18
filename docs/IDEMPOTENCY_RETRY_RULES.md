@@ -1,6 +1,6 @@
-# Idempotency and Retry Notes
+# Idempotency and Retry Rules
 
-This note records domain naming conventions for commands, events, sync, payment, and robot execution. Do not add all fields to every entity. Add them only at boundaries where duplicate requests, duplicate events, or retry after partial success can happen.
+This document records domain naming and behavior rules for commands, events, sync, payment, and robot execution. Do not add all fields to every entity. Add them only at boundaries where duplicate requests, duplicate events, or retry after partial success can happen.
 
 ## Naming Rules
 

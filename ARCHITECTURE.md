@@ -126,10 +126,11 @@ Default approach:
 - Commit once at the use-case boundary.
 - Use explicit transactions when a use case spans multiple writes that must succeed together.
 - Add focused repositories only for complex aggregate queries or persistence behavior that repeats across use cases.
+- Keep repository abstractions thin when they exist. They should support rich handlers, not replace them.
 
 When external systems are involved, do not hold a database transaction across network calls. Persist intent/state first, call the external provider, then persist result or retry state.
 
-Avoid a global generic repository/service/controller stack. It creates long signatures and hides domain decisions.
+Avoid a global generic repository/service/controller stack. It creates long signatures and hides domain decisions. If an existing generic repository must stay, reshape it into a thin persistence helper instead of adding business behavior to it.
 
 ## Edge-Cloud Model
 
@@ -168,7 +169,7 @@ Recommended patterns:
 
 Outbox can be added when the system starts publishing reliable integration events from local transactions.
 
-See [Idempotency and Retry Notes](IceBot/Domain/IDEMPOTENCY_RETRY_NOTES.md).
+See [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md).
 
 ## JSON Fields
 
@@ -176,7 +177,7 @@ JSON fields are allowed for robot SDK payloads, provider payloads, snapshots, an
 
 Query-critical or invariant-critical values should be promoted to typed columns.
 
-See [JSON Field Rules](IceBot/Domain/JSON_FIELD_NOTES.md).
+See [JSON Field Rules](docs/JSON_FIELD_RULES.md).
 
 ## Multi-Tenancy
 
@@ -190,7 +191,7 @@ Device > Kiosk > Store > Organization > Global
 
 Tenant filters should be explicit and safe for admin/platform queries.
 
-See [Multi-Tenancy Notes](IceBot/Domain/MULTI_TENANCY_NOTES.md).
+See [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md).
 
 ## API And Observability
 
@@ -218,6 +219,7 @@ Prefer:
 - Bounded-context placement for new domain concepts.
 - Thin WebAPI controllers.
 - Application handlers/use cases for orchestration.
+- Rich handlers with thin repositories for persistence helper behavior.
 - Typed columns for workflow-critical state.
 - Snapshots when runtime history must not depend on mutable catalog/configuration.
 
@@ -235,6 +237,7 @@ Avoid:
 
 - [Boundary Contexts](docs/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](docs/DEPENDENCY_RULES.md)
-- [Multi-Tenancy Notes](IceBot/Domain/MULTI_TENANCY_NOTES.md)
-- [Idempotency and Retry Notes](IceBot/Domain/IDEMPOTENCY_RETRY_NOTES.md)
-- [JSON Field Rules](IceBot/Domain/JSON_FIELD_NOTES.md)
+- [Naming Rules](docs/NAMING_RULES.md)
+- [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md)
+- [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](docs/JSON_FIELD_RULES.md)
