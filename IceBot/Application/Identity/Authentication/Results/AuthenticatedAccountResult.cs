@@ -10,7 +10,6 @@ namespace Application.Identity.Authentication.Results
         public string Email { get; set; } = string.Empty;
         public string? ImageUrl { get; set; }
         public string? Address { get; set; }
-        public string Role { get; set; } = string.Empty;
         public List<AuthenticatedAccountRoleResult> Roles { get; set; } = [];
         public string Status { get; set; } = string.Empty;
         public bool LocalLoginEnabled { get; set; }

@@ -13,6 +13,7 @@ Do not duplicate long architecture explanations here. This file is for execution
 ## Change Guardrails
 
 - Preserve existing API route contracts unless the user explicitly asks to change them.
+- Do not keep backward-compatibility or legacy response/request fields unless the user explicitly asks for compatibility, especially before first deployment.
 - Keep changes scoped to the requested work.
 - Do not convert a review, challenge, or "why did you do this?" question into code edits. Explain first; wait for an explicit action request before changing files.
 - Treat phrases such as "vì sao", "sao không", "có đang ... không", "cân nhắc", "kiểm tra", and "đánh giá" as inspection/explanation by default, not permission to refactor.

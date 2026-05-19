@@ -87,7 +87,6 @@ namespace Application.Identity.Tokens.Services
                 Email = account.Email,
                 ImageUrl = account.ImageUrl,
                 Address = account.Address,
-                Role = roles.FirstOrDefault()?.RoleCode ?? "Unassigned",
                 Roles = roles.Select(role => new AuthenticatedAccountRoleResult
                 {
                     RoleCode = role.RoleCode,
