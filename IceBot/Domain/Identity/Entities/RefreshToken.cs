@@ -22,7 +22,13 @@ public partial class RefreshToken : GuidEntity
 
     public string? RevokedByIp { get; set; }
 
+    public string? CreatedByUserAgent { get; set; }
+
+    public string? RevokedByUserAgent { get; set; }
+
     public string? RevokeReason { get; set; }
+
+    public DateTimeOffset? ReuseDetectedAt { get; set; }
 
     public bool IsUsed { get; set; }
 

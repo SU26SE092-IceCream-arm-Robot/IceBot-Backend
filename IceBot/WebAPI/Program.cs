@@ -2,12 +2,14 @@ using Application;
 using Asp.Versioning;
 using Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Serilog;
 using System.Reflection;
 using System.Text;
 using System.Text.Json.Serialization;
+using WebAPI.Authorization;
 using WebAPI.Configuration;
 using WebAPI.Middlewares;
 
@@ -73,6 +75,14 @@ try
             ClockSkew = TimeSpan.Zero
         };
     });
+
+    builder.Services.AddAuthorization(options =>
+    {
+        options.AddPolicy("accounts.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin")));
+    });
+
+    builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
 
     builder.Services.AddControllers().AddJsonOptions(options =>
     {

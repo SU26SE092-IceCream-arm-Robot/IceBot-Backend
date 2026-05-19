@@ -22,21 +22,6 @@ namespace Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("AccountRoles", b =>
-                {
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<long>("RoleId")
-                        .HasColumnType("bigint");
-
-                    b.HasKey("AccountId", "RoleId");
-
-                    b.HasIndex("RoleId");
-
-                    b.ToTable("AccountRoles", (string)null);
-                });
-
             modelBuilder.Entity("AccountStores", b =>
                 {
                     b.Property<Guid>("AccountId")
@@ -1006,14 +991,6 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("EmailConfirmedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("ExternalId")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("ExternalProvider")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<int>("FailedLoginCount")
                         .HasColumnType("integer");
 
@@ -1026,15 +1003,26 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("GoogleEmail")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("GoogleLoginEnabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("GoogleSubjectId")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("ImageUrl")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<bool>("IsExternal")
-                        .HasColumnType("boolean");
-
                     b.Property<DateTimeOffset?>("LastLoginAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("LocalLoginEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("LockedUntil")
                         .HasColumnType("timestamp with time zone");
@@ -1053,9 +1041,6 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("PhoneNumberConfirmedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<long?>("PrimaryRoleId")
-                        .HasColumnType("bigint");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -1076,12 +1061,15 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.HasIndex("PrimaryRoleId");
+                    b.HasIndex("GoogleEmail")
+                        .HasFilter("\"GoogleEmail\" IS NOT NULL");
+
+                    b.HasIndex("GoogleSubjectId")
+                        .IsUnique()
+                        .HasFilter("\"GoogleSubjectId\" IS NOT NULL");
 
                     b.HasIndex("UserName")
                         .IsUnique();
-
-                    b.HasIndex("ExternalProvider", "ExternalId");
 
                     b.ToTable("Accounts", (string)null);
                 });
@@ -1150,6 +1138,53 @@ namespace Infrastructure.Migrations
                     b.ToTable("AccountDevices", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Identity.Entities.AccountRole", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("AssignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("AssignedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("RoleId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignedByAccountId");
+
+                    b.HasIndex("KioskId");
+
+                    b.HasIndex("RoleId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("OrganizationId", "StoreId", "KioskId");
+
+                    b.HasIndex("AccountId", "RoleId", "OrganizationId", "StoreId", "KioskId")
+                        .IsUnique();
+
+                    b.ToTable("AccountRoles", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Identity.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1168,6 +1203,10 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("CreatedByUserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTimeOffset>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1177,6 +1216,9 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("ReplacedByTokenId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("ReuseDetectedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("RevokeReason")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -1185,6 +1227,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RevokedByIp")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RevokedByUserAgent")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
@@ -3591,21 +3637,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("ProductProductOptions", (string)null);
                 });
 
-            modelBuilder.Entity("AccountRoles", b =>
-                {
-                    b.HasOne("Domain.Identity.Entities.Account", null)
-                        .WithMany()
-                        .HasForeignKey("AccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Identity.Entities.Role", null)
-                        .WithMany()
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("AccountStores", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", null)
@@ -3824,16 +3855,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("Kiosk");
                 });
 
-            modelBuilder.Entity("Domain.Identity.Entities.Account", b =>
-                {
-                    b.HasOne("Domain.Identity.Entities.Role", "PrimaryRole")
-                        .WithMany()
-                        .HasForeignKey("PrimaryRoleId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("PrimaryRole");
-                });
-
             modelBuilder.Entity("Domain.Identity.Entities.AccountDevice", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "Account")
@@ -3843,6 +3864,53 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Account");
+                });
+
+            modelBuilder.Entity("Domain.Identity.Entities.AccountRole", b =>
+                {
+                    b.HasOne("Domain.Identity.Entities.Account", "Account")
+                        .WithMany("AccountRoles")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Identity.Entities.Account", "AssignedByAccount")
+                        .WithMany()
+                        .HasForeignKey("AssignedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Identity.Entities.Role", "Role")
+                        .WithMany("AccountRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Account");
+
+                    b.Navigation("AssignedByAccount");
+
+                    b.Navigation("Kiosk");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Role");
+
+                    b.Navigation("Store");
                 });
 
             modelBuilder.Entity("Domain.Identity.Entities.RefreshToken", b =>
@@ -4453,6 +4521,13 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Identity.Entities.Account", b =>
                 {
                     b.Navigation("AccountDevices");
+
+                    b.Navigation("AccountRoles");
+                });
+
+            modelBuilder.Entity("Domain.Identity.Entities.Role", b =>
+                {
+                    b.Navigation("AccountRoles");
                 });
 
             modelBuilder.Entity("Domain.Orders.Entities.Order", b =>

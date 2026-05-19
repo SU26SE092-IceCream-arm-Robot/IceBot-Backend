@@ -7,8 +7,6 @@ namespace Domain.Identity.Entities;
 
 public partial class Account : BusinessEntity
 {
-    public long? PrimaryRoleId { get; set; }
-
     public string UserName { get; set; } = null!;
 
     public string? FullName { get; set; }
@@ -35,11 +33,13 @@ public partial class Account : BusinessEntity
 
     public AccountStatus Status { get; set; } = AccountStatus.Active;
 
-    public bool IsExternal { get; set; }
+    public bool LocalLoginEnabled { get; set; }
 
-    public string? ExternalProvider { get; set; }
+    public bool GoogleLoginEnabled { get; set; }
 
-    public string? ExternalId { get; set; }
+    public string? GoogleSubjectId { get; set; }
+
+    public string? GoogleEmail { get; set; }
 
     public DateTimeOffset? LastLoginAt { get; set; }
 
@@ -47,11 +47,9 @@ public partial class Account : BusinessEntity
 
     public int FailedLoginCount { get; set; }
 
-    public virtual Role? PrimaryRole { get; set; }
-
     public virtual ICollection<AccountDevice> AccountDevices { get; set; } = new List<AccountDevice>();
 
-    public virtual ICollection<Role> Roles { get; set; } = new List<Role>();
+    public virtual ICollection<AccountRole> AccountRoles { get; set; } = new List<AccountRole>();
 
     public virtual ICollection<Store> Stores { get; set; } = new List<Store>();
 }

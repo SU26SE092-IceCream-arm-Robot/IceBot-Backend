@@ -14,6 +14,11 @@ Do not duplicate long architecture explanations here. This file is for execution
 
 - Preserve existing API route contracts unless the user explicitly asks to change them.
 - Keep changes scoped to the requested work.
+- Do not convert a review, challenge, or "why did you do this?" question into code edits. Explain first; wait for an explicit action request before changing files.
+- Treat phrases such as "vì sao", "sao không", "có đang ... không", "cân nhắc", "kiểm tra", and "đánh giá" as inspection/explanation by default, not permission to refactor.
+- Do not justify broad movement, renaming, or added abstraction only because the build passes. Build success verifies compilation, not design fit.
+- State assumptions explicitly when they affect structure, ownership, integration boundaries, or future extensibility. If an assumption is challenged, stop editing and correct the reasoning before proposing more changes.
+- Do not hide or dilute a mistaken assumption. Name the wrong assumption, identify the affected files, and separate explanation from proposed remediation.
 - When the user asks to inspect or adjust an existing abstraction, preserve it and repair it first. Do not delete it just because it is currently unused or copied from another project.
 - Do not perform broad renames, namespace moves, or folder reshuffles unless requested.
 - Do not remove files, abstractions, or extension points unless the user explicitly asks for removal, or the file is proven obsolete and the removal is stated as part of the intended fix before editing.
@@ -36,6 +41,8 @@ Do not duplicate long architecture explanations here. This file is for execution
 
 - Read the current implementation and search all usages before changing an abstraction.
 - Identify whether the request is to repair, reshape, or remove. Default to repair/reshape when removal is not explicit.
+- Before moving files, renaming public/internal concepts, or introducing a new abstraction, verify that the user asked for implementation rather than explanation. If not explicit, provide a short recommendation only.
+- Prefer the smallest change that resolves the current mismatch. Do not add future-facing infrastructure until there is a present use case or the user asks for it.
 - Keep class names, file names, namespaces, and `using` references consistent.
 - Update interface and implementation signatures together.
 - Update DI registrations when service contracts change.
@@ -66,3 +73,12 @@ If a required tool is unavailable, report exactly what could not be verified.
 ## Ambiguity
 
 Make reasonable assumptions when they are low risk and consistent with the existing codebase. Ask for clarification only when the choice would change public contracts, data model ownership, migrations, or workflow semantics.
+
+## Technical Challenge And Decision Ownership
+
+- Do not simply agree with the user's architectural or design statement. Evaluate it against the current codebase, stated requirements, and likely future constraints.
+- When the user's proposal is valid but not the only good option, present the trade-offs and at least one stronger or simpler alternative when one exists.
+- Separate facts, assumptions, and recommendations. State which parts are proven from code and which parts are inferred.
+- For design choices with meaningful trade-offs, provide options and a recommendation, then let the user decide which option to implement.
+- Do not implement a debatable architectural choice immediately after discussing it unless the user explicitly asks to apply that specific option.
+- If the user challenges a previous decision, reassess it on technical grounds instead of defending the prior change. Acknowledge mistakes directly, but still explain any parts of the previous approach that were technically reasonable.

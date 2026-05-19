@@ -25,6 +25,7 @@ public class IceBotDbContext : DbContext
     }
 
     public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<AccountRole> AccountRoles => Set<AccountRole>();
     public DbSet<AccountDevice> AccountDevices => Set<AccountDevice>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Role> Roles => Set<Role>();
@@ -97,7 +98,8 @@ public class IceBotDbContext : DbContext
             entity.ToTable("Accounts");
             entity.HasIndex(x => x.UserName).IsUnique();
             entity.HasIndex(x => x.Email).IsUnique();
-            entity.HasIndex(x => new { x.ExternalProvider, x.ExternalId });
+            entity.HasIndex(x => x.GoogleSubjectId).IsUnique().HasFilter("\"GoogleSubjectId\" IS NOT NULL");
+            entity.HasIndex(x => x.GoogleEmail).HasFilter("\"GoogleEmail\" IS NOT NULL");
 
             entity.Property(x => x.Password)
                 .HasConversion(
@@ -106,22 +108,10 @@ public class IceBotDbContext : DbContext
                 .HasColumnName("PasswordHash")
                 .HasMaxLength(512);
 
-            entity.HasOne(x => x.PrimaryRole)
-                .WithMany()
-                .HasForeignKey(x => x.PrimaryRoleId)
+            entity.HasMany(x => x.AccountRoles)
+                .WithOne(x => x.Account)
+                .HasForeignKey(x => x.AccountId)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            entity.HasMany(x => x.Roles)
-                .WithMany()
-                .UsingEntity<Dictionary<string, object>>(
-                    "AccountRoles",
-                    right => right.HasOne<Role>().WithMany().HasForeignKey("RoleId").OnDelete(DeleteBehavior.Restrict),
-                    left => left.HasOne<Account>().WithMany().HasForeignKey("AccountId").OnDelete(DeleteBehavior.Restrict),
-                    join =>
-                    {
-                        join.ToTable("AccountRoles");
-                        join.HasKey("AccountId", "RoleId");
-                    });
 
             entity.HasMany(x => x.Stores)
                 .WithMany()
@@ -134,6 +124,33 @@ public class IceBotDbContext : DbContext
                         join.ToTable("AccountStores");
                         join.HasKey("AccountId", "StoreId");
                     });
+        });
+
+        modelBuilder.Entity<AccountRole>(entity =>
+        {
+            entity.ToTable("AccountRoles");
+            entity.HasIndex(x => new { x.AccountId, x.RoleId, x.OrganizationId, x.StoreId, x.KioskId }).IsUnique();
+            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId });
+            entity.HasOne(x => x.Role)
+                .WithMany(x => x.AccountRoles)
+                .HasForeignKey(x => x.RoleId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Organization)
+                .WithMany()
+                .HasForeignKey(x => x.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Store)
+                .WithMany()
+                .HasForeignKey(x => x.StoreId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Kiosk)
+                .WithMany()
+                .HasForeignKey(x => x.KioskId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.AssignedByAccount)
+                .WithMany()
+                .HasForeignKey(x => x.AssignedByAccountId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AccountDevice>(entity =>

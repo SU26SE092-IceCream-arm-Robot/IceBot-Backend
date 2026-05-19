@@ -1,5 +1,4 @@
-﻿using System;
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -12,6 +11,43 @@ namespace Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "Accounts",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    FullName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    Email = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    EmailConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                    EmailConfirmedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    PasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    PhoneNumber = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    PhoneNumberConfirmed = table.Column<bool>(type: "boolean", nullable: false),
+                    PhoneNumberConfirmedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    Address = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    Gender = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    LocalLoginEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    GoogleLoginEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    GoogleSubjectId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    GoogleEmail = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    LastLoginAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    LockedUntil = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    FailedLoginCount = table.Column<int>(type: "integer", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Accounts", x => x.Id);
+                });
+
             migrationBuilder.CreateTable(
                 name: "DeviceTypes",
                 columns: table => new
@@ -193,6 +229,38 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "AccountDevices",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
+                    DeviceName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Platform = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    AppVersion = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    DeviceTokenHash = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    PushToken = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    IsTrusted = table.Column<bool>(type: "boolean", nullable: false),
+                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AccountDevices", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AccountDevices_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "DeviceModels",
                 columns: table => new
                 {
@@ -312,44 +380,68 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Accounts",
+                name: "RefreshTokens",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    PrimaryRoleId = table.Column<long>(type: "bigint", nullable: true),
-                    UserName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    FullName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    Email = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    EmailConfirmed = table.Column<bool>(type: "boolean", nullable: false),
-                    EmailConfirmedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    PasswordHash = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
-                    ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    PhoneNumber = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    PhoneNumberConfirmed = table.Column<bool>(type: "boolean", nullable: false),
-                    PhoneNumberConfirmedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    Address = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    Gender = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Status = table.Column<int>(type: "integer", nullable: false),
-                    IsExternal = table.Column<bool>(type: "boolean", nullable: false),
-                    ExternalProvider = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    ExternalId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    LastLoginAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    LockedUntil = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    FailedLoginCount = table.Column<int>(type: "integer", nullable: false),
+                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AccountDeviceId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ReplacedByTokenId = table.Column<Guid>(type: "uuid", nullable: true),
+                    TokenHash = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByIp = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    RevokedByIp = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    CreatedByUserAgent = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    RevokedByUserAgent = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    RevokeReason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    ReuseDetectedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    IsUsed = table.Column<bool>(type: "boolean", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Accounts", x => x.Id);
+                    table.PrimaryKey("PK_RefreshTokens", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Accounts_Roles_PrimaryRoleId",
-                        column: x => x.PrimaryRoleId,
-                        principalTable: "Roles",
+                        name: "FK_RefreshTokens_AccountDevices_AccountDeviceId",
+                        column: x => x.AccountDeviceId,
+                        principalTable: "AccountDevices",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_RefreshTokens_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_RefreshTokens_RefreshTokens_ReplacedByTokenId",
+                        column: x => x.ReplacedByTokenId,
+                        principalTable: "RefreshTokens",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "AccountStores",
+                columns: table => new
+                {
+                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
+                    StoreId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AccountStores", x => new { x.AccountId, x.StoreId });
+                    table.ForeignKey(
+                        name: "FK_AccountStores_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_AccountStores_Stores_StoreId",
+                        column: x => x.StoreId,
+                        principalTable: "Stores",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -401,51 +493,44 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "AccountDevices",
+                name: "AccountRoles",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     AccountId = table.Column<Guid>(type: "uuid", nullable: false),
-                    DeviceName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Platform = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    AppVersion = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    DeviceTokenHash = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    PushToken = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    IsTrusted = table.Column<bool>(type: "boolean", nullable: false),
-                    LastSeenAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                    RoleId = table.Column<long>(type: "bigint", nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StoreId = table.Column<Guid>(type: "uuid", nullable: true),
+                    KioskId = table.Column<Guid>(type: "uuid", nullable: true),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    AssignedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    AssignedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_AccountDevices", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_AccountDevices_Accounts_AccountId",
-                        column: x => x.AccountId,
-                        principalTable: "Accounts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AccountRoles",
-                columns: table => new
-                {
-                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
-                    RoleId = table.Column<long>(type: "bigint", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AccountRoles", x => new { x.AccountId, x.RoleId });
+                    table.PrimaryKey("PK_AccountRoles", x => x.Id);
                     table.ForeignKey(
                         name: "FK_AccountRoles_Accounts_AccountId",
                         column: x => x.AccountId,
                         principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_AccountRoles_Accounts_AssignedByAccountId",
+                        column: x => x.AssignedByAccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_AccountRoles_Kiosks_KioskId",
+                        column: x => x.KioskId,
+                        principalTable: "Kiosks",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_AccountRoles_Organizations_OrganizationId",
+                        column: x => x.OrganizationId,
+                        principalTable: "Organizations",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -454,26 +539,8 @@ namespace Infrastructure.Migrations
                         principalTable: "Roles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "AccountStores",
-                columns: table => new
-                {
-                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
-                    StoreId = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_AccountStores", x => new { x.AccountId, x.StoreId });
                     table.ForeignKey(
-                        name: "FK_AccountStores_Accounts_AccountId",
-                        column: x => x.AccountId,
-                        principalTable: "Accounts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_AccountStores_Stores_StoreId",
+                        name: "FK_AccountRoles_Stores_StoreId",
                         column: x => x.StoreId,
                         principalTable: "Stores",
                         principalColumn: "Id",
@@ -723,46 +790,6 @@ namespace Infrastructure.Migrations
                         name: "FK_SyncEventInbox_Kiosks_KioskId",
                         column: x => x.KioskId,
                         principalTable: "Kiosks",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "RefreshTokens",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
-                    AccountDeviceId = table.Column<Guid>(type: "uuid", nullable: true),
-                    ReplacedByTokenId = table.Column<Guid>(type: "uuid", nullable: true),
-                    TokenHash = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedByIp = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    RevokedByIp = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    RevokeReason = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    IsUsed = table.Column<bool>(type: "boolean", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_RefreshTokens", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_RefreshTokens_AccountDevices_AccountDeviceId",
-                        column: x => x.AccountDeviceId,
-                        principalTable: "AccountDevices",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_RefreshTokens_Accounts_AccountId",
-                        column: x => x.AccountId,
-                        principalTable: "Accounts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_RefreshTokens_RefreshTokens_ReplacedByTokenId",
-                        column: x => x.ReplacedByTokenId,
-                        principalTable: "RefreshTokens",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -1895,9 +1922,35 @@ namespace Infrastructure.Migrations
                 columns: new[] { "AccountId", "DeviceTokenHash" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_AccountRoles_AccountId_RoleId_OrganizationId_StoreId_KioskId",
+                table: "AccountRoles",
+                columns: new[] { "AccountId", "RoleId", "OrganizationId", "StoreId", "KioskId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountRoles_AssignedByAccountId",
+                table: "AccountRoles",
+                column: "AssignedByAccountId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountRoles_KioskId",
+                table: "AccountRoles",
+                column: "KioskId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountRoles_OrganizationId_StoreId_KioskId",
+                table: "AccountRoles",
+                columns: new[] { "OrganizationId", "StoreId", "KioskId" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AccountRoles_RoleId",
                 table: "AccountRoles",
                 column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountRoles_StoreId",
+                table: "AccountRoles",
+                column: "StoreId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Accounts_Email",
@@ -1906,14 +1959,17 @@ namespace Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_Accounts_ExternalProvider_ExternalId",
+                name: "IX_Accounts_GoogleEmail",
                 table: "Accounts",
-                columns: new[] { "ExternalProvider", "ExternalId" });
+                column: "GoogleEmail",
+                filter: "\"GoogleEmail\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Accounts_PrimaryRoleId",
+                name: "IX_Accounts_GoogleSubjectId",
                 table: "Accounts",
-                column: "PrimaryRoleId");
+                column: "GoogleSubjectId",
+                unique: true,
+                filter: "\"GoogleSubjectId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Accounts_UserName",
@@ -2744,6 +2800,9 @@ namespace Infrastructure.Migrations
                 name: "SyncDeadLetters");
 
             migrationBuilder.DropTable(
+                name: "Roles");
+
+            migrationBuilder.DropTable(
                 name: "ProductOptions");
 
             migrationBuilder.DropTable(
@@ -2796,9 +2855,6 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "Products");
-
-            migrationBuilder.DropTable(
-                name: "Roles");
 
             migrationBuilder.DropTable(
                 name: "DeviceModels");
