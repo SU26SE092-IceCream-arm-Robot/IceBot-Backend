@@ -85,7 +85,7 @@ Owns technical implementation:
 
 - `IceBotDbContext`.
 - EF Core mappings and migrations.
-- SQL Server persistence.
+- PostgreSQL persistence.
 - External provider adapters.
 - Farino robot SDK adapter.
 - Payment provider adapters.

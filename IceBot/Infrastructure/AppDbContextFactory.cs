@@ -28,7 +28,7 @@ namespace Infrastructure
                     "Set ENV var ConnectionStrings__IceBot_DB hoặc thêm vào appsettings.*");
 
             var optionsBuilder = new DbContextOptionsBuilder<IceBotDbContext>()
-                .UseSqlServer(cs, sql =>
+                .UseNpgsql(cs, sql =>
                 {
                     sql.MigrationsAssembly(typeof(IceBotDbContext).Assembly.FullName);
                     sql.EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null);

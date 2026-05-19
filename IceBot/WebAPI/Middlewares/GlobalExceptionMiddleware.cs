@@ -1,8 +1,8 @@
 ﻿using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
-using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Context;
+using System.Data.Common;
 using System.Net;
 using System.Text.Json;
 
@@ -63,9 +63,9 @@ namespace WebAPI.Middlewares
                     ApplyExceptionDetails(response, ex);
                     await WriteResponseAsync(context, response, HttpStatusCode.InternalServerError);
                 }
-                catch (SqlException ex)
+                catch (DbException ex)
                 {
-                    _logger.LogError(ex, "SQL exception caught");
+                    _logger.LogError(ex, "Database exception caught");
 
                     var response = ApiResult<object>.Fail("Database error", 500)
                                                   .SetSystemError(ex.Message);

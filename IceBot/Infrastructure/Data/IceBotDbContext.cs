@@ -193,7 +193,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("Kiosks");
             entity.HasIndex(x => new { x.OrganizationId, x.Code }).IsUnique();
-            entity.HasIndex(x => x.SerialNumber).IsUnique().HasFilter("[SerialNumber] IS NOT NULL");
+            entity.HasIndex(x => x.SerialNumber).IsUnique().HasFilter("\"SerialNumber\" IS NOT NULL");
             entity.HasOne(x => x.Organization)
                 .WithMany()
                 .HasForeignKey(x => x.OrganizationId)
@@ -227,7 +227,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("Devices");
             entity.HasIndex(x => new { x.KioskId, x.Code }).IsUnique();
-            entity.HasIndex(x => x.SerialNumber).IsUnique().HasFilter("[SerialNumber] IS NOT NULL");
+            entity.HasIndex(x => x.SerialNumber).IsUnique().HasFilter("\"SerialNumber\" IS NOT NULL");
             entity.HasOne(x => x.DeviceType).WithMany().HasForeignKey(x => x.DeviceTypeId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.DeviceModel).WithMany().HasForeignKey(x => x.DeviceModelId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany(x => x.Devices).HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
@@ -317,7 +317,7 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<StockMovement>(entity =>
         {
             entity.ToTable("StockMovements");
-            entity.HasIndex(x => x.SourceEventId).IsUnique().HasFilter("[SourceEventId] IS NOT NULL");
+            entity.HasIndex(x => x.SourceEventId).IsUnique().HasFilter("\"SourceEventId\" IS NOT NULL");
             entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.OccurredAt });
             entity.HasOne(x => x.CreatedByAccount).WithMany().HasForeignKey(x => x.CreatedByAccountId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
@@ -335,7 +335,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("Orders");
             entity.HasIndex(x => x.OrderNumber).IsUnique();
-            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
+            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
             entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.PlacedAt });
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
@@ -345,7 +345,7 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<OrderItem>(entity =>
         {
             entity.ToTable("OrderItems");
-            entity.HasIndex(x => new { x.OrderId, x.ClientLineId }).IsUnique().HasFilter("[ClientLineId] IS NOT NULL");
+            entity.HasIndex(x => new { x.OrderId, x.ClientLineId }).IsUnique().HasFilter("\"ClientLineId\" IS NOT NULL");
             entity.HasOne(x => x.Order).WithMany(x => x.OrderItems).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
@@ -380,8 +380,8 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("PaymentTransactions");
             entity.HasIndex(x => x.TransactionNumber).IsUnique();
-            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
-            entity.HasIndex(x => x.ProviderTransactionId).HasFilter("[ProviderTransactionId] IS NOT NULL");
+            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            entity.HasIndex(x => x.ProviderTransactionId).HasFilter("\"ProviderTransactionId\" IS NOT NULL");
             entity.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -389,7 +389,7 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<PaymentCallback>(entity =>
         {
             entity.ToTable("PaymentCallbacks");
-            entity.HasIndex(x => new { x.Provider, x.ProviderEventId }).IsUnique().HasFilter("[ProviderEventId] IS NOT NULL");
+            entity.HasIndex(x => new { x.Provider, x.ProviderEventId }).IsUnique().HasFilter("\"ProviderEventId\" IS NOT NULL");
             entity.HasOne(x => x.PaymentTransaction).WithMany().HasForeignKey(x => x.PaymentTransactionId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -397,8 +397,8 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("Refunds");
             entity.HasIndex(x => x.RefundNumber).IsUnique();
-            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
-            entity.HasIndex(x => x.ProviderRefundId).HasFilter("[ProviderRefundId] IS NOT NULL");
+            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            entity.HasIndex(x => x.ProviderRefundId).HasFilter("\"ProviderRefundId\" IS NOT NULL");
             entity.HasOne(x => x.PaymentTransaction).WithMany().HasForeignKey(x => x.PaymentTransactionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.RequestedByAccount).WithMany().HasForeignKey(x => x.RequestedByAccountId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -432,7 +432,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("RobotJobs");
             entity.HasIndex(x => x.JobNumber).IsUnique();
-            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("[IdempotencyKey] IS NOT NULL");
+            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
             entity.HasIndex(x => new { x.KioskId, x.RequestedAt });
             entity.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.OrderItem).WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
@@ -476,7 +476,7 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<KioskHeartbeat>(entity =>
         {
             entity.ToTable("KioskHeartbeats");
-            entity.HasIndex(x => new { x.KioskId, x.NodeId, x.HeartbeatSequence }).IsUnique().HasFilter("[HeartbeatSequence] IS NOT NULL");
+            entity.HasIndex(x => new { x.KioskId, x.NodeId, x.HeartbeatSequence }).IsUnique().HasFilter("\"HeartbeatSequence\" IS NOT NULL");
             entity.HasIndex(x => new { x.KioskId, x.ReportedAt });
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -528,7 +528,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("SyncDeadLetters");
             entity.HasIndex(x => new { x.Status, x.FailedAt });
-            entity.HasIndex(x => x.EventId).HasFilter("[EventId] IS NOT NULL");
+            entity.HasIndex(x => x.EventId).HasFilter("\"EventId\" IS NOT NULL");
             entity.HasOne(x => x.SyncEventInbox).WithMany().HasForeignKey(x => x.SyncEventInboxId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.ResolvedByAccount).WithMany().HasForeignKey(x => x.ResolvedByAccountId).OnDelete(DeleteBehavior.Restrict);
@@ -544,7 +544,7 @@ public class IceBotDbContext : DbContext
             {
                 modelBuilder.Entity(entityType.ClrType)
                     .Property(property.Name)
-                    .HasColumnType("nvarchar(max)");
+                    .HasColumnType("jsonb");
             }
 
             if (typeof(GuidEntity).IsAssignableFrom(entityType.ClrType))

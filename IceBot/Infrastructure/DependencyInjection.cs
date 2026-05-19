@@ -24,7 +24,7 @@ namespace Infrastructure
                     throw new InvalidOperationException(
                         "Missing DB connection string. Set CONNECTIONSTRING or ConnectionStrings:IceBot_DB.");
 
-                opt.UseSqlServer(cs);
+                opt.UseNpgsql(cs);
             });
 
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
