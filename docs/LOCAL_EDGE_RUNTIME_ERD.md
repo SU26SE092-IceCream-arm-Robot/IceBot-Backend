@@ -4,8 +4,7 @@ This document defines the proposed Local Edge PostgreSQL relationship model for 
 
 Scope:
 
-- Relationship/table design only.
-- No table attributes yet.
+- Relationship/table design with the minimum attributes needed for implementation.
 - Local DB is not a 1:1 copy of Cloud DB.
 - Local DB stores runtime snapshots, executable commands, robot execution state, inventory runtime state, and sync evidence.
 - Cloud remains the source of truth for payment, central order lifecycle, tenant management, reporting, and admin identity.
@@ -19,6 +18,703 @@ Scope:
 - Edge command pull and local command inbox are the source of executable work.
 - Local execution must be idempotent by cloud command/order ids.
 - Local events must be syncable and replay-safe.
+
+## Attribute Conventions
+
+- Local primary keys use `Id`.
+- Cloud-owned ids are stored as scalar reference fields named `Cloud...Id`.
+- Local edge-generated business/runtime ids use explicit names such as `CommandId`, `EventId`, `RobotJobId`, and `BatchId`.
+- All timestamps use UTC.
+- JSON fields are snapshots or payload evidence. They must not hide idempotency keys, status, retry state, or timestamps.
+- Append-only event/outbox tables should not use soft delete.
+- Status fields should become enums in code once implementation starts.
+
+## Table Attributes
+
+### `EdgeNode`
+
+Identifies the local edge process/node.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `NodeId` | stable local node id, unique |
+| `CloudKioskId` | cloud kiosk reference |
+| `NodeName` | display/debug name |
+| `AppVersion` | local edge app version |
+| `RobotSdkVersion` | Fairino SDK/runtime version |
+| `Status` | local node status |
+| `LastSeenAt` | last local heartbeat/update |
+| `CreatedAt` / `UpdatedAt` | audit timestamps |
+
+Indexes:
+
+- unique `NodeId`
+- index `CloudKioskId`
+
+### `KioskRuntime`
+
+Stores the latest local runtime state for this kiosk.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EdgeNodeId` | FK to `EdgeNode` |
+| `CloudKioskId` | cloud kiosk reference |
+| `KioskCode` | local/cloud kiosk code |
+| `ConfigurationVersion` | latest applied config version |
+| `ConfigurationChecksum` | latest applied config checksum |
+| `MachineStatus` | available/degraded/offline/error |
+| `RuntimeStateTimestamp` | latest state calculation time |
+| `LastCommandPulledAt` | latest command pull time |
+| `LastEventSyncedAt` | latest event sync success time |
+| `CreatedAt` / `UpdatedAt` | audit timestamps |
+
+Indexes:
+
+- unique `EdgeNodeId`
+- unique `CloudKioskId`
+
+### `EdgeSyncCheckpoint`
+
+Tracks pull/sync progress for offline retry.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EdgeNodeId` | FK to `EdgeNode` |
+| `LastCommandSequence` | latest cloud command sequence seen |
+| `LastCommandPulledAt` | latest successful command pull |
+| `LastEventSequence` | latest local event sequence generated |
+| `LastEventSyncedAt` | latest successful outbox sync |
+| `ClockSkewMs` | optional cloud-edge clock skew estimate |
+| `UpdatedAt` | checkpoint update time |
+
+Indexes:
+
+- unique `EdgeNodeId`
+
+### `RuntimeProduct`
+
+Local product snapshot used for tablet projection and execution references.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `CloudProductId` | cloud product reference |
+| `ProductCode` | stable product code |
+| `DisplayName` | tablet display name |
+| `Price` / `Currency` | local display/payment quote |
+| `IsActive` | whether product is currently sellable by config |
+| `ProductSnapshotSchemaVersion` | snapshot schema |
+| `ProductSnapshotJson` | immutable/latest local product snapshot |
+| `ConfigurationVersion` | config package version |
+| `SyncedAt` | last config sync time |
+
+Indexes:
+
+- unique `KioskRuntimeId`, `ProductCode`, `ConfigurationVersion`
+- index `CloudProductId`
+
+### `RuntimeIngredient`
+
+Local ingredient definition snapshot used by recipe and inventory state.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `CloudIngredientId` | cloud ingredient reference |
+| `IngredientCode` | stable ingredient code |
+| `DisplayName` | local display/debug name |
+| `UnitCode` | reporting unit |
+| `IsActive` | whether ingredient is active in config |
+| `IngredientSnapshotJson` | local ingredient snapshot |
+| `ConfigurationVersion` | config package version |
+| `SyncedAt` | last config sync time |
+
+Indexes:
+
+- unique `KioskRuntimeId`, `IngredientCode`, `ConfigurationVersion`
+- index `CloudIngredientId`
+
+### `RuntimeRecipe`
+
+Local recipe snapshot for a product.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `RuntimeProductId` | FK to `RuntimeProduct` |
+| `CloudRecipeId` | cloud recipe reference |
+| `RecipeCode` | stable recipe code |
+| `RecipeVersion` | business recipe version |
+| `IsActive` | whether recipe can be used |
+| `RecipeSnapshotSchemaVersion` | snapshot schema |
+| `RecipeSnapshotJson` | execution/reporting snapshot |
+| `ConfigurationVersion` | config package version |
+| `SyncedAt` | last config sync time |
+
+Indexes:
+
+- unique `KioskRuntimeId`, `RecipeCode`, `RecipeVersion`
+- index `CloudRecipeId`
+
+### `RuntimeRecipeItem`
+
+Ingredient requirements for one local recipe.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `RuntimeRecipeId` | FK to `RuntimeRecipe` |
+| `RuntimeIngredientId` | FK to `RuntimeIngredient` |
+| `StepOrder` | ingredient/recipe order |
+| `Quantity` | expected quantity |
+| `UnitCode` | quantity unit |
+| `IsRequired` | whether this ingredient gates availability |
+| `RecipeItemSnapshotJson` | optional recipe item snapshot |
+
+Indexes:
+
+- unique `RuntimeRecipeId`, `RuntimeIngredientId`, `StepOrder`
+
+### `RuntimeRobotProgram`
+
+Local robot program snapshot deployed to this kiosk/device.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `RuntimeDeviceId` | FK to robot `RuntimeDevice` |
+| `CloudRobotProgramId` | cloud robot program reference |
+| `ProgramCode` | stable program code |
+| `ProgramVersion` | business program version |
+| `ExecutionMode` | SDK command sequence or vendor program file |
+| `Vendor` | `Fairino` |
+| `VendorProgramId` / `VendorProgramVersion` | Fairino reference if available |
+| `PointStatus` | point/frame sync status |
+| `ProgramPayloadSchemaVersion` | program payload schema |
+| `ProgramPayloadJson` | source-of-truth local program payload |
+| `PointSnapshotSchemaVersion` | point snapshot schema |
+| `PointSnapshotJson` | local Fairino point/frame backup snapshot |
+| `SafetyZoneSchemaVersion` | safety zone schema |
+| `SafetyZoneJson` | safety zone/config payload |
+| `ConfigurationVersion` | config package version |
+| `IsActive` | active locally |
+| `SyncedAt` | last config sync time |
+
+Indexes:
+
+- unique `KioskRuntimeId`, `RuntimeDeviceId`, `ProgramCode`, `ProgramVersion`
+- index `CloudRobotProgramId`
+
+### `RuntimeRobotProgramStep`
+
+Workflow action/instruction. Motion steps reference local Fairino point/frame names directly; there is no separate teaching point table in v1.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `RuntimeRobotProgramId` | FK to `RuntimeRobotProgram` |
+| `CloudRobotProgramStepId` | cloud step reference |
+| `StepNumber` | workflow order |
+| `StepCode` | stable step code |
+| `Name` | display/debug name |
+| `StepCommandType` | `MoveL`, `MoveJ`, `Wait`, `SetDO`, `CallProgram`, etc. |
+| `TargetPointCode` | local symbolic point code |
+| `VendorPointName` | Fairino controller point name/id |
+| `CoordinateSystem` | cartesian/joint/tool/workpiece marker if needed |
+| `ToolFrameCode` | local Fairino tool frame |
+| `WorkpieceFrameCode` | local Fairino workpiece frame |
+| `MotionProfileCode` | speed/accel profile reference |
+| `SpeedScale` | optional local speed multiplier |
+| `SafetyClearanceMm` | optional safety clearance |
+| `ExpectedDurationMs` | expected step duration |
+| `ParametersSchemaVersion` | parameters schema |
+| `ParametersJson` | command parameters |
+| `PointSnapshotSchemaVersion` | point snapshot schema |
+| `PointSnapshotJson` | optional Fairino point/frame backup for this step |
+| `RetryPolicySchemaVersion` | retry policy schema |
+| `RetryPolicyJson` | step retry policy |
+| `IsRequired` | required workflow step |
+| `NextOnSuccessStepNumber` / `NextOnFailureStepNumber` | optional branch |
+
+Indexes:
+
+- unique `RuntimeRobotProgramId`, `StepNumber`
+- unique `RuntimeRobotProgramId`, `StepCode`
+- index `CloudRobotProgramStepId`
+
+### `RuntimeRecipeProgramBinding`
+
+Maps recipes to robot programs without assuming a permanent 1:1 relationship.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `RuntimeRecipeId` | FK to `RuntimeRecipe` |
+| `RuntimeRobotProgramId` | FK to `RuntimeRobotProgram` |
+| `BindingCode` | stable binding code |
+| `Priority` | selection priority |
+| `IsDefault` | default program for recipe |
+| `IsActive` | active locally |
+
+Indexes:
+
+- unique `RuntimeRecipeId`, `RuntimeRobotProgramId`
+
+### `RuntimeDevice`
+
+Installed local device snapshot.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `CloudDeviceId` | cloud device reference |
+| `DeviceCode` | local device code |
+| `DeviceTypeCode` | robot/dispenser/sensor/etc. |
+| `DeviceModelCode` | model code |
+| `Vendor` | vendor name |
+| `SerialNumber` | hardware serial if available |
+| `ConnectionEndpoint` | local endpoint/ip/port if needed |
+| `CapabilitiesJson` | runtime capability snapshot |
+| `IsActive` | active locally |
+| `SyncedAt` | last config sync time |
+
+Indexes:
+
+- unique `KioskRuntimeId`, `DeviceCode`
+- index `CloudDeviceId`
+- index `SerialNumber`
+
+### `DeviceRuntimeState`
+
+Latest runtime state for a device.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `RuntimeDeviceId` | FK to `RuntimeDevice` |
+| `Status` | online/offline/error/maintenance |
+| `IsAvailable` | availability gate for execution |
+| `LastSeenAt` | latest heartbeat/status time |
+| `LastErrorCode` / `LastErrorMessage` | latest error |
+| `RuntimeStateJson` | latest vendor/runtime state payload |
+| `UpdatedAt` | latest state update |
+
+Indexes:
+
+- unique `RuntimeDeviceId`
+- index `Status`, `UpdatedAt`
+
+### `IngredientDispenserState`
+
+Latest local dispenser state for one ingredient/container.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `RuntimeDeviceId` | FK to dispenser device |
+| `RuntimeIngredientId` | FK to `RuntimeIngredient` |
+| `ContainerCode` | local container identifier |
+| `LevelStatus` | `Unknown`, `Low`, `Medium`, `Full` |
+| `EstimatedQuantity` | local estimate for reporting |
+| `UnitCode` | estimate unit |
+| `LevelToQuantityProfileJson` | local conversion profile |
+| `SensorPayloadJson` | latest sensor/debug payload |
+| `MeasuredAt` | latest measurement time |
+| `UpdatedAt` | latest state update |
+
+Indexes:
+
+- unique `RuntimeDeviceId`, `ContainerCode`
+- index `RuntimeIngredientId`
+
+### `StockMovement`
+
+Append-only inventory movement generated locally.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EventId` | local/cloud event id, unique |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `IngredientDispenserStateId` | FK to `IngredientDispenserState` |
+| `RuntimeIngredientId` | FK to `RuntimeIngredient` |
+| `RobotJobId` | optional FK to `RobotJob` |
+| `RobotJobStepId` | optional FK to `RobotJobStep` |
+| `MovementType` | consume/refill/adjust/waste |
+| `Quantity` | signed or positive quantity based on implementation rule |
+| `UnitCode` | movement unit |
+| `SourceType` | robot job/manual refill/adjustment/sensor |
+| `SourceEventId` | upstream event that caused this movement |
+| `OccurredAt` | business occurrence time |
+| `SyncedAt` | cloud sync success time |
+
+Indexes:
+
+- unique `EventId`
+- unique `SourceEventId` where not null
+- index `KioskRuntimeId`, `OccurredAt`
+- index `RobotJobId`
+
+### `RuntimeProductProjection`
+
+Short-lived availability projection served to the tablet.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `SnapshotId` | external snapshot id returned to tablet |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `GeneratedAt` | projection generation time |
+| `ExpiresAt` | tablet freshness expiry |
+| `RuntimeStateTimestamp` | state timestamp used to build projection |
+| `MachineAvailable` | machine availability at generation |
+| `ProjectionPayloadJson` | full response/debug snapshot |
+
+Indexes:
+
+- unique `SnapshotId`
+- index `KioskRuntimeId`, `GeneratedAt`
+
+### `RuntimeProductProjectionItem`
+
+One product row in a short-lived projection.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `RuntimeProductProjectionId` | FK to `RuntimeProductProjection` |
+| `RuntimeProductId` | FK to `RuntimeProduct` |
+| `RuntimeRecipeId` | FK to `RuntimeRecipe` |
+| `Available` | availability result |
+| `UnavailableReason` | reason if unavailable |
+| `Price` / `Currency` | displayed quote |
+| `EstimatedLevelsJson` | ingredient level snapshot for this product |
+
+Indexes:
+
+- unique `RuntimeProductProjectionId`, `RuntimeProductId`, `RuntimeRecipeId`
+
+### `EdgeCommandInbox`
+
+Durable local record of commands pulled from Cloud.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `CommandId` | cloud command id, unique |
+| `CommandSequence` | cloud command sequence |
+| `CommandType` | command type |
+| `CloudOrderId` | cloud order reference |
+| `CloudPaymentTransactionId` | cloud payment reference |
+| `IdempotencyKey` | command idempotency key |
+| `CorrelationId` / `CausationId` | trace ids |
+| `IssuedAt` / `ExpiresAt` | cloud command window |
+| `ReceivedAt` | local receive time |
+| `Status` | received/accepted/rejected/processed/failed |
+| `PayloadSchemaVersion` | payload schema |
+| `PayloadJson` | command payload |
+| `ProcessedAt` | local processing time |
+| `LastErrorCode` / `LastErrorMessage` | latest error |
+
+Indexes:
+
+- unique `CommandId`
+- unique `IdempotencyKey`
+- index `KioskRuntimeId`, `Status`
+- index `CommandSequence`
+- index `CloudOrderId`
+
+### `ExecutableOrder`
+
+Minimal local executable snapshot after payment is verified by Cloud.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EdgeCommandInboxId` | FK to `EdgeCommandInbox` |
+| `CloudOrderId` | cloud order reference |
+| `OrderNumber` | order display/reference |
+| `CloudPaymentTransactionId` | cloud payment reference |
+| `Status` | pending/accepted/rejected/executing/completed/failed |
+| `IdempotencyKey` | order execution idempotency key |
+| `OrderSnapshotSchemaVersion` | snapshot schema |
+| `OrderSnapshotJson` | executable order snapshot |
+| `CreatedAt` / `AcceptedAt` / `RejectedAt` / `CompletedAt` | lifecycle timestamps |
+| `RejectionReason` / `FailureReason` | final failure reason |
+
+Indexes:
+
+- unique `CloudOrderId`
+- unique `IdempotencyKey`
+- unique `EdgeCommandInboxId`
+
+### `ExecutableOrderItem`
+
+Local executable order line.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `ExecutableOrderId` | FK to `ExecutableOrder` |
+| `CloudOrderItemId` | cloud order item reference |
+| `ClientLineId` | tablet/client line id if available |
+| `RuntimeProductId` | FK to `RuntimeProduct` |
+| `RuntimeRecipeId` | FK to `RuntimeRecipe` |
+| `ProductCode` | immutable copied code |
+| `RecipeVersion` | copied recipe version |
+| `Quantity` | ordered quantity |
+| `UnitPrice` / `Currency` | copied price |
+| `ItemSnapshotJson` | immutable line snapshot |
+
+Indexes:
+
+- unique `ExecutableOrderId`, `CloudOrderItemId`
+- index `RuntimeProductId`
+- index `RuntimeRecipeId`
+
+### `ExecutionReadinessCheck`
+
+Fast runtime check before accepting an executable command.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EdgeCommandInboxId` | FK to `EdgeCommandInbox` |
+| `ExecutableOrderId` | optional FK to `ExecutableOrder` |
+| `CheckedAt` | check time |
+| `CheckDurationMs` | elapsed check duration |
+| `IsReady` | final readiness result |
+| `RobotAvailable` | robot gate |
+| `DeviceHealthy` | device gate |
+| `InventorySufficient` | inventory gate |
+| `QueueCapacityAvailable` | queue gate |
+| `RuntimeStateTimestamp` | runtime state used |
+| `RejectionReason` | reason if not ready |
+| `ReadinessSnapshotJson` | full debug snapshot |
+
+Indexes:
+
+- index `EdgeCommandInboxId`, `CheckedAt`
+- index `ExecutableOrderId`
+
+### `RobotExecutionQueue`
+
+Queue entry for local robot execution.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `RobotJobId` | FK to `RobotJob`, unique |
+| `QueueNumber` | local queue order |
+| `Priority` | execution priority |
+| `Status` | queued/locked/running/completed/cancelled |
+| `LockedBy` / `LockedUntil` | worker lock |
+| `QueuedAt` / `StartedAt` / `CompletedAt` | queue lifecycle timestamps |
+
+Indexes:
+
+- unique `RobotJobId`
+- unique `QueueNumber`
+- index `Status`, `Priority`, `QueuedAt`
+
+### `RobotJob`
+
+Local robot execution aggregate.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `ExecutableOrderItemId` | FK to `ExecutableOrderItem` |
+| `RuntimeRobotProgramId` | FK to `RuntimeRobotProgram` |
+| `RuntimeDeviceId` | FK to robot device |
+| `CloudOrderId` | cloud order reference |
+| `CloudOrderItemId` | cloud order item reference |
+| `CommandId` | source command id |
+| `JobNumber` | local job number |
+| `IdempotencyKey` | unique execution key |
+| `CorrelationId` / `CausationId` | trace ids |
+| `Status` | queued/running/paused/completed/failed/cancelled |
+| `ProductCode` | copied product code |
+| `RecipeVersion` | copied recipe version |
+| `RecipeSnapshotSchemaVersion` | recipe snapshot schema |
+| `RecipeSnapshotJson` | immutable job recipe snapshot |
+| `RequestedAt` / `StartedAt` / `CompletedAt` / `FailedAt` | lifecycle timestamps |
+| `RetryCount` / `MaxRetries` / `NextRetryAt` | retry state |
+| `LastErrorCode` / `LastErrorMessage` | latest error |
+
+Indexes:
+
+- unique `JobNumber`
+- unique `IdempotencyKey`
+- index `CloudOrderId`
+- index `CommandId`
+- index `Status`, `RequestedAt`
+
+### `RobotJobStep`
+
+Runtime copy of a robot program step.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `RobotJobId` | FK to `RobotJob` |
+| `RuntimeRobotProgramStepId` | FK to `RuntimeRobotProgramStep` |
+| `StepNumber` | execution order |
+| `StepCode` | copied step code |
+| `StepCommandType` | copied command type |
+| `TargetPointCode` | copied local point code |
+| `VendorPointName` | copied Fairino point name |
+| `CoordinateSystem` | copied coordinate marker |
+| `ToolFrameCode` | copied tool frame |
+| `WorkpieceFrameCode` | copied workpiece frame |
+| `MotionProfileCode` | copied motion profile |
+| `ParametersSchemaVersion` | parameter schema |
+| `ParametersJson` | immutable runtime parameters |
+| `Status` | pending/running/completed/failed/skipped/cancelled |
+| `StartedAt` / `CompletedAt` / `FailedAt` | lifecycle timestamps |
+| `DurationMs` | measured duration |
+| `RetryCount` / `MaxRetries` / `NextRetryAt` | retry state |
+| `LastErrorCode` / `LastErrorMessage` | latest error |
+
+Indexes:
+
+- unique `RobotJobId`, `StepNumber`
+- index `RuntimeRobotProgramStepId`
+
+### `RobotJobEvent`
+
+Append-only robot execution event.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EventId` | unique event id |
+| `EventSequence` | local event sequence |
+| `RobotJobId` | FK to `RobotJob` |
+| `RobotJobStepId` | optional FK to `RobotJobStep` |
+| `RuntimeDeviceId` | optional FK to robot device |
+| `EventType` | event type |
+| `OccurredAt` | event time |
+| `CorrelationId` / `CausationId` | trace ids |
+| `PayloadSchemaVersion` | payload schema |
+| `PayloadJson` | event payload/evidence |
+| `SyncedAt` | cloud sync success time |
+
+Indexes:
+
+- unique `EventId`
+- unique `EventSequence`
+- index `RobotJobId`, `OccurredAt`
+
+### `DeviceEvent`
+
+Append-only device event.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EventId` | unique event id |
+| `EventSequence` | local event sequence |
+| `RuntimeDeviceId` | FK to `RuntimeDevice` |
+| `RobotJobId` | optional FK to `RobotJob` |
+| `EventType` | event type |
+| `Severity` | info/warning/error/critical |
+| `OccurredAt` | event time |
+| `PayloadSchemaVersion` | payload schema |
+| `PayloadJson` | vendor/runtime evidence |
+| `SyncedAt` | cloud sync success time |
+
+Indexes:
+
+- unique `EventId`
+- index `RuntimeDeviceId`, `OccurredAt`
+- index `RobotJobId`
+
+### `KioskHeartbeat`
+
+Append-only heartbeat telemetry.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `MessageId` | unique heartbeat message id |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `OriginNodeId` | node id from edge |
+| `HeartbeatSequence` | local heartbeat sequence |
+| `ReportedAt` | heartbeat report time |
+| `Status` | online/degraded/offline |
+| `AppVersion` | edge app version |
+| `RobotSdkVersion` | Fairino SDK version |
+| `NetworkStatus` | local/cloud network status |
+| `RuntimeStateTimestamp` | latest runtime state timestamp |
+| `PayloadJson` | extra telemetry |
+| `SyncedAt` | cloud sync success time |
+
+Indexes:
+
+- unique `KioskRuntimeId`, `OriginNodeId`, `HeartbeatSequence`
+- unique `MessageId`
+- index `KioskRuntimeId`, `ReportedAt`
+
+### `EdgeOutboxMessage`
+
+Reliable outbound sync message to Cloud.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `MessageId` | unique outbound message id |
+| `BatchId` | optional sync batch id |
+| `SourceTable` | source table name |
+| `SourceId` | source row id |
+| `EventId` | source business event id if available |
+| `MessageType` | cloud event/message type |
+| `PayloadSchemaVersion` | payload schema |
+| `PayloadJson` | outbound payload |
+| `Status` | pending/sending/sent/failed/dead-lettered |
+| `AttemptCount` / `MaxAttempts` | retry state |
+| `LastAttemptAt` / `NextRetryAt` | retry timestamps |
+| `LastErrorCode` / `LastErrorMessage` | latest failure |
+| `CreatedAt` / `SentAt` | lifecycle timestamps |
+
+Indexes:
+
+- unique `MessageId`
+- unique `SourceTable`, `SourceId`, `MessageType`
+- index `KioskRuntimeId`, `Status`
+- index `Status`, `NextRetryAt`
+- index `BatchId`
+
+### `EdgeOutboxDeadLetter`
+
+Failed outbound message requiring manual or automated resolution.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `EdgeOutboxMessageId` | FK to `EdgeOutboxMessage` |
+| `FailedAt` | failure time |
+| `FailureCode` / `FailureMessage` | failure reason |
+| `PayloadJson` | failed payload snapshot |
+| `Status` | open/resolved/ignored |
+| `ResolvedAt` | resolution time |
+| `ResolutionNote` | resolution note |
+
+Indexes:
+
+- unique `EdgeOutboxMessageId`
+- index `Status`, `FailedAt`
 
 ## Required Local Tables
 
@@ -122,6 +818,8 @@ Purpose:
 
 ## Relationship ERD
 
+The relationship diagram intentionally stays focused on table ownership/cardinality. Required attributes are listed in the table sections above.
+
 ```mermaid
 erDiagram
     EdgeNode ||--|| KioskRuntime : hosts
@@ -150,6 +848,7 @@ erDiagram
     RuntimeProduct ||--o{ RuntimeProductProjectionItem : quoted
     RuntimeRecipe ||--o{ RuntimeProductProjectionItem : quoted_with
 
+    KioskRuntime ||--o{ EdgeCommandInbox : receives
     EdgeCommandInbox ||--o| ExecutableOrder : creates
     EdgeCommandInbox ||--o{ ExecutionReadinessCheck : checks
     ExecutableOrder ||--o{ ExecutableOrderItem : contains
@@ -167,6 +866,7 @@ erDiagram
     RobotJob ||--o{ StockMovement : consumes
     DeviceEvent }o--o| RobotJob : related_to
 
+    KioskRuntime ||--o{ EdgeOutboxMessage : publishes
     RobotJobEvent ||--o{ EdgeOutboxMessage : publishes
     DeviceEvent ||--o{ EdgeOutboxMessage : publishes
     StockMovement ||--o{ EdgeOutboxMessage : publishes
