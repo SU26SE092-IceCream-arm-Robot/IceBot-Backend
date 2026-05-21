@@ -311,3 +311,4 @@ Group related small enums by context only when it improves readability. Do not r
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](JSON_FIELD_RULES.md)
+- [IoT Contract](IOT_CONTRACT.md)

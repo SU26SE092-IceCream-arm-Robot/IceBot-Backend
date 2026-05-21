@@ -1,6 +1,4 @@
 using Domain.Common;
-using Domain.Identity.Entities;
-using Domain.RobotConfiguration.Enums;
 
 namespace Domain.RobotConfiguration.Entities;
 
@@ -10,15 +8,25 @@ public partial class RobotProgramStep : RobotConfigurationEntity
 
     public Guid? TemplateStepId { get; set; }
 
-    public Guid? CalibratedByAccountId { get; set; }
-
     public int StepNumber { get; set; }
 
     public string StepCode { get; set; } = null!;
 
     public string Name { get; set; } = null!;
 
-    public string Command { get; set; } = null!;
+    public string StepCommandType { get; set; } = null!;
+
+    public string? TargetPointCode { get; set; }
+
+    public string? VendorPointName { get; set; }
+
+    public string? CoordinateSystem { get; set; }
+
+    public string? ToolFrameCode { get; set; }
+
+    public string? WorkpieceFrameCode { get; set; }
+
+    public string? MotionProfileCode { get; set; }
 
     public int ParametersSchemaVersion { get; set; } = 1;
 
@@ -27,34 +35,6 @@ public partial class RobotProgramStep : RobotConfigurationEntity
     public int ParametersOverrideSchemaVersion { get; set; } = 1;
 
     public string? ParametersOverrideJson { get; set; }
-
-    public bool RequiresCalibration { get; set; }
-
-    public string? CalibrationKey { get; set; }
-
-    public CalibrationStatus CalibrationStatus { get; set; } = CalibrationStatus.NotRequired;
-
-    public string? CoordinateFrame { get; set; }
-
-    public string? ToolName { get; set; }
-
-    public decimal? TargetX { get; set; }
-
-    public decimal? TargetY { get; set; }
-
-    public decimal? TargetZ { get; set; }
-
-    public decimal? TargetRx { get; set; }
-
-    public decimal? TargetRy { get; set; }
-
-    public decimal? TargetRz { get; set; }
-
-    public decimal? OffsetX { get; set; }
-
-    public decimal? OffsetY { get; set; }
-
-    public decimal? OffsetZ { get; set; }
 
     public decimal? SpeedScale { get; set; }
 
@@ -72,21 +52,11 @@ public partial class RobotProgramStep : RobotConfigurationEntity
 
     public int? NextOnFailureStepNumber { get; set; }
 
-    public int CalibrationDataSchemaVersion { get; set; } = 1;
+    public int PointSnapshotSchemaVersion { get; set; } = 1;
 
-    public string? CalibrationDataJson { get; set; }
-
-    public int ValidationResultSchemaVersion { get; set; } = 1;
-
-    public string? ValidationResultJson { get; set; }
-
-    public DateTimeOffset? CalibratedAt { get; set; }
-
-    public DateTimeOffset? ValidatedAt { get; set; }
+    public string? PointSnapshotJson { get; set; }
 
     public virtual RobotProgramStep? TemplateStep { get; set; }
-
-    public virtual Account? CalibratedByAccount { get; set; }
 
     public virtual RobotProgram RobotProgram { get; set; } = null!;
 
@@ -94,7 +64,7 @@ public partial class RobotProgramStep : RobotConfigurationEntity
         int stepNumber,
         string stepCode,
         string name,
-        string command,
+        string stepCommandType,
         string? parametersJson = null)
     {
         if (stepNumber <= 0)
@@ -112,9 +82,9 @@ public partial class RobotProgramStep : RobotConfigurationEntity
             throw new DomainRuleException("Robot program step name is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(command))
+        if (string.IsNullOrWhiteSpace(stepCommandType))
         {
-            throw new DomainRuleException("Robot program step command is required.");
+            throw new DomainRuleException("Robot program step command type is required.");
         }
 
         return new RobotProgramStep
@@ -122,60 +92,39 @@ public partial class RobotProgramStep : RobotConfigurationEntity
             StepNumber = stepNumber,
             StepCode = stepCode.Trim(),
             Name = name.Trim(),
-            Command = command.Trim(),
+            StepCommandType = stepCommandType.Trim(),
             ParametersJson = parametersJson
         };
     }
 
-    public void RequireCalibration(string calibrationKey)
+    public void SetTargetPoint(
+        string targetPointCode,
+        string? vendorPointName = null,
+        string? coordinateSystem = null,
+        string? toolFrameCode = null,
+        string? workpieceFrameCode = null,
+        string? pointSnapshotJson = null)
     {
-        if (string.IsNullOrWhiteSpace(calibrationKey))
+        if (string.IsNullOrWhiteSpace(targetPointCode))
         {
-            throw new DomainRuleException("Calibration key is required.");
+            throw new DomainRuleException("Target point code is required.");
         }
 
-        RequiresCalibration = true;
-        CalibrationKey = calibrationKey.Trim();
-        CalibrationStatus = CalibrationStatus.Pending;
+        TargetPointCode = targetPointCode.Trim();
+        VendorPointName = string.IsNullOrWhiteSpace(vendorPointName) ? VendorPointName : vendorPointName.Trim();
+        CoordinateSystem = string.IsNullOrWhiteSpace(coordinateSystem) ? CoordinateSystem : coordinateSystem.Trim();
+        ToolFrameCode = string.IsNullOrWhiteSpace(toolFrameCode) ? ToolFrameCode : toolFrameCode.Trim();
+        WorkpieceFrameCode = string.IsNullOrWhiteSpace(workpieceFrameCode) ? WorkpieceFrameCode : workpieceFrameCode.Trim();
+        PointSnapshotJson = pointSnapshotJson ?? PointSnapshotJson;
     }
 
-    public void ApplyCalibration(
-        decimal? targetX,
-        decimal? targetY,
-        decimal? targetZ,
-        decimal? targetRx,
-        decimal? targetRy,
-        decimal? targetRz,
-        DateTimeOffset calibratedAt,
-        Guid? calibratedByAccountId,
-        string? parametersOverrideJson = null)
+    public void SetMotionProfile(string motionProfileCode)
     {
-        if (!RequiresCalibration)
+        if (string.IsNullOrWhiteSpace(motionProfileCode))
         {
-            throw new DomainRuleException("This robot program step does not require calibration.");
+            throw new DomainRuleException("Motion profile code is required.");
         }
 
-        TargetX = targetX;
-        TargetY = targetY;
-        TargetZ = targetZ;
-        TargetRx = targetRx;
-        TargetRy = targetRy;
-        TargetRz = targetRz;
-        ParametersOverrideJson = parametersOverrideJson ?? ParametersOverrideJson;
-        CalibratedAt = calibratedAt;
-        CalibratedByAccountId = calibratedByAccountId;
-        CalibrationStatus = CalibrationStatus.Calibrated;
-    }
-
-    public void MarkCalibrationValidated(DateTimeOffset validatedAt, string? validationResultJson = null)
-    {
-        if (RequiresCalibration && CalibrationStatus != CalibrationStatus.Calibrated)
-        {
-            throw new DomainRuleException("Only calibrated steps can be validated.");
-        }
-
-        ValidationResultJson = validationResultJson ?? ValidationResultJson;
-        ValidatedAt = validatedAt;
-        CalibrationStatus = CalibrationStatus.Validated;
+        MotionProfileCode = motionProfileCode.Trim();
     }
 }

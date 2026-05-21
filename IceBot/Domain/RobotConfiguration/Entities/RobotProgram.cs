@@ -19,7 +19,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public Guid? TemplateProgramId { get; set; }
 
-    public Guid? CalibratedByAccountId { get; set; }
+    public Guid? PointValidatedByAccountId { get; set; }
 
     public string Code { get; set; } = null!;
 
@@ -33,7 +33,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public RobotProgramStatus Status { get; set; } = RobotProgramStatus.Draft;
 
-    public string Vendor { get; set; } = "Farino";
+    public string Vendor { get; set; } = "Fairino";
 
     public string? VendorProgramId { get; set; }
 
@@ -45,7 +45,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public bool IsDefault { get; set; }
 
-    public CalibrationStatus CalibrationStatus { get; set; } = CalibrationStatus.NotRequired;
+    public RobotProgramPointStatus PointStatus { get; set; } = RobotProgramPointStatus.NotRequired;
 
     public string? Description { get; set; }
 
@@ -53,9 +53,9 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public string? ProgramPayloadJson { get; set; }
 
-    public int CalibrationDataSchemaVersion { get; set; } = 1;
+    public int PointSnapshotSchemaVersion { get; set; } = 1;
 
-    public string? CalibrationDataJson { get; set; }
+    public string? PointSnapshotJson { get; set; }
 
     public int SafetyZoneSchemaVersion { get; set; } = 1;
 
@@ -67,7 +67,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public DateTimeOffset? PublishedAt { get; set; }
 
-    public DateTimeOffset? CalibratedAt { get; set; }
+    public DateTimeOffset? PointValidatedAt { get; set; }
 
     public DateTimeOffset? ActivatedAt { get; set; }
 
@@ -83,7 +83,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public virtual RobotProgram? TemplateProgram { get; set; }
 
-    public virtual Account? CalibratedByAccount { get; set; }
+    public virtual Account? PointValidatedByAccount { get; set; }
 
     public virtual ICollection<RobotProgramStep> RobotProgramSteps { get; set; } = new List<RobotProgramStep>();
 
@@ -91,7 +91,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         int stepNumber,
         string stepCode,
         string name,
-        string command,
+        string stepCommandType,
         string? parametersJson = null)
     {
         EnsureDraft();
@@ -106,7 +106,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
             throw new DomainRuleException("A robot program step with the same code already exists.");
         }
 
-        var step = RobotProgramStep.Create(stepNumber, stepCode, name, command, parametersJson);
+        var step = RobotProgramStep.Create(stepNumber, stepCode, name, stepCommandType, parametersJson);
         RobotProgramSteps.Add(step);
         return step;
     }
@@ -131,11 +131,6 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
             throw new DomainRuleException("Only published robot programs can be activated.");
         }
 
-        if (RobotProgramSteps.Any(step => step.RequiresCalibration && step.CalibrationStatus != CalibrationStatus.Validated))
-        {
-            throw new DomainRuleException("Cannot activate a robot program with unvalidated calibration.");
-        }
-
         Status = RobotProgramStatus.Active;
         ActivatedAt = activatedAt;
     }
@@ -151,21 +146,27 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         RetiredAt = retiredAt;
     }
 
-    public void MarkCalibrationPending()
+    public void MarkPointSyncPending()
     {
-        CalibrationStatus = CalibrationStatus.Pending;
+        PointStatus = RobotProgramPointStatus.PendingSync;
     }
 
-    public void MarkCalibrationValidated(DateTimeOffset calibratedAt, Guid? calibratedByAccountId)
+    public void MarkPointSynced(string? pointSnapshotJson = null)
     {
-        if (RobotProgramSteps.Any(step => step.RequiresCalibration && step.CalibrationStatus != CalibrationStatus.Validated))
-        {
-            throw new DomainRuleException("All calibration-required steps must be validated first.");
-        }
+        PointSnapshotJson = pointSnapshotJson ?? PointSnapshotJson;
+        PointStatus = RobotProgramPointStatus.Synced;
+    }
 
-        CalibrationStatus = CalibrationStatus.Validated;
-        CalibratedAt = calibratedAt;
-        CalibratedByAccountId = calibratedByAccountId;
+    public void MarkPointValidated(DateTimeOffset validatedAt, Guid? validatedByAccountId)
+    {
+        PointStatus = RobotProgramPointStatus.Validated;
+        PointValidatedAt = validatedAt;
+        PointValidatedByAccountId = validatedByAccountId;
+    }
+
+    public void MarkPointSyncFailed()
+    {
+        PointStatus = RobotProgramPointStatus.Failed;
     }
 
     private void EnsureDraft()

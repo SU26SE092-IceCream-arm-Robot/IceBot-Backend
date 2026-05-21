@@ -96,7 +96,7 @@ Robot program resolution should use:
 Device > Kiosk > Store > Organization > Global
 ```
 
-Kiosk/device-scoped robot programs may contain calibration data specific to a physical installation.
+Kiosk/device-scoped robot programs may contain local Fairino point/frame references and backup snapshots specific to a physical installation.
 
 ## Operational Entities
 
@@ -165,7 +165,7 @@ Organization owns:
 
 Kiosk/edge may create or update:
 
-- kiosk/device-scoped robot programs and calibration
+- kiosk/device-scoped robot programs and local Fairino point/frame snapshots
 - robot jobs and steps
 - ingredient dispenser state
 - stock movements

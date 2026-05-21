@@ -76,7 +76,7 @@ Infrastructure owns:
 - `IceBotDbContext`.
 - EF Core migrations.
 - Provider adapters.
-- Farino robot SDK integration.
+- Fairino robot SDK integration.
 - Payment provider integration.
 - Sync workers.
 - Background jobs.

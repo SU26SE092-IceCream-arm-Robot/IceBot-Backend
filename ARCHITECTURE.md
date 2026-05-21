@@ -87,7 +87,7 @@ Owns technical implementation:
 - EF Core mappings and migrations.
 - PostgreSQL persistence.
 - External provider adapters.
-- Farino robot SDK adapter.
+- Fairino robot SDK adapter.
 - Payment provider adapters.
 - Sync/inbox/dead-letter workers.
 - Background jobs and technical integrations.
@@ -142,7 +142,7 @@ Edge/kiosk runtime owns:
 - Local device communication.
 - Telemetry capture.
 - Temporary operation while offline.
-- Kiosk/device-scoped calibration updates.
+- Kiosk/device-scoped Fairino point/frame snapshot updates.
 
 Cloud/backend owns:
 
@@ -241,3 +241,5 @@ Avoid:
 - [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](docs/JSON_FIELD_RULES.md)
+- [IoT Contract](docs/IOT_CONTRACT.md)
+- [Local Edge Runtime ERD](docs/LOCAL_EDGE_RUNTIME_ERD.md)

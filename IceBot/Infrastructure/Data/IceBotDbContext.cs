@@ -432,7 +432,7 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.TemplateProgram).WithMany().HasForeignKey(x => x.TemplateProgramId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.CalibratedByAccount).WithMany().HasForeignKey(x => x.CalibratedByAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.PointValidatedByAccount).WithMany().HasForeignKey(x => x.PointValidatedByAccountId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<RobotProgramStep>(entity =>
@@ -442,7 +442,6 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.RobotProgramId, x.StepCode }).IsUnique();
             entity.HasOne(x => x.RobotProgram).WithMany(x => x.RobotProgramSteps).HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.TemplateStep).WithMany().HasForeignKey(x => x.TemplateStepId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.CalibratedByAccount).WithMany().HasForeignKey(x => x.CalibratedByAccountId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<RobotJob>(entity =>

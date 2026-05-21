@@ -85,7 +85,7 @@ Provider payloads are external evidence. Idempotency and retry decisions must us
 
 Namespace: `Domain.RobotConfiguration`
 
-Owns robot program definitions, step definitions, calibration data, and versioned robot configuration shipped to edge kiosks.
+Owns robot program definitions, step definitions, local Fairino point/frame references, and versioned robot configuration shipped to edge kiosks.
 
 Entities:
 

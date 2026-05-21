@@ -16,12 +16,12 @@ Fields:
 - `Store.OpeningHoursJson` with `OpeningHoursSchemaVersion`
 - `Recipe.InstructionsJson` with `InstructionsSchemaVersion`
 - `RobotProgram.ProgramPayloadJson` with `ProgramPayloadSchemaVersion`
-- `RobotProgram.CalibrationDataJson` with `CalibrationDataSchemaVersion`
+- `RobotProgram.PointSnapshotJson` with `PointSnapshotSchemaVersion`
 - `RobotProgram.SafetyZoneJson` with `SafetyZoneSchemaVersion`
 - `RobotProgramStep.ParametersJson` with `ParametersSchemaVersion`
 - `RobotProgramStep.ParametersOverrideJson` with `ParametersOverrideSchemaVersion`
 - `RobotProgramStep.RetryPolicyJson` with `RetryPolicySchemaVersion`
-- `RobotProgramStep.CalibrationDataJson` with `CalibrationDataSchemaVersion`
+- `RobotProgramStep.PointSnapshotJson` with `PointSnapshotSchemaVersion`
 - `IngredientDispenserState.LevelToQuantityProfileJson` with `LevelToQuantityProfileSchemaVersion`
 
 Rules:
@@ -65,7 +65,6 @@ Fields:
 - `OperationLog.PayloadJson`
 - `KioskHeartbeat.PayloadJson`
 - `IngredientDispenserState.SensorPayloadJson`
-- `RobotProgramStep.ValidationResultJson` with `ValidationResultSchemaVersion`
 
 Rules:
 

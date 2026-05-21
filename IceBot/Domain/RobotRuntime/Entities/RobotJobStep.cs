@@ -14,7 +14,19 @@ public partial class RobotJobStep : RobotRuntimeAggregateEntity
 
     public string StepCode { get; set; } = null!;
 
-    public string Command { get; set; } = null!;
+    public string StepCommandType { get; set; } = null!;
+
+    public string? TargetPointCode { get; set; }
+
+    public string? VendorPointName { get; set; }
+
+    public string? CoordinateSystem { get; set; }
+
+    public string? ToolFrameCode { get; set; }
+
+    public string? WorkpieceFrameCode { get; set; }
+
+    public string? MotionProfileCode { get; set; }
 
     public int ParametersSchemaVersion { get; set; } = 1;
 
@@ -56,7 +68,13 @@ public partial class RobotJobStep : RobotRuntimeAggregateEntity
             RobotProgramStepId = programStep.Id,
             StepNumber = programStep.StepNumber,
             StepCode = programStep.StepCode,
-            Command = programStep.Command,
+            StepCommandType = programStep.StepCommandType,
+            TargetPointCode = programStep.TargetPointCode,
+            VendorPointName = programStep.VendorPointName,
+            CoordinateSystem = programStep.CoordinateSystem,
+            ToolFrameCode = programStep.ToolFrameCode,
+            WorkpieceFrameCode = programStep.WorkpieceFrameCode,
+            MotionProfileCode = programStep.MotionProfileCode,
             ParametersSchemaVersion = programStep.ParametersOverrideJson is not null
                 ? programStep.ParametersOverrideSchemaVersion
                 : programStep.ParametersSchemaVersion,

@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore.Migrations;
+﻿using System;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
@@ -914,7 +915,7 @@ namespace Infrastructure.Migrations
                     KioskId = table.Column<Guid>(type: "uuid", nullable: true),
                     DeviceId = table.Column<Guid>(type: "uuid", nullable: true),
                     TemplateProgramId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CalibratedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    PointValidatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
                     Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     ScopeType = table.Column<int>(type: "integer", nullable: false),
@@ -927,18 +928,18 @@ namespace Infrastructure.Migrations
                     SupportedDeviceTypeId = table.Column<long>(type: "bigint", nullable: true),
                     EstimatedDurationSeconds = table.Column<int>(type: "integer", nullable: true),
                     IsDefault = table.Column<bool>(type: "boolean", nullable: false),
-                    CalibrationStatus = table.Column<int>(type: "integer", nullable: false),
+                    PointStatus = table.Column<int>(type: "integer", nullable: false),
                     Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     ProgramPayloadSchemaVersion = table.Column<int>(type: "integer", nullable: false),
                     ProgramPayloadJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
-                    CalibrationDataSchemaVersion = table.Column<int>(type: "integer", nullable: false),
-                    CalibrationDataJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    PointSnapshotSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    PointSnapshotJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
                     SafetyZoneSchemaVersion = table.Column<int>(type: "integer", nullable: false),
                     SafetyZoneJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
                     EffectiveFrom = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     EffectiveTo = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     PublishedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CalibratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    PointValidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     ActivatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     RetiredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
@@ -955,8 +956,8 @@ namespace Infrastructure.Migrations
                 {
                     table.PrimaryKey("PK_RobotPrograms", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_RobotPrograms_Accounts_CalibratedByAccountId",
-                        column: x => x.CalibratedByAccountId,
+                        name: "FK_RobotPrograms_Accounts_PointValidatedByAccountId",
+                        column: x => x.PointValidatedByAccountId,
                         principalTable: "Accounts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
@@ -1304,29 +1305,20 @@ namespace Infrastructure.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     RobotProgramId = table.Column<Guid>(type: "uuid", nullable: false),
                     TemplateStepId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CalibratedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
                     StepNumber = table.Column<int>(type: "integer", nullable: false),
                     StepCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Command = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    StepCommandType = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    TargetPointCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    VendorPointName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    CoordinateSystem = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    ToolFrameCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    WorkpieceFrameCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    MotionProfileCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     ParametersSchemaVersion = table.Column<int>(type: "integer", nullable: false),
                     ParametersJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
                     ParametersOverrideSchemaVersion = table.Column<int>(type: "integer", nullable: false),
                     ParametersOverrideJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
-                    RequiresCalibration = table.Column<bool>(type: "boolean", nullable: false),
-                    CalibrationKey = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    CalibrationStatus = table.Column<int>(type: "integer", nullable: false),
-                    CoordinateFrame = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    ToolName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    TargetX = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    TargetY = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    TargetZ = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    TargetRx = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    TargetRy = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    TargetRz = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    OffsetX = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    OffsetY = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
-                    OffsetZ = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
                     SpeedScale = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
                     SafetyClearanceMm = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
                     ExpectedDurationMs = table.Column<int>(type: "integer", nullable: true),
@@ -1335,12 +1327,8 @@ namespace Infrastructure.Migrations
                     IsRequired = table.Column<bool>(type: "boolean", nullable: false),
                     NextOnSuccessStepNumber = table.Column<int>(type: "integer", nullable: true),
                     NextOnFailureStepNumber = table.Column<int>(type: "integer", nullable: true),
-                    CalibrationDataSchemaVersion = table.Column<int>(type: "integer", nullable: false),
-                    CalibrationDataJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
-                    ValidationResultSchemaVersion = table.Column<int>(type: "integer", nullable: false),
-                    ValidationResultJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
-                    CalibratedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    ValidatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    PointSnapshotSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    PointSnapshotJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -1354,12 +1342,6 @@ namespace Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_RobotProgramSteps", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_RobotProgramSteps_Accounts_CalibratedByAccountId",
-                        column: x => x.CalibratedByAccountId,
-                        principalTable: "Accounts",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_RobotProgramSteps_RobotProgramSteps_TemplateStepId",
                         column: x => x.TemplateStepId,
@@ -1829,7 +1811,13 @@ namespace Infrastructure.Migrations
                     RobotProgramStepId = table.Column<Guid>(type: "uuid", nullable: true),
                     StepNumber = table.Column<int>(type: "integer", nullable: false),
                     StepCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Command = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    StepCommandType = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    TargetPointCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    VendorPointName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    CoordinateSystem = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    ToolFrameCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    WorkpieceFrameCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    MotionProfileCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     ParametersSchemaVersion = table.Column<int>(type: "integer", nullable: false),
                     ParametersJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
                     Status = table.Column<int>(type: "integer", nullable: false),
@@ -2571,11 +2559,6 @@ namespace Infrastructure.Migrations
                 column: "RobotProgramStepId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_RobotPrograms_CalibratedByAccountId",
-                table: "RobotPrograms",
-                column: "CalibratedByAccountId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_RobotPrograms_DeviceId",
                 table: "RobotPrograms",
                 column: "DeviceId");
@@ -2602,6 +2585,11 @@ namespace Infrastructure.Migrations
                 columns: new[] { "OriginNodeId", "Version" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_RobotPrograms_PointValidatedByAccountId",
+                table: "RobotPrograms",
+                column: "PointValidatedByAccountId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RobotPrograms_StoreId",
                 table: "RobotPrograms",
                 column: "StoreId");
@@ -2610,11 +2598,6 @@ namespace Infrastructure.Migrations
                 name: "IX_RobotPrograms_TemplateProgramId",
                 table: "RobotPrograms",
                 column: "TemplateProgramId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_RobotProgramSteps_CalibratedByAccountId",
-                table: "RobotProgramSteps",
-                column: "CalibratedByAccountId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RobotProgramSteps_OriginNodeId_Version",

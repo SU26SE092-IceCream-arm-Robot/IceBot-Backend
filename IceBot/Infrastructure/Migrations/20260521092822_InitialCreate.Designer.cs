@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    [Migration("20260519121447_InitialCreate")]
+    [Migration("20260521092822_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -2496,22 +2496,6 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("ActivatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<DateTimeOffset?>("CalibratedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CalibratedByAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CalibrationDataJson")
-                        .HasMaxLength(500)
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("CalibrationDataSchemaVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("CalibrationStatus")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -2560,6 +2544,22 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PointSnapshotJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("PointSnapshotSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("PointStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("PointValidatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("PointValidatedByAccountId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("ProductType")
@@ -2632,13 +2632,13 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CalibratedByAccountId");
-
                     b.HasIndex("DeviceId");
 
                     b.HasIndex("KioskId");
 
                     b.HasIndex("OrganizationId");
+
+                    b.HasIndex("PointValidatedByAccountId");
 
                     b.HasIndex("StoreId");
 
@@ -2657,32 +2657,7 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("CalibratedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CalibratedByAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("CalibrationDataJson")
-                        .HasMaxLength(500)
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("CalibrationDataSchemaVersion")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("CalibrationKey")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<int>("CalibrationStatus")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Command")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("CoordinateFrame")
+                    b.Property<string>("CoordinateSystem")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
@@ -2704,6 +2679,10 @@ namespace Infrastructure.Migrations
                     b.Property<bool>("IsRequired")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("MotionProfileCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -2714,18 +2693,6 @@ namespace Infrastructure.Migrations
 
                     b.Property<int?>("NextOnSuccessStepNumber")
                         .HasColumnType("integer");
-
-                    b.Property<decimal?>("OffsetX")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal?>("OffsetY")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal?>("OffsetZ")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
 
                     b.Property<Guid>("OriginNodeId")
                         .HasColumnType("uuid");
@@ -2744,8 +2711,12 @@ namespace Infrastructure.Migrations
                     b.Property<int>("ParametersSchemaVersion")
                         .HasColumnType("integer");
 
-                    b.Property<bool>("RequiresCalibration")
-                        .HasColumnType("boolean");
+                    b.Property<string>("PointSnapshotJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("PointSnapshotSchemaVersion")
+                        .HasColumnType("integer");
 
                     b.Property<string>("RetryPolicyJson")
                         .HasMaxLength(500)
@@ -2770,40 +2741,25 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("StepCommandType")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<int>("StepNumber")
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<decimal?>("TargetRx")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal?>("TargetRy")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal?>("TargetRz")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal?>("TargetX")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal?>("TargetY")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
-                    b.Property<decimal?>("TargetZ")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                    b.Property<string>("TargetPointCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<Guid?>("TemplateStepId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ToolName")
+                    b.Property<string>("ToolFrameCode")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
@@ -2813,22 +2769,18 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("UpdatedByAccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset?>("ValidatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ValidationResultJson")
+                    b.Property<string>("VendorPointName")
                         .HasMaxLength(500)
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("ValidationResultSchemaVersion")
-                        .HasColumnType("integer");
+                        .HasColumnType("character varying(500)");
 
                     b.Property<long>("Version")
                         .HasColumnType("bigint");
 
-                    b.HasKey("Id");
+                    b.Property<string>("WorkpieceFrameCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
-                    b.HasIndex("CalibratedByAccountId");
+                    b.HasKey("Id");
 
                     b.HasIndex("TemplateStepId");
 
@@ -3075,13 +3027,12 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Command")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CoordinateSystem")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3111,6 +3062,10 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("MaxRetries")
                         .HasColumnType("integer");
+
+                    b.Property<string>("MotionProfileCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTimeOffset?>("NextRetryAt")
                         .HasColumnType("timestamp with time zone");
@@ -3145,11 +3100,24 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("StepCommandType")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<int>("StepNumber")
                         .HasColumnType("integer");
 
                     b.Property<DateTimeOffset?>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TargetPointCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ToolFrameCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3157,8 +3125,16 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("UpdatedByAccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("VendorPointName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<long>("Version")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("WorkpieceFrameCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
 
@@ -4241,11 +4217,6 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
                 {
-                    b.HasOne("Domain.Identity.Entities.Account", "CalibratedByAccount")
-                        .WithMany()
-                        .HasForeignKey("CalibratedByAccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Domain.Devices.Entities.Device", "Device")
                         .WithMany()
                         .HasForeignKey("DeviceId")
@@ -4261,6 +4232,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Domain.Identity.Entities.Account", "PointValidatedByAccount")
+                        .WithMany()
+                        .HasForeignKey("PointValidatedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Tenants.Entities.Store", "Store")
                         .WithMany()
                         .HasForeignKey("StoreId")
@@ -4271,13 +4247,13 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("TemplateProgramId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("CalibratedByAccount");
-
                     b.Navigation("Device");
 
                     b.Navigation("Kiosk");
 
                     b.Navigation("Organization");
+
+                    b.Navigation("PointValidatedByAccount");
 
                     b.Navigation("Store");
 
@@ -4286,11 +4262,6 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgramStep", b =>
                 {
-                    b.HasOne("Domain.Identity.Entities.Account", "CalibratedByAccount")
-                        .WithMany()
-                        .HasForeignKey("CalibratedByAccountId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Domain.RobotConfiguration.Entities.RobotProgram", "RobotProgram")
                         .WithMany("RobotProgramSteps")
                         .HasForeignKey("RobotProgramId")
@@ -4301,8 +4272,6 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("TemplateStepId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("CalibratedByAccount");
 
                     b.Navigation("RobotProgram");
 
