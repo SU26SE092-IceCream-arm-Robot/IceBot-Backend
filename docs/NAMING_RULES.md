@@ -193,12 +193,15 @@ CrudManager
 Use feature/use-case names:
 
 ```text
-CreateOrder
+PlaceOrder
 ProcessPaymentCallback
-CreateRobotJob
+CreatePaymentSession
+DispatchRobotJob
 RecordStockMovement
 RetrySyncEvent
 ```
+
+Application use cases should name the business action, not the persistence operation. Prefer `PlaceOrder` over `CreateOrder` because the customer is placing an order, not creating a database row. CRUD terms belong in repositories/stores/DbContext when they describe persistence operations.
 
 Recommended type suffixes:
 
@@ -212,8 +215,8 @@ Recommended type suffixes:
 Examples:
 
 ```csharp
-CreateOrderCommand
-CreateOrderHandler
+PlaceOrderCommand
+PlaceOrderHandler
 GetRobotJobQuery
 RobotJobResponse
 ```
@@ -244,7 +247,7 @@ Route names should be stable and resource-oriented:
 Action method names may map to use cases:
 
 ```text
-OrdersController.Create -> CreateOrderCommand
+OrdersController.PlaceOrder -> PlaceOrderCommand
 OrdersController.Cancel -> CancelOrderCommand
 RobotJobsController.Retry -> RetryRobotJobCommand
 ```

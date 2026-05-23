@@ -65,27 +65,29 @@ Edge must pull commands from cloud after receiving an MQTT notification. Edge mu
 4. Tablet stores temporary cart/session in memory or local storage.
 5. Customer confirms checkout.
 6. Tablet checks projection freshness: now - generatedAt <= 5-15 seconds.
-7. Tablet calls Cloud to create payment session.
-8. Cloud creates Order, PaymentTransaction, and provider payment session.
-9. Cloud returns payment token, QR payload, and expire time.
-10. Tablet renders QR.
-11. Customer pays.
-12. Payment provider calls Cloud callback.
-13. Cloud verifies payment.
-14. Cloud marks PaymentTransaction = Paid and Order = Paid/ready for execution in one database transaction.
-15. Cloud commits the transaction.
-16. Cloud emits `PaymentSucceeded` / `OrderReadyForExecution` through outbox/event handlers.
-17. Tablet notification handler publishes payment/order status update.
-18. Tablet switches from QR screen to paid/preparing screen.
-19. Edge dispatch handler creates executable order command and publishes MQTT notification.
-20. Edge receives MQTT notification or discovers command by polling.
-21. Edge pulls executable order command from Cloud.
-22. Edge performs fast runtime check with 5-10 second timeout.
-23. If ready, Edge accepts command and persists local RobotJob/queue.
-24. Robot executor runs the job through the Fairino SDK/local integration.
-25. Edge records execution status, estimated inventory deduction, telemetry, and logs.
-26. Edge syncs execution events/results to Cloud.
-27. Cloud finalizes Order = Completed, or Failed/RefundRequired path if execution fails.
+7. Tablet calls Cloud to create Order.
+8. Cloud validates kiosk/product/basic idempotency and creates Order + OrderItems with `PendingPayment`.
+9. Tablet calls Cloud to create payment session for the created order.
+10. Cloud creates PaymentTransaction and provider payment session.
+11. Cloud returns checkout URL/QR payload and expire time.
+12. Tablet renders QR.
+13. Customer pays.
+14. Payment provider calls Cloud callback.
+15. Cloud verifies payment.
+16. Cloud marks PaymentTransaction = Paid and Order = Paid/ready for execution in one database transaction.
+17. Cloud commits the transaction.
+18. Cloud emits `PaymentSucceeded` / `OrderReadyForExecution` through outbox/event handlers.
+19. Tablet notification handler publishes payment/order status update.
+20. Tablet switches from QR screen to paid/preparing screen.
+21. Edge dispatch handler creates executable order command and publishes MQTT notification.
+22. Edge receives MQTT notification or discovers command by polling.
+23. Edge pulls executable order command from Cloud.
+24. Edge performs fast runtime check with 5-10 second timeout.
+25. If ready, Edge accepts command and persists local RobotJob/queue.
+26. Robot executor runs the job through the Fairino SDK/local integration.
+27. Edge records execution status, estimated inventory deduction, telemetry, and logs.
+28. Edge syncs execution events/results to Cloud.
+29. Cloud finalizes Order = Completed, or Failed/RefundRequired path if execution fails.
 ```
 
 Payment success and robot execution are separate concerns. Tablet should not wait for Edge acceptance before showing that payment succeeded.
@@ -217,16 +219,16 @@ This response is a quote for UX, not a reservation.
 
 ## Tablet To Cloud
 
-### Create Payment Session
+### Create Order
 
 ```http
-POST /api/v1/payment-sessions
+POST /api/v1/orders
 ```
 
 Headers:
 
 ```text
-X-Idempotency-Key: checkout:{tabletSessionId}
+X-Idempotency-Key: create-order:{tabletSessionId}
 X-Correlation-Id: {correlationId}
 ```
 
@@ -260,10 +262,10 @@ Response:
 {
   "orderId": "uuid",
   "orderNumber": "ORD-20260521-0001",
-  "paymentTransactionId": "uuid",
-  "paymentToken": "provider-token",
-  "qrPayload": "provider-qr-payload",
-  "expiresAt": "2026-05-21T10:05:00Z"
+  "status": "PendingPayment",
+  "paymentStatus": "Unpaid",
+  "totalAmount": 25000,
+  "currency": "VND"
 }
 ```
 
@@ -271,6 +273,45 @@ Cloud creates:
 
 - `Order`
 - `OrderItem`
+
+Cloud must calculate price from backend catalog/product data. Tablet totals are used only for comparison and conflict detection.
+
+### Create Payment Session
+
+```http
+POST /api/v1/orders/{orderId}/payment-sessions
+```
+
+Headers:
+
+```text
+X-Idempotency-Key: payment-session:{orderId}
+X-Correlation-Id: {correlationId}
+```
+
+Request:
+
+```json
+{
+  "idempotencyKey": "payment-session:{orderId}",
+  "description": "IceBot order ORD-20260521-0001"
+}
+```
+
+Response:
+
+```json
+{
+  "orderId": "uuid",
+  "paymentTransactionId": "uuid",
+  "checkoutUrl": "https://provider-checkout-url",
+  "qrCodePayload": "provider-qr-payload",
+  "expiresAt": "2026-05-21T10:05:00Z"
+}
+```
+
+Cloud creates:
+
 - `PaymentTransaction`
 - provider payment session
 

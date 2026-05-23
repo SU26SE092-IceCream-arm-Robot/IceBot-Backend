@@ -1,6 +1,7 @@
 using Application.Abstractions.Persistence;
 using Infrastructure.Data;
 using Infrastructure.Identity;
+using Infrastructure.Orders;
 using Infrastructure.Payments;
 using Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -31,6 +32,7 @@ namespace Infrastructure
 
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
             services.AddIdentityInfrastructure();
+            services.AddOrdersInfrastructure();
             services.AddPaymentsInfrastructure(config);
 
             return services;
