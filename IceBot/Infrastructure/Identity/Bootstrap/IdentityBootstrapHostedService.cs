@@ -119,7 +119,6 @@ public class IdentityBootstrapHostedService : IHostedService
         var now = DateTimeOffset.UtcNow;
         var account = existingAccount ?? new Account
         {
-            Id = Guid.NewGuid(),
             UserName = normalizedUserName,
             Email = normalizedEmail,
             CreatedAt = now
@@ -142,7 +141,6 @@ public class IdentityBootstrapHostedService : IHostedService
         {
             account.AccountRoles.Add(new AccountRole
             {
-                Id = Guid.NewGuid(),
                 RoleId = systemAdminRole.Id,
                 AssignedAt = now,
                 IsActive = true

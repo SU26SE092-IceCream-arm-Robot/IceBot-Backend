@@ -2,7 +2,7 @@ namespace Domain.Common;
 
 public abstract class GuidEntity
 {
-    public Guid Id { get; set; }
+    public Guid Id { get; set; } = GuidId.New();
 }
 
 public abstract class LongEntity

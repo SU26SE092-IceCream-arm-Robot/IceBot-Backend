@@ -64,6 +64,15 @@ Do not introduce another generic base such as `BaseFullEntity`. If a new base ty
 
 Use `Id` for the primary key.
 
+`GuidEntity` uses UUID v7 by default through `Domain.Common.GuidId.New()`.
+This keeps the CLR/database type as `Guid`/PostgreSQL `uuid`, but makes new IDs time-ordered for better B-tree locality, write performance, and operational debugging.
+
+Use UUID v7 for distributed/offline-created records, runtime records, append-only events, sync records, orders, payments, robot jobs, and tenant/topology entities.
+
+Keep `LongEntity` for stable catalog/reference tables that do not need offline/global id creation.
+
+Do not use primary keys as secrets. If a public opaque token is needed, add a dedicated token/code field and hash it when appropriate.
+
 Use `{EntityName}Id` for foreign keys:
 
 ```csharp

@@ -72,7 +72,6 @@ public sealed class PaymentSessionService
             var now = DateTimeOffset.UtcNow;
             var paymentTransaction = new PaymentTransaction
             {
-                Id = Guid.NewGuid(),
                 OrderId = order.Id,
                 PaymentMethodId = paymentMethod.Id,
                 TransactionNumber = GenerateTransactionNumber(now),
@@ -198,7 +197,6 @@ public sealed class PaymentSessionService
 
             var callback = new PaymentCallback
             {
-                Id = Guid.NewGuid(),
                 PaymentTransactionId = paymentTransaction.Id,
                 Provider = notification.Provider,
                 EventType = notification.EventType,

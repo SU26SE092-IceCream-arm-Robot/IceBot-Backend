@@ -60,7 +60,6 @@ namespace Application.Identity.InternalAccounts.Services
             var now = DateTimeOffset.UtcNow;
             var account = new Account
             {
-                Id = Guid.NewGuid(),
                 UserName = userName,
                 Email = email,
                 FullName = request.FullName?.Trim(),
@@ -80,7 +79,6 @@ namespace Application.Identity.InternalAccounts.Services
             {
                 account.AccountRoles.Add(new AccountRole
                 {
-                    Id = Guid.NewGuid(),
                     RoleId = role.Id,
                     Role = role,
                     OrganizationId = scope.OrganizationId,
@@ -270,7 +268,6 @@ namespace Application.Identity.InternalAccounts.Services
             {
                 account.AccountRoles.Add(new AccountRole
                 {
-                    Id = Guid.NewGuid(),
                     RoleId = role.Id,
                     Role = role,
                     OrganizationId = request.OrganizationId,

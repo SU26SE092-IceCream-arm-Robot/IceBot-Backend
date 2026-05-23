@@ -174,6 +174,7 @@ Allowed here:
 
 - `GuidEntity`
 - `LongEntity`
+- `GuidId`
 - `BusinessEntity`
 - `CatalogEntity`
 - `RobotConfigurationEntity`
@@ -187,6 +188,8 @@ Allowed here:
 - `DomainRuleException`
 - `EntityStatus`
 - `SeverityLevel`
+
+`GuidId.New()` is the shared UUID v7 generator used by `GuidEntity`.
 
 Do not place context-specific enums here.
 

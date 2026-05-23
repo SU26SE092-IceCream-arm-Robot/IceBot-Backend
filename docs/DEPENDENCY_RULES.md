@@ -111,6 +111,8 @@ Controllers should be thin. They should call application handlers/services and r
 - EF Core `DbContext` is the unit of work.
 - Use explicit transactions at use-case boundaries when needed.
 - Do not hold database transactions across external network calls.
+- `GuidEntity` IDs are application-generated UUID v7 values. Keep the database column type as PostgreSQL `uuid`.
+- `LongEntity` IDs remain database-generated `long` values for catalog/reference rows.
 - Append-only event/log/ledger tables should not be soft-deleted.
 - JSON payloads are not source of truth unless explicitly documented as configuration JSON with schema version.
 

@@ -125,7 +125,6 @@ namespace Application.Identity.Tokens.Services
             var rawToken = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64));
             var refreshToken = new RefreshToken
             {
-                Id = Guid.NewGuid(),
                 AccountId = accountId,
                 TokenHash = HashToken(rawToken),
                 CreatedAt = DateTimeOffset.UtcNow,
