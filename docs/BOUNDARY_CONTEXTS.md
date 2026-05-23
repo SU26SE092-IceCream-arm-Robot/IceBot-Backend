@@ -81,6 +81,8 @@ Entities:
 
 Provider payloads are external evidence. Idempotency and retry decisions must use typed columns.
 
+Current refund phase is manual cash refund. Auto provider refund or payout integration can be added later, but should not be assumed in the first implementation.
+
 ### Robot Configuration
 
 Namespace: `Domain.RobotConfiguration`

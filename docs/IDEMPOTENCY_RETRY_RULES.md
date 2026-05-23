@@ -139,6 +139,8 @@ Reason: payment providers commonly send duplicate webhooks.
 
 ### Refund
 
+Current phase uses manual cash refund. Treat auto provider refund and payout as future integration work unless explicitly requested.
+
 Recommended fields:
 
 - `IdempotencyKey`

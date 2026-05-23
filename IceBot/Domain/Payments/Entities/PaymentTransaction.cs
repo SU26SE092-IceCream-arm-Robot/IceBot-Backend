@@ -22,9 +22,25 @@ public partial class PaymentTransaction : BusinessEntity
 
     public string? PaymentIntentId { get; set; }
 
+    public string? ProviderOrderCode { get; set; }
+
+    public string? ProviderPaymentLinkId { get; set; }
+
+    public string? CheckoutUrl { get; set; }
+
+    public string? QrCodePayload { get; set; }
+
+    public DateTimeOffset? ExpiresAt { get; set; }
+
     public decimal Amount { get; set; }
 
+    public decimal? PaidAmount { get; set; }
+
     public string Currency { get; set; } = "VND";
+
+    public string? ProviderStatus { get; set; }
+
+    public DateTimeOffset? ProviderPaidAt { get; set; }
 
     public PaymentTransactionStatus Status { get; set; } = PaymentTransactionStatus.Pending;
 

@@ -398,7 +398,13 @@ public class IceBotDbContext : DbContext
             entity.ToTable("PaymentTransactions");
             entity.HasIndex(x => x.TransactionNumber).IsUnique();
             entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
+            entity.HasIndex(x => x.ProviderOrderCode).HasFilter("\"ProviderOrderCode\" IS NOT NULL");
             entity.HasIndex(x => x.ProviderTransactionId).HasFilter("\"ProviderTransactionId\" IS NOT NULL");
+            entity.Property(x => x.ProviderOrderCode).HasMaxLength(100);
+            entity.Property(x => x.ProviderPaymentLinkId).HasMaxLength(200);
+            entity.Property(x => x.ProviderStatus).HasMaxLength(100);
+            entity.Property(x => x.CheckoutUrl).HasMaxLength(2048);
+            entity.Property(x => x.QrCodePayload).HasMaxLength(2048);
             entity.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
         });

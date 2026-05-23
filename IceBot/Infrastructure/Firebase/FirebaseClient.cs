@@ -68,7 +68,7 @@ public class FirebaseClient : IFirebaseClient
             {
                 var credentialsPath =
                     _configuration.GetSection("Firebase").GetValue<string>("CredentialsPath")
-                    ?? "../Infrastructure/Firebase/gear-forge-firebase-adminsdk-fbsvc-e2ab583c19.json";
+                    ?? "../Infrastructure/Firebase/icecream-arm-robot-firebase-adminsdk-fbsvc-d729c976e7.json";
 
                 if (!Path.IsPathRooted(credentialsPath))
                 {

@@ -72,17 +72,23 @@ Edge must pull commands from cloud after receiving an MQTT notification. Edge mu
 11. Customer pays.
 12. Payment provider calls Cloud callback.
 13. Cloud verifies payment.
-14. Cloud marks PaymentTransaction = Paid and Order = Paid.
-15. Cloud publishes MQTT notification: executable order available.
-16. Edge receives MQTT notification or discovers command by polling.
-17. Edge pulls executable order command from Cloud.
-18. Edge performs fast runtime check with 5-10 second timeout.
-19. If ready, Edge accepts command and persists local RobotJob/queue.
-20. Robot executor runs the job through the Fairino SDK/local integration.
-21. Edge records execution status, estimated inventory deduction, telemetry, and logs.
-22. Edge syncs execution events/results to Cloud.
-23. Cloud finalizes Order = Completed, or Failed/RefundRequired path if execution fails.
+14. Cloud marks PaymentTransaction = Paid and Order = Paid/ready for execution in one database transaction.
+15. Cloud commits the transaction.
+16. Cloud emits `PaymentSucceeded` / `OrderReadyForExecution` through outbox/event handlers.
+17. Tablet notification handler publishes payment/order status update.
+18. Tablet switches from QR screen to paid/preparing screen.
+19. Edge dispatch handler creates executable order command and publishes MQTT notification.
+20. Edge receives MQTT notification or discovers command by polling.
+21. Edge pulls executable order command from Cloud.
+22. Edge performs fast runtime check with 5-10 second timeout.
+23. If ready, Edge accepts command and persists local RobotJob/queue.
+24. Robot executor runs the job through the Fairino SDK/local integration.
+25. Edge records execution status, estimated inventory deduction, telemetry, and logs.
+26. Edge syncs execution events/results to Cloud.
+27. Cloud finalizes Order = Completed, or Failed/RefundRequired path if execution fails.
 ```
+
+Payment success and robot execution are separate concerns. Tablet should not wait for Edge acceptance before showing that payment succeeded.
 
 ## State Mapping
 
@@ -282,7 +288,48 @@ Cloud must:
 - Deduplicate provider event by provider event id.
 - Update `PaymentTransactionStatus`.
 - Set `OrderStatus = Paid` only after verified payment.
-- Create an executable order command for Edge.
+- Commit payment/order state before notifying Tablet or Edge.
+- Emit a durable domain/application event after commit, such as `PaymentSucceeded` or `OrderReadyForExecution`.
+
+Cloud must not:
+
+- Block the provider webhook response while waiting for Edge acceptance.
+- Let Tablet notification depend on Edge dispatch success.
+- Create robot runtime state in the payment webhook transaction.
+
+After commit, event/outbox handlers fan out into independent flows:
+
+```text
+PaymentSucceeded / OrderReadyForExecution
+  -> Tablet status notification
+  -> Edge executable command dispatch
+```
+
+If either fan-out fails, retry that handler independently. Payment remains paid because the provider-confirmed payment is already committed.
+
+## Cloud To Tablet Status
+
+Tablet needs fast feedback after the customer pays. Cloud can support this through polling first, then MQTT/WebSocket/SSE later if needed.
+
+Recommended v1:
+
+- Tablet polls `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds while QR is displayed.
+- When `Order.PaymentStatus = Paid`, Tablet shows payment success immediately.
+- If `Order.Status = Paid` but Edge has not accepted yet, Tablet shows "payment successful, preparing order".
+- If `Order.Status = Preparing`, Tablet shows "making item".
+- If `Order.Status = Completed`, Tablet shows "ready/pick up".
+- If `Order.Status = Failed` after payment, Tablet shows staff support/manual refund message.
+
+Tablet state mapping:
+
+| Cloud state | Tablet screen |
+| --- | --- |
+| `PaymentTransaction = Pending` | QR payment screen |
+| `PaymentTransaction = Paid`, `Order = Paid` | Payment successful, preparing order |
+| `Order = Accepted` | Machine accepted order |
+| `Order = Preparing` | Making item |
+| `Order = Completed` | Ready / pick up |
+| `Order = Failed` after paid | Staff support / manual refund required |
 
 ## Cloud To Edge Notification
 
@@ -578,11 +625,29 @@ Flow:
 ```text
 Edge rejects command
 Cloud marks order failed/refund-required
-Refund/manual compensation workflow starts
+Cloud creates manual cash refund request
+Staff handles cash refund outside payment provider
+Staff confirms refund completion
 Monitoring/audit log is created
 ```
 
+Current phase uses manual cash refund only:
+
+- Do not call provider refund or auto payout APIs in the default flow yet.
+- Do not use payout terminology for this phase. `Payout` is reserved for a later provider/bank-transfer automation phase.
+- Cloud should create a refund request/record for staff follow-up.
+- Staff refunds the customer in cash and confirms completion in the admin UI.
+
 Current domain can represent this with `OrderStatus.Failed` plus payment/refund state. Add explicit `RefundRequired` later if needed.
+
+Manual refund records should capture:
+
+- related order and payment transaction
+- refund amount and reason
+- refund method: manual cash
+- staff account that confirmed completion
+- confirmation time
+- optional note/evidence
 
 ### Edge Offline During Payment
 

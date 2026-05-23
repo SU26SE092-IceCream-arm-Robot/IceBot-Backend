@@ -1,4 +1,5 @@
 using Application.Identity;
+using Application.Payments;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application
@@ -8,6 +9,7 @@ namespace Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddIdentityApplication();
+            services.AddPaymentModule();
             return services;
         }
     }

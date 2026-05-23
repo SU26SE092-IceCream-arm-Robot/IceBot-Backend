@@ -1041,8 +1041,16 @@ namespace Infrastructure.Migrations
                     Provider = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     ProviderTransactionId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     PaymentIntentId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    ProviderOrderCode = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    ProviderPaymentLinkId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    CheckoutUrl = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    QrCodePayload = table.Column<string>(type: "character varying(2048)", maxLength: 2048, nullable: true),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Amount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    PaidAmount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: true),
                     Currency = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    ProviderStatus = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    ProviderPaidAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     Status = table.Column<int>(type: "integer", nullable: false),
                     RequestedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     AuthorizedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
@@ -2295,6 +2303,12 @@ namespace Infrastructure.Migrations
                 name: "IX_PaymentTransactions_PaymentMethodId",
                 table: "PaymentTransactions",
                 column: "PaymentMethodId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PaymentTransactions_ProviderOrderCode",
+                table: "PaymentTransactions",
+                column: "ProviderOrderCode",
+                filter: "\"ProviderOrderCode\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PaymentTransactions_ProviderTransactionId",

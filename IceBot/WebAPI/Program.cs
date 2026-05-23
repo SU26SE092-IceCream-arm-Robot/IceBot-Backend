@@ -80,6 +80,9 @@ try
     {
         options.AddPolicy("accounts.manage", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin")));
+
+        options.AddPolicy("payments.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager")));
     });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
