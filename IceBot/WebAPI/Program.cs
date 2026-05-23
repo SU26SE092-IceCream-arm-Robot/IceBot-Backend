@@ -4,7 +4,7 @@ using Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using Serilog;
 using System.Reflection;
 using System.Text;
@@ -112,6 +112,7 @@ try
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(c =>
     {
+        const string securitySchemeId = JwtBearerDefaults.AuthenticationScheme;
         var securityScheme = new OpenApiSecurityScheme
         {
             Name = "Authorization",
@@ -119,20 +120,15 @@ try
             In = ParameterLocation.Header,
             Type = SecuritySchemeType.Http,
             Scheme = "bearer",
-            BearerFormat = "JWT",
-            Reference = new OpenApiReference
-            {
-                Id = JwtBearerDefaults.AuthenticationScheme,
-                Type = ReferenceType.SecurityScheme
-            }
+            BearerFormat = "JWT"
         };
 
-        c.AddSecurityDefinition(securityScheme.Reference.Id, securityScheme);
+        c.AddSecurityDefinition(securitySchemeId, securityScheme);
 
-        c.AddSecurityRequirement(new OpenApiSecurityRequirement
-                    {
-                        { securityScheme, new string[] { } }
-                    });
+        c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+        {
+            [new OpenApiSecuritySchemeReference(securitySchemeId, document)] = []
+        });
 
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
