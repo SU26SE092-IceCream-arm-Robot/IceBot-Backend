@@ -56,41 +56,11 @@ MQTT is notification only. It is not the source of truth and must not contain la
 
 Edge must pull commands from cloud after receiving an MQTT notification. Edge must also poll/pull periodically in case MQTT is missed while offline.
 
-## End-To-End Flow
+## System Flow
 
-```text
-1. Customer opens Tablet.
-2. Tablet calls Local Edge for runtime menu/product projection.
-3. Edge builds projection from menu item snapshot, product snapshot, recipe snapshot, inventory state, device state, and availability policy.
-4. Tablet stores temporary cart/session in memory or local storage.
-5. Customer confirms checkout.
-6. Tablet checks projection freshness: now - generatedAt <= 5-15 seconds.
-7. Tablet calls Cloud to create Order.
-8. Cloud validates kiosk/menu item/basic idempotency and creates Order + OrderItems with `PendingPayment`.
-9. Tablet calls Cloud to create payment session for the created order.
-10. Cloud creates PaymentTransaction and provider payment session.
-11. Cloud returns checkout URL/QR payload and expire time.
-12. Tablet renders QR.
-13. Customer pays.
-14. Payment provider calls Cloud callback.
-15. Cloud verifies payment.
-16. Cloud marks PaymentTransaction = Paid and Order = Paid/ready for execution in one database transaction.
-17. Cloud commits the transaction.
-18. Cloud emits `PaymentSucceeded` / `OrderReadyForExecution` through outbox/event handlers.
-19. Tablet notification handler publishes payment/order status update.
-20. Tablet switches from QR screen to paid/preparing screen.
-21. Edge dispatch handler creates executable order command and publishes MQTT notification.
-22. Edge receives MQTT notification or discovers command by polling.
-23. Edge pulls executable order command from Cloud.
-24. Edge performs fast runtime check with 5-10 second timeout.
-25. If ready, Edge accepts command and persists local RobotJob/queue.
-26. Robot executor runs the job through the Fairino SDK/local integration.
-27. Edge records execution status, estimated inventory deduction, telemetry, and logs.
-28. Edge syncs execution events/results to Cloud.
-29. Cloud finalizes Order = Completed, or Failed/RefundRequired path if execution fails.
-```
+End-to-end checkout, payment, edge dispatch, robot execution, and failure flows live in [System Flows](SYSTEM_FLOWS.md).
 
-Payment success and robot execution are separate concerns. Tablet should not wait for Edge acceptance before showing that payment succeeded.
+This document focuses on API/message contract shape, source-of-truth boundaries, state mapping, and idempotency requirements.
 
 ## State Mapping
 
@@ -651,60 +621,15 @@ Retry behavior:
 
 ## Failure Paths
 
-### Payment Paid But Edge Cannot Execute
+Failure flows live in [System Flows](SYSTEM_FLOWS.md).
 
-Expected causes:
+Contract-level rules:
 
-- Robot offline.
-- Device error.
-- Ingredient level too low.
-- Required config/program missing.
-- Edge queue unavailable.
-
-Flow:
-
-```text
-Edge rejects command
-Cloud marks order failed/refund-required
-Cloud creates manual cash refund request
-Staff handles cash refund outside payment provider
-Staff confirms refund completion
-Monitoring/audit log is created
-```
-
-Current phase uses manual cash refund only:
-
+- Payment success and robot execution are separate concerns.
+- Payment webhook handling must not wait for Edge acceptance.
+- Duplicate MQTT notifications are harmless because Edge always pulls and deduplicates commands.
+- Current phase uses manual cash refund only when paid execution fails.
 - Do not call provider refund or auto payout APIs in the default flow yet.
-- Do not use payout terminology for this phase. `Payout` is reserved for a later provider/bank-transfer automation phase.
-- Cloud should create a refund request/record for staff follow-up.
-- Staff refunds the customer in cash and confirms completion in the admin UI.
-
-Current domain can represent this with `OrderStatus.Failed` plus payment/refund state. Add explicit `RefundRequired` later if needed.
-
-Manual refund records should capture:
-
-- related order and payment transaction
-- refund amount and reason
-- refund method: manual cash
-- staff account that confirmed completion
-- confirmation time
-- optional note/evidence
-
-### Edge Offline During Payment
-
-Flow:
-
-```text
-Cloud marks payment paid
-Cloud creates executable command
-MQTT notification may fail or be missed
-Edge reconnects and pulls pending commands
-Edge accepts or rejects after runtime check
-```
-
-### Duplicate MQTT Notification
-
-Duplicate MQTT notifications are harmless because Edge always pulls and deduplicates commands.
 
 ## Security
 
@@ -737,6 +662,7 @@ Future hardening:
 
 - [Architecture](../ARCHITECTURE.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
+- [System Flows](SYSTEM_FLOWS.md)
 - [Local Edge Runtime ERD](LOCAL_EDGE_RUNTIME_ERD.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](JSON_FIELD_RULES.md)

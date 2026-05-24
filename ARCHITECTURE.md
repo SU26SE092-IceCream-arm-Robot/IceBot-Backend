@@ -240,6 +240,7 @@ Avoid:
 - [Dependency Rules](docs/DEPENDENCY_RULES.md)
 - [Naming Rules](docs/NAMING_RULES.md)
 - [Data Modeling Rules](docs/DATA_MODELING_RULES.md)
+- [System Flows](docs/SYSTEM_FLOWS.md)
 - [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](docs/JSON_FIELD_RULES.md)

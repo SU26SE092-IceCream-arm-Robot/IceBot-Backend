@@ -111,6 +111,7 @@ Use:
 - [Dependency Rules](DEPENDENCY_RULES.md) for layer boundaries.
 - [Naming Rules](NAMING_RULES.md) for naming conventions.
 - [Data Modeling Rules](DATA_MODELING_RULES.md) for persistence and ERD checks.
+- [System Flows](SYSTEM_FLOWS.md) for backend/tablet-edge-cloud flows.
 - [IoT Contract](IOT_CONTRACT.md) for tablet-edge-cloud flow.
 
 When changing code that affects contracts, domain ownership, or data model rules, update the relevant doc.
