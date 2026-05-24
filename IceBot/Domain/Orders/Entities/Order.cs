@@ -20,6 +20,10 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public Guid? CorrelationId { get; set; }
 
+    public Guid? RuntimeSnapshotId { get; set; }
+
+    public DateTimeOffset? RuntimeSnapshotGeneratedAt { get; set; }
+
     public OrderChannel Channel { get; set; } = OrderChannel.Tablet;
 
     public string? ExternalChannel { get; set; }
@@ -67,10 +71,13 @@ public partial class Order : BusinessEntity, IStoreScoped
         Guid productId,
         Guid productVariantId,
         Guid? recipeId,
+        string menuItemCodeSnapshot,
+        string menuItemNameSnapshot,
         string productCodeSnapshot,
         string productNameSnapshot,
         string productVariantCodeSnapshot,
         string productVariantNameSnapshot,
+        int? recipeVersionSnapshot,
         int quantity,
         decimal unitPrice,
         decimal discountAmount = 0,
@@ -91,10 +98,13 @@ public partial class Order : BusinessEntity, IStoreScoped
             productId,
             productVariantId,
             recipeId,
+            menuItemCodeSnapshot,
+            menuItemNameSnapshot,
             productCodeSnapshot,
             productNameSnapshot,
             productVariantCodeSnapshot,
             productVariantNameSnapshot,
+            recipeVersionSnapshot,
             quantity,
             unitPrice,
             discountAmount,
@@ -164,15 +174,42 @@ public partial class Order : BusinessEntity, IStoreScoped
 
         if (PaymentStatus == PaymentStatus.Paid && Status == OrderStatus.PendingPayment)
         {
-            Status = OrderStatus.Paid;
+            Status = OrderStatus.ReadyForExecution;
         }
+    }
+
+    public void MarkExecutionRejected(string? notes = null)
+    {
+        if (Status is not (OrderStatus.Paid or OrderStatus.ReadyForExecution or OrderStatus.Accepted))
+        {
+            throw new DomainRuleException("Only paid or execution-ready orders can be rejected by execution.");
+        }
+
+        Status = OrderStatus.ExecutionRejected;
+        Notes = notes ?? Notes;
+    }
+
+    public void MarkRefundRequired(string? notes = null)
+    {
+        if (PaymentStatus != PaymentStatus.Paid)
+        {
+            throw new DomainRuleException("Only paid orders can require refund.");
+        }
+
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled)
+        {
+            throw new DomainRuleException("Cannot require refund for completed or cancelled orders.");
+        }
+
+        Status = OrderStatus.RefundRequired;
+        Notes = notes ?? Notes;
     }
 
     public void MarkPreparing()
     {
-        if (Status is not (OrderStatus.Paid or OrderStatus.Accepted))
+        if (Status is not (OrderStatus.ReadyForExecution or OrderStatus.Accepted))
         {
-            throw new DomainRuleException("Only paid or accepted orders can be prepared.");
+            throw new DomainRuleException("Only execution-ready or accepted orders can be prepared.");
         }
 
         Status = OrderStatus.Preparing;
@@ -180,9 +217,9 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public void Complete(DateTimeOffset completedAt)
     {
-        if (Status is OrderStatus.Cancelled or OrderStatus.Failed)
+        if (Status is OrderStatus.Cancelled or OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)
         {
-            throw new DomainRuleException("Cannot complete a cancelled or failed order.");
+            throw new DomainRuleException("Cannot complete a cancelled, failed, rejected, or refund-required order.");
         }
 
         Status = OrderStatus.Completed;

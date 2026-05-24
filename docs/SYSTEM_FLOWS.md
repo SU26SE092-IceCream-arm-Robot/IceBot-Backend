@@ -54,7 +54,7 @@ Detailed API and message contracts live in [IoT Contract](IOT_CONTRACT.md).
 14. Customer pays.
 15. Payment provider calls Cloud webhook.
 16. Cloud verifies provider callback and signature.
-17. Cloud updates PaymentTransaction = Paid and Order = Paid in one DB transaction.
+17. Cloud updates PaymentTransaction = Paid and Order = ReadyForExecution in one DB transaction.
 18. Cloud commits payment/order state.
 19. Cloud emits post-commit events:
    - PaymentSucceeded
@@ -117,11 +117,11 @@ State mapping:
 | Cloud state | Tablet screen |
 | --- | --- |
 | `PaymentTransaction = Pending` | QR payment screen |
-| `PaymentTransaction = Paid`, `Order = Paid` | Payment successful, preparing order |
+| `PaymentTransaction = Paid`, `Order = ReadyForExecution` | Payment successful, preparing order |
 | `Order = Accepted` | Machine accepted order |
 | `Order = Preparing` | Making item |
 | `Order = Completed` | Ready / pick up |
-| `Order = Failed` after paid | Staff support / manual refund required |
+| `Order = ExecutionRejected` / `RefundRequired` | Staff support / manual refund required |
 
 ## Edge Command Flow
 

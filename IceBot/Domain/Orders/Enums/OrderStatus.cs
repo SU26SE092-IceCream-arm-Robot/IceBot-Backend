@@ -5,11 +5,14 @@
         Draft = 1,
         PendingPayment = 2,
         Paid = 3,
-        Accepted = 4,
-        Preparing = 5,
-        Ready = 6,
-        Completed = 7,
-        Cancelled = 8,
-        Failed = 9
+        ReadyForExecution = 4,
+        Accepted = 5,
+        Preparing = 6,
+        Ready = 7,
+        Completed = 8,
+        Cancelled = 9,
+        Failed = 10,
+        ExecutionRejected = 11,
+        RefundRequired = 12
     }
 }

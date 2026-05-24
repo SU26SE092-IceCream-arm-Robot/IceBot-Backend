@@ -78,11 +78,13 @@ public sealed class PlaceOrderService
                 IdempotencyKey = idempotencyKey,
                 ClientOrderId = clientOrderId,
                 CorrelationId = request.RuntimeSnapshotId,
+                RuntimeSnapshotId = request.RuntimeSnapshotId,
+                RuntimeSnapshotGeneratedAt = request.RuntimeSnapshotGeneratedAt,
                 Channel = request.Channel,
                 Currency = DefaultCurrency,
                 CustomerName = NormalizeOptional(request.CustomerName),
                 CustomerPhoneNumber = NormalizeOptional(request.CustomerPhoneNumber),
-                Notes = BuildOrderNotes(request),
+                Notes = NormalizeOptional(request.Notes),
                 CreatedAt = now
             };
 
@@ -166,10 +168,13 @@ public sealed class PlaceOrderService
                     product.Id,
                     productVariant.Id,
                     recipe?.Id,
+                    menuItem.Code,
+                    menuItem.DisplayName,
                     product.Code,
                     product.DisplayName ?? product.Name,
                     productVariant.Code,
-                    menuItem.DisplayName,
+                    productVariant.DisplayName ?? productVariant.Name,
+                    recipe?.Version,
                     itemRequest.Quantity,
                     menuItem.Price,
                     menuItem.DiscountAmount,
@@ -279,6 +284,8 @@ public sealed class PlaceOrderService
             OrganizationId = order.OrganizationId,
             OrderNumber = order.OrderNumber,
             ClientOrderId = order.ClientOrderId,
+            RuntimeSnapshotId = order.RuntimeSnapshotId,
+            RuntimeSnapshotGeneratedAt = order.RuntimeSnapshotGeneratedAt,
             Channel = order.Channel,
             Status = order.Status,
             PaymentStatus = order.PaymentStatus,
@@ -302,10 +309,13 @@ public sealed class PlaceOrderService
                     ProductVariantId = item.ProductVariantId,
                     RecipeId = item.RecipeId,
                     ClientLineId = item.ClientLineId,
+                    MenuItemCodeSnapshot = item.MenuItemCodeSnapshot,
+                    MenuItemNameSnapshot = item.MenuItemNameSnapshot,
                     ProductCodeSnapshot = item.ProductCodeSnapshot,
                     ProductNameSnapshot = item.ProductNameSnapshot,
                     ProductVariantCodeSnapshot = item.ProductVariantCodeSnapshot,
                     ProductVariantNameSnapshot = item.ProductVariantNameSnapshot,
+                    RecipeVersionSnapshot = item.RecipeVersionSnapshot,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     DiscountAmount = item.DiscountAmount,
@@ -365,23 +375,6 @@ public sealed class PlaceOrderService
     private static string? NormalizeOptional(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    private static string? BuildOrderNotes(PlaceOrderRequest request)
-    {
-        var note = NormalizeOptional(request.Notes);
-        if (!request.RuntimeSnapshotId.HasValue && !request.RuntimeSnapshotGeneratedAt.HasValue)
-        {
-            return note;
-        }
-
-        var runtimeNote = JsonSerializer.Serialize(new
-        {
-            request.RuntimeSnapshotId,
-            request.RuntimeSnapshotGeneratedAt
-        });
-
-        return note is null ? runtimeNote : $"{note}\n{runtimeNote}";
     }
 
     private static string BuildRecipeSnapshotJson(Recipe recipe)

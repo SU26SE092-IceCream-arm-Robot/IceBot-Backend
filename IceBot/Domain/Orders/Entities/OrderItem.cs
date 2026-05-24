@@ -19,6 +19,10 @@ public partial class OrderItem : BusinessEntity
 
     public string? ClientLineId { get; set; }
 
+    public string MenuItemCodeSnapshot { get; set; } = null!;
+
+    public string MenuItemNameSnapshot { get; set; } = null!;
+
     public string ProductCodeSnapshot { get; set; } = null!;
 
     public string ProductNameSnapshot { get; set; } = null!;
@@ -26,6 +30,8 @@ public partial class OrderItem : BusinessEntity
     public string ProductVariantCodeSnapshot { get; set; } = null!;
 
     public string ProductVariantNameSnapshot { get; set; } = null!;
+
+    public int? RecipeVersionSnapshot { get; set; }
 
     public int Quantity { get; set; } = 1;
 
@@ -62,10 +68,13 @@ public partial class OrderItem : BusinessEntity
         Guid productId,
         Guid productVariantId,
         Guid? recipeId,
+        string menuItemCodeSnapshot,
+        string menuItemNameSnapshot,
         string productCodeSnapshot,
         string productNameSnapshot,
         string productVariantCodeSnapshot,
         string productVariantNameSnapshot,
+        int? recipeVersionSnapshot,
         int quantity,
         decimal unitPrice,
         decimal discountAmount = 0,
@@ -91,6 +100,16 @@ public partial class OrderItem : BusinessEntity
         if (string.IsNullOrWhiteSpace(productCodeSnapshot))
         {
             throw new DomainRuleException("Product code snapshot is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(menuItemCodeSnapshot))
+        {
+            throw new DomainRuleException("Menu item code snapshot is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(menuItemNameSnapshot))
+        {
+            throw new DomainRuleException("Menu item name snapshot is required.");
         }
 
         if (string.IsNullOrWhiteSpace(productNameSnapshot))
@@ -129,10 +148,13 @@ public partial class OrderItem : BusinessEntity
             ProductId = productId,
             ProductVariantId = productVariantId,
             RecipeId = recipeId,
+            MenuItemCodeSnapshot = menuItemCodeSnapshot.Trim(),
+            MenuItemNameSnapshot = menuItemNameSnapshot.Trim(),
             ProductCodeSnapshot = productCodeSnapshot.Trim(),
             ProductNameSnapshot = productNameSnapshot.Trim(),
             ProductVariantCodeSnapshot = productVariantCodeSnapshot.Trim(),
             ProductVariantNameSnapshot = productVariantNameSnapshot.Trim(),
+            RecipeVersionSnapshot = recipeVersionSnapshot,
             ClientLineId = string.IsNullOrWhiteSpace(clientLineId) ? null : clientLineId.Trim(),
             Quantity = quantity,
             UnitPrice = unitPrice,

@@ -16,6 +16,10 @@ public sealed class OrderResult
 
     public string? ClientOrderId { get; set; }
 
+    public Guid? RuntimeSnapshotId { get; set; }
+
+    public DateTimeOffset? RuntimeSnapshotGeneratedAt { get; set; }
+
     public OrderChannel Channel { get; set; }
 
     public OrderStatus Status { get; set; }

@@ -2055,6 +2055,12 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("PlacedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("RuntimeSnapshotGeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RuntimeSnapshotId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -2126,8 +2132,18 @@ namespace Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
 
+                    b.Property<string>("MenuItemCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<Guid>("MenuItemId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("MenuItemNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<string>("OptionsJson")
                         .HasMaxLength(500)
@@ -2176,6 +2192,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("jsonb");
 
                     b.Property<int>("RecipeSnapshotSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RecipeVersionSnapshot")
                         .HasColumnType("integer");
 
                     b.Property<int>("Status")

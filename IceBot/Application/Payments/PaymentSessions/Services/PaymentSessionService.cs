@@ -53,7 +53,7 @@ public sealed class PaymentSessionService
                 return ApiResult<PaymentSessionResult>.Fail("Order is already paid.", 409);
             }
 
-            if (order.Status is OrderStatus.Cancelled or OrderStatus.Completed or OrderStatus.Failed)
+            if (order.Status is OrderStatus.Cancelled or OrderStatus.Completed or OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)
             {
                 return ApiResult<PaymentSessionResult>.Fail("Order cannot be paid in its current state.", 409);
             }

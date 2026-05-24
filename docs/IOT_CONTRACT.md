@@ -77,13 +77,15 @@ Recommended v1 mapping:
 | Business state | Current enum |
 | --- | --- |
 | Created, waiting for payment | `PendingPayment` |
-| Payment verified, waiting for edge execution | `Paid` |
+| Payment verified, ready to dispatch to edge | `ReadyForExecution` |
 | Edge accepted executable command | `Accepted` |
 | Robot job running | `Preparing` |
 | Robot execution completed | `Completed` |
-| Payment failed, cancelled, or execution failed | `Failed` / `Cancelled` |
+| Edge rejected execution after payment | `ExecutionRejected` |
+| Paid order needs manual refund/support | `RefundRequired` |
+| Payment failed, cancelled, or non-refundable execution failure | `Failed` / `Cancelled` |
 
-If the project later needs more precision, add explicit states such as `ReadyForExecution`, `ExecutionRejected`, and `RefundRequired`.
+`Paid` remains a coarse payment-confirmed state, but current orchestration should move fully paid orders to `ReadyForExecution`.
 
 ### Payment
 
@@ -351,7 +353,7 @@ Cloud must:
 - Verify signature/provider authenticity.
 - Deduplicate provider event by provider event id.
 - Update `PaymentTransactionStatus`.
-- Set `OrderStatus = Paid` only after verified payment.
+- Set `OrderStatus = ReadyForExecution` only after verified payment.
 - Commit payment/order state before notifying Tablet or Edge.
 - Emit a durable domain/application event after commit, such as `PaymentSucceeded` or `OrderReadyForExecution`.
 
@@ -379,7 +381,7 @@ Recommended v1:
 
 - Tablet polls `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds while QR is displayed.
 - When `Order.PaymentStatus = Paid`, Tablet shows payment success immediately.
-- If `Order.Status = Paid` but Edge has not accepted yet, Tablet shows "payment successful, preparing order".
+- If `Order.Status = ReadyForExecution` but Edge has not accepted yet, Tablet shows "payment successful, preparing order".
 - If `Order.Status = Preparing`, Tablet shows "making item".
 - If `Order.Status = Completed`, Tablet shows "ready/pick up".
 - If `Order.Status = Failed` after payment, Tablet shows staff support/manual refund message.
@@ -389,11 +391,11 @@ Tablet state mapping:
 | Cloud state | Tablet screen |
 | --- | --- |
 | `PaymentTransaction = Pending` | QR payment screen |
-| `PaymentTransaction = Paid`, `Order = Paid` | Payment successful, preparing order |
+| `PaymentTransaction = Paid`, `Order = ReadyForExecution` | Payment successful, preparing order |
 | `Order = Accepted` | Machine accepted order |
 | `Order = Preparing` | Making item |
 | `Order = Completed` | Ready / pick up |
-| `Order = Failed` after paid | Staff support / manual refund required |
+| `Order = ExecutionRejected` / `RefundRequired` | Staff support / manual refund required |
 
 ## Cloud To Edge Notification
 

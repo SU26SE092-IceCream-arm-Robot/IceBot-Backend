@@ -16,6 +16,10 @@ public sealed class OrderItemResult
 
     public string? ClientLineId { get; set; }
 
+    public string MenuItemCodeSnapshot { get; set; } = null!;
+
+    public string MenuItemNameSnapshot { get; set; } = null!;
+
     public string ProductCodeSnapshot { get; set; } = null!;
 
     public string ProductNameSnapshot { get; set; } = null!;
@@ -23,6 +27,8 @@ public sealed class OrderItemResult
     public string ProductVariantCodeSnapshot { get; set; } = null!;
 
     public string ProductVariantNameSnapshot { get; set; } = null!;
+
+    public int? RecipeVersionSnapshot { get; set; }
 
     public int Quantity { get; set; }
 
