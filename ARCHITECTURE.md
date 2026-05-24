@@ -173,11 +173,9 @@ See [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md).
 
 ## JSON Fields
 
-JSON fields are allowed for robot SDK payloads, provider payloads, snapshots, and metadata. They must be classified as configuration, immutable snapshot, append-only payload/debug, or metadata extension.
+JSON fields are allowed for robot SDK payloads, provider payloads, snapshots, and metadata, but workflow-critical values should be typed columns.
 
-Query-critical or invariant-critical values should be promoted to typed columns.
-
-See [JSON Field Rules](docs/JSON_FIELD_RULES.md).
+Detailed JSON rules live in [JSON Field Rules](docs/JSON_FIELD_RULES.md).
 
 ## Multi-Tenancy
 
@@ -212,6 +210,8 @@ Operational concerns:
 - Serilog file/console logs.
 - Swagger for API visibility.
 
+Detailed API naming and route conventions live in [Naming Rules](docs/NAMING_RULES.md).
+
 ## Design Constraints
 
 Prefer:
@@ -235,9 +235,11 @@ Avoid:
 
 ## Documentation Map
 
+- [Working Protocol](docs/WORKING_PROTOCOL.md)
 - [Boundary Contexts](docs/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](docs/DEPENDENCY_RULES.md)
 - [Naming Rules](docs/NAMING_RULES.md)
+- [Data Modeling Rules](docs/DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](docs/JSON_FIELD_RULES.md)

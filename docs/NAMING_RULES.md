@@ -12,21 +12,9 @@ This document defines naming conventions for IceBot domain, application, infrast
 - Prefer precise domain names over generic names such as `Data`, `Info`, `Manager`, `Helper`, or `Processor`.
 - Do not reuse names from old projects if they do not match the current domain model.
 
-## Bounded Contexts
+## Bounded Context Names
 
-Folder and namespace names should follow bounded context ownership:
-
-```text
-Domain.Orders
-Domain.Payments
-Domain.SalesCatalog
-Domain.RobotConfiguration
-Domain.RobotRuntime
-Domain.Inventory
-Domain.Devices
-Domain.Tenants
-Domain.Sync
-```
+Folder and namespace names should follow bounded context ownership. The current context map lives in [Boundary Contexts](BOUNDARY_CONTEXTS.md).
 
 Use singular entity names:
 
@@ -160,18 +148,6 @@ SyncedAt
 
 ## Repository Names
 
-Application persistence contracts belong under:
-
-```text
-Application/Abstractions/Persistence
-```
-
-Infrastructure implementations belong under:
-
-```text
-Infrastructure/Persistence/Repositories
-```
-
 Use repository names only for persistence boundaries:
 
 ```csharp
@@ -182,6 +158,8 @@ RobotJobRepository
 ```
 
 Repositories should stay thin. They may expose query composition and persistence operations, but should not contain workflow transitions or business decisions.
+
+Repository placement and dependency rules live in [Dependency Rules](DEPENDENCY_RULES.md).
 
 Do not create generic service/controller names such as:
 
@@ -321,8 +299,10 @@ Group related small enums by context only when it improves readability. Do not r
 ## Related Docs
 
 - [Architecture](../ARCHITECTURE.md)
+- [Working Protocol](WORKING_PROTOCOL.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](DEPENDENCY_RULES.md)
+- [Data Modeling Rules](DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](JSON_FIELD_RULES.md)

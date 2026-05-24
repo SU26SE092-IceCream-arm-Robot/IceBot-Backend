@@ -113,14 +113,15 @@ Controllers should be thin. They should call application handlers/services and r
 - Do not hold database transactions across external network calls.
 - `GuidEntity` IDs are application-generated UUID v7 values. Keep the database column type as PostgreSQL `uuid`.
 - `LongEntity` IDs remain database-generated `long` values for catalog/reference rows.
-- Append-only event/log/ledger tables should not be soft-deleted.
-- JSON payloads are not source of truth unless explicitly documented as configuration JSON with schema version.
+- Detailed persistence, index, soft-delete, snapshot, and JSON rules live in [Data Modeling Rules](DATA_MODELING_RULES.md).
 
 ## Related Docs
 
 - [Architecture](../ARCHITECTURE.md)
+- [Working Protocol](WORKING_PROTOCOL.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
 - [Naming Rules](NAMING_RULES.md)
+- [Data Modeling Rules](DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](JSON_FIELD_RULES.md)
