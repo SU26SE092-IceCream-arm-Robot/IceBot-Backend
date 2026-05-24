@@ -616,6 +616,7 @@ public class IceBotDbContext : DbContext
             entity.ToTable("SyncEventInbox");
             entity.HasIndex(x => x.EventId).IsUnique();
             entity.HasIndex(x => new { x.SourceNodeId, x.EventType, x.OccurredAt });
+            entity.HasIndex(x => new { x.Status, x.NextRetryAt, x.LockedUntil });
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
         });
 

@@ -3170,6 +3170,11 @@ namespace Infrastructure.Migrations
                 name: "IX_SyncEventInbox_SourceNodeId_EventType_OccurredAt",
                 table: "SyncEventInbox",
                 columns: new[] { "SourceNodeId", "EventType", "OccurredAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SyncEventInbox_Status_NextRetryAt_LockedUntil",
+                table: "SyncEventInbox",
+                columns: new[] { "Status", "NextRetryAt", "LockedUntil" });
         }
 
         /// <inheritdoc />

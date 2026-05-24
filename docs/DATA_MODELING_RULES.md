@@ -121,6 +121,39 @@ Every source-of-truth JSON configuration should have a matching schema version f
 
 See [JSON Field Rules](JSON_FIELD_RULES.md).
 
+## High-Volume Log And Event Tables
+
+Append-only log, event, heartbeat, and sync tables must be designed for growth before production.
+
+High-volume tables include:
+
+- `KioskHeartbeats`
+- `DeviceEvents`
+- `OperationLogs`
+- `RobotJobEvents`
+- `SyncEventInbox`
+- `SyncDeadLetters`
+
+Rules:
+
+- Every high-volume table must have a time-based index aligned with its normal query field, such as `ReportedAt`, `OccurredAt`, `ReceivedAt`, or `FailedAt`.
+- Kiosk/device scoped logs should include the scope id before the time field in common query indexes, such as `(KioskId, ReportedAt)` or `(DeviceId, OccurredAt)`.
+- Background-worker queues must have indexes matching their scan predicate. For example, `SyncEventInbox` needs `(Status, NextRetryAt, LockedUntil)` for retry/lock scans.
+- Define retention policy before production. Examples: keep raw heartbeats for a short period, aggregate health metrics, then archive or purge old rows.
+- Define a PostgreSQL partition plan for high-volume append-only tables before production. Monthly range partitions by the main time field are the default starting point.
+- Do not rely on EF Core fluent configuration alone for partition lifecycle. PostgreSQL partition creation/maintenance should be handled by raw SQL migrations, DBA scripts, or scheduled database maintenance.
+
+Partition key direction:
+
+| Table | Partition field |
+| --- | --- |
+| `KioskHeartbeats` | `ReportedAt` |
+| `DeviceEvents` | `OccurredAt` |
+| `OperationLogs` | `OccurredAt` |
+| `RobotJobEvents` | `OccurredAt` |
+| `SyncEventInbox` | `ReceivedAt` or `OccurredAt`, depending on worker/query ownership |
+| `SyncDeadLetters` | `FailedAt` |
+
 ## Index Review Checklist
 
 Before finishing a new entity or relationship, check:
@@ -131,6 +164,7 @@ Before finishing a new entity or relationship, check:
 - Are idempotency/event/provider keys intentionally reusable or immutable?
 - Are tenant scope indexes aligned with query patterns?
 - Are common list/detail queries covered by non-unique indexes?
+- Do high-volume log/event tables have time indexes, retention rules, and a partition plan?
 - Are FK delete behaviors restrictive unless cascade is intentional?
 - Are historical values snapshotted when mutable references can change?
 

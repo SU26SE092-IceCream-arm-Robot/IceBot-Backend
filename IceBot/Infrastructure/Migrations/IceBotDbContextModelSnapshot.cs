@@ -3865,6 +3865,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("SourceNodeId", "EventType", "OccurredAt");
 
+                    b.HasIndex("Status", "NextRetryAt", "LockedUntil");
+
                     b.ToTable("SyncEventInbox", (string)null);
                 });
 

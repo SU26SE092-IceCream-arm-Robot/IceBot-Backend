@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    [Migration("20260524175149_InitialCreate")]
+    [Migration("20260524185146_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -3867,6 +3867,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("KioskId");
 
                     b.HasIndex("SourceNodeId", "EventType", "OccurredAt");
+
+                    b.HasIndex("Status", "NextRetryAt", "LockedUntil");
 
                     b.ToTable("SyncEventInbox", (string)null);
                 });
