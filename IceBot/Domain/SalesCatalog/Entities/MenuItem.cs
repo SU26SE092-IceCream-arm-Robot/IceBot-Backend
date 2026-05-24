@@ -10,6 +10,8 @@ public partial class MenuItem : BusinessEntity
 
     public Guid ProductId { get; set; }
 
+    public Guid ProductVariantId { get; set; }
+
     public Guid? RecipeId { get; set; }
 
     public string Code { get; set; } = null!;
@@ -43,6 +45,8 @@ public partial class MenuItem : BusinessEntity
     public virtual Menu Menu { get; set; } = null!;
 
     public virtual Product Product { get; set; } = null!;
+
+    public virtual ProductVariant ProductVariant { get; set; } = null!;
 
     public virtual Recipe? Recipe { get; set; }
 

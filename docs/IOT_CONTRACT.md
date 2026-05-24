@@ -156,9 +156,12 @@ Response:
   "products": [
     {
       "productId": "uuid",
+      "productVariantId": "uuid",
       "menuItemId": "uuid",
       "productCode": "VANILLA_CUP",
+      "productVariantCode": "M",
       "displayName": "Vanilla Cup",
+      "sizeCode": "M",
       "price": 25000,
       "currency": "VND",
       "available": true,
@@ -180,6 +183,7 @@ Response:
 Projection inputs:
 
 - Menu item snapshot.
+- Product variant snapshot.
 - Product snapshot.
 - Recipe snapshot.
 - `IngredientDispenserState`.
@@ -412,7 +416,9 @@ Response:
             "orderItemId": "uuid",
             "menuItemId": "uuid",
             "productId": "uuid",
+            "productVariantId": "uuid",
             "productCode": "VANILLA_CUP",
+            "productVariantCode": "M",
             "recipeId": "uuid",
             "recipeVersion": 3,
             "quantity": 1,
@@ -574,7 +580,7 @@ Maps to `KioskHeartbeat`.
 GET /api/v1/iot/kiosks/{kioskId}/configuration?currentVersion={version}
 ```
 
-Purpose: edge fetches menu, product, recipe, robot program, and device configuration snapshots.
+Purpose: edge fetches menu, product variant, product, recipe, recipe execution profile, robot program, and device configuration snapshots.
 
 Response:
 
@@ -586,7 +592,9 @@ Response:
   "menus": [],
   "menuItems": [],
   "products": [],
+  "productVariants": [],
   "recipes": [],
+  "recipeExecutionProfiles": [],
   "robotPrograms": [],
   "devices": []
 }
@@ -594,6 +602,7 @@ Response:
 
 Rules:
 
+- Recipe execution profiles are Cloud-side config bindings that Edge can resolve into local runtime recipe-program bindings.
 - Robot programs and steps are shipped as complete versioned packages.
 - `RobotProgramStep` represents a workflow action/instruction. For motion steps, it references local Fairino point/frame names instead of Cloud-owned coordinates.
 - Do not send realtime robot step commands from Cloud.

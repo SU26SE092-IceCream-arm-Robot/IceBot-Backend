@@ -23,8 +23,10 @@ Order
 OrderItem
 Menu
 MenuItem
+ProductVariant
 RobotJob
 RobotProgram
+KioskRecipeExecutionProfile
 StockMovement
 ```
 

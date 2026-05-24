@@ -294,6 +294,7 @@ Usually do not retry old `KioskHeartbeat` records. Send the next heartbeat or a 
 These entities should rely on `Code`, `Version`, scope, or natural unique constraints instead of command idempotency fields:
 
 - `Product`
+- `ProductVariant`
 - `ProductCategory`
 - `ProductOption`
 - `OptionGroup`
@@ -310,7 +311,7 @@ These entities should rely on `Code`, `Version`, scope, or natural unique constr
 
 Notes:
 
-- They still need uniqueness rules such as `Code`, `ScopeType + Code`, or `ProductId + Version`.
+- They still need uniqueness rules such as `Code`, `ScopeType + Code`, `ProductId + VariantCode`, or `ProductVariantId + Version`.
 - For `RobotProgram` and `RobotProgramStep`, use `Code`, `ScopeType`, `TemplateProgramId`, `ProgramVersion`, and `StepNumber` to avoid duplicate configuration.
 - They may need optimistic concurrency (`Version`) if edited from both cloud and edge.
 

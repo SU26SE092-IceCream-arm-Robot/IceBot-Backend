@@ -26,11 +26,13 @@ Apply this to reusable identifiers such as:
 - `Store.Code`
 - `Kiosk.Code`
 - `Product.Code`
+- `ProductVariant.Code`
 - `Recipe.Code`
 - `Menu.Code`
 - `MenuItem.Code`
 - `RobotProgram.Code`
 - `RobotProgramStep.StepCode`
+- `KioskRecipeExecutionProfile.Code`
 - `Device.Code`
 - `Device.SerialNumber`
 
@@ -77,7 +79,7 @@ Orders, payments, robot jobs, stock movements, and audit/event tables should not
 
 Use snapshots for values that must remain true after catalog/menu/configuration changes:
 
-- product/menu display name at order time
+- product/product variant/menu display name at order time
 - unit price and discount at order time
 - recipe/config version used for execution
 - provider raw payload evidence

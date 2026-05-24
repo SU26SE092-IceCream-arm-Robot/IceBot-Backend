@@ -46,9 +46,26 @@ Recommended uniqueness:
 
 Global product templates should have all scope IDs null.
 
+### ProductVariant
+
+`ProductVariant` belongs to a `Product` and represents a sellable/recipe-bearing variant such as size, portion, flavor, or package.
+
+Use:
+
+- `ProductId`
+- `Code`
+- `VariantType`
+- `SizeCode` when the variant is size-based
+
+Recommended uniqueness:
+
+- `ProductId + Code`
+
+Tenant ownership is inherited from the parent product. Do not duplicate tenant scope fields on `ProductVariant` unless variant overrides need independent scope later.
+
 ### Recipe
 
-`Recipe` follows product scoping and can be overridden per tenant or kiosk.
+`Recipe` follows product variant scoping and can be overridden per tenant or kiosk.
 
 Use:
 
@@ -57,12 +74,12 @@ Use:
 - `StoreId`
 - `KioskId`
 - `TemplateRecipeId`
-- `ProductId`
+- `ProductVariantId`
 - `Version`
 
 Recommended uniqueness:
 
-- `ScopeType + OrganizationId + StoreId + KioskId + ProductId + Version`
+- `ScopeType + OrganizationId + StoreId + KioskId + ProductVariantId + Version`
 - or `ScopeType + OrganizationId + StoreId + KioskId + Code + Version`
 
 ### ProductOption
@@ -97,6 +114,26 @@ Device > Kiosk > Store > Organization > Global
 ```
 
 Kiosk/device-scoped robot programs may contain local Fairino point/frame references and backup snapshots specific to a physical installation.
+
+### KioskRecipeExecutionProfile
+
+`KioskRecipeExecutionProfile` is kiosk/device-scoped robot configuration. It binds a catalog recipe to a robot program for a concrete kiosk/device context.
+
+Use:
+
+- `OrganizationId`
+- `StoreId`
+- `KioskId`
+- `DeviceId`
+- `ProductVariantId`
+- `RecipeId`
+- `RobotProgramId`
+
+Recommended uniqueness:
+
+- `OrganizationId + StoreId + KioskId + DeviceId + RecipeId + Code`
+
+This is the Cloud configuration/backup source that syncs to Edge as a runtime recipe-program binding. Do not put this relationship directly on `Product`, `ProductVariant`, `Recipe`, or `MenuItem`.
 
 ## Operational Entities
 

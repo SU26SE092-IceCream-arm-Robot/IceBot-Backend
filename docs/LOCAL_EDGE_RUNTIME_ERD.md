@@ -96,7 +96,7 @@ Indexes:
 
 ### `RuntimeProduct`
 
-Local product snapshot used for tablet projection and execution references.
+Local product snapshot used for tablet projection grouping and execution references.
 
 | Field | Role |
 | --- | --- |
@@ -105,7 +105,6 @@ Local product snapshot used for tablet projection and execution references.
 | `CloudProductId` | cloud product reference |
 | `ProductCode` | stable product code |
 | `DisplayName` | tablet display name |
-| `Price` / `Currency` | local display/payment quote |
 | `IsActive` | whether product is currently sellable by config |
 | `ProductSnapshotSchemaVersion` | snapshot schema |
 | `ProductSnapshotJson` | immutable/latest local product snapshot |
@@ -116,6 +115,32 @@ Indexes:
 
 - unique `KioskRuntimeId`, `ProductCode`, `ConfigurationVersion`
 - index `CloudProductId`
+
+### `RuntimeProductVariant`
+
+Local product variant snapshot for size, portion, flavor, package, or other sellable variant dimensions.
+
+| Field | Role |
+| --- | --- |
+| `Id` | PK |
+| `KioskRuntimeId` | FK to `KioskRuntime` |
+| `RuntimeProductId` | FK to `RuntimeProduct` |
+| `CloudProductVariantId` | cloud product variant reference |
+| `VariantCode` | stable variant code |
+| `DisplayName` | tablet display name |
+| `VariantType` | size/portion/flavor/package/etc. |
+| `SizeCode` | optional S/M/L-style size code |
+| `BasePrice` / `Currency` | local reference price |
+| `IsActive` | whether variant is active in config |
+| `ProductVariantSnapshotSchemaVersion` | snapshot schema |
+| `ProductVariantSnapshotJson` | local product variant snapshot |
+| `ConfigurationVersion` | config package version |
+| `SyncedAt` | last config sync time |
+
+Indexes:
+
+- unique `RuntimeProductId`, `VariantCode`, `ConfigurationVersion`
+- index `CloudProductVariantId`
 
 ### `RuntimeIngredient`
 
@@ -141,13 +166,13 @@ Indexes:
 
 ### `RuntimeRecipe`
 
-Local recipe snapshot for a product.
+Local recipe snapshot for a product variant.
 
 | Field | Role |
 | --- | --- |
 | `Id` | PK |
 | `KioskRuntimeId` | FK to `KioskRuntime` |
-| `RuntimeProductId` | FK to `RuntimeProduct` |
+| `RuntimeProductVariantId` | FK to `RuntimeProductVariant` |
 | `CloudRecipeId` | cloud recipe reference |
 | `RecipeCode` | stable recipe code |
 | `RecipeVersion` | business recipe version |
@@ -251,13 +276,14 @@ Indexes:
 
 ### `RuntimeRecipeProgramBinding`
 
-Maps recipes to robot programs without assuming a permanent 1:1 relationship.
+Maps recipes to robot programs without assuming a permanent 1:1 relationship. This is the Edge runtime form of Cloud `KioskRecipeExecutionProfile`.
 
 | Field | Role |
 | --- | --- |
 | `Id` | PK |
 | `RuntimeRecipeId` | FK to `RuntimeRecipe` |
 | `RuntimeRobotProgramId` | FK to `RuntimeRobotProgram` |
+| `CloudKioskRecipeExecutionProfileId` | cloud execution profile reference |
 | `BindingCode` | stable binding code |
 | `Priority` | selection priority |
 | `IsDefault` | default program for recipe |
@@ -266,6 +292,7 @@ Maps recipes to robot programs without assuming a permanent 1:1 relationship.
 Indexes:
 
 - unique `RuntimeRecipeId`, `RuntimeRobotProgramId`
+- index `CloudKioskRecipeExecutionProfileId`
 
 ### `RuntimeDevice`
 
@@ -393,6 +420,7 @@ One product row in a short-lived projection.
 | `Id` | PK |
 | `RuntimeProductProjectionId` | FK to `RuntimeProductProjection` |
 | `RuntimeProductId` | FK to `RuntimeProduct` |
+| `RuntimeProductVariantId` | FK to `RuntimeProductVariant` |
 | `RuntimeRecipeId` | FK to `RuntimeRecipe` |
 | `Available` | availability result |
 | `UnavailableReason` | reason if unavailable |
@@ -401,7 +429,7 @@ One product row in a short-lived projection.
 
 Indexes:
 
-- unique `RuntimeProductProjectionId`, `RuntimeProductId`, `RuntimeRecipeId`
+- unique `RuntimeProductProjectionId`, `RuntimeProductVariantId`, `RuntimeRecipeId`
 
 ### `EdgeCommandInbox`
 
@@ -469,8 +497,10 @@ Local executable order line.
 | `CloudOrderItemId` | cloud order item reference |
 | `ClientLineId` | tablet/client line id if available |
 | `RuntimeProductId` | FK to `RuntimeProduct` |
+| `RuntimeProductVariantId` | FK to `RuntimeProductVariant` |
 | `RuntimeRecipeId` | FK to `RuntimeRecipe` |
 | `ProductCode` | immutable copied code |
+| `ProductVariantCode` | immutable copied variant code |
 | `RecipeVersion` | copied recipe version |
 | `Quantity` | ordered quantity |
 | `UnitPrice` / `Currency` | copied price |
@@ -480,6 +510,7 @@ Indexes:
 
 - unique `ExecutableOrderId`, `CloudOrderItemId`
 - index `RuntimeProductId`
+- index `RuntimeProductVariantId`
 - index `RuntimeRecipeId`
 
 ### `ExecutionReadinessCheck`
@@ -545,6 +576,7 @@ Local robot execution aggregate.
 | `CorrelationId` / `CausationId` | trace ids |
 | `Status` | queued/running/paused/completed/failed/cancelled |
 | `ProductCode` | copied product code |
+| `ProductVariantCode` | copied product variant code |
 | `RecipeVersion` | copied recipe version |
 | `RecipeSnapshotSchemaVersion` | recipe snapshot schema |
 | `RecipeSnapshotJson` | immutable job recipe snapshot |
@@ -732,6 +764,7 @@ Purpose:
 ### Runtime Configuration Snapshots
 
 - `RuntimeProduct`
+- `RuntimeProductVariant`
 - `RuntimeRecipe`
 - `RuntimeRecipeItem`
 - `RuntimeIngredient`
@@ -741,7 +774,7 @@ Purpose:
 
 Purpose:
 
-- Store the subset of product, recipe, ingredient, and robot program configuration required by the local kiosk.
+- Store the subset of product, product variant, recipe, ingredient, and robot program configuration required by the local kiosk.
 - These are local runtime snapshots, not full Cloud catalog/config tables.
 
 ### Runtime Devices And Inventory
@@ -831,7 +864,8 @@ erDiagram
     KioskRuntime ||--o{ KioskHeartbeat : reports
 
     KioskRuntime ||--o{ RuntimeProduct : caches
-    RuntimeProduct ||--o{ RuntimeRecipe : offers
+    RuntimeProduct ||--o{ RuntimeProductVariant : has
+    RuntimeProductVariant ||--o{ RuntimeRecipe : offers
     RuntimeRecipe ||--o{ RuntimeRecipeItem : contains
     RuntimeIngredient ||--o{ RuntimeRecipeItem : required_by
 
@@ -846,6 +880,7 @@ erDiagram
 
     RuntimeProductProjection ||--o{ RuntimeProductProjectionItem : includes
     RuntimeProduct ||--o{ RuntimeProductProjectionItem : quoted
+    RuntimeProductVariant ||--o{ RuntimeProductProjectionItem : quoted
     RuntimeRecipe ||--o{ RuntimeProductProjectionItem : quoted_with
 
     KioskRuntime ||--o{ EdgeCommandInbox : receives
@@ -853,6 +888,7 @@ erDiagram
     EdgeCommandInbox ||--o{ ExecutionReadinessCheck : checks
     ExecutableOrder ||--o{ ExecutableOrderItem : contains
     RuntimeProduct ||--o{ ExecutableOrderItem : references
+    RuntimeProductVariant ||--o{ ExecutableOrderItem : references
     RuntimeRecipe ||--o{ ExecutableOrderItem : references
 
     ExecutableOrderItem ||--o{ RobotJob : produces
@@ -881,6 +917,7 @@ erDiagram
 These tables are copied from Cloud as scoped, versioned runtime snapshots:
 
 - `RuntimeProduct`
+- `RuntimeProductVariant`
 - `RuntimeRecipe`
 - `RuntimeRecipeItem`
 - `RuntimeIngredient`
@@ -973,6 +1010,7 @@ Add only if the local runtime needs them:
 
 ## Relationship Notes
 
+- `RuntimeRecipeProgramBinding` is the Edge runtime form of Cloud `KioskRecipeExecutionProfile`.
 - `RuntimeRecipeProgramBinding` avoids assuming a recipe maps directly to exactly one robot program forever.
 - `RuntimeRobotProgramStep` stores workflow actions and local Fairino point/frame references. It does not require a separate teaching point table in v1.
 - `ExecutableOrderItem` creates one or more `RobotJob` rows because quantity or serving workflow may require multiple robot executions.

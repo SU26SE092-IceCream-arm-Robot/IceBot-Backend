@@ -26,6 +26,7 @@ public sealed class OrderStore : IOrderStore
         return _dbContext.MenuItems
             .Include(menuItem => menuItem.Menu)
             .Include(menuItem => menuItem.Product)
+            .Include(menuItem => menuItem.ProductVariant)
             .Include(menuItem => menuItem.Recipe)
             .FirstOrDefaultAsync(menuItem => menuItem.Id == menuItemId, cancellationToken);
     }

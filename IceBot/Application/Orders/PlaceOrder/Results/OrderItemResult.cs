@@ -10,6 +10,8 @@ public sealed class OrderItemResult
 
     public Guid ProductId { get; set; }
 
+    public Guid ProductVariantId { get; set; }
+
     public Guid? RecipeId { get; set; }
 
     public string? ClientLineId { get; set; }
@@ -17,6 +19,10 @@ public sealed class OrderItemResult
     public string ProductCodeSnapshot { get; set; } = null!;
 
     public string ProductNameSnapshot { get; set; } = null!;
+
+    public string ProductVariantCodeSnapshot { get; set; } = null!;
+
+    public string ProductVariantNameSnapshot { get; set; } = null!;
 
     public int Quantity { get; set; }
 

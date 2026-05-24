@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    [Migration("20260524034903_InitialCreate")]
+    [Migration("20260524084457_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -107,7 +107,8 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Ingredients", (string)null);
                 });
@@ -272,7 +273,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TemplateProductId");
 
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Products", (string)null);
                 });
@@ -419,9 +421,100 @@ namespace Infrastructure.Migrations
                     b.HasIndex("TemplateProductOptionId");
 
                     b.HasIndex("OrganizationId", "OptionGroupId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("ProductOptions", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("BasePrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<bool>("IsAvailable")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MetadataJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int?>("PreparationTimeSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SizeCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("VariantType")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId", "Code")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("ProductId", "DisplayOrder");
+
+                    b.ToTable("ProductVariants", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.Recipe", b =>
@@ -476,7 +569,7 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("OrganizationId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("ProductId")
+                    b.Property<Guid>("ProductVariantId")
                         .HasColumnType("uuid");
 
                     b.Property<int>("ScopeType")
@@ -515,14 +608,15 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
-                    b.HasIndex("ProductId");
+                    b.HasIndex("ProductVariantId");
 
                     b.HasIndex("StoreId");
 
                     b.HasIndex("TemplateRecipeId");
 
-                    b.HasIndex("OrganizationId", "StoreId", "KioskId", "ProductId", "Code", "Version")
-                        .IsUnique();
+                    b.HasIndex("OrganizationId", "StoreId", "KioskId", "ProductVariantId", "Code", "Version")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Recipes", (string)null);
                 });
@@ -580,7 +674,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("IngredientId");
 
                     b.HasIndex("RecipeId", "IngredientId", "StepOrder")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("RecipeItems", (string)null);
                 });
@@ -660,10 +755,11 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("SerialNumber")
                         .IsUnique()
-                        .HasFilter("\"SerialNumber\" IS NOT NULL");
+                        .HasFilter("\"SerialNumber\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.HasIndex("KioskId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Devices", (string)null);
                 });
@@ -809,7 +905,8 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("DeviceTypeId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("DeviceModels", (string)null);
                 });
@@ -1062,17 +1159,19 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("GoogleEmail")
                         .HasFilter("\"GoogleEmail\" IS NOT NULL");
 
                     b.HasIndex("GoogleSubjectId")
                         .IsUnique()
-                        .HasFilter("\"GoogleSubjectId\" IS NOT NULL");
+                        .HasFilter("\"GoogleSubjectId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.HasIndex("UserName")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Accounts", (string)null);
                 });
@@ -1399,7 +1498,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("KioskId");
 
                     b.HasIndex("DeviceId", "ContainerCode")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("OriginNodeId", "Version");
 
@@ -1715,7 +1815,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("DeviceId");
 
                     b.HasIndex("TicketNumber")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("OriginNodeId", "Version");
 
@@ -2006,6 +2107,19 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("ProductVariantCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductVariantNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<int>("Quantity")
                         .HasColumnType("integer");
 
@@ -2042,11 +2156,13 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariantId");
+
                     b.HasIndex("RecipeId");
 
                     b.HasIndex("OrderId", "ClientLineId")
                         .IsUnique()
-                        .HasFilter("\"ClientLineId\" IS NOT NULL");
+                        .HasFilter("\"ClientLineId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("OrderItems", (string)null);
                 });
@@ -2528,6 +2644,136 @@ namespace Infrastructure.Migrations
                     b.ToTable("Refunds", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.RobotConfiguration.Entities.KioskRecipeExecutionProfile", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ExecutionSnapshotJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ExecutionSnapshotSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ResolverPolicyJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ResolverPolicySchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RobotProgramId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("RecipeId");
+
+                    b.HasIndex("RobotProgramId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("OriginNodeId", "Version");
+
+                    b.HasIndex("KioskId", "DeviceId", "RecipeId", "Status", "Priority");
+
+                    b.HasIndex("OrganizationId", "StoreId", "KioskId", "DeviceId", "RecipeId", "Code")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("KioskRecipeExecutionProfiles", (string)null);
+                });
+
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2687,7 +2933,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "DeviceId", "Code", "ProgramVersion")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("RobotPrograms", (string)null);
                 });
@@ -2827,10 +3074,12 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.HasIndex("RobotProgramId", "StepCode")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("RobotProgramId", "StepNumber")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("RobotProgramSteps", (string)null);
                 });
@@ -3183,7 +3432,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.HasIndex("RobotJobId", "StepNumber")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("RobotJobSteps", (string)null);
                 });
@@ -3270,7 +3520,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("StoreId");
 
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "Status");
 
@@ -3350,6 +3601,9 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid?>("RecipeId")
                         .HasColumnType("uuid");
 
@@ -3366,10 +3620,13 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("ProductId");
 
+                    b.HasIndex("ProductVariantId");
+
                     b.HasIndex("RecipeId");
 
                     b.HasIndex("MenuId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.HasIndex("MenuId", "Status", "DisplayOrder");
 
@@ -3640,12 +3897,13 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("SerialNumber")
                         .IsUnique()
-                        .HasFilter("\"SerialNumber\" IS NOT NULL");
+                        .HasFilter("\"SerialNumber\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.HasIndex("StoreId");
 
                     b.HasIndex("OrganizationId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Kiosks", (string)null);
                 });
@@ -3713,7 +3971,8 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Organizations", (string)null);
                 });
@@ -3809,7 +4068,8 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("OrganizationId", "Code")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Stores", (string)null);
                 });
@@ -3932,6 +4192,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("TemplateProductOption");
                 });
 
+            modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
+                {
+                    b.HasOne("Domain.Catalog.Entities.Product", "Product")
+                        .WithMany("ProductVariants")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+                });
+
             modelBuilder.Entity("Domain.Catalog.Entities.Recipe", b =>
                 {
                     b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
@@ -3944,9 +4215,9 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Catalog.Entities.Product", "Product")
+                    b.HasOne("Domain.Catalog.Entities.ProductVariant", "ProductVariant")
                         .WithMany("Recipes")
-                        .HasForeignKey("ProductId")
+                        .HasForeignKey("ProductVariantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
@@ -3964,7 +4235,7 @@ namespace Infrastructure.Migrations
 
                     b.Navigation("Organization");
 
-                    b.Navigation("Product");
+                    b.Navigation("ProductVariant");
 
                     b.Navigation("Store");
 
@@ -4371,6 +4642,12 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Domain.Catalog.Entities.ProductVariant", "ProductVariant")
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Domain.Catalog.Entities.Recipe", "Recipe")
                         .WithMany()
                         .HasForeignKey("RecipeId")
@@ -4381,6 +4658,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Order");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariant");
 
                     b.Navigation("Recipe");
                 });
@@ -4449,6 +4728,61 @@ namespace Infrastructure.Migrations
                     b.Navigation("PaymentTransaction");
 
                     b.Navigation("RequestedByAccount");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.Entities.KioskRecipeExecutionProfile", b =>
+                {
+                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Catalog.Entities.ProductVariant", "ProductVariant")
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.Recipe", "Recipe")
+                        .WithMany()
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.RobotConfiguration.Entities.RobotProgram", "RobotProgram")
+                        .WithMany()
+                        .HasForeignKey("RobotProgramId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Device");
+
+                    b.Navigation("Kiosk");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("ProductVariant");
+
+                    b.Navigation("Recipe");
+
+                    b.Navigation("RobotProgram");
+
+                    b.Navigation("Store");
                 });
 
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
@@ -4642,6 +4976,12 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Domain.Catalog.Entities.ProductVariant", "ProductVariant")
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Domain.Catalog.Entities.Recipe", "Recipe")
                         .WithMany()
                         .HasForeignKey("RecipeId")
@@ -4650,6 +4990,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Menu");
 
                     b.Navigation("Product");
+
+                    b.Navigation("ProductVariant");
 
                     b.Navigation("Recipe");
                 });
@@ -4753,12 +5095,17 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Catalog.Entities.Product", b =>
                 {
-                    b.Navigation("Recipes");
+                    b.Navigation("ProductVariants");
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.ProductCategory", b =>
                 {
                     b.Navigation("ChildCategories");
+                });
+
+            modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
+                {
+                    b.Navigation("Recipes");
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.Recipe", b =>

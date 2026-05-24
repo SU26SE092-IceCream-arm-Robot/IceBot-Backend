@@ -13,6 +13,8 @@ public partial class OrderItem : BusinessEntity
 
     public Guid ProductId { get; set; }
 
+    public Guid ProductVariantId { get; set; }
+
     public Guid? RecipeId { get; set; }
 
     public string? ClientLineId { get; set; }
@@ -20,6 +22,10 @@ public partial class OrderItem : BusinessEntity
     public string ProductCodeSnapshot { get; set; } = null!;
 
     public string ProductNameSnapshot { get; set; } = null!;
+
+    public string ProductVariantCodeSnapshot { get; set; } = null!;
+
+    public string ProductVariantNameSnapshot { get; set; } = null!;
 
     public int Quantity { get; set; } = 1;
 
@@ -45,6 +51,8 @@ public partial class OrderItem : BusinessEntity
 
     public virtual Product Product { get; set; } = null!;
 
+    public virtual ProductVariant ProductVariant { get; set; } = null!;
+
     public virtual Recipe? Recipe { get; set; }
 
     public virtual ICollection<ProductOption> ProductOptions { get; set; } = new List<ProductOption>();
@@ -52,9 +60,12 @@ public partial class OrderItem : BusinessEntity
     public static OrderItem Create(
         Guid menuItemId,
         Guid productId,
+        Guid productVariantId,
         Guid? recipeId,
         string productCodeSnapshot,
         string productNameSnapshot,
+        string productVariantCodeSnapshot,
+        string productVariantNameSnapshot,
         int quantity,
         decimal unitPrice,
         decimal discountAmount = 0,
@@ -72,6 +83,11 @@ public partial class OrderItem : BusinessEntity
             throw new DomainRuleException("Product is required for an order item.");
         }
 
+        if (productVariantId == Guid.Empty)
+        {
+            throw new DomainRuleException("Product variant is required for an order item.");
+        }
+
         if (string.IsNullOrWhiteSpace(productCodeSnapshot))
         {
             throw new DomainRuleException("Product code snapshot is required.");
@@ -80,6 +96,16 @@ public partial class OrderItem : BusinessEntity
         if (string.IsNullOrWhiteSpace(productNameSnapshot))
         {
             throw new DomainRuleException("Product name snapshot is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(productVariantCodeSnapshot))
+        {
+            throw new DomainRuleException("Product variant code snapshot is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(productVariantNameSnapshot))
+        {
+            throw new DomainRuleException("Product variant name snapshot is required.");
         }
 
         if (quantity <= 0)
@@ -101,9 +127,12 @@ public partial class OrderItem : BusinessEntity
         {
             MenuItemId = menuItemId,
             ProductId = productId,
+            ProductVariantId = productVariantId,
             RecipeId = recipeId,
             ProductCodeSnapshot = productCodeSnapshot.Trim(),
             ProductNameSnapshot = productNameSnapshot.Trim(),
+            ProductVariantCodeSnapshot = productVariantCodeSnapshot.Trim(),
+            ProductVariantNameSnapshot = productVariantNameSnapshot.Trim(),
             ClientLineId = string.IsNullOrWhiteSpace(clientLineId) ? null : clientLineId.Trim(),
             Quantity = quantity,
             UnitPrice = unitPrice,

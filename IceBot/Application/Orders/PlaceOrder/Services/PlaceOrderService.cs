@@ -96,6 +96,7 @@ public sealed class PlaceOrderService
 
                 var menu = menuItem.Menu;
                 var product = menuItem.Product;
+                var productVariant = menuItem.ProductVariant;
                 var recipe = menuItem.Recipe;
 
                 if (menu.Status != MenuStatus.Active)
@@ -116,6 +117,16 @@ public sealed class PlaceOrderService
                 if (!product.IsAvailable)
                 {
                     return ApiResult<OrderResult>.Fail($"Product '{product.Name}' is not available.", 409);
+                }
+
+                if (!productVariant.IsAvailable)
+                {
+                    return ApiResult<OrderResult>.Fail($"Product variant '{productVariant.Name}' is not available.", 409);
+                }
+
+                if (productVariant.ProductId != product.Id)
+                {
+                    return ApiResult<OrderResult>.Fail("Menu item variant does not belong to the selected product.", 409);
                 }
 
                 if (!order.OrderItems.Any())
@@ -143,7 +154,7 @@ public sealed class PlaceOrderService
 
                 if (recipe is not null)
                 {
-                    var recipeValidationError = ValidateRecipe(recipe, product, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id);
+                    var recipeValidationError = ValidateRecipe(recipe, productVariant, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id);
                     if (recipeValidationError is not null)
                     {
                         return ApiResult<OrderResult>.Fail(recipeValidationError, 409);
@@ -153,8 +164,11 @@ public sealed class PlaceOrderService
                 var orderItem = order.AddItem(
                     menuItem.Id,
                     product.Id,
+                    productVariant.Id,
                     recipe?.Id,
                     product.Code,
+                    product.DisplayName ?? product.Name,
+                    productVariant.Code,
                     menuItem.DisplayName,
                     itemRequest.Quantity,
                     menuItem.Price,
@@ -285,10 +299,13 @@ public sealed class PlaceOrderService
                     Id = item.Id,
                     MenuItemId = item.MenuItemId,
                     ProductId = item.ProductId,
+                    ProductVariantId = item.ProductVariantId,
                     RecipeId = item.RecipeId,
                     ClientLineId = item.ClientLineId,
                     ProductCodeSnapshot = item.ProductCodeSnapshot,
                     ProductNameSnapshot = item.ProductNameSnapshot,
+                    ProductVariantCodeSnapshot = item.ProductVariantCodeSnapshot,
+                    ProductVariantNameSnapshot = item.ProductVariantNameSnapshot,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     DiscountAmount = item.DiscountAmount,
@@ -323,11 +340,11 @@ public sealed class PlaceOrderService
                (effectiveTo is null || effectiveTo >= now);
     }
 
-    private static string? ValidateRecipe(Recipe recipe, Product product, Guid? organizationId, Guid? storeId, Guid kioskId)
+    private static string? ValidateRecipe(Recipe recipe, ProductVariant productVariant, Guid? organizationId, Guid? storeId, Guid kioskId)
     {
-        if (recipe.ProductId != product.Id)
+        if (recipe.ProductVariantId != productVariant.Id)
         {
-            return "Menu item recipe does not belong to the selected product.";
+            return "Menu item recipe does not belong to the selected product variant.";
         }
 
         if (recipe.Status is not (RecipeStatus.Published or RecipeStatus.Active))
@@ -374,6 +391,7 @@ public sealed class PlaceOrderService
             recipe.Id,
             recipe.Code,
             recipe.Name,
+            recipe.ProductVariantId,
             recipe.Version,
             recipe.Status,
             recipe.EstimatedDurationSeconds,

@@ -40,11 +40,12 @@ Enums:
 
 Namespace: `Domain.Catalog`
 
-Owns product definitions, product options, recipes, and ingredient definitions used to describe products.
+Owns product definitions, product variants, product options, recipes, and ingredient definitions used to describe products.
 
 Entities:
 
 - `Product`
+- `ProductVariant`
 - `ProductCategory`
 - `ProductOption`
 - `OptionGroup`
@@ -63,7 +64,7 @@ Entities:
 - `Menu`
 - `MenuItem`
 
-`MenuItem` is a domain concept, not just a database mapping. It represents a sellable offer that points to Catalog product/recipe data and provides order pricing.
+`MenuItem` is a domain concept, not just a database mapping. It represents a sellable offer that points to Catalog product variant/recipe data and provides order pricing.
 
 ### Orders
 
@@ -106,8 +107,11 @@ Entities:
 
 - `RobotProgram`
 - `RobotProgramStep`
+- `KioskRecipeExecutionProfile`
 
 This context is configuration-time. It should not own runtime execution state.
+
+`KioskRecipeExecutionProfile` is the cloud-side config/backup binding that says which robot program can execute a recipe for a kiosk/device context. Edge still resolves and executes locally.
 
 ### Robot Runtime
 
@@ -213,7 +217,7 @@ Dependency and cross-layer rules live in [Dependency Rules](DEPENDENCY_RULES.md)
 ## Current Intentional Cross-Context References
 
 - Orders reference Tenants through `OrganizationId`, `StoreId`, and `KioskId`.
-- Orders reference Sales Catalog through `MenuItemId`, and keep Catalog references through `ProductId`, `RecipeId`, and item snapshots.
+- Orders reference Sales Catalog through `MenuItemId`, and keep Catalog references through `ProductId`, `ProductVariantId`, `RecipeId`, and item snapshots.
 - Payments reference Orders through `OrderId`.
 - Robot Runtime references Orders, Robot Configuration, Devices, Catalog recipes, and Tenants by ids/snapshots.
 - Inventory references Devices, Tenants, Catalog ingredients, and dispenser state.

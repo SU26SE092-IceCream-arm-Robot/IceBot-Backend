@@ -24,8 +24,10 @@ Detailed API and message contracts live in [IoT Contract](IOT_CONTRACT.md).
 2. Tablet calls Local Edge Backend for runtime menu/product projection.
 3. Edge builds projection from:
    - menu item snapshot
+   - product variant snapshot
    - product snapshot
    - recipe snapshot
+   - recipe execution profile
    - inventory state
    - device state
    - robot availability
@@ -151,7 +153,7 @@ Check:
 
 - Edge process is healthy.
 - Robot executor is available.
-- Required robot program/config version exists.
+- Required product variant recipe, recipe execution profile, and robot program/config version exist.
 - Required Fairino point/frame references exist locally.
 - Required devices are online and not in error.
 - Ingredient levels are not below allowed threshold.

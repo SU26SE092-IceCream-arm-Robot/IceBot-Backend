@@ -50,7 +50,7 @@ public partial class Product : BusinessEntity, IKioskScoped
 
     public virtual ProductCategory? Category { get; set; }
 
-    public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
+    public virtual ICollection<ProductVariant> ProductVariants { get; set; } = new List<ProductVariant>();
 
     public virtual ICollection<ProductOption> ProductOptions { get; set; } = new List<ProductOption>();
 }

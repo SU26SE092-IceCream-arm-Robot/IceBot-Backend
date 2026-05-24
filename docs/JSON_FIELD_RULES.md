@@ -22,6 +22,8 @@ Fields:
 - `RobotProgramStep.ParametersOverrideJson` with `ParametersOverrideSchemaVersion`
 - `RobotProgramStep.RetryPolicyJson` with `RetryPolicySchemaVersion`
 - `RobotProgramStep.PointSnapshotJson` with `PointSnapshotSchemaVersion`
+- `KioskRecipeExecutionProfile.ResolverPolicyJson` with `ResolverPolicySchemaVersion`
+- `KioskRecipeExecutionProfile.ExecutionSnapshotJson` with `ExecutionSnapshotSchemaVersion`
 - `IngredientDispenserState.LevelToQuantityProfileJson` with `LevelToQuantityProfileSchemaVersion`
 
 Rules:
@@ -47,8 +49,8 @@ Fields:
 Rules:
 
 - Treat as immutable once the order item, robot job, or payment attempt is created.
-- If product, recipe, or option configuration changes later, do not rewrite historical snapshots.
-- Reports may read snapshots for historical truth, but current catalog pages should read typed product/recipe tables.
+- If product, product variant, recipe, or option configuration changes later, do not rewrite historical snapshots.
+- Reports may read snapshots for historical truth, but current catalog pages should read typed product/product variant/recipe tables.
 
 ### Append-only payload/debug
 
@@ -103,7 +105,7 @@ Rules:
 
 For edge-cloud sync, conflict resolution should happen at the aggregate boundary:
 
-- Robot configuration: `RobotProgram` and `RobotProgramStep` versions.
+- Robot configuration: `RobotProgram`, `RobotProgramStep`, and `KioskRecipeExecutionProfile` versions.
 - Runtime execution: `RobotJob`, `RobotJobStep`, and append-only runtime events.
 - Stock reporting: typed `StockMovement` quantities; JSON sensor payloads are only supporting evidence.
 

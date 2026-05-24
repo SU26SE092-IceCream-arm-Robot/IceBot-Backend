@@ -45,6 +45,7 @@ public class IceBotDbContext : DbContext
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<OptionGroup> OptionGroups => Set<OptionGroup>();
     public DbSet<ProductOption> ProductOptions => Set<ProductOption>();
     public DbSet<Recipe> Recipes => Set<Recipe>();
@@ -67,6 +68,7 @@ public class IceBotDbContext : DbContext
 
     public DbSet<RobotProgram> RobotPrograms => Set<RobotProgram>();
     public DbSet<RobotProgramStep> RobotProgramSteps => Set<RobotProgramStep>();
+    public DbSet<KioskRecipeExecutionProfile> KioskRecipeExecutionProfiles => Set<KioskRecipeExecutionProfile>();
     public DbSet<RobotJob> RobotJobs => Set<RobotJob>();
     public DbSet<RobotJobStep> RobotJobSteps => Set<RobotJobStep>();
     public DbSet<RobotJobEvent> RobotJobEvents => Set<RobotJobEvent>();
@@ -289,6 +291,14 @@ public class IceBotDbContext : DbContext
                     });
         });
 
+        modelBuilder.Entity<ProductVariant>(entity =>
+        {
+            entity.ToTable("ProductVariants");
+            entity.HasIndex(x => new { x.ProductId, x.Code }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.ProductId, x.DisplayOrder });
+            entity.HasOne(x => x.Product).WithMany(x => x.ProductVariants).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+        });
+
         modelBuilder.Entity<OptionGroup>(entity =>
         {
             entity.ToTable("OptionGroups");
@@ -307,11 +317,11 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<Recipe>(entity =>
         {
             entity.ToTable("Recipes");
-            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.ProductId, x.Code, x.Version }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.ProductVariantId, x.Code, x.Version }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Product).WithMany(x => x.Recipes).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ProductVariant).WithMany(x => x.Recipes).HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.TemplateRecipe).WithMany().HasForeignKey(x => x.TemplateRecipeId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -374,6 +384,7 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.Order).WithMany(x => x.OrderItems).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.MenuItem).WithMany().HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(x => x.ProductOptions)
                 .WithMany()
@@ -455,6 +466,7 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.MenuId, x.Status, x.DisplayOrder });
             entity.HasOne(x => x.Menu).WithMany(x => x.MenuItems).HasForeignKey(x => x.MenuId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
         });
     }
@@ -480,6 +492,22 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.RobotProgramId, x.StepCode }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasOne(x => x.RobotProgram).WithMany(x => x.RobotProgramSteps).HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.TemplateStep).WithMany().HasForeignKey(x => x.TemplateStepId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<KioskRecipeExecutionProfile>(entity =>
+        {
+            entity.ToTable("KioskRecipeExecutionProfiles");
+            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.DeviceId, x.RecipeId, x.Code })
+                .IsUnique()
+                .HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.KioskId, x.DeviceId, x.RecipeId, x.Status, x.Priority });
+            entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.RobotProgram).WithMany().HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<RobotJob>(entity =>

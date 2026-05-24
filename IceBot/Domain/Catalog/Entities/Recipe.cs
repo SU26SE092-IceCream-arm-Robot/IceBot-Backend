@@ -13,7 +13,7 @@ public partial class Recipe : BusinessEntity, IKioskScoped
 
     public Guid? KioskId { get; set; }
 
-    public Guid ProductId { get; set; }
+    public Guid ProductVariantId { get; set; }
 
     public Guid? TemplateRecipeId { get; set; }
 
@@ -49,7 +49,7 @@ public partial class Recipe : BusinessEntity, IKioskScoped
 
     public virtual Kiosk? Kiosk { get; set; }
 
-    public virtual Product Product { get; set; } = null!;
+    public virtual ProductVariant ProductVariant { get; set; } = null!;
 
     public virtual Recipe? TemplateRecipe { get; set; }
 

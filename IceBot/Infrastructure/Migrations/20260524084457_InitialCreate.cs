@@ -1165,28 +1165,24 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "Recipes",
+                name: "ProductVariants",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
-                    StoreId = table.Column<Guid>(type: "uuid", nullable: true),
-                    KioskId = table.Column<Guid>(type: "uuid", nullable: true),
                     ProductId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TemplateRecipeId = table.Column<Guid>(type: "uuid", nullable: true),
                     Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Version = table.Column<int>(type: "integer", nullable: false),
-                    Status = table.Column<int>(type: "integer", nullable: false),
-                    IsDefault = table.Column<bool>(type: "boolean", nullable: false),
-                    YieldQuantity = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
-                    Unit = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    EstimatedDurationSeconds = table.Column<int>(type: "integer", nullable: true),
-                    EffectiveFrom = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    EffectiveTo = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    InstructionsSchemaVersion = table.Column<int>(type: "integer", nullable: false),
-                    InstructionsJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
-                    ScopeType = table.Column<int>(type: "integer", nullable: false),
+                    DisplayName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    VariantType = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    SizeCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    BasePrice = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Currency = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    IsAvailable = table.Column<bool>(type: "boolean", nullable: false),
+                    DisplayOrder = table.Column<int>(type: "integer", nullable: false),
+                    PreparationTimeSeconds = table.Column<int>(type: "integer", nullable: true),
+                    ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    MetadataJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -1196,35 +1192,11 @@ namespace Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Recipes", x => x.Id);
+                    table.PrimaryKey("PK_ProductVariants", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_Recipes_Kiosks_KioskId",
-                        column: x => x.KioskId,
-                        principalTable: "Kiosks",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Recipes_Organizations_OrganizationId",
-                        column: x => x.OrganizationId,
-                        principalTable: "Organizations",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Recipes_Products_ProductId",
+                        name: "FK_ProductVariants_Products_ProductId",
                         column: x => x.ProductId,
                         principalTable: "Products",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Recipes_Recipes_TemplateRecipeId",
-                        column: x => x.TemplateRecipeId,
-                        principalTable: "Recipes",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_Recipes_Stores_StoreId",
-                        column: x => x.StoreId,
-                        principalTable: "Stores",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -1497,12 +1469,162 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Recipes",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StoreId = table.Column<Guid>(type: "uuid", nullable: true),
+                    KioskId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ProductVariantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TemplateRecipeId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Version = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    IsDefault = table.Column<bool>(type: "boolean", nullable: false),
+                    YieldQuantity = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Unit = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    EstimatedDurationSeconds = table.Column<int>(type: "integer", nullable: true),
+                    EffectiveFrom = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    EffectiveTo = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    InstructionsSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    InstructionsJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    ScopeType = table.Column<int>(type: "integer", nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Recipes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Recipes_Kiosks_KioskId",
+                        column: x => x.KioskId,
+                        principalTable: "Kiosks",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Recipes_Organizations_OrganizationId",
+                        column: x => x.OrganizationId,
+                        principalTable: "Organizations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Recipes_ProductVariants_ProductVariantId",
+                        column: x => x.ProductVariantId,
+                        principalTable: "ProductVariants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Recipes_Recipes_TemplateRecipeId",
+                        column: x => x.TemplateRecipeId,
+                        principalTable: "Recipes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Recipes_Stores_StoreId",
+                        column: x => x.StoreId,
+                        principalTable: "Stores",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "KioskRecipeExecutionProfiles",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StoreId = table.Column<Guid>(type: "uuid", nullable: true),
+                    KioskId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeviceId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ProductVariantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RecipeId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RobotProgramId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    Priority = table.Column<int>(type: "integer", nullable: false),
+                    IsDefault = table.Column<bool>(type: "boolean", nullable: false),
+                    EffectiveFrom = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    EffectiveTo = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    PublishedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ActivatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RetiredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    ResolverPolicySchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    ResolverPolicyJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    ExecutionSnapshotSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    ExecutionSnapshotJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    Notes = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    OriginNodeId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Version = table.Column<long>(type: "bigint", nullable: false),
+                    SyncedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_KioskRecipeExecutionProfiles", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_KioskRecipeExecutionProfiles_Devices_DeviceId",
+                        column: x => x.DeviceId,
+                        principalTable: "Devices",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_KioskRecipeExecutionProfiles_Kiosks_KioskId",
+                        column: x => x.KioskId,
+                        principalTable: "Kiosks",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_KioskRecipeExecutionProfiles_Organizations_OrganizationId",
+                        column: x => x.OrganizationId,
+                        principalTable: "Organizations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_KioskRecipeExecutionProfiles_ProductVariants_ProductVariant~",
+                        column: x => x.ProductVariantId,
+                        principalTable: "ProductVariants",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_KioskRecipeExecutionProfiles_Recipes_RecipeId",
+                        column: x => x.RecipeId,
+                        principalTable: "Recipes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_KioskRecipeExecutionProfiles_RobotPrograms_RobotProgramId",
+                        column: x => x.RobotProgramId,
+                        principalTable: "RobotPrograms",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_KioskRecipeExecutionProfiles_Stores_StoreId",
+                        column: x => x.StoreId,
+                        principalTable: "Stores",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "MenuItems",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     MenuId = table.Column<Guid>(type: "uuid", nullable: false),
                     ProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductVariantId = table.Column<Guid>(type: "uuid", nullable: false),
                     RecipeId = table.Column<Guid>(type: "uuid", nullable: true),
                     Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     DisplayName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
@@ -1532,6 +1654,12 @@ namespace Infrastructure.Migrations
                         name: "FK_MenuItems_Menus_MenuId",
                         column: x => x.MenuId,
                         principalTable: "Menus",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_MenuItems_ProductVariants_ProductVariantId",
+                        column: x => x.ProductVariantId,
+                        principalTable: "ProductVariants",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -1592,10 +1720,13 @@ namespace Infrastructure.Migrations
                     OrderId = table.Column<Guid>(type: "uuid", nullable: false),
                     MenuItemId = table.Column<Guid>(type: "uuid", nullable: false),
                     ProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductVariantId = table.Column<Guid>(type: "uuid", nullable: false),
                     RecipeId = table.Column<Guid>(type: "uuid", nullable: true),
                     ClientLineId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     ProductCodeSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     ProductNameSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    ProductVariantCodeSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    ProductVariantNameSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     Quantity = table.Column<int>(type: "integer", nullable: false),
                     UnitPrice = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
                     DiscountAmount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
@@ -1625,6 +1756,12 @@ namespace Infrastructure.Migrations
                         name: "FK_OrderItems_Orders_OrderId",
                         column: x => x.OrderId,
                         principalTable: "Orders",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_OrderItems_ProductVariants_ProductVariantId",
+                        column: x => x.ProductVariantId,
+                        principalTable: "ProductVariants",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
@@ -2060,7 +2197,8 @@ namespace Infrastructure.Migrations
                 name: "IX_Accounts_Email",
                 table: "Accounts",
                 column: "Email",
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Accounts_GoogleEmail",
@@ -2073,13 +2211,14 @@ namespace Infrastructure.Migrations
                 table: "Accounts",
                 column: "GoogleSubjectId",
                 unique: true,
-                filter: "\"GoogleSubjectId\" IS NOT NULL");
+                filter: "\"GoogleSubjectId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Accounts_UserName",
                 table: "Accounts",
                 column: "UserName",
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_AccountStores_StoreId",
@@ -2141,7 +2280,8 @@ namespace Infrastructure.Migrations
                 name: "IX_DeviceModels_DeviceTypeId_Code",
                 table: "DeviceModels",
                 columns: new[] { "DeviceTypeId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Devices_DeviceModelId",
@@ -2157,14 +2297,15 @@ namespace Infrastructure.Migrations
                 name: "IX_Devices_KioskId_Code",
                 table: "Devices",
                 columns: new[] { "KioskId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Devices_SerialNumber",
                 table: "Devices",
                 column: "SerialNumber",
                 unique: true,
-                filter: "\"SerialNumber\" IS NOT NULL");
+                filter: "\"SerialNumber\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceTypes_Code",
@@ -2176,7 +2317,8 @@ namespace Infrastructure.Migrations
                 name: "IX_IngredientDispenserStates_DeviceId_ContainerCode",
                 table: "IngredientDispenserStates",
                 columns: new[] { "DeviceId", "ContainerCode" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_IngredientDispenserStates_IngredientId",
@@ -2197,7 +2339,8 @@ namespace Infrastructure.Migrations
                 name: "IX_Ingredients_Code",
                 table: "Ingredients",
                 column: "Code",
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_KioskHeartbeats_KioskId_NodeId_HeartbeatSequence",
@@ -2217,6 +2360,53 @@ namespace Infrastructure.Migrations
                 columns: new[] { "OriginNodeId", "Version" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_DeviceId",
+                table: "KioskRecipeExecutionProfiles",
+                column: "DeviceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_KioskId_DeviceId_RecipeId_Stat~",
+                table: "KioskRecipeExecutionProfiles",
+                columns: new[] { "KioskId", "DeviceId", "RecipeId", "Status", "Priority" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_OrganizationId",
+                table: "KioskRecipeExecutionProfiles",
+                column: "OrganizationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_OrganizationId_StoreId_KioskId~",
+                table: "KioskRecipeExecutionProfiles",
+                columns: new[] { "OrganizationId", "StoreId", "KioskId", "DeviceId", "RecipeId", "Code" },
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_OriginNodeId_Version",
+                table: "KioskRecipeExecutionProfiles",
+                columns: new[] { "OriginNodeId", "Version" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_ProductVariantId",
+                table: "KioskRecipeExecutionProfiles",
+                column: "ProductVariantId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_RecipeId",
+                table: "KioskRecipeExecutionProfiles",
+                column: "RecipeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_RobotProgramId",
+                table: "KioskRecipeExecutionProfiles",
+                column: "RobotProgramId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KioskRecipeExecutionProfiles_StoreId",
+                table: "KioskRecipeExecutionProfiles",
+                column: "StoreId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Kiosks_OrganizationId",
                 table: "Kiosks",
                 column: "OrganizationId");
@@ -2225,14 +2415,15 @@ namespace Infrastructure.Migrations
                 name: "IX_Kiosks_OrganizationId_Code",
                 table: "Kiosks",
                 columns: new[] { "OrganizationId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Kiosks_SerialNumber",
                 table: "Kiosks",
                 column: "SerialNumber",
                 unique: true,
-                filter: "\"SerialNumber\" IS NOT NULL");
+                filter: "\"SerialNumber\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Kiosks_StoreId",
@@ -2268,13 +2459,15 @@ namespace Infrastructure.Migrations
                 name: "IX_MaintenanceTickets_TicketNumber",
                 table: "MaintenanceTickets",
                 column: "TicketNumber",
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MenuItems_MenuId_Code",
                 table: "MenuItems",
                 columns: new[] { "MenuId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MenuItems_MenuId_Status_DisplayOrder",
@@ -2285,6 +2478,11 @@ namespace Infrastructure.Migrations
                 name: "IX_MenuItems_ProductId",
                 table: "MenuItems",
                 column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MenuItems_ProductVariantId",
+                table: "MenuItems",
+                column: "ProductVariantId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_MenuItems_RecipeId",
@@ -2305,7 +2503,8 @@ namespace Infrastructure.Migrations
                 name: "IX_Menus_OrganizationId_StoreId_KioskId_Code",
                 table: "Menus",
                 columns: new[] { "OrganizationId", "StoreId", "KioskId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Menus_OrganizationId_StoreId_KioskId_Status",
@@ -2368,12 +2567,17 @@ namespace Infrastructure.Migrations
                 table: "OrderItems",
                 columns: new[] { "OrderId", "ClientLineId" },
                 unique: true,
-                filter: "\"ClientLineId\" IS NOT NULL");
+                filter: "\"ClientLineId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrderItems_ProductId",
                 table: "OrderItems",
                 column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OrderItems_ProductVariantId",
+                table: "OrderItems",
+                column: "ProductVariantId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_OrderItems_RecipeId",
@@ -2429,7 +2633,8 @@ namespace Infrastructure.Migrations
                 name: "IX_Organizations_Code",
                 table: "Organizations",
                 column: "Code",
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_PaymentCallbacks_PaymentTransactionId",
@@ -2509,7 +2714,8 @@ namespace Infrastructure.Migrations
                 name: "IX_ProductOptions_OrganizationId_OptionGroupId_Code",
                 table: "ProductOptions",
                 columns: new[] { "OrganizationId", "OptionGroupId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ProductOptions_TemplateProductOptionId",
@@ -2540,7 +2746,8 @@ namespace Infrastructure.Migrations
                 name: "IX_Products_OrganizationId_StoreId_KioskId_Code",
                 table: "Products",
                 columns: new[] { "OrganizationId", "StoreId", "KioskId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Products_StoreId",
@@ -2553,6 +2760,18 @@ namespace Infrastructure.Migrations
                 column: "TemplateProductId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ProductVariants_ProductId_Code",
+                table: "ProductVariants",
+                columns: new[] { "ProductId", "Code" },
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProductVariants_ProductId_DisplayOrder",
+                table: "ProductVariants",
+                columns: new[] { "ProductId", "DisplayOrder" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RecipeItems_IngredientId",
                 table: "RecipeItems",
                 column: "IngredientId");
@@ -2561,7 +2780,8 @@ namespace Infrastructure.Migrations
                 name: "IX_RecipeItems_RecipeId_IngredientId_StepOrder",
                 table: "RecipeItems",
                 columns: new[] { "RecipeId", "IngredientId", "StepOrder" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Recipes_KioskId",
@@ -2574,15 +2794,16 @@ namespace Infrastructure.Migrations
                 column: "OrganizationId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Recipes_OrganizationId_StoreId_KioskId_ProductId_Code_Versi~",
+                name: "IX_Recipes_OrganizationId_StoreId_KioskId_ProductVariantId_Cod~",
                 table: "Recipes",
-                columns: new[] { "OrganizationId", "StoreId", "KioskId", "ProductId", "Code", "Version" },
-                unique: true);
+                columns: new[] { "OrganizationId", "StoreId", "KioskId", "ProductVariantId", "Code", "Version" },
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Recipes_ProductId",
+                name: "IX_Recipes_ProductVariantId",
                 table: "Recipes",
-                column: "ProductId");
+                column: "ProductVariantId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Recipes_StoreId",
@@ -2727,7 +2948,8 @@ namespace Infrastructure.Migrations
                 name: "IX_RobotJobSteps_RobotJobId_StepNumber",
                 table: "RobotJobSteps",
                 columns: new[] { "RobotJobId", "StepNumber" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RobotJobSteps_RobotProgramStepId",
@@ -2753,7 +2975,8 @@ namespace Infrastructure.Migrations
                 name: "IX_RobotPrograms_OrganizationId_StoreId_KioskId_DeviceId_Code_~",
                 table: "RobotPrograms",
                 columns: new[] { "OrganizationId", "StoreId", "KioskId", "DeviceId", "Code", "ProgramVersion" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RobotPrograms_OriginNodeId_Version",
@@ -2784,13 +3007,15 @@ namespace Infrastructure.Migrations
                 name: "IX_RobotProgramSteps_RobotProgramId_StepCode",
                 table: "RobotProgramSteps",
                 columns: new[] { "RobotProgramId", "StepCode" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RobotProgramSteps_RobotProgramId_StepNumber",
                 table: "RobotProgramSteps",
                 columns: new[] { "RobotProgramId", "StepNumber" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_RobotProgramSteps_TemplateStepId",
@@ -2859,7 +3084,8 @@ namespace Infrastructure.Migrations
                 name: "IX_Stores_OrganizationId_Code",
                 table: "Stores",
                 columns: new[] { "OrganizationId", "Code" },
-                unique: true);
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SyncDeadLetters_EventId",
@@ -2921,6 +3147,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "KioskHeartbeats");
+
+            migrationBuilder.DropTable(
+                name: "KioskRecipeExecutionProfiles");
 
             migrationBuilder.DropTable(
                 name: "MaintenanceTickets");
@@ -3022,10 +3251,13 @@ namespace Infrastructure.Migrations
                 name: "DeviceModels");
 
             migrationBuilder.DropTable(
-                name: "Products");
+                name: "ProductVariants");
 
             migrationBuilder.DropTable(
                 name: "DeviceTypes");
+
+            migrationBuilder.DropTable(
+                name: "Products");
 
             migrationBuilder.DropTable(
                 name: "Kiosks");
