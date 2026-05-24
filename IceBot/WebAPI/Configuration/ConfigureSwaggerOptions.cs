@@ -20,7 +20,7 @@ namespace WebAPI.Configuration
                     description.GroupName,
                     new OpenApiInfo
                     {
-                        Title = "GearForge API",
+                        Title = "IceBot API",
                         Version = description.ApiVersion.ToString()
                     });
             }
