@@ -63,6 +63,7 @@ public partial class Order : BusinessEntity, IStoreScoped
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
 
     public OrderItem AddItem(
+        Guid menuItemId,
         Guid productId,
         Guid? recipeId,
         string productCodeSnapshot,
@@ -83,6 +84,7 @@ public partial class Order : BusinessEntity, IStoreScoped
         }
 
         var orderItem = OrderItem.Create(
+            menuItemId,
             productId,
             recipeId,
             productCodeSnapshot,

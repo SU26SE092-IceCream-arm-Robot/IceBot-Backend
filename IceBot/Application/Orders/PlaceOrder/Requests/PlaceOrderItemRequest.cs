@@ -2,9 +2,7 @@ namespace Application.Orders.PlaceOrder.Requests;
 
 public sealed class PlaceOrderItemRequest
 {
-    public Guid ProductId { get; set; }
-
-    public Guid? RecipeId { get; set; }
+    public Guid MenuItemId { get; set; }
 
     public string? ClientLineId { get; set; }
 

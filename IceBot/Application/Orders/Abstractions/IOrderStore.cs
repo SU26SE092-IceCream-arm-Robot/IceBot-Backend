@@ -1,5 +1,5 @@
-using Domain.Catalog.Entities;
 using Domain.Orders.Entities;
+using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 
 namespace Application.Orders.Abstractions;
@@ -8,9 +8,7 @@ public interface IOrderStore
 {
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
-    Task<Product?> GetProductByIdAsync(Guid productId, CancellationToken cancellationToken = default);
-
-    Task<Recipe?> GetRecipeByIdAsync(Guid recipeId, CancellationToken cancellationToken = default);
+    Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default);
 
     Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default);
 

@@ -19,6 +19,7 @@ Folder and namespace names should follow bounded context ownership:
 ```text
 Domain.Orders
 Domain.Payments
+Domain.SalesCatalog
 Domain.RobotConfiguration
 Domain.RobotRuntime
 Domain.Inventory
@@ -32,6 +33,8 @@ Use singular entity names:
 ```csharp
 Order
 OrderItem
+Menu
+MenuItem
 RobotJob
 RobotProgram
 StockMovement

@@ -40,7 +40,7 @@ Enums:
 
 Namespace: `Domain.Catalog`
 
-Owns sellable products, product options, recipes, and ingredient definitions used to describe products.
+Owns product definitions, product options, recipes, and ingredient definitions used to describe products.
 
 Entities:
 
@@ -51,6 +51,19 @@ Entities:
 - `Recipe`
 - `RecipeItem`
 - `Ingredient`
+
+### Sales Catalog
+
+Namespace: `Domain.SalesCatalog`
+
+Owns menus and menu items: the products/recipes currently offered for sale in a tenant/store/kiosk context, including sellable price and availability windows.
+
+Entities:
+
+- `Menu`
+- `MenuItem`
+
+`MenuItem` is a domain concept, not just a database mapping. It represents a sellable offer that points to Catalog product/recipe data and provides order pricing.
 
 ### Orders
 
@@ -200,7 +213,7 @@ Dependency and cross-layer rules live in [Dependency Rules](DEPENDENCY_RULES.md)
 ## Current Intentional Cross-Context References
 
 - Orders reference Tenants through `OrganizationId`, `StoreId`, and `KioskId`.
-- Orders reference Catalog through `ProductId`, `RecipeId`, and item snapshots.
+- Orders reference Sales Catalog through `MenuItemId`, and keep Catalog references through `ProductId`, `RecipeId`, and item snapshots.
 - Payments reference Orders through `OrderId`.
 - Robot Runtime references Orders, Robot Configuration, Devices, Catalog recipes, and Tenants by ids/snapshots.
 - Inventory references Devices, Tenants, Catalog ingredients, and dispenser state.

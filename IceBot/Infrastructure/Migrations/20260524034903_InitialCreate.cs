@@ -635,6 +635,55 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "Menus",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    StoreId = table.Column<Guid>(type: "uuid", nullable: true),
+                    KioskId = table.Column<Guid>(type: "uuid", nullable: true),
+                    Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    ScopeType = table.Column<int>(type: "integer", nullable: false),
+                    Currency = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    EffectiveFrom = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    EffectiveTo = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DisplayOrder = table.Column<int>(type: "integer", nullable: false),
+                    MetadataSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    MetadataJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Menus", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_Menus_Kiosks_KioskId",
+                        column: x => x.KioskId,
+                        principalTable: "Kiosks",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Menus_Organizations_OrganizationId",
+                        column: x => x.OrganizationId,
+                        principalTable: "Organizations",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_Menus_Stores_StoreId",
+                        column: x => x.StoreId,
+                        principalTable: "Stores",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Orders",
                 columns: table => new
                 {
@@ -1448,25 +1497,27 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "OrderItems",
+                name: "MenuItems",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrderId = table.Column<Guid>(type: "uuid", nullable: false),
+                    MenuId = table.Column<Guid>(type: "uuid", nullable: false),
                     ProductId = table.Column<Guid>(type: "uuid", nullable: false),
                     RecipeId = table.Column<Guid>(type: "uuid", nullable: true),
-                    ClientLineId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
-                    ProductCodeSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    ProductNameSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    Quantity = table.Column<int>(type: "integer", nullable: false),
-                    UnitPrice = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
-                    DiscountAmount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
-                    TotalAmount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    DisplayName = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Description = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     Status = table.Column<int>(type: "integer", nullable: false),
-                    OptionsSchemaVersion = table.Column<int>(type: "integer", nullable: false),
-                    OptionsJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
-                    RecipeSnapshotSchemaVersion = table.Column<int>(type: "integer", nullable: false),
-                    RecipeSnapshotJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    Price = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    DiscountAmount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Currency = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    DisplayOrder = table.Column<int>(type: "integer", nullable: false),
+                    PreparationTimeSeconds = table.Column<int>(type: "integer", nullable: true),
+                    ImageUrl = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    EffectiveFrom = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    EffectiveTo = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    MetadataSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    MetadataJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
                     CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
@@ -1476,21 +1527,21 @@ namespace Infrastructure.Migrations
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_OrderItems", x => x.Id);
+                    table.PrimaryKey("PK_MenuItems", x => x.Id);
                     table.ForeignKey(
-                        name: "FK_OrderItems_Orders_OrderId",
-                        column: x => x.OrderId,
-                        principalTable: "Orders",
+                        name: "FK_MenuItems_Menus_MenuId",
+                        column: x => x.MenuId,
+                        principalTable: "Menus",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_OrderItems_Products_ProductId",
+                        name: "FK_MenuItems_Products_ProductId",
                         column: x => x.ProductId,
                         principalTable: "Products",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
-                        name: "FK_OrderItems_Recipes_RecipeId",
+                        name: "FK_MenuItems_Recipes_RecipeId",
                         column: x => x.RecipeId,
                         principalTable: "Recipes",
                         principalColumn: "Id",
@@ -1527,6 +1578,63 @@ namespace Infrastructure.Migrations
                         onDelete: ReferentialAction.Restrict);
                     table.ForeignKey(
                         name: "FK_RecipeItems_Recipes_RecipeId",
+                        column: x => x.RecipeId,
+                        principalTable: "Recipes",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OrderItems",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrderId = table.Column<Guid>(type: "uuid", nullable: false),
+                    MenuItemId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RecipeId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ClientLineId = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    ProductCodeSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    ProductNameSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    Quantity = table.Column<int>(type: "integer", nullable: false),
+                    UnitPrice = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    DiscountAmount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    TotalAmount = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    OptionsSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    OptionsJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    RecipeSnapshotSchemaVersion = table.Column<int>(type: "integer", nullable: false),
+                    RecipeSnapshotJson = table.Column<string>(type: "jsonb", maxLength: 500, nullable: true),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrderItems", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OrderItems_MenuItems_MenuItemId",
+                        column: x => x.MenuItemId,
+                        principalTable: "MenuItems",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_OrderItems_Orders_OrderId",
+                        column: x => x.OrderId,
+                        principalTable: "Orders",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_OrderItems_Products_ProductId",
+                        column: x => x.ProductId,
+                        principalTable: "Products",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_OrderItems_Recipes_RecipeId",
                         column: x => x.RecipeId,
                         principalTable: "Recipes",
                         principalColumn: "Id",
@@ -2163,6 +2271,53 @@ namespace Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_MenuItems_MenuId_Code",
+                table: "MenuItems",
+                columns: new[] { "MenuId", "Code" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MenuItems_MenuId_Status_DisplayOrder",
+                table: "MenuItems",
+                columns: new[] { "MenuId", "Status", "DisplayOrder" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MenuItems_ProductId",
+                table: "MenuItems",
+                column: "ProductId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MenuItems_RecipeId",
+                table: "MenuItems",
+                column: "RecipeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Menus_KioskId",
+                table: "Menus",
+                column: "KioskId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Menus_OrganizationId",
+                table: "Menus",
+                column: "OrganizationId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Menus_OrganizationId_StoreId_KioskId_Code",
+                table: "Menus",
+                columns: new[] { "OrganizationId", "StoreId", "KioskId", "Code" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Menus_OrganizationId_StoreId_KioskId_Status",
+                table: "Menus",
+                columns: new[] { "OrganizationId", "StoreId", "KioskId", "Status" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Menus_StoreId",
+                table: "Menus",
+                column: "StoreId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OperationLogs_AccountId",
                 table: "OperationLogs",
                 column: "AccountId");
@@ -2204,6 +2359,11 @@ namespace Infrastructure.Migrations
                 column: "ProductOptionId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_OrderItems_MenuItemId",
+                table: "OrderItems",
+                column: "MenuItemId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OrderItems_OrderId_ClientLineId",
                 table: "OrderItems",
                 columns: new[] { "OrderId", "ClientLineId" },
@@ -2228,9 +2388,11 @@ namespace Infrastructure.Migrations
                 filter: "\"IdempotencyKey\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Orders_KioskId",
+                name: "IX_Orders_KioskId_ClientOrderId",
                 table: "Orders",
-                column: "KioskId");
+                columns: new[] { "KioskId", "ClientOrderId" },
+                unique: true,
+                filter: "\"ClientOrderId\" IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_Orders_OrderNumber",
@@ -2839,10 +3001,10 @@ namespace Infrastructure.Migrations
                 name: "RobotPrograms");
 
             migrationBuilder.DropTable(
-                name: "Orders");
+                name: "MenuItems");
 
             migrationBuilder.DropTable(
-                name: "Recipes");
+                name: "Orders");
 
             migrationBuilder.DropTable(
                 name: "Accounts");
@@ -2851,19 +3013,25 @@ namespace Infrastructure.Migrations
                 name: "Devices");
 
             migrationBuilder.DropTable(
-                name: "Products");
+                name: "Menus");
+
+            migrationBuilder.DropTable(
+                name: "Recipes");
 
             migrationBuilder.DropTable(
                 name: "DeviceModels");
+
+            migrationBuilder.DropTable(
+                name: "Products");
+
+            migrationBuilder.DropTable(
+                name: "DeviceTypes");
 
             migrationBuilder.DropTable(
                 name: "Kiosks");
 
             migrationBuilder.DropTable(
                 name: "ProductCategories");
-
-            migrationBuilder.DropTable(
-                name: "DeviceTypes");
 
             migrationBuilder.DropTable(
                 name: "Stores");

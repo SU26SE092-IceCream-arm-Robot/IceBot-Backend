@@ -7,6 +7,8 @@ using Domain.Catalog.Enums;
 using Domain.Common;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
+using Domain.SalesCatalog.Entities;
+using Domain.SalesCatalog.Enums;
 using Domain.Tenants.Enums;
 using System.Text.Json;
 
@@ -86,10 +88,29 @@ public sealed class PlaceOrderService
 
             foreach (var itemRequest in request.Items)
             {
-                var product = await _orderStore.GetProductByIdAsync(itemRequest.ProductId, ct);
-                if (product is null)
+                var menuItem = await _orderStore.GetMenuItemByIdAsync(itemRequest.MenuItemId, ct);
+                if (menuItem is null)
                 {
-                    return ApiResult<OrderResult>.Fail($"Product '{itemRequest.ProductId}' not found.", 404);
+                    return ApiResult<OrderResult>.Fail($"Menu item '{itemRequest.MenuItemId}' not found.", 404);
+                }
+
+                var menu = menuItem.Menu;
+                var product = menuItem.Product;
+                var recipe = menuItem.Recipe;
+
+                if (menu.Status != MenuStatus.Active)
+                {
+                    return ApiResult<OrderResult>.Fail($"Menu '{menu.Name}' is not active.", 409);
+                }
+
+                if (!IsWithinEffectiveWindow(menu.EffectiveFrom, menu.EffectiveTo, now))
+                {
+                    return ApiResult<OrderResult>.Fail($"Menu '{menu.Name}' is not active at this time.", 409);
+                }
+
+                if (!menuItem.IsCurrentlySellable(now))
+                {
+                    return ApiResult<OrderResult>.Fail($"Menu item '{menuItem.DisplayName}' is not available.", 409);
                 }
 
                 if (!product.IsAvailable)
@@ -97,9 +118,20 @@ public sealed class PlaceOrderService
                     return ApiResult<OrderResult>.Fail($"Product '{product.Name}' is not available.", 409);
                 }
 
-                if (!CurrencyMatches(order.Currency, product.Currency))
+                if (!order.OrderItems.Any())
+                {
+                    order.Currency = menuItem.Currency;
+                }
+                else if (!CurrencyMatches(order.Currency, menuItem.Currency))
                 {
                     return ApiResult<OrderResult>.Fail("All order items must use the same currency.", 400);
+                }
+
+                if (!MatchesScope(menu.OrganizationId, kiosk.OrganizationId) ||
+                    !MatchesScope(menu.StoreId, kiosk.StoreId) ||
+                    !MatchesScope(menu.KioskId, kiosk.Id))
+                {
+                    return ApiResult<OrderResult>.Fail($"Menu '{menu.Name}' is not available for this kiosk.", 409);
                 }
 
                 if (!MatchesScope(product.OrganizationId, kiosk.OrganizationId) ||
@@ -109,41 +141,25 @@ public sealed class PlaceOrderService
                     return ApiResult<OrderResult>.Fail($"Product '{product.Name}' is not available for this kiosk.", 409);
                 }
 
-                Recipe? recipe = null;
-                if (itemRequest.RecipeId.HasValue)
+                if (recipe is not null)
                 {
-                    recipe = await _orderStore.GetRecipeByIdAsync(itemRequest.RecipeId.Value, ct);
-                    if (recipe is null)
+                    var recipeValidationError = ValidateRecipe(recipe, product, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id);
+                    if (recipeValidationError is not null)
                     {
-                        return ApiResult<OrderResult>.Fail($"Recipe '{itemRequest.RecipeId}' not found.", 404);
-                    }
-
-                    if (recipe.ProductId != product.Id)
-                    {
-                        return ApiResult<OrderResult>.Fail("Recipe does not belong to the selected product.", 400);
-                    }
-
-                    if (recipe.Status is not (RecipeStatus.Published or RecipeStatus.Active))
-                    {
-                        return ApiResult<OrderResult>.Fail($"Recipe '{recipe.Name}' is not active.", 409);
-                    }
-
-                    if (!MatchesScope(recipe.OrganizationId, kiosk.OrganizationId) ||
-                        !MatchesScope(recipe.StoreId, kiosk.StoreId) ||
-                        !MatchesScope(recipe.KioskId, kiosk.Id))
-                    {
-                        return ApiResult<OrderResult>.Fail($"Recipe '{recipe.Name}' is not available for this kiosk.", 409);
+                        return ApiResult<OrderResult>.Fail(recipeValidationError, 409);
                     }
                 }
 
                 var orderItem = order.AddItem(
+                    menuItem.Id,
                     product.Id,
                     recipe?.Id,
                     product.Code,
-                    product.DisplayName ?? product.Name,
+                    menuItem.DisplayName,
                     itemRequest.Quantity,
-                    product.BasePrice,
-                    clientLineId: NormalizeOptional(itemRequest.ClientLineId),
+                    menuItem.Price,
+                    menuItem.DiscountAmount,
+                    NormalizeOptional(itemRequest.ClientLineId),
                     optionsJson: itemRequest.OptionsJson,
                     recipeSnapshotJson: recipe is null ? null : BuildRecipeSnapshotJson(recipe));
 
@@ -221,9 +237,9 @@ public sealed class PlaceOrderService
             return "Order must contain at least one item.";
         }
 
-        if (request.Items.Any(item => item.ProductId == Guid.Empty))
+        if (request.Items.Any(item => item.MenuItemId == Guid.Empty))
         {
-            return "Product is required for every order item.";
+            return "Menu item is required for every order item.";
         }
 
         if (request.Items.Any(item => item.Quantity <= 0))
@@ -267,6 +283,7 @@ public sealed class PlaceOrderService
                 .Select(item => new OrderItemResult
                 {
                     Id = item.Id,
+                    MenuItemId = item.MenuItemId,
                     ProductId = item.ProductId,
                     RecipeId = item.RecipeId,
                     ClientLineId = item.ClientLineId,
@@ -295,6 +312,37 @@ public sealed class PlaceOrderService
     private static bool MatchesScope(Guid? entityScopeId, Guid? kioskScopeId)
     {
         return entityScopeId is null || entityScopeId == kioskScopeId;
+    }
+
+    private static bool IsWithinEffectiveWindow(
+        DateTimeOffset? effectiveFrom,
+        DateTimeOffset? effectiveTo,
+        DateTimeOffset now)
+    {
+        return (effectiveFrom is null || effectiveFrom <= now) &&
+               (effectiveTo is null || effectiveTo >= now);
+    }
+
+    private static string? ValidateRecipe(Recipe recipe, Product product, Guid? organizationId, Guid? storeId, Guid kioskId)
+    {
+        if (recipe.ProductId != product.Id)
+        {
+            return "Menu item recipe does not belong to the selected product.";
+        }
+
+        if (recipe.Status is not (RecipeStatus.Published or RecipeStatus.Active))
+        {
+            return $"Recipe '{recipe.Name}' is not active.";
+        }
+
+        if (!MatchesScope(recipe.OrganizationId, organizationId) ||
+            !MatchesScope(recipe.StoreId, storeId) ||
+            !MatchesScope(recipe.KioskId, kioskId))
+        {
+            return $"Recipe '{recipe.Name}' is not available for this kiosk.";
+        }
+
+        return null;
     }
 
     private static string? NormalizeOptional(string? value)

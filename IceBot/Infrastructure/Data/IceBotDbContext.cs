@@ -9,6 +9,7 @@ using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using Domain.RobotConfiguration.Entities;
 using Domain.RobotRuntime.Entities;
+using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,9 @@ public class IceBotDbContext : DbContext
     public DbSet<IngredientDispenserState> IngredientDispenserStates => Set<IngredientDispenserState>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
+    public DbSet<Menu> Menus => Set<Menu>();
+    public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
@@ -84,6 +88,7 @@ public class IceBotDbContext : DbContext
         ConfigureIdentity(modelBuilder);
         ConfigureTopology(modelBuilder);
         ConfigureCatalog(modelBuilder);
+        ConfigureSalesCatalog(modelBuilder);
         ConfigureOrdersAndPayments(modelBuilder);
         ConfigureRobot(modelBuilder);
         ConfigureOperations(modelBuilder);
@@ -365,6 +370,7 @@ public class IceBotDbContext : DbContext
             entity.ToTable("OrderItems");
             entity.HasIndex(x => new { x.OrderId, x.ClientLineId }).IsUnique().HasFilter("\"ClientLineId\" IS NOT NULL");
             entity.HasOne(x => x.Order).WithMany(x => x.OrderItems).HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.MenuItem).WithMany().HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(x => x.ProductOptions)
@@ -425,6 +431,29 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => x.ProviderRefundId).HasFilter("\"ProviderRefundId\" IS NOT NULL");
             entity.HasOne(x => x.PaymentTransaction).WithMany().HasForeignKey(x => x.PaymentTransactionId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.RequestedByAccount).WithMany().HasForeignKey(x => x.RequestedByAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    private static void ConfigureSalesCatalog(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Menu>(entity =>
+        {
+            entity.ToTable("Menus");
+            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.Code }).IsUnique();
+            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.Status });
+            entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MenuItem>(entity =>
+        {
+            entity.ToTable("MenuItems");
+            entity.HasIndex(x => new { x.MenuId, x.Code }).IsUnique();
+            entity.HasIndex(x => new { x.MenuId, x.Status, x.DisplayOrder });
+            entity.HasOne(x => x.Menu).WithMany(x => x.MenuItems).HasForeignKey(x => x.MenuId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

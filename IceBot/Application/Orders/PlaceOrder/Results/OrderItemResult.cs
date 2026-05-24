@@ -6,6 +6,8 @@ public sealed class OrderItemResult
 {
     public Guid Id { get; set; }
 
+    public Guid MenuItemId { get; set; }
+
     public Guid ProductId { get; set; }
 
     public Guid? RecipeId { get; set; }

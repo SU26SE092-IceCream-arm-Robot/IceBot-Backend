@@ -29,7 +29,7 @@ The tablet must not start robot execution directly.
 
 The local edge backend owns runtime machine truth:
 
-- Runtime product projection.
+- Runtime menu/product projection.
 - Estimated inventory availability.
 - Device and robot availability.
 - Local execution queue.
@@ -60,13 +60,13 @@ Edge must pull commands from cloud after receiving an MQTT notification. Edge mu
 
 ```text
 1. Customer opens Tablet.
-2. Tablet calls Local Edge for runtime product projection.
-3. Edge builds projection from product snapshot, recipe snapshot, inventory state, device state, and availability policy.
+2. Tablet calls Local Edge for runtime menu/product projection.
+3. Edge builds projection from menu item snapshot, product snapshot, recipe snapshot, inventory state, device state, and availability policy.
 4. Tablet stores temporary cart/session in memory or local storage.
 5. Customer confirms checkout.
 6. Tablet checks projection freshness: now - generatedAt <= 5-15 seconds.
 7. Tablet calls Cloud to create Order.
-8. Cloud validates kiosk/product/basic idempotency and creates Order + OrderItems with `PendingPayment`.
+8. Cloud validates kiosk/menu item/basic idempotency and creates Order + OrderItems with `PendingPayment`.
 9. Tablet calls Cloud to create payment session for the created order.
 10. Cloud creates PaymentTransaction and provider payment session.
 11. Cloud returns checkout URL/QR payload and expire time.
@@ -165,7 +165,7 @@ Rules:
 
 ## Tablet To Local Edge
 
-### Get Runtime Product Projection
+### Get Runtime Menu Projection
 
 ```http
 GET /api/v1/local/runtime-products?kioskId={kioskId}
@@ -186,6 +186,7 @@ Response:
   "products": [
     {
       "productId": "uuid",
+      "menuItemId": "uuid",
       "productCode": "VANILLA_CUP",
       "displayName": "Vanilla Cup",
       "price": 25000,
@@ -208,6 +209,7 @@ Response:
 
 Projection inputs:
 
+- Menu item snapshot.
 - Product snapshot.
 - Recipe snapshot.
 - `IngredientDispenserState`.
@@ -243,16 +245,11 @@ Request:
   "items": [
     {
       "clientLineId": "uuid",
-      "productId": "uuid",
-      "productCode": "VANILLA_CUP",
-      "recipeId": "uuid",
-      "recipeVersion": 3,
-      "quantity": 1,
-      "unitPrice": 25000
+      "menuItemId": "uuid",
+      "quantity": 1
     }
   ],
-  "totalAmount": 25000,
-  "currency": "VND"
+  "clientTotalAmount": 25000
 }
 ```
 
@@ -274,7 +271,7 @@ Cloud creates:
 - `Order`
 - `OrderItem`
 
-Cloud must calculate price from backend catalog/product data. Tablet totals are used only for comparison and conflict detection.
+Cloud must calculate price from backend Sales Catalog `MenuItem.Price`. Tablet totals are used only for comparison and conflict detection.
 
 ### Create Payment Session
 
@@ -443,6 +440,7 @@ Response:
         "items": [
           {
             "orderItemId": "uuid",
+            "menuItemId": "uuid",
             "productId": "uuid",
             "productCode": "VANILLA_CUP",
             "recipeId": "uuid",
@@ -606,7 +604,7 @@ Maps to `KioskHeartbeat`.
 GET /api/v1/iot/kiosks/{kioskId}/configuration?currentVersion={version}
 ```
 
-Purpose: edge fetches product, recipe, robot program, and device configuration snapshots.
+Purpose: edge fetches menu, product, recipe, robot program, and device configuration snapshots.
 
 Response:
 
@@ -615,6 +613,8 @@ Response:
   "configurationVersion": 42,
   "generatedAt": "2026-05-21T10:00:00Z",
   "checksum": "sha256",
+  "menus": [],
+  "menuItems": [],
   "products": [],
   "recipes": [],
   "robotPrograms": [],

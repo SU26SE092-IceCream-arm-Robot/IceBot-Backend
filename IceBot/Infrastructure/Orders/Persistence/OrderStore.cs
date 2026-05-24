@@ -1,6 +1,6 @@
 using Application.Orders.Abstractions;
-using Domain.Catalog.Entities;
 using Domain.Orders.Entities;
+using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -21,14 +21,13 @@ public sealed class OrderStore : IOrderStore
         return _dbContext.Kiosks.FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
     }
 
-    public Task<Product?> GetProductByIdAsync(Guid productId, CancellationToken cancellationToken = default)
+    public Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Products.FirstOrDefaultAsync(product => product.Id == productId, cancellationToken);
-    }
-
-    public Task<Recipe?> GetRecipeByIdAsync(Guid recipeId, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.Recipes.FirstOrDefaultAsync(recipe => recipe.Id == recipeId, cancellationToken);
+        return _dbContext.MenuItems
+            .Include(menuItem => menuItem.Menu)
+            .Include(menuItem => menuItem.Product)
+            .Include(menuItem => menuItem.Recipe)
+            .FirstOrDefaultAsync(menuItem => menuItem.Id == menuItemId, cancellationToken);
     }
 
     public Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default)

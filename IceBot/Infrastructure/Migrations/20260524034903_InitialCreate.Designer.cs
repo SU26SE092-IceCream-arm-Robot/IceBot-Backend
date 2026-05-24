@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    [Migration("20260523072404_InitialCreate")]
+    [Migration("20260524034903_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -20,7 +20,7 @@ namespace Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.16")
+                .HasAnnotation("ProductVersion", "10.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -1939,14 +1939,16 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"IdempotencyKey\" IS NOT NULL");
 
-                    b.HasIndex("KioskId");
-
                     b.HasIndex("OrderNumber")
                         .IsUnique();
 
                     b.HasIndex("OrganizationId");
 
                     b.HasIndex("StoreId");
+
+                    b.HasIndex("KioskId", "ClientOrderId")
+                        .IsUnique()
+                        .HasFilter("\"ClientOrderId\" IS NOT NULL");
 
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "PlacedAt");
 
@@ -1977,6 +1979,9 @@ namespace Infrastructure.Migrations
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("MenuItemId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("OptionsJson")
                         .HasMaxLength(500)
@@ -2032,6 +2037,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("MenuItemId");
 
                     b.HasIndex("ProductId");
 
@@ -3181,6 +3188,194 @@ namespace Infrastructure.Migrations
                     b.ToTable("RobotJobSteps", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MetadataJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("MetadataSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ScopeType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KioskId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("OrganizationId", "StoreId", "KioskId", "Code")
+                        .IsUnique();
+
+                    b.HasIndex("OrganizationId", "StoreId", "KioskId", "Status");
+
+                    b.ToTable("Menus", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("EffectiveFrom")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("EffectiveTo")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ImageUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("MenuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MetadataJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("MetadataSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PreparationTimeSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("Price")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("RecipeId");
+
+                    b.HasIndex("MenuId", "Code")
+                        .IsUnique();
+
+                    b.HasIndex("MenuId", "Status", "DisplayOrder");
+
+                    b.ToTable("MenuItems", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Sync.Entities.SyncDeadLetter", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4158,6 +4353,12 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Orders.Entities.OrderItem", b =>
                 {
+                    b.HasOne("Domain.SalesCatalog.Entities.MenuItem", "MenuItem")
+                        .WithMany()
+                        .HasForeignKey("MenuItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Domain.Orders.Entities.Order", "Order")
                         .WithMany("OrderItems")
                         .HasForeignKey("OrderId")
@@ -4174,6 +4375,8 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("RecipeId")
                         .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("MenuItem");
 
                     b.Navigation("Order");
 
@@ -4401,6 +4604,56 @@ namespace Infrastructure.Migrations
                     b.Navigation("RobotProgramStep");
                 });
 
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Kiosk");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItem", b =>
+                {
+                    b.HasOne("Domain.SalesCatalog.Entities.Menu", "Menu")
+                        .WithMany("MenuItems")
+                        .HasForeignKey("MenuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.Recipe", "Recipe")
+                        .WithMany()
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Menu");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Recipe");
+                });
+
             modelBuilder.Entity("Domain.Sync.Entities.SyncDeadLetter", b =>
                 {
                     b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
@@ -4548,6 +4801,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.RobotRuntime.Entities.RobotJob", b =>
                 {
                     b.Navigation("RobotJobSteps");
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>
+                {
+                    b.Navigation("MenuItems");
                 });
 
             modelBuilder.Entity("Domain.Tenants.Entities.Kiosk", b =>
