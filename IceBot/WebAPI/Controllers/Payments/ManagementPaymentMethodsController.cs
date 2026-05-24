@@ -9,13 +9,13 @@ namespace WebAPI.Controllers.Payments;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/admin/payment-methods")]
+[Route("api/v{version:apiVersion}/management/payment-methods")]
 [Authorize(Policy = "payments.manage")]
-public sealed class AdminPaymentMethodsController : ControllerBase
+public sealed class ManagementPaymentMethodsController : ControllerBase
 {
     private readonly IManagePaymentMethodService _paymentMethodService;
 
-    public AdminPaymentMethodsController(IManagePaymentMethodService paymentMethodService)
+    public ManagementPaymentMethodsController(IManagePaymentMethodService paymentMethodService)
     {
         _paymentMethodService = paymentMethodService;
     }

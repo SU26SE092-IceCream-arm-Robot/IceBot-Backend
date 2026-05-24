@@ -104,6 +104,12 @@ Detailed API naming rules live in [Naming Rules](NAMING_RULES.md).
 
 Docs should reduce repeated reasoning, not duplicate long explanations.
 
+Use the project documentation index first when the task spans multiple repos or document areas:
+
+- [Project Documentation Index](../../Docs/README.md)
+
+Do not read all docs by default. Read the smallest relevant set, usually 1-3 files, then inspect code as needed.
+
 Use:
 
 - [Architecture](../ARCHITECTURE.md) for high-level architecture.
@@ -113,6 +119,10 @@ Use:
 - [Data Modeling Rules](DATA_MODELING_RULES.md) for persistence and ERD checks.
 - [System Flows](SYSTEM_FLOWS.md) for backend/tablet-edge-cloud flows.
 - [IoT Contract](IOT_CONTRACT.md) for tablet-edge-cloud flow.
+
+The project-level `Vault/` folder is a personal reasoning notebook, not implementation truth. Use it only as background context unless a decision has been promoted into `Docs/` or repository docs.
+
+Do not load `Vault/` by default. Use it only when the user asks about reasoning history, trade-offs, rejected designs, unresolved ideas, or why a decision was considered.
 
 When changing code that affects contracts, domain ownership, or data model rules, update the relevant doc.
 

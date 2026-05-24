@@ -225,7 +225,10 @@ Route names should be stable and resource-oriented:
 /api/v1/orders
 /api/v1/robot-jobs
 /api/v1/kiosks/{kioskId}/heartbeats
+/api/v1/management/products
 ```
+
+Use `/management/...` for authenticated internal management APIs. Do not use `/admin/...` as a route prefix for new APIs; `Admin` is a role concept and can be confused with `SystemAdmin`-only access.
 
 Action method names may map to use cases:
 
@@ -304,6 +307,7 @@ Group related small enums by context only when it improves readability. Do not r
 - [Working Protocol](WORKING_PROTOCOL.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](DEPENDENCY_RULES.md)
+- [Authorization Rules](AUTHORIZATION_RULES.md)
 - [Data Modeling Rules](DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)

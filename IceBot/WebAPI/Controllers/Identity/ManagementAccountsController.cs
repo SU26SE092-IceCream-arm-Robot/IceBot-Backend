@@ -10,13 +10,13 @@ namespace WebAPI.Controllers.Identity
 {
     [ApiController]
     [ApiVersion("1.0")]
-    [Route("api/v{version:apiVersion}/admin/accounts")]
+    [Route("api/v{version:apiVersion}/management/accounts")]
     [Authorize(Policy = "accounts.manage")]
-    public class AdminAccountsController : ControllerBase
+    public class ManagementAccountsController : ControllerBase
     {
         private readonly InternalAccountService _internalAccounts;
 
-        public AdminAccountsController(InternalAccountService internalAccounts)
+        public ManagementAccountsController(InternalAccountService internalAccounts)
         {
             _internalAccounts = internalAccounts;
         }

@@ -121,6 +121,7 @@ Controllers should be thin. They should call application handlers/services and r
 - [Working Protocol](WORKING_PROTOCOL.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
 - [Naming Rules](NAMING_RULES.md)
+- [Authorization Rules](AUTHORIZATION_RULES.md)
 - [Data Modeling Rules](DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)

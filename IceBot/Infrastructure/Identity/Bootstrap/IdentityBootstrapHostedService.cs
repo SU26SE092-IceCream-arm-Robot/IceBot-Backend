@@ -17,8 +17,9 @@ public class IdentityBootstrapHostedService : IHostedService
     [
         new("SystemAdmin", "System Admin", true, 10),
         new("Manager", "Manager", false, 20),
-        new("Technician", "Technician", false, 30),
-        new("LocationOwner", "Location Owner", false, 40)
+        new("Staff", "Staff", false, 30),
+        new("Technician", "Technician", false, 40),
+        new("LocationOwner", "Location Owner", false, 50)
     ];
 
     private readonly IServiceScopeFactory _scopeFactory;

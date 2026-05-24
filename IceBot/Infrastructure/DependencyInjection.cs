@@ -1,4 +1,5 @@
 using Application.Abstractions.Persistence;
+using Infrastructure.Catalog;
 using Infrastructure.Data;
 using Infrastructure.Identity;
 using Infrastructure.Orders;
@@ -31,6 +32,7 @@ namespace Infrastructure
             });
 
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
+            services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure();
             services.AddOrdersInfrastructure();
             services.AddPaymentsInfrastructure(config);
