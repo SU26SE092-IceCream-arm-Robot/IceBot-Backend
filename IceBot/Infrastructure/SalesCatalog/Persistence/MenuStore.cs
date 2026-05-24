@@ -1,6 +1,9 @@
 using Application.SalesCatalog.Abstractions;
 using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
+using Domain.SalesCatalog.Enums;
+using Domain.Tenants.Entities;
+using Domain.Tenants.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +16,13 @@ public sealed class MenuStore : IMenuStore
     public MenuStore(IceBotDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Kiosks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
     }
 
     public Task<int> CountMenusAsync(
@@ -47,6 +57,45 @@ public sealed class MenuStore : IMenuStore
             .ThenBy(menu => menu.Name)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<Menu>> ListActiveMenusForKioskAsync(
+        Guid? organizationId,
+        Guid storeId,
+        Guid kioskId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Menus
+            .AsNoTracking()
+            .Include(menu => menu.MenuItems)
+                .ThenInclude(item => item.Product)
+            .Include(menu => menu.MenuItems)
+                .ThenInclude(item => item.ProductVariant)
+            .Include(menu => menu.MenuItems)
+                .ThenInclude(item => item.Recipe)
+            .Where(menu =>
+                menu.Status == MenuStatus.Active &&
+                (menu.EffectiveFrom == null || menu.EffectiveFrom <= now) &&
+                (menu.EffectiveTo == null || menu.EffectiveTo >= now) &&
+                (
+                    menu.ScopeType == TenantScopeType.Global ||
+                    (organizationId.HasValue &&
+                        menu.ScopeType == TenantScopeType.Organization &&
+                        menu.OrganizationId == organizationId.Value) ||
+                    (organizationId.HasValue &&
+                        menu.ScopeType == TenantScopeType.Store &&
+                        menu.OrganizationId == organizationId.Value &&
+                        menu.StoreId == storeId) ||
+                    (organizationId.HasValue &&
+                        menu.ScopeType == TenantScopeType.Kiosk &&
+                        menu.OrganizationId == organizationId.Value &&
+                        menu.StoreId == storeId &&
+                        menu.KioskId == kioskId)
+                ))
+            .OrderBy(menu => menu.DisplayOrder)
+            .ThenBy(menu => menu.Name)
             .ToListAsync(cancellationToken);
     }
 

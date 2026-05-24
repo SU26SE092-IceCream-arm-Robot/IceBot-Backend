@@ -224,15 +224,10 @@ Route names should be stable and resource-oriented:
 ```text
 /api/v1/orders
 /api/v1/robot-jobs
-/api/v1/kiosks/{kioskId}/heartbeats
-/api/v1/management/products
-/api/v1/management/menus
 /api/v1/me
 ```
 
-Use `/management/...` for authenticated internal management APIs. Do not use `/admin/...` as a route prefix for new APIs; `Admin` is a role concept and can be confused with `SystemAdmin`-only access.
-
-Use `/me` only for the authenticated user's account/profile/security surface. Do not put broader business resources under `/me`; keep them in their owning resource routes.
+API surface categories and route prefix ownership live in [API Surface Rules](API_SURFACE_RULES.md). Naming rules should not duplicate the full route map.
 
 Action method names may map to use cases:
 
@@ -311,6 +306,7 @@ Group related small enums by context only when it improves readability. Do not r
 - [Working Protocol](WORKING_PROTOCOL.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](DEPENDENCY_RULES.md)
+- [API Surface Rules](API_SURFACE_RULES.md)
 - [Authorization Rules](AUTHORIZATION_RULES.md)
 - [Data Modeling Rules](DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)

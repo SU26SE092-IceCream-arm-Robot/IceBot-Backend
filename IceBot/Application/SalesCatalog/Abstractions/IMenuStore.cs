@@ -1,10 +1,13 @@
 using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
+using Domain.Tenants.Entities;
 
 namespace Application.SalesCatalog.Abstractions;
 
 public interface IMenuStore
 {
+    Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
+
     Task<int> CountMenusAsync(
         string? search,
         Guid? organizationId,
@@ -19,6 +22,13 @@ public interface IMenuStore
         Guid? kioskId,
         int pageNumber,
         int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<List<Menu>> ListActiveMenusForKioskAsync(
+        Guid? organizationId,
+        Guid storeId,
+        Guid kioskId,
+        DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
     Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default);

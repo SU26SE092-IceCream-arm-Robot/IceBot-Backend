@@ -62,6 +62,8 @@ End-to-end checkout, payment, edge dispatch, robot execution, and failure flows 
 
 This document focuses on API/message contract shape, source-of-truth boundaries, state mapping, and idempotency requirements.
 
+Backend API surface categories and route ownership live in [API Surface Rules](API_SURFACE_RULES.md). This document only expands the IoT/tablet/edge contracts that need integration detail.
+
 ## State Mapping
 
 Use current domain states where possible.
@@ -194,6 +196,56 @@ Projection inputs:
 This response is a quote for UX, not a reservation.
 
 ## Tablet To Cloud
+
+### Get Kiosk Sales Catalog Snapshot
+
+```http
+GET /api/v1/kiosks/{kioskId}/runtime-menu
+```
+
+Purpose: return the Cloud Sales Catalog snapshot that is currently sellable for a kiosk.
+
+This endpoint is useful when the tablet needs a Cloud-backed menu snapshot, but it is not a replacement for the Local Edge runtime projection. It does not include live machine availability, ingredient sufficiency, robot status, or local queue state.
+
+Response:
+
+```json
+{
+  "snapshotId": "uuid",
+  "kioskId": "uuid",
+  "generatedAt": "2026-05-21T10:00:00Z",
+  "expiresAt": "2026-05-21T10:00:15Z",
+  "availabilitySource": "CloudSalesCatalog",
+  "containsMachineRuntimeState": false,
+  "items": [
+    {
+      "menuId": "uuid",
+      "menuItemId": "uuid",
+      "productId": "uuid",
+      "productVariantId": "uuid",
+      "recipeId": "uuid",
+      "menuItemCode": "VANILLA_CUP_M",
+      "productCode": "VANILLA_CUP",
+      "productVariantCode": "M",
+      "displayName": "Vanilla Cup",
+      "sizeCode": "M",
+      "price": 25000,
+      "discountAmount": 0,
+      "finalPrice": 25000,
+      "currency": "VND",
+      "preparationTimeSeconds": 90,
+      "imageUrl": null,
+      "recipeVersion": 3
+    }
+  ]
+}
+```
+
+Rules:
+
+- Use this endpoint only for Cloud Sales Catalog truth.
+- For final runtime availability before checkout, the tablet should still prefer the Local Edge runtime projection when the edge service is available.
+- The returned `snapshotId` can be sent to `POST /api/v1/orders` as `runtimeSnapshotId`, but Cloud still recalculates prices from `MenuItem.Price`.
 
 ### Create Order
 
@@ -670,6 +722,7 @@ Future hardening:
 ## Related Docs
 
 - [Architecture](../ARCHITECTURE.md)
+- [API Surface Rules](API_SURFACE_RULES.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
 - [System Flows](SYSTEM_FLOWS.md)
 - [Local Edge Runtime ERD](LOCAL_EDGE_RUNTIME_ERD.md)

@@ -6,27 +6,9 @@ Customer ordering is anonymous in the current system. Customer is a business act
 
 ## Route Surface
 
-Use `/management/...` for authenticated internal management APIs.
+API surface ownership, route categories, and examples live in [API Surface Rules](API_SURFACE_RULES.md).
 
-`management` means the internal management/back-office surface. It does not mean only `Manager` role can call it. Actual permissions are controlled by authorization policies and scoped role claims.
-
-Do not use `/admin/...` for new APIs. `Admin` is a role concept (`SystemAdmin`) and can be confused with route ownership when multiple internal roles can access the same management API.
-
-Use `/me` for the authenticated user's own account profile and security actions only.
-
-Allowed `/me` examples:
-
-- `GET /api/v1/me`
-- `PUT /api/v1/me/profile`
-- `PUT /api/v1/me/password`
-
-Do not use `/me` as a catch-all for business resources such as orders, kiosks, reports, or maintenance tickets. Those resources should stay in their owning controller and use filters or dedicated use cases.
-
-Password recovery is not part of `/me` because the user may be logged out:
-
-- `POST /api/v1/authentication/forgot-password` requests a reset token/email.
-- `POST /api/v1/authentication/reset-password` uses the token to set a new password.
-- `PUT /api/v1/me/password` changes password for an already authenticated account.
+This document only defines authorization direction for those surfaces.
 
 ## Internal Roles
 
@@ -63,5 +45,6 @@ Password recovery is not part of `/me` because the user may be logged out:
 ## Related Docs
 
 - [Business Flows](../../Docs/BUSINESS_FLOWS.md)
+- [API Surface Rules](API_SURFACE_RULES.md)
 - [Dependency Rules](DEPENDENCY_RULES.md)
 - [Naming Rules](NAMING_RULES.md)
