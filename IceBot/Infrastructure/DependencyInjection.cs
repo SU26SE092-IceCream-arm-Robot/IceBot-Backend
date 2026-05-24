@@ -1,6 +1,8 @@
 using Application.Abstractions.Persistence;
+using Application.Email;
 using Infrastructure.Catalog;
 using Infrastructure.Data;
+using Infrastructure.Email;
 using Infrastructure.Identity;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
@@ -32,6 +34,8 @@ namespace Infrastructure
             });
 
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
+            services.Configure<EmailOptions>(config.GetSection(EmailOptions.SectionName));
+            services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure();
             services.AddOrdersInfrastructure();

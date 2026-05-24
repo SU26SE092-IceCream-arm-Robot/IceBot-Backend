@@ -1,5 +1,7 @@
 using Application.Identity.Abstractions;
 using Application.Identity.Authentication.Requests;
+using Application.Identity.PasswordReset.Requests;
+using Application.Identity.PasswordReset.Services;
 using Application.Identity.Tokens.Services;
 using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
@@ -17,13 +19,16 @@ namespace WebAPI.Controllers.Identity
     {
         private readonly IAccountAuthenticationService _authenticationService;
         private readonly AccountTokenService _tokenService;
+        private readonly PasswordResetService _passwordResetService;
 
         public AuthenticationController(
             IAccountAuthenticationService authenticationService,
-            AccountTokenService tokenService)
+            AccountTokenService tokenService,
+            PasswordResetService passwordResetService)
         {
             _authenticationService = authenticationService;
             _tokenService = tokenService;
+            _passwordResetService = passwordResetService;
         }
 
         [HttpPost("login")]
@@ -79,6 +84,39 @@ namespace WebAPI.Controllers.Identity
 
             var revokedCount = await _tokenService.RevokeAllForAccountAsync(parsedAccountId, request?.Reason, GetRemoteIpAddress(), GetUserAgent());
             var result = ApiResult<object>.Success(new { revoked = revokedCount }, "All sessions revoked", 200);
+            return StatusCode(result.StatusCode, result);
+        }
+
+        [HttpPost("forgot-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ForgotPassword(
+            [FromBody] RequestPasswordResetRequest request,
+            CancellationToken cancellationToken)
+        {
+            EnsureValidModel();
+
+            var result = await _passwordResetService.RequestResetAsync(
+                request,
+                GetRemoteIpAddress(),
+                GetUserAgent(),
+                cancellationToken);
+            return StatusCode(result.StatusCode, result);
+        }
+
+        [HttpPost("reset-password")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ResetPassword(
+            [FromBody] ResetPasswordRequest request,
+            CancellationToken cancellationToken)
+        {
+            EnsureValidModel();
+
+            var result = await _passwordResetService.ResetAsync(
+                request,
+                GetRemoteIpAddress(),
+                GetUserAgent(),
+                cancellationToken);
+
             return StatusCode(result.StatusCode, result);
         }
 

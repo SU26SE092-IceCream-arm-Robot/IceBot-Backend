@@ -262,6 +262,32 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PasswordResetRequests",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    RequestedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UsedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RequestedByIp = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    RequestedByUserAgent = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    UsedByIp = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    UsedByUserAgent = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PasswordResetRequests", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PasswordResetRequests_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "DeviceModels",
                 columns: table => new
                 {
@@ -2637,6 +2663,17 @@ namespace Infrastructure.Migrations
                 filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
+                name: "IX_PasswordResetRequests_AccountId_RequestedAt",
+                table: "PasswordResetRequests",
+                columns: new[] { "AccountId", "RequestedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PasswordResetRequests_TokenHash",
+                table: "PasswordResetRequests",
+                column: "TokenHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PaymentCallbacks_PaymentTransactionId",
                 table: "PaymentCallbacks",
                 column: "PaymentTransactionId");
@@ -3162,6 +3199,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "OrderStatusHistories");
+
+            migrationBuilder.DropTable(
+                name: "PasswordResetRequests");
 
             migrationBuilder.DropTable(
                 name: "PaymentCallbacks");

@@ -51,5 +51,7 @@ public partial class Account : BusinessEntity
 
     public virtual ICollection<AccountRole> AccountRoles { get; set; } = new List<AccountRole>();
 
+    public virtual ICollection<PasswordResetRequest> PasswordResetRequests { get; set; } = new List<PasswordResetRequest>();
+
     public virtual ICollection<Store> Stores { get; set; } = new List<Store>();
 }

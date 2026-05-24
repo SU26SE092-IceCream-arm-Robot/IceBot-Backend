@@ -1284,6 +1284,54 @@ namespace Infrastructure.Migrations
                     b.ToTable("AccountRoles", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Identity.Entities.PasswordResetRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequestedByIp")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("RequestedByUserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTimeOffset?>("UsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UsedByIp")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("UsedByUserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("AccountId", "RequestedAt");
+
+                    b.ToTable("PasswordResetRequests", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Identity.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4388,6 +4436,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("Store");
                 });
 
+            modelBuilder.Entity("Domain.Identity.Entities.PasswordResetRequest", b =>
+                {
+                    b.HasOne("Domain.Identity.Entities.Account", "Account")
+                        .WithMany("PasswordResetRequests")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+                });
+
             modelBuilder.Entity("Domain.Identity.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.AccountDevice", "AccountDevice")
@@ -5125,6 +5184,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("AccountDevices");
 
                     b.Navigation("AccountRoles");
+
+                    b.Navigation("PasswordResetRequests");
                 });
 
             modelBuilder.Entity("Domain.Identity.Entities.Role", b =>

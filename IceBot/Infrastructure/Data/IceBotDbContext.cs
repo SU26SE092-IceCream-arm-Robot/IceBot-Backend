@@ -30,6 +30,7 @@ public class IceBotDbContext : DbContext
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<AccountRole> AccountRoles => Set<AccountRole>();
     public DbSet<AccountDevice> AccountDevices => Set<AccountDevice>();
+    public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Role> Roles => Set<Role>();
 
@@ -133,6 +134,18 @@ public class IceBotDbContext : DbContext
                         join.ToTable("AccountStores");
                         join.HasKey("AccountId", "StoreId");
                     });
+        });
+
+        modelBuilder.Entity<PasswordResetRequest>(entity =>
+        {
+            entity.ToTable("PasswordResetRequests");
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => new { x.AccountId, x.RequestedAt });
+            entity.Property(x => x.TokenHash).HasMaxLength(128);
+            entity.HasOne(x => x.Account)
+                .WithMany(x => x.PasswordResetRequests)
+                .HasForeignKey(x => x.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AccountRole>(entity =>

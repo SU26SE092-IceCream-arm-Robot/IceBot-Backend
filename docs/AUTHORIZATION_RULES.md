@@ -22,6 +22,12 @@ Allowed `/me` examples:
 
 Do not use `/me` as a catch-all for business resources such as orders, kiosks, reports, or maintenance tickets. Those resources should stay in their owning controller and use filters or dedicated use cases.
 
+Password recovery is not part of `/me` because the user may be logged out:
+
+- `POST /api/v1/authentication/forgot-password` requests a reset token/email.
+- `POST /api/v1/authentication/reset-password` uses the token to set a new password.
+- `PUT /api/v1/me/password` changes password for an already authenticated account.
+
 ## Internal Roles
 
 | Role code | Meaning |

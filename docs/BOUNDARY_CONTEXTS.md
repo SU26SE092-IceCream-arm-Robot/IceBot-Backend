@@ -14,8 +14,11 @@ Entities:
 
 - `Account`
 - `AccountDevice`
+- `PasswordResetRequest`
 - `RefreshToken`
 - `Role`
+
+`PasswordResetRequest` is separated from `Account` because password recovery has its own token lifecycle, expiry, usage, and audit evidence.
 
 ### Tenants
 
