@@ -226,6 +226,7 @@ Route names should be stable and resource-oriented:
 /api/v1/robot-jobs
 /api/v1/kiosks/{kioskId}/heartbeats
 /api/v1/management/products
+/api/v1/management/menus
 /api/v1/me
 ```
 

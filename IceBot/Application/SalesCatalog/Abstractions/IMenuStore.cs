@@ -1,0 +1,57 @@
+using Domain.Catalog.Entities;
+using Domain.SalesCatalog.Entities;
+
+namespace Application.SalesCatalog.Abstractions;
+
+public interface IMenuStore
+{
+    Task<int> CountMenusAsync(
+        string? search,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<Menu>> ListMenusAsync(
+        string? search,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default);
+
+    Task<MenuItem?> GetMenuItemByIdAsync(
+        Guid menuId,
+        Guid menuItemId,
+        bool asNoTracking = true,
+        CancellationToken cancellationToken = default);
+
+    Task<Product?> GetProductByIdAsync(Guid productId, CancellationToken cancellationToken = default);
+
+    Task<ProductVariant?> GetProductVariantByIdAsync(Guid productVariantId, CancellationToken cancellationToken = default);
+
+    Task<Recipe?> GetRecipeByIdAsync(Guid recipeId, CancellationToken cancellationToken = default);
+
+    Task<bool> MenuCodeExistsAsync(
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        string code,
+        Guid? excludedMenuId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> MenuItemCodeExistsAsync(
+        Guid menuId,
+        string code,
+        Guid? excludedMenuItemId = null,
+        CancellationToken cancellationToken = default);
+
+    Task AddMenuAsync(Menu menu, CancellationToken cancellationToken = default);
+
+    Task AddMenuItemAsync(MenuItem menuItem, CancellationToken cancellationToken = default);
+
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+}

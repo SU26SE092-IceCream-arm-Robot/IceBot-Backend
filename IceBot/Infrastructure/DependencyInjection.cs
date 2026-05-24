@@ -7,6 +7,7 @@ using Infrastructure.Identity;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
 using Infrastructure.Persistence.Repositories;
+using Infrastructure.SalesCatalog;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -40,6 +41,7 @@ namespace Infrastructure
             services.AddIdentityInfrastructure();
             services.AddOrdersInfrastructure();
             services.AddPaymentsInfrastructure(config);
+            services.AddSalesCatalogInfrastructure();
 
             return services;
         }
