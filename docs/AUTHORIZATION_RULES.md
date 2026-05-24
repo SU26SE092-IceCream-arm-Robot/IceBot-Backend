@@ -12,6 +12,16 @@ Use `/management/...` for authenticated internal management APIs.
 
 Do not use `/admin/...` for new APIs. `Admin` is a role concept (`SystemAdmin`) and can be confused with route ownership when multiple internal roles can access the same management API.
 
+Use `/me` for the authenticated user's own account profile and security actions only.
+
+Allowed `/me` examples:
+
+- `GET /api/v1/me`
+- `PUT /api/v1/me/profile`
+- `PUT /api/v1/me/password`
+
+Do not use `/me` as a catch-all for business resources such as orders, kiosks, reports, or maintenance tickets. Those resources should stay in their owning controller and use filters or dedicated use cases.
+
 ## Internal Roles
 
 | Role code | Meaning |

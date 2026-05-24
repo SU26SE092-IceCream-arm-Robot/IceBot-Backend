@@ -226,9 +226,12 @@ Route names should be stable and resource-oriented:
 /api/v1/robot-jobs
 /api/v1/kiosks/{kioskId}/heartbeats
 /api/v1/management/products
+/api/v1/me
 ```
 
 Use `/management/...` for authenticated internal management APIs. Do not use `/admin/...` as a route prefix for new APIs; `Admin` is a role concept and can be confused with `SystemAdmin`-only access.
+
+Use `/me` only for the authenticated user's account/profile/security surface. Do not put broader business resources under `/me`; keep them in their owning resource routes.
 
 Action method names may map to use cases:
 
