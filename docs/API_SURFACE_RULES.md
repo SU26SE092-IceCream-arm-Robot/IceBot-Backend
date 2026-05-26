@@ -20,6 +20,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Authentication | `/api/v1/authentication...` | Internal login/password recovery clients | Mixed public/login and token flows |
 | Payment provider webhook | `/api/v1/payments/.../webhook` | Payment provider callbacks | Provider signature verification |
 | IoT/edge | `/api/v1/iot/...` | Local edge backend/kiosk runtime | Kiosk/device credential, future mTLS/signing |
+| Operations health/info | `/health...`, `/info` | Load balancer, deployment monitor, developer tooling | Public operational probe |
 
 ## Tablet / Customer APIs
 
@@ -128,6 +129,26 @@ Rules:
 - Do not use internal account JWT as the long-term kiosk runtime credential.
 - Keep IoT DTOs separate from EF entities.
 - MQTT is notification only; Edge pulls command details through the API.
+
+## Operations Health APIs
+
+Health APIs are operational probes, not business APIs.
+
+Current examples:
+
+```text
+GET /health
+GET /health/ready
+GET /info
+```
+
+Rules:
+
+- `/health` is a lightweight liveness probe.
+- `/health/ready` may check dependencies such as the database.
+- `/info` exposes non-sensitive service/build metadata.
+- Do not require user JWT for health probes.
+- Do not expose secrets, connection strings, stack traces, or sensitive dependency details.
 
 ## Related Docs
 

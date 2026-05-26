@@ -1,35 +1,92 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace Application.Shared.Utils
 {
     public static class SensitiveDataMasker
     {
-        private static readonly HashSet<string> SensitiveKeys = new(StringComparer.OrdinalIgnoreCase)
+        private const string RedactedValue = "[REDACTED]";
+
+        private static readonly HashSet<string> ExactSensitiveKeys = new(StringComparer.OrdinalIgnoreCase)
         {
-            "password", "pass", "pwd",
-            "token", "jwtToken", "accessToken", "refreshToken",
-            "jwt", "secret", "authorization", "authToken"
+            "apiKey",
+            "authorization",
+            "authToken",
+            "clientSecret",
+            "confirmPassword",
+            "currentPassword",
+            "externalIdToken",
+            "firebaseToken",
+            "idToken",
+            "initialPassword",
+            "jwt",
+            "jwtToken",
+            "newPassword",
+            "pass",
+            "password",
+            "passwordHash",
+            "providerSignature",
+            "pwd",
+            "refreshToken",
+            "resetToken",
+            "secret",
+            "secretKey",
+            "signature",
+            "token",
+            "tokenHash"
         };
 
-        public static string MaskSensitiveData(string json)
+        private static readonly string[] SensitiveKeyFragments =
+        [
+            "apiKey",
+            "authorization",
+            "credential",
+            "password",
+            "secret",
+            "signature",
+            "token"
+        ];
+
+        private static readonly HashSet<string> SensitivePayloadKeys = new(StringComparer.OrdinalIgnoreCase)
         {
-            if (string.IsNullOrWhiteSpace(json))
-                return json;
+            "checkoutUrl",
+            "headersJson",
+            "payloadJson",
+            "providerPayload",
+            "qrCodePayload",
+            "rawRequestJson",
+            "rawResponseJson"
+        };
+
+        private static readonly Regex JsonStringValueRegex = new(
+            "(?<prefix>\"(?<key>[^\"]+)\"\\s*:\\s*)\"(?<value>(?:\\\\.|[^\"\\\\])*)\"",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
+        private static readonly Regex FormValueRegex = new(
+            @"(?<prefix>(?<key>[A-Za-z0-9_.-]*(?:password|token|secret|signature|authorization|apiKey|credential)[A-Za-z0-9_.-]*)=)(?<value>[^&\s]+)",
+            RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+        public static string MaskSensitiveData(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return value;
+            }
 
             try
             {
-                var root = JsonNode.Parse(json);
+                var root = JsonNode.Parse(value);
                 MaskNode(root);
                 return root?.ToJsonString(new JsonSerializerOptions
                 {
                     WriteIndented = false,
                     PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-                }) ?? json;
+                }) ?? value;
             }
             catch
             {
-                return json;
+                return MaskText(value);
             }
         }
 
@@ -39,9 +96,9 @@ namespace Application.Shared.Utils
             {
                 foreach (var kvp in obj.ToList())
                 {
-                    if (SensitiveKeys.Contains(kvp.Key))
+                    if (IsSensitiveKey(kvp.Key))
                     {
-                        obj[kvp.Key] = "[REDACTED]";
+                        obj[kvp.Key] = RedactedValue;
                     }
                     else
                     {
@@ -56,6 +113,36 @@ namespace Application.Shared.Utils
                     MaskNode(item);
                 }
             }
+        }
+
+        private static string MaskText(string value)
+        {
+            var masked = JsonStringValueRegex.Replace(value, match =>
+            {
+                var key = match.Groups["key"].Value;
+                return IsSensitiveKey(key)
+                    ? $"{match.Groups["prefix"].Value}\"{RedactedValue}\""
+                    : match.Value;
+            });
+
+            return FormValueRegex.Replace(masked, match =>
+            {
+                var key = match.Groups["key"].Value;
+                return IsSensitiveKey(key)
+                    ? $"{match.Groups["prefix"].Value}{RedactedValue}"
+                    : match.Value;
+            });
+        }
+
+        private static bool IsSensitiveKey(string key)
+        {
+            if (ExactSensitiveKeys.Contains(key) || SensitivePayloadKeys.Contains(key))
+            {
+                return true;
+            }
+
+            return SensitiveKeyFragments.Any(fragment =>
+                key.Contains(fragment, StringComparison.OrdinalIgnoreCase));
         }
     }
 }

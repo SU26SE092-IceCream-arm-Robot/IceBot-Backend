@@ -169,6 +169,8 @@ try
 
     app.UseAuthorization();
 
+    app.MapHealthEndpoints();
+    app.MapApplicationInfoEndpoints();
     app.MapControllers();
 
     app.Run();
