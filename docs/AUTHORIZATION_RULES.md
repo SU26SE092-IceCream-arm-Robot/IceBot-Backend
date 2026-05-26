@@ -18,7 +18,7 @@ This document only defines authorization direction for those surfaces.
 | `Manager` | Business/operations management across kiosks, reports, menus, pricing, and maintenance coordination |
 | `Staff` | On-site operations such as refill, cleaning, status checks, issue reporting, and manual support/refund handling |
 | `Technician` | Installation, robot/kiosk setup, technical maintenance, troubleshooting, and device/robot configuration |
-| `LocationOwner` | Placement-location owner who can view activity, usage, and revenue/commission for their scoped location |
+| `OrgAdmin` | Organization admin who can view and manage resources within their assigned organization scope |
 
 ## Policy Direction
 
@@ -33,7 +33,7 @@ This document only defines authorization direction for those surfaces.
 | `maintenance.manage` | `SystemAdmin`, `Manager`, `Technician` | Maintenance tickets and technical work coordination |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |
 | `kiosks.manage` | `SystemAdmin`, `Manager`, `Technician` | Kiosk setup and operational configuration |
-| `reports.view` | `SystemAdmin`, `Manager`, `LocationOwner` | Scope filtering must be enforced when scoped authorization is implemented |
+| `reports.view` | `SystemAdmin`, `Manager`, `OrgAdmin` | Scope filtering must be enforced when scoped authorization is implemented |
 
 ## Current Implementation Notes
 

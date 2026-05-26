@@ -15,7 +15,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Surface | Route pattern | Primary clients | Auth direction |
 | --- | --- | --- | --- |
 | Tablet/customer | `/api/v1/kiosks/...`, `/api/v1/orders...` | Flutter tablet/customer checkout flow | Public v1 endpoints with idempotency and validation |
-| Internal management | `/api/v1/management/...` | Back-office UI for SystemAdmin, Manager, Staff, Technician, LocationOwner depending on policy | JWT + scoped RBAC policy |
+| Internal management | `/api/v1/management/...` | Back-office UI for SystemAdmin, Manager, Staff, Technician, OrgAdmin depending on policy | JWT + scoped RBAC policy |
 | Current account | `/api/v1/me...` | Logged-in internal user managing own profile/security | JWT |
 | Authentication | `/api/v1/authentication...` | Internal login/password recovery clients | Mixed public/login and token flows |
 | Payment provider webhook | `/api/v1/payments/.../webhook` | Payment provider callbacks | Provider signature verification |
