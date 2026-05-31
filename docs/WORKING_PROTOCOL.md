@@ -133,7 +133,7 @@ Do not run build for documentation-only changes unless explicitly requested.
 For code changes, run:
 
 ```powershell
-dotnet build IceBot\IceBot.slnx
+dotnet build src\IceBot.slnx
 ```
 
 For documentation-only changes, no build is needed.

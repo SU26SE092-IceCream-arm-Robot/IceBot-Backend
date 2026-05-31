@@ -19,7 +19,7 @@ Do not split into microservices yet. Keep module boundaries clear inside the mon
 ## Project Layout
 
 ```text
-IceBot/
+src/
   WebAPI/
   Application/
   Domain/

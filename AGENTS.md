@@ -55,7 +55,7 @@ Do not duplicate long architecture explanations here. This file is for execution
 Default build command:
 
 ```powershell
-dotnet build IceBot\IceBot.slnx
+dotnet build src\IceBot.slnx
 ```
 
 Do not run build for documentation-only changes unless the user explicitly asks for verification.
