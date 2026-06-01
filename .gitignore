@@ -386,4 +386,5 @@ FodyWeavers.xsd
 *.sqlite
 *.sqlite3
 
-*.local.md
+# Local Agent Memory
+.project-memory/

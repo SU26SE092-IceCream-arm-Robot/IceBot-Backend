@@ -10,6 +10,13 @@ Operational rules for coding agents working in this repository.
 
 Do not duplicate long architecture explanations here. This file is for execution rules.
 
+## Documentation Reading
+
+- Treat links as routing hints, not mandatory recursive reads.
+- Do not follow every link in every document.
+- If a linked file was already read in the current task, do not reopen it unless the user asks, the file may have changed, or a specific section is needed.
+- Prefer reading the smallest relevant set of docs, then inspect code.
+
 ## Change Guardrails
 
 - Preserve existing API route contracts unless the user explicitly asks to change them.

@@ -26,6 +26,8 @@ src/
   Infrastructure/
 ```
 
+The source root is named `src` because the backend is still one deployable modular monolith. Do not use `services` until there are multiple independently deployable services with separate runtime, deployment, and ownership boundaries.
+
 Current compile-time dependency chain:
 
 ```text
@@ -239,6 +241,8 @@ Avoid:
 - [Boundary Contexts](docs/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](docs/DEPENDENCY_RULES.md)
 - [Naming Rules](docs/NAMING_RULES.md)
+- [API Surface Rules](docs/API_SURFACE_RULES.md)
+- [Authorization Rules](docs/AUTHORIZATION_RULES.md)
 - [Data Modeling Rules](docs/DATA_MODELING_RULES.md)
 - [System Flows](docs/SYSTEM_FLOWS.md)
 - [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md)

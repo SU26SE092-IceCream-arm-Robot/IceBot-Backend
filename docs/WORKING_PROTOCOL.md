@@ -110,6 +110,8 @@ Use the project documentation index first when the task spans multiple repos or 
 
 Do not read all docs by default. Read the smallest relevant set, usually 1-3 files, then inspect code as needed.
 
+Links are routing hints, not mandatory recursive reads. If a linked file was already read in the current task, do not reopen it unless the user asks, the file may have changed, or a specific section is needed.
+
 Use:
 
 - [Architecture](../ARCHITECTURE.md) for high-level architecture.
