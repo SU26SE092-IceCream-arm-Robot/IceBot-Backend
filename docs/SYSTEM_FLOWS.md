@@ -6,6 +6,10 @@ Business/user-facing flows live in the project-level `Docs/BUSINESS_FLOWS.md`.
 
 Detailed API and message contracts live in [IoT Contract](IOT_CONTRACT.md).
 
+## Search Keywords
+
+`system flow`, `checkout to execution`, `post-payment fan-out`, `tablet status`, `edge command flow`, `runtime readiness check`, `execution event sync`, `paid but edge cannot execute`, `edge offline`, `duplicate notification`, `MQTT`, `payment success`, `ready for execution`, `refund required`
+
 ## Current Assumptions
 
 - One tablet per kiosk.

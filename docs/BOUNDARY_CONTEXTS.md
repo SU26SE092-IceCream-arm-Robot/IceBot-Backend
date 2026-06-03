@@ -2,7 +2,29 @@
 
 This project keeps one Domain project, but domain entities are grouped by bounded context. The folder and namespace should describe business ownership, not technical implementation.
 
-## Context Map
+## Search Keywords
+
+`bounded context`, `domain ownership`, `Domain.Identity`, `Domain.Tenants`, `Domain.Catalog`, `Domain.SalesCatalog`, `Domain.Orders`, `Domain.Payments`, `Domain.RobotConfiguration`, `Domain.RobotRuntime`, `Domain.Devices`, `Domain.Inventory`, `Domain.Operations`, `Domain.Sync`, `Domain.Common`, `ProductVariant`, `MenuItem`, `KioskRecipeExecutionProfile`, `RobotProgram`, `RobotJob`, `SyncEventInbox`
+
+## Bounded Context Ownership
+
+### Ownership Lookup
+
+| Context | Namespace | Owns |
+| --- | --- | --- |
+| Identity | `Domain.Identity` | accounts, roles, login devices, refresh tokens, password reset requests |
+| Tenants | `Domain.Tenants` | organizations, stores, kiosks, tenant scope |
+| Catalog | `Domain.Catalog` | product definitions, variants, options, recipes, ingredients |
+| Sales Catalog | `Domain.SalesCatalog` | menus, menu items, sellable offers, pricing |
+| Orders | `Domain.Orders` | order lifecycle, order items, historical order snapshots |
+| Payments | `Domain.Payments` | payment transactions, callbacks, refunds, payment methods |
+| Robot Configuration | `Domain.RobotConfiguration` | robot programs, program steps, recipe execution profiles |
+| Robot Runtime | `Domain.RobotRuntime` | robot jobs, robot job steps, robot job events |
+| Devices | `Domain.Devices` | device catalog, installed devices, telemetry, heartbeats |
+| Inventory | `Domain.Inventory` | dispenser state, stock movements |
+| Operations | `Domain.Operations` | alerts, maintenance tickets, operation logs |
+| Sync | `Domain.Sync` | edge-cloud inbox and dead letters |
+| Common | `Domain.Common` | base entities, shared abstractions, shared primitives |
 
 ### Identity
 

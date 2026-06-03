@@ -2,6 +2,10 @@
 
 This document records domain naming and behavior rules for commands, events, sync, payment, and robot execution. Do not add all fields to every entity. Add them only at boundaries where duplicate requests, duplicate events, or retry after partial success can happen.
 
+## Search Keywords
+
+`idempotency`, `retry`, `IdempotencyKey`, `EventId`, `SourceEventId`, `CorrelationId`, `CausationId`, `ProcessingAttempts`, `NextRetryAt`, `LockedUntil`, `LockId`, `payment callback`, `provider callback`, `sync inbox`, `dead letter`, `robot job retry`, `stock movement`, `device event`, `heartbeat`, `append-only event`
+
 ## Naming Rules
 
 Use `IdempotencyKey` for a client/API command that may be retried by the caller.
@@ -317,6 +321,8 @@ Notes:
 
 ## Do Not Soft Delete Event Tables
 
+Event, callback, retry, and append-only evidence tables should not use soft delete as a normal lifecycle.
+
 Append-only event/log/ledger tables should not use soft delete:
 
 - `RobotJobEvent`
@@ -329,3 +335,10 @@ Append-only event/log/ledger tables should not use soft delete:
 - `SyncDeadLetter`
 
 If data is wrong, append a correction/reversal event instead of deleting or soft-deleting the original record.
+
+## Related Docs
+
+- [Data Modeling Rules](DATA_MODELING_RULES.md)
+- [JSON Field Rules](JSON_FIELD_RULES.md)
+- [IoT Contract](IOT_CONTRACT.md)
+- [Naming Rules](NAMING_RULES.md)

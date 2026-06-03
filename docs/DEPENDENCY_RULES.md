@@ -2,6 +2,10 @@
 
 This document defines dependency boundaries for the current modular monolith. The goal is to keep the codebase easy to split later without paying microservice complexity now.
 
+## Search Keywords
+
+`dependency rules`, `clean architecture`, `modular monolith`, `WebAPI`, `Infrastructure`, `Application`, `Domain`, `DbContext`, `unit of work`, `repository`, `thin repository`, `handler`, `controller`, `bounded context`, `layer boundary`, `EF Core`, `external adapter`, `provider adapter`, `microservice-ready`
+
 ## Project Dependencies
 
 Current project direction:

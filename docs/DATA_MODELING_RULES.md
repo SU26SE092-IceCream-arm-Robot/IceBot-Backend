@@ -2,6 +2,10 @@
 
 This document captures small data-modeling rules that are easy to miss during ERD and EF Core changes. These rules are practical guardrails for tables, indexes, constraints, and persistence behavior.
 
+## Search Keywords
+
+`data modeling`, `EF Core`, `PostgreSQL`, `soft delete`, `filtered unique index`, `partial unique index`, `DeletedAt IS NULL`, `nullable unique`, `tenant scope`, `historical snapshot`, `DeleteBehavior.Restrict`, `enum status`, `decimal money`, `JSONB`, `high-volume logs`, `partitioning`, `retention`, `SyncEventInbox index`, `KioskHeartbeats`, `DeviceEvents`, `RobotJobEvents`
+
 ## Soft Delete And Unique Indexes
 
 If an entity uses `ISoftDeletable`, unique indexes for reusable business identifiers must filter out deleted rows.

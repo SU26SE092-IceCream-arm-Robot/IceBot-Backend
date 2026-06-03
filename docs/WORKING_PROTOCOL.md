@@ -4,6 +4,10 @@ This project is still in discovery and pre-deployment. The domain model, API sha
 
 This document defines how to work during this phase. It is not a frozen engineering process.
 
+## Search Keywords
+
+`working protocol`, `workflow`, `question versus action`, `apply`, `inspect`, `review`, `refactor rules`, `change scope`, `documentation rules`, `verification`, `done criteria`, `pre-deployment`, `do not create migrations`, `build command`, `AI agent workflow`
+
 ## Current Phase
 
 Default assumptions:
@@ -114,6 +118,8 @@ Links are routing hints, not mandatory recursive reads. If a linked file was alr
 
 Use:
 
+- [RAG Context Map](RAG_CONTEXT_MAP.md) when the right backend doc is unclear.
+- [Documentation Rules](DOCUMENTATION_RULES.md) for RAG-friendly document structure.
 - [Architecture](../ARCHITECTURE.md) for high-level architecture.
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md) for domain ownership.
 - [Dependency Rules](DEPENDENCY_RULES.md) for layer boundaries.
@@ -129,6 +135,13 @@ Do not load `Vault/` by default. Use it only when the user asks about reasoning 
 When changing code that affects contracts, domain ownership, or data model rules, update the relevant doc.
 
 Do not run build for documentation-only changes unless explicitly requested.
+
+Do not run RAG ingest automatically after documentation-only changes unless explicitly requested. RAG ingest mutates the local vector database and can be slow on the current machine because embedding runs in small batches. Instead, report the manual command:
+
+```powershell
+cd ..\IceBot-Tools
+python .\rag\commands\ingest.py
+```
 
 ## Verification
 
@@ -155,3 +168,12 @@ A change is done when:
 - docs were updated if the decision changed architecture, contract, data model, or naming;
 - any skipped verification is stated explicitly;
 - remaining warnings or risks are reported.
+
+## Related Docs
+
+- [Documentation Rules](DOCUMENTATION_RULES.md)
+- [RAG Context Map](RAG_CONTEXT_MAP.md)
+- [Architecture](../ARCHITECTURE.md)
+- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
+- [Dependency Rules](DEPENDENCY_RULES.md)
+- [Naming Rules](NAMING_RULES.md)

@@ -1,5 +1,11 @@
 # Multi-Tenancy Rules
 
+This document defines tenant isolation and configurable override scope for organizations, stores, kiosks, devices, catalog, menu, recipe, and robot configuration.
+
+## Search Keywords
+
+`multi-tenancy`, `tenant`, `tenant isolation`, `Organization`, `Store`, `Kiosk`, `TenantScopeType`, `Global`, `Organization scope`, `Store scope`, `Kiosk scope`, `Device scope`, `global query filter`, `Product`, `ProductVariant`, `Recipe`, `Menu`, `RobotProgram`, `KioskRecipeExecutionProfile`, `OrgAdmin`
+
 ## Tenant Root
 
 `Organization` is the tenant root.
@@ -210,3 +216,10 @@ Kiosk/edge may create or update:
 - sync inbox/dead letter records
 
 When edge creates tenant-owned rows, it must include `OrganizationId` if known. If not known at the edge, cloud ingestion must enrich it from `KioskId` before storing/reporting.
+
+## Related Docs
+
+- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
+- [Authorization Rules](AUTHORIZATION_RULES.md)
+- [Data Modeling Rules](DATA_MODELING_RULES.md)
+- [API Surface Rules](API_SURFACE_RULES.md)

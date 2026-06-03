@@ -2,6 +2,10 @@
 
 JSON columns are acceptable in this domain because the system runs across edge kiosks, robot SDKs, payment providers, and cloud sync. They must not all be treated the same. Every JSON field should fall into one of these roles.
 
+## Search Keywords
+
+`JSON fields`, `JSONB`, `ConfigJson`, `SettingsJson`, `ParametersJson`, `SnapshotJson`, `PayloadJson`, `HeadersJson`, `RawRequestJson`, `RawResponseJson`, `MetadataJson`, `schema version`, `source of truth JSON`, `immutable snapshot`, `append-only payload`, `provider payload`, `robot parameters`, `sync payload`, `JSON conflict resolution`
+
 ## Roles
 
 ### Source of truth configuration
@@ -110,3 +114,10 @@ For edge-cloud sync, conflict resolution should happen at the aggregate boundary
 - Stock reporting: typed `StockMovement` quantities; JSON sensor payloads are only supporting evidence.
 
 Never resolve sync conflicts by merging arbitrary JSON payloads from cloud and edge. Either reject stale writes, create a new version, or normalize the changed field into typed columns.
+
+## Related Docs
+
+- [Data Modeling Rules](DATA_MODELING_RULES.md)
+- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
+- [IoT Contract](IOT_CONTRACT.md)
+- [Boundary Contexts](BOUNDARY_CONTEXTS.md)

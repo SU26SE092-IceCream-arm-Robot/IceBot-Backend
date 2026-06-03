@@ -2,6 +2,10 @@
 
 This document defines naming conventions for IceBot domain, application, infrastructure, and API code. Prefer names that describe business ownership and runtime behavior instead of technical convenience.
 
+## Search Keywords
+
+`naming`, `code naming`, `entity name`, `GuidEntity`, `LongEntity`, `UUID v7`, `Id fields`, `foreign key`, `Status enum`, `Application names`, `Command`, `Query`, `Handler`, `Controller`, `route naming`, `JSON field names`, `retry names`, `idempotency names`, `file names`
+
 ## General Rules
 
 - Use English names in code.
@@ -313,3 +317,4 @@ Group related small enums by context only when it improves readability. Do not r
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](JSON_FIELD_RULES.md)
 - [IoT Contract](IOT_CONTRACT.md)
+- [Documentation Rules](DOCUMENTATION_RULES.md)

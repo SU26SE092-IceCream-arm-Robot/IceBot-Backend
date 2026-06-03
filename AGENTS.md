@@ -7,6 +7,8 @@ Operational rules for coding agents working in this repository.
 - Architecture decisions: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Domain context map: [docs/BOUNDARY_CONTEXTS.md](docs/BOUNDARY_CONTEXTS.md)
 - Dependency boundaries: [docs/DEPENDENCY_RULES.md](docs/DEPENDENCY_RULES.md)
+- RAG/docs routing map: [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md)
+- Documentation structure: [docs/DOCUMENTATION_RULES.md](docs/DOCUMENTATION_RULES.md)
 
 Do not duplicate long architecture explanations here. This file is for execution rules.
 
@@ -16,6 +18,7 @@ Do not duplicate long architecture explanations here. This file is for execution
 - Do not follow every link in every document.
 - If a linked file was already read in the current task, do not reopen it unless the user asks, the file may have changed, or a specific section is needed.
 - Prefer reading the smallest relevant set of docs, then inspect code.
+- When the right backend doc is unclear after direct retrieval or metadata/path filters, use [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md) as a fallback router.
 
 ## Change Guardrails
 

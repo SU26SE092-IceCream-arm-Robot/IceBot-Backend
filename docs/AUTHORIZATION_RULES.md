@@ -4,6 +4,10 @@ This document records backend API authorization direction for internal users.
 
 Customer ordering is anonymous in the current system. Customer is a business actor, not an internal account role.
 
+## Search Keywords
+
+`authorization`, `authz`, `RBAC`, `scoped RBAC`, `role`, `roles`, `SystemAdmin`, `Manager`, `Staff`, `Technician`, `OrgAdmin`, `Organization Admin`, `policy`, `permissions`, `account roles`, `organization scope`, `store scope`, `kiosk scope`, `accounts.manage`, `products.manage`, `menus.manage`, `robot-config.manage`
+
 ## Route Surface
 
 API surface ownership, route categories, and examples live in [API Surface Rules](API_SURFACE_RULES.md).

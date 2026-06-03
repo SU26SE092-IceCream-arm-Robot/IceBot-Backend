@@ -2,6 +2,10 @@
 
 This document defines the backend API surface categories for IceBot. It is an ownership map, not a full endpoint contract. Detailed request/response contracts belong in Swagger, feature docs, or integration docs such as [IoT Contract](IOT_CONTRACT.md).
 
+## Search Keywords
+
+`API surface`, `route prefix`, `tablet API`, `customer API`, `management API`, `current account`, `me API`, `authentication`, `auth`, `login`, `external login`, `Firebase Google login`, `refresh token`, `forgot password`, `reset password`, `change password`, `payment webhook`, `IoT API`, `edge API`, `health`, `info`
+
 ## Purpose
 
 Use separate API surfaces for separate client workflows.
@@ -21,6 +25,18 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Payment provider webhook | `/api/v1/payments/.../webhook` | Payment provider callbacks | Provider signature verification |
 | IoT/edge | `/api/v1/iot/...` | Local edge backend/kiosk runtime | Kiosk/device credential, future mTLS/signing |
 | Operations health/info | `/health...`, `/info` | Load balancer, deployment monitor, developer tooling | Public operational probe |
+
+## API Lookup
+
+| Area | Main routes | Read when asking about |
+| --- | --- | --- |
+| Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password |
+| Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password` | own profile, edit profile, change password while logged in |
+| Account management | `/api/v1/management/accounts/*` | create internal account, assign roles, disable account, set password |
+| Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
+| Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
+| Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
+| Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
 
 ## Tablet / Customer APIs
 
@@ -82,6 +98,8 @@ Rules:
 - Password recovery is not `/me` because the user may be logged out.
 
 ## Authentication And Password Recovery APIs
+
+Search keywords: `authentication`, `auth`, `local login`, `username password login`, `Firebase Google login`, `external login`, `refresh token`, `revoke refresh token`, `forgot password`, `reset password`, `change password`, `current account password`, `management accounts`.
 
 Current examples:
 

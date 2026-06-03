@@ -12,6 +12,10 @@ The contract is written for the current pre-deployment system:
 - Edge owns runtime execution and local machine state.
 - Cloud owns payment verification, central order state, reporting, and monitoring.
 
+## Search Keywords
+
+`IoT contract`, `edge-cloud contract`, `tablet`, `local edge`, `cloud backend`, `MQTT`, `payment session`, `QR payment`, `order execution`, `ready for execution`, `executable order`, `pull commands`, `command ack`, `fast runtime check`, `sync events batch`, `heartbeat`, `configuration sync`, `runtime menu projection`, `payment callback`, `refund required`
+
 ## Source Of Truth
 
 ### Tablet

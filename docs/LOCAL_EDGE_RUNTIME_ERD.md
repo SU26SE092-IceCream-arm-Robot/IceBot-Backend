@@ -9,6 +9,22 @@ Scope:
 - Local DB stores runtime snapshots, executable commands, robot execution state, inventory runtime state, and sync evidence.
 - Cloud remains the source of truth for payment, central order lifecycle, tenant management, reporting, and admin identity.
 
+## Search Keywords
+
+`local edge DB`, `edge runtime ERD`, `local PostgreSQL`, `runtime snapshot`, `executable order`, `edge command inbox`, `robot execution queue`, `RobotJob`, `RobotJobStep`, `RobotJobEvent`, `RuntimeProductProjection`, `RuntimeRecipeProgramBinding`, `RuntimeRobotProgramStep`, `KioskRuntime`, `IngredientDispenserState`, `StockMovement`, `EdgeOutboxMessage`, `heartbeat`, `sync checkpoint`, `Fairino`
+
+## Table Lookup
+
+| Area | Main tables |
+| --- | --- |
+| Node and kiosk runtime | `EdgeNode`, `KioskRuntime`, `EdgeSyncCheckpoint` |
+| Runtime catalog/config snapshots | `RuntimeProduct`, `RuntimeProductVariant`, `RuntimeIngredient`, `RuntimeRecipe`, `RuntimeRecipeItem`, `RuntimeRobotProgram`, `RuntimeRobotProgramStep`, `RuntimeRecipeProgramBinding` |
+| Devices and inventory | `RuntimeDevice`, `DeviceRuntimeState`, `IngredientDispenserState`, `StockMovement` |
+| Tablet runtime projection | `RuntimeProductProjection`, `RuntimeProductProjectionItem` |
+| Cloud commands and orders | `EdgeCommandInbox`, `ExecutableOrder`, `ExecutableOrderItem`, `ExecutionReadinessCheck` |
+| Robot execution | `RobotExecutionQueue`, `RobotJob`, `RobotJobStep`, `RobotJobEvent` |
+| Telemetry and sync outbox | `DeviceEvent`, `KioskHeartbeat`, `EdgeOutboxMessage`, `EdgeOutboxDeadLetter` |
+
 ## Design Principles
 
 - Keep the local schema runtime-focused.
