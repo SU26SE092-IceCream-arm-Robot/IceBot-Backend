@@ -140,7 +140,8 @@ Do not run RAG ingest automatically after documentation-only changes unless expl
 
 ```powershell
 cd ..\IceBot-Tools
-python .\rag\commands\ingest.py
+python .\rag\commands\ingest_docs.py
+python .\rag\commands\ingest_code.py
 ```
 
 ## Verification
