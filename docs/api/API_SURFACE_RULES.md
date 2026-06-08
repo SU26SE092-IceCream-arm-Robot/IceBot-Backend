@@ -34,6 +34,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password` | own profile, edit profile, change password while logged in |
 | Account management | `/api/v1/management/accounts/*` | create internal account, invitation link generation, assign roles, disable account, set password |
 | Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
+| Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
@@ -78,6 +79,12 @@ POST /api/v1/management/organizations
 PUT /api/v1/management/organizations/{organizationId}
 PATCH /api/v1/management/organizations/{organizationId}/disable
 PATCH /api/v1/management/organizations/{organizationId}/activate
+GET /api/v1/management/stores
+GET /api/v1/management/stores/{storeId}
+POST /api/v1/management/organizations/{organizationId}/stores
+PUT /api/v1/management/stores/{storeId}
+PATCH /api/v1/management/stores/{storeId}/disable
+PATCH /api/v1/management/stores/{storeId}/activate
 ```
 
 Rules:

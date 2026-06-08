@@ -10,4 +10,6 @@ public sealed class CurrentUserContext
     public bool IsSystemAdmin { get; init; }
     
     public IReadOnlySet<Guid> AllowedOrganizationIds { get; init; } = new HashSet<Guid>();
+
+    public IReadOnlySet<Guid> AllowedStoreIds { get; init; } = new HashSet<Guid>();
 }

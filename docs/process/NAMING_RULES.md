@@ -300,6 +300,42 @@ LastErrorCode
 LastErrorMessage
 ```
 
+## Result Wrapper Names
+
+Use `ApiResult<T>` for Application use cases whose result is returned directly by WebAPI controllers.
+
+`ApiResult<T>` is API-facing and may carry response-oriented fields such as:
+
+```text
+StatusCode
+ValidationErrors
+BusinessError
+SystemError
+```
+
+Use `InternalResult<T>` for internal helper operations inside an Application workflow or provider/orchestration step.
+
+`InternalResult<T>` is not an HTTP response contract. It should stay small:
+
+```text
+Succeeded
+Message
+Data
+Exception
+Details
+```
+
+Do not add `StatusCode` or API response fields to `InternalResult<T>`.
+
+Rule:
+
+```text
+Controller-facing use case -> ApiResult<T>
+Internal workflow step -> InternalResult<T> or a purpose-built result type
+```
+
+For complex flows such as payment, sync, edge dispatch, or robot execution, internal steps may return `InternalResult<T>` and the final Application use case converts that internal result into `ApiResult<T>` at the API boundary.
+
 ## File Names
 
 File name should match the primary type name:

@@ -50,6 +50,28 @@ KioskId = null
 
 OrgAdmin access must be checked against role scope. Do not infer tenant access from email domain.
 
+## Permission Entity Decision
+
+Do not add a `Permission` entity for v1.
+
+Current authorization uses:
+
+```text
+RoleCode
++ AccountRole scope
++ ASP.NET policy name
+```
+
+Policy names are treated as permission-like constants for now. This keeps v1 authorization explicit while roles and business flows are still being finalized.
+
+Add `Permission` and `RolePermission` entities only when there is a concrete need for dynamic permission management, such as:
+
+- admins configuring permissions from UI,
+- tenant-specific custom roles,
+- many custom roles beyond the current internal role set,
+- hardcoded policies becoming too large to maintain safely,
+- permission changes needing their own audit and lifecycle.
+
 ## Policy Direction
 
 | Policy | Allowed roles | Notes |
@@ -58,6 +80,9 @@ OrgAdmin access must be checked against role scope. Do not infer tenant access f
 | `organizations.manage` | `SystemAdmin` | Platform-level organization management: create, activate, disable organizations |
 | `organizations.view` | `SystemAdmin`, `OrgAdmin` | View organizations. OrgAdmin can view/read only their assigned organization(s) |
 | `organizations.update` | `SystemAdmin`, `OrgAdmin` | Update organizations. OrgAdmin can update only basic profile/contact info for assigned organization(s); SystemAdmin can update platform-managed fields |
+| `stores.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View stores. Scoped to assigned organization/store |
+| `stores.manage` | `SystemAdmin`, `OrgAdmin` | Create, disable, and activate stores. Scoped to assigned organization |
+| `stores.update` | `SystemAdmin`, `OrgAdmin`, `Manager` | Update store details. Scoped to assigned organization/store |
 | `products.manage` | `SystemAdmin`, `Manager` | Product/catalog management. Staff and Technician should not change product pricing/catalog by default |
 | `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |
 | `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |
@@ -71,8 +96,9 @@ OrgAdmin access must be checked against role scope. Do not infer tenant access f
 ## Current Implementation Notes
 
 - Current `ScopedRoleAuthorizationHandler` checks role presence only.
-- Route/resource scope matching is deferred until APIs pass `OrganizationId`, `StoreId`, or `KioskId` authorization context.
-- When scoped authorization is implemented, role checks must also validate the requested resource scope.
+- Store management APIs perform service-level scope checks using `OrganizationId` and `StoreId` from role scope claims.
+- Other route/resource scope matching is still added incrementally as APIs pass `OrganizationId`, `StoreId`, or `KioskId` authorization context.
+- Role checks must validate requested resource scope before returning scoped tenant data.
 - Do not add `Staff` or `Technician` to product/menu pricing policies unless the business explicitly gives them that responsibility.
 
 ## Related Docs

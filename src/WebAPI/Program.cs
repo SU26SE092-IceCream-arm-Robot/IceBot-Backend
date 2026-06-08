@@ -98,6 +98,15 @@ try
 
         options.AddPolicy("organizations.update", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin")));
+
+        options.AddPolicy("stores.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
+
+        options.AddPolicy("stores.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin")));
+
+        options.AddPolicy("stores.update", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
     });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();

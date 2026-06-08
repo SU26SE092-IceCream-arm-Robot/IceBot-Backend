@@ -17,6 +17,7 @@ public static class ClaimsPrincipalExtensions
         var isSystemAdmin = roles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase);
 
         var allowedOrgIds = new HashSet<Guid>();
+        var allowedStoreIds = new HashSet<Guid>();
         var roleScopes = principal.FindAll("role_scope").Select(c => c.Value).ToList();
         foreach (var scopeVal in roleScopes)
         {
@@ -25,14 +26,23 @@ public static class ClaimsPrincipalExtensions
             {
                 var roleCode = parts[0];
                 var orgIdStr = parts[1];
-                if (orgIdStr != "*" && Guid.TryParse(orgIdStr, out var orgId))
+                var storeIdStr = parts[2];
+
+                if (!IsManagementTenantRole(roleCode))
                 {
-                    if (roleCode.Equals("OrgAdmin", StringComparison.OrdinalIgnoreCase) || 
-                        roleCode.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
-                        roleCode.Equals("SystemAdmin", StringComparison.OrdinalIgnoreCase))
-                    {
-                        allowedOrgIds.Add(orgId);
-                    }
+                    continue;
+                }
+
+                if (orgIdStr != "*" &&
+                    storeIdStr == "*" &&
+                    Guid.TryParse(orgIdStr, out var orgId))
+                {
+                    allowedOrgIds.Add(orgId);
+                }
+
+                if (storeIdStr != "*" && Guid.TryParse(storeIdStr, out var storeId))
+                {
+                    allowedStoreIds.Add(storeId);
                 }
             }
         }
@@ -41,7 +51,15 @@ public static class ClaimsPrincipalExtensions
         {
             AccountId = accountId,
             IsSystemAdmin = isSystemAdmin,
-            AllowedOrganizationIds = allowedOrgIds
+            AllowedOrganizationIds = allowedOrgIds,
+            AllowedStoreIds = allowedStoreIds
         };
+    }
+
+    private static bool IsManagementTenantRole(string roleCode)
+    {
+        return roleCode.Equals("OrgAdmin", StringComparison.OrdinalIgnoreCase) ||
+               roleCode.Equals("Manager", StringComparison.OrdinalIgnoreCase) ||
+               roleCode.Equals("SystemAdmin", StringComparison.OrdinalIgnoreCase);
     }
 }

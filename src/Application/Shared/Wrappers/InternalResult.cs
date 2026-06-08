@@ -1,11 +1,11 @@
-﻿namespace Application.Shared.Wrappers;
+namespace Application.Shared.Wrappers;
 
 public class InternalResult<T>
 {
     public bool Succeeded { get; init; }
     public string? Message { get; init; }
-    public T? Data { get; init; }
     public Exception? Exception { get; init; }
+    public T? Data { get; init; }
     public Dictionary<string, object>? Details { get; private set; }
 
     private InternalResult()
@@ -18,13 +18,6 @@ public class InternalResult<T>
             Succeeded = true,
             Message = message,
             Data = data
-        };
-
-    public static InternalResult<T> Success(string? message = null)
-        => new()
-        {
-            Succeeded = true,
-            Message = message
         };
 
     public static InternalResult<T> Fail(string message, Exception? exception = null)

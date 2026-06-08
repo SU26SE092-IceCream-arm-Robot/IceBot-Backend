@@ -47,6 +47,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `auth`, `login`, `forgot password`, `reset password`, `refresh token` | [API Surface Rules](api/API_SURFACE_RULES.md), section `Authentication And Password Recovery APIs` |
 | `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
 | `management accounts`, `role scope`, `RBAC`, `policy` | [Authorization Rules](api/AUTHORIZATION_RULES.md) |
+| `store`, `organization`, `kiosk`, `tenant scope` | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `order paid`, `ready for execution`, `refund required`, `edge offline` | [System Flows](flows/SYSTEM_FLOWS.md), [IoT Contract](iot/IOT_CONTRACT.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | `PayloadJson`, `SnapshotJson`, `ConfigJson`, `JSONB` | [JSON Field Rules](data/JSON_FIELD_RULES.md) |

@@ -9,6 +9,7 @@ public static class TenantsInfrastructureRegistration
     public static IServiceCollection AddTenantsInfrastructure(this IServiceCollection services)
     {
         services.AddScoped<IOrganizationStore, OrganizationStore>();
+        services.AddScoped<IStoreStore, StoreStore>();
         return services;
     }
 }

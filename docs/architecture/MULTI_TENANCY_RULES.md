@@ -64,6 +64,33 @@ Infrastructure.Tenants.Persistence.OrganizationStore
 
 Do not place organization-specific persistence in the generic `Infrastructure.Persistence.Repositories` namespace. That namespace is for generic/shared repository infrastructure.
 
+## Store Management
+
+Store management APIs live under:
+
+```text
+/api/v1/management/stores
+/api/v1/management/organizations/{organizationId}/stores
+```
+
+`SystemAdmin` owns platform-level store operations.
+`OrgAdmin` owns store management operations within their assigned organization scope.
+
+- **Create Store:** `OrgAdmin` can create stores under their assigned organization.
+- **Update Store:** `OrgAdmin` and `Manager` can update store details within their assigned scope. `Code` is immutable.
+- **Disable/Activate Store:** `OrgAdmin` can activate or disable stores. Activating a store requires that its parent organization is active. Disabling a store does not cascade disable kiosks.
+- Organization-scoped roles can access all stores in that organization.
+- Store-scoped roles can access only the assigned store and must not be expanded to the whole organization.
+
+Store persistence ports should stay context-specific:
+
+```text
+Application.Tenants.Abstractions.IStoreStore
+Infrastructure.Tenants.Persistence.StoreStore
+```
+
+Do not place store-specific persistence in the generic repositories namespace.
+
 ## Scope Model
 
 Use `TenantScopeType` for configurable data that can exist as global defaults and tenant overrides:
