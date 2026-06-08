@@ -91,6 +91,32 @@ Infrastructure.Tenants.Persistence.StoreStore
 
 Do not place store-specific persistence in the generic repositories namespace.
 
+## Kiosk Management
+
+Kiosk management APIs live under:
+
+```text
+/api/v1/management/kiosks
+/api/v1/management/stores/{storeId}/kiosks
+```
+
+`SystemAdmin` owns platform-level kiosk operations.
+`OrgAdmin`, `Manager`, and `Technician` own kiosk management operations within their assigned scope:
+- **Create Kiosk:** Can create kiosks under their assigned store. Validates parent store and organization are active, and Kiosk's OrganizationId matches Store's OrganizationId.
+- **Update Kiosk:** Can update kiosk details within scope. `Code`, `StoreId`, and `OrganizationId` are immutable.
+- **Status Change:** Can change kiosk status. Setting to `Active` requires parent store and organization to be active.
+
+Kiosk-scoped roles (e.g. Technician with KioskId scope) can access only their assigned kiosk.
+
+Kiosk persistence ports:
+
+```text
+Application.Tenants.Abstractions.IKioskStore
+Infrastructure.Tenants.Persistence.KioskStore
+```
+
+Do not place kiosk-specific persistence in the generic repositories namespace.
+
 ## Scope Model
 
 Use `TenantScopeType` for configurable data that can exist as global defaults and tenant overrides:

@@ -10,6 +10,7 @@ public static class TenantsInfrastructureRegistration
     {
         services.AddScoped<IOrganizationStore, OrganizationStore>();
         services.AddScoped<IStoreStore, StoreStore>();
+        services.AddScoped<IKioskStore, KioskStore>();
         return services;
     }
 }

@@ -83,6 +83,9 @@ Add `Permission` and `RolePermission` entities only when there is a concrete nee
 | `stores.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View stores. Scoped to assigned organization/store |
 | `stores.manage` | `SystemAdmin`, `OrgAdmin` | Create, disable, and activate stores. Scoped to assigned organization |
 | `stores.update` | `SystemAdmin`, `OrgAdmin`, `Manager` | Update store details. Scoped to assigned organization/store |
+| `kiosks.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View kiosks. Scoped to assigned organization/store/kiosk |
+| `kiosks.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create and change status of kiosks. Scoped to assigned organization/store/kiosk |
+| `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Update kiosk details. Scoped to assigned organization/store/kiosk |
 | `products.manage` | `SystemAdmin`, `Manager` | Product/catalog management. Staff and Technician should not change product pricing/catalog by default |
 | `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |
 | `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |
@@ -90,7 +93,6 @@ Add `Permission` and `RolePermission` entities only when there is a concrete nee
 | `inventory.operate` | `SystemAdmin`, `Manager`, `Staff` | Refill and stock movement operations |
 | `maintenance.manage` | `SystemAdmin`, `Manager`, `Technician` | Maintenance tickets and technical work coordination |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |
-| `kiosks.manage` | `SystemAdmin`, `Manager`, `Technician` | Kiosk setup and operational configuration |
 | `reports.view` | `SystemAdmin`, `Manager`, `OrgAdmin` | Scope filtering must be enforced when scoped authorization is implemented |
 
 ## Current Implementation Notes
