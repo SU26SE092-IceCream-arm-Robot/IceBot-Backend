@@ -63,6 +63,12 @@ public sealed class AccountInvitationService
 
         var activeInvitations = await _invitationStore.GetActiveInvitationsByAccountIdAsync(account.Id, cancellationToken);
         var now = DateTimeOffset.UtcNow;
+
+        foreach (var activeInvitation in activeInvitations)
+        {
+            activeInvitation.RevokedAt = now;
+        }
+
         var rawToken = CreateToken();
         var invitation = new AccountInvitation
         {
@@ -97,11 +103,6 @@ public sealed class AccountInvitationService
             {
                 _logger.LogError(ex, "Failed to send invitation email to {Email}", account.Email);
             }
-        }
-
-        foreach (var activeInvitation in activeInvitations)
-        {
-            activeInvitation.RevokedAt = DateTimeOffset.UtcNow;
         }
 
         await _invitationStore.SaveChangesAsync(cancellationToken);
@@ -145,12 +146,24 @@ public sealed class AccountInvitationService
         var tokenHash = HashToken(request.Token.Trim());
         var invitation = await _invitationStore.GetByTokenHashAsync(tokenHash, asNoTracking: false, cancellationToken);
 
-        if (invitation is null ||
-            invitation.AcceptedAt is not null ||
-            invitation.RevokedAt is not null ||
-            invitation.ExpiresAt <= DateTimeOffset.UtcNow)
+        if (invitation is null)
         {
-            return ApiResult<AcceptInvitationResult>.Fail("Invitation token is invalid or expired.", 400);
+            return ApiResult<AcceptInvitationResult>.Fail("Invitation token is invalid.", 400);
+        }
+
+        if (invitation.AcceptedAt is not null)
+        {
+            return ApiResult<AcceptInvitationResult>.Fail("Invitation already accepted.", 400);
+        }
+
+        if (invitation.RevokedAt is not null)
+        {
+            return ApiResult<AcceptInvitationResult>.Fail("Invitation has been revoked. Please request a new invitation.", 400);
+        }
+
+        if (invitation.ExpiresAt <= DateTimeOffset.UtcNow)
+        {
+            return ApiResult<AcceptInvitationResult>.Fail("Invitation has expired. Please request a new invitation.", 400);
         }
 
         var account = invitation.Account;

@@ -145,6 +145,8 @@ Do not leak raw SMTP exception details to the API response. Log the server-side 
 
 Management can create a new invitation for an account that is still `Invited`.
 
+One account should have at most one active invitation.
+
 Route direction:
 
 ```text
@@ -164,10 +166,12 @@ Behavior:
 ```text
 create new invitation
   -> optionally send email
-  -> revoke previous active invitations after the new invitation is created
+  -> revoke previous active invitations
 ```
 
 This route means "create a new invitation link". It is not only "resend email".
+
+Expired invitations are not extended or revived. Create a new invitation instead.
 
 ## Accept Invitation
 
@@ -196,6 +200,14 @@ user submits token and new password
 Invitation tokens must not activate accounts that are already `Active`, `Disabled`, or `Suspended`.
 
 Accepting a valid invitation token proves token possession. It does not always prove mailbox ownership.
+
+Acceptance is not idempotent. If a token has already been accepted, return an explicit error such as:
+
+```text
+400 Invitation already accepted.
+```
+
+If a token is expired or revoked, return an explicit error and require management to create a new invitation.
 
 Current implementation uses:
 
