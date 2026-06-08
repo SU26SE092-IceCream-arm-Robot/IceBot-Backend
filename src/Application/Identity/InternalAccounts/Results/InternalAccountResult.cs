@@ -18,6 +18,7 @@ namespace Application.Identity.InternalAccounts.Results
         public string InvitationToken { get; set; } = string.Empty;
         public string? InvitationUrl { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
+        public DateTimeOffset? EmailSentAt { get; set; }
         public bool EmailSent { get; set; }
     }
 

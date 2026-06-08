@@ -13,6 +13,8 @@ public partial class AccountInvitation : GuidEntity
     
     public DateTimeOffset ExpiresAt { get; set; }
 
+    public DateTimeOffset? EmailSentAt { get; set; }
+
     public DateTimeOffset? AcceptedAt { get; set; }
     
     public DateTimeOffset? RevokedAt { get; set; }

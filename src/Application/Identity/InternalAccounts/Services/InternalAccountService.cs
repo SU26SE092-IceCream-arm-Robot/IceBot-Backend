@@ -387,6 +387,7 @@ namespace Application.Identity.InternalAccounts.Services
                         InvitationToken = invitation.InvitationToken,
                         InvitationUrl = invitation.InvitationUrl,
                         ExpiresAt = invitation.ExpiresAt,
+                        EmailSentAt = invitation.EmailSentAt,
                         EmailSent = invitation.EmailSent
                     },
                 Roles = account.AccountRoles.Select(accountRole => new InternalAccountRoleResult

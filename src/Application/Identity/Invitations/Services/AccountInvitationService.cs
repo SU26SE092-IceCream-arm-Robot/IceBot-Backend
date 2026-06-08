@@ -91,6 +91,7 @@ public sealed class AccountInvitationService
                     cancellationToken);
 
                 emailSent = true;
+                invitation.EmailSentAt = DateTimeOffset.UtcNow;
             }
             catch (Exception ex)
             {
@@ -111,6 +112,7 @@ public sealed class AccountInvitationService
             InvitationToken = rawToken,
             InvitationUrl = invitationUrl,
             ExpiresAt = invitation.ExpiresAt,
+            EmailSentAt = invitation.EmailSentAt,
             EmailSent = emailSent
         };
 
@@ -184,8 +186,12 @@ public sealed class AccountInvitationService
         }
 
         account.Status = AccountStatus.Active;
-        account.EmailConfirmed = true;
-        account.EmailConfirmedAt = DateTimeOffset.UtcNow;
+        if (invitation.EmailSentAt is not null)
+        {
+            account.EmailConfirmed = true;
+            account.EmailConfirmedAt = DateTimeOffset.UtcNow;
+        }
+
         account.UpdatedAt = DateTimeOffset.UtcNow;
         account.UpdatedByAccountId = account.Id;
 

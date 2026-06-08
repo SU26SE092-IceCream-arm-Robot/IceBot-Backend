@@ -270,6 +270,7 @@ namespace Infrastructure.Migrations
                     TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     InvitedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    EmailSentAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     AcceptedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     InvitedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),

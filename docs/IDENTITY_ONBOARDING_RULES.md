@@ -1,10 +1,10 @@
 # Identity Onboarding Rules
 
-This document is the backend source of truth for internal account onboarding, invitation links, and temporary password fallback.
+This document is the backend source of truth for internal account onboarding, invitation links, email ownership proof, and temporary password fallback.
 
 ## Search Keywords
 
-`identity onboarding`, `account onboarding`, `admin creates account`, `internal account invitation`, `invitation link`, `accept invitation`, `CreateInvitation`, `SendInvitationEmail`, `InitialPassword`, `temporary password`, `Invited account`, `Active account`, `/api/v1/management/accounts`, `/api/v1/authentication/accept-invitation`
+`identity onboarding`, `account onboarding`, `admin creates account`, `internal account invitation`, `invitation link`, `accept invitation`, `email confirmed`, `EmailConfirmedAt`, `email ownership proof`, `CreateInvitation`, `SendInvitationEmail`, `InitialPassword`, `temporary password`, `Invited account`, `Active account`, `/api/v1/management/accounts`, `/api/v1/authentication/accept-invitation`
 
 ## Purpose
 
@@ -73,6 +73,56 @@ Invitation delivery owns:
 
 Email is only one delivery channel. Admin users may copy and send the invitation link through another approved channel such as email, Zalo, Messenger, Slack, Teams, QR code, printed paper, or an internal message.
 
+## Invitation Accepted Vs Email Confirmed Vs Account Active
+
+Do not collapse these three concepts into one state.
+
+| Concept | Meaning | Stored as |
+| --- | --- | --- |
+| Invitation accepted | User presented a valid invitation token and completed the accept flow | `AccountInvitation.AcceptedAt` |
+| Email confirmed | User proved ownership of the account mailbox | `Account.EmailConfirmedAt` |
+| Account active | User is allowed to log in through an enabled auth method | `Account.Status = Active` |
+
+Final rule:
+
+```text
+Accept invitation
+  -> may activate account
+
+Verified mailbox ownership
+  -> may confirm email
+```
+
+These states are independent.
+
+For multi-tenant systems, do not infer email ownership from the domain:
+
+```text
+@gmail.com
+@outlook.com
+@company.com
+@corp.xyz.vn
+```
+
+The same tenant may contain company email, Gmail, Yahoo, contractors, or external accounts. The security criterion is ownership proof, not domain shape.
+
+Valid email ownership proof can come from:
+
+- a separate verify-email link
+- Firebase/Google token with `email_verified = true` and email matching the account
+- an invitation link sent by the backend to the same mailbox and accepted from that email delivery path
+
+Manual invitation delivery is not email ownership proof.
+
+Examples:
+
+| Case | Result |
+| --- | --- |
+| Backend sends invitation email to `user@gmail.com`, user clicks and accepts | `Active`, `EmailConfirmedAt` can be set |
+| Firebase returns verified `employee@corp.com` matching the account | `Active`, `EmailConfirmedAt` can be set |
+| Admin copies invitation link and sends through Zalo/Messenger/QR/paper | `Active`, `EmailConfirmedAt` remains null |
+| Google login invitation where Firebase verified email matches account email | `Active`, `EmailConfirmedAt` can be set |
+
 ## Email Failure
 
 SMTP failure must not make onboarding unrecoverable.
@@ -84,6 +134,7 @@ account remains Invited
 invitation remains usable
 response includes invitation link/token
 emailSent = false
+EmailSentAt remains null
 ```
 
 The management UI can show a warning and let the admin copy the link manually or create another invitation later.
@@ -136,13 +187,23 @@ user submits token and new password
   -> find active, non-expired, non-revoked invitation
   -> require account Status = Invited
   -> set password for local login when needed
-  -> set EmailConfirmed
   -> set account Status = Active
   -> mark invitation Accepted
+  -> set EmailConfirmed only when mailbox ownership proof exists
   -> revoke existing sessions/refresh tokens
 ```
 
 Invitation tokens must not activate accounts that are already `Active`, `Disabled`, or `Suspended`.
+
+Accepting a valid invitation token proves token possession. It does not always prove mailbox ownership.
+
+Current implementation uses:
+
+```text
+AccountInvitation.EmailSentAt
+```
+
+as the backend-email delivery proof for invitation acceptance. If `EmailSentAt` is null, accepting the invitation must not set `Account.EmailConfirmedAt`.
 
 ## Temporary Password Fallback
 
