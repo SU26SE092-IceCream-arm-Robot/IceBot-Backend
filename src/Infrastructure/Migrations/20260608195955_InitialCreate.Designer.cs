@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    [Migration("20260608094932_InitialCreate")]
+    [Migration("20260608195955_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -3980,7 +3980,7 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<Guid?>("OrganizationId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("SerialNumber")
@@ -4158,7 +4158,7 @@ namespace Infrastructure.Migrations
                     b.Property<int>("OpeningHoursSchemaVersion")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("OrganizationId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("PhoneNumber")
@@ -5180,7 +5180,8 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
                         .WithMany()
                         .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Domain.Tenants.Entities.Store", "Store")
                         .WithMany("Kiosks")
@@ -5198,7 +5199,8 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
                         .WithMany("Stores")
                         .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Organization");
                 });

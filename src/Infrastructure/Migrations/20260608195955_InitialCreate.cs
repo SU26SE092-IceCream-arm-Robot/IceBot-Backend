@@ -400,7 +400,7 @@ namespace Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
                     Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     StoreType = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
@@ -506,7 +506,7 @@ namespace Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: true),
+                    OrganizationId = table.Column<Guid>(type: "uuid", nullable: false),
                     StoreId = table.Column<Guid>(type: "uuid", nullable: false),
                     Code = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     Name = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),

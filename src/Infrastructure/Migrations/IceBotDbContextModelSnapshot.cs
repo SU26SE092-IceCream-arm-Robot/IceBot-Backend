@@ -3977,7 +3977,7 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<Guid?>("OrganizationId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("SerialNumber")
@@ -4155,7 +4155,7 @@ namespace Infrastructure.Migrations
                     b.Property<int>("OpeningHoursSchemaVersion")
                         .HasColumnType("integer");
 
-                    b.Property<Guid?>("OrganizationId")
+                    b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("PhoneNumber")
@@ -5177,7 +5177,8 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
                         .WithMany()
                         .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.HasOne("Domain.Tenants.Entities.Store", "Store")
                         .WithMany("Kiosks")
@@ -5195,7 +5196,8 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
                         .WithMany("Stores")
                         .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Organization");
                 });
