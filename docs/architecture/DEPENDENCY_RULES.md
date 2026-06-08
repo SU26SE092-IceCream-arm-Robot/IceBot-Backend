@@ -117,16 +117,16 @@ Controllers should be thin. They should call application handlers/services and r
 - Do not hold database transactions across external network calls.
 - `GuidEntity` IDs are application-generated UUID v7 values. Keep the database column type as PostgreSQL `uuid`.
 - `LongEntity` IDs remain database-generated `long` values for catalog/reference rows.
-- Detailed persistence, index, soft-delete, snapshot, and JSON rules live in [Data Modeling Rules](DATA_MODELING_RULES.md).
+- Detailed persistence, index, soft-delete, snapshot, and JSON rules live in [Data Modeling Rules](../data/DATA_MODELING_RULES.md).
 
 ## Related Docs
 
-- [Architecture](../ARCHITECTURE.md)
-- [Working Protocol](WORKING_PROTOCOL.md)
+- [Architecture](../../ARCHITECTURE.md)
+- [Working Protocol](../process/WORKING_PROTOCOL.md)
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [Naming Rules](NAMING_RULES.md)
-- [Authorization Rules](AUTHORIZATION_RULES.md)
-- [Data Modeling Rules](DATA_MODELING_RULES.md)
+- [Naming Rules](../process/NAMING_RULES.md)
+- [Authorization Rules](../api/AUTHORIZATION_RULES.md)
+- [Data Modeling Rules](../data/DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
-- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
-- [JSON Field Rules](JSON_FIELD_RULES.md)
+- [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](../data/JSON_FIELD_RULES.md)

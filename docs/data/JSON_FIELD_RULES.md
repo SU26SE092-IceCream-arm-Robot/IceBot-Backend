@@ -119,5 +119,5 @@ Never resolve sync conflicts by merging arbitrary JSON payloads from cloud and e
 
 - [Data Modeling Rules](DATA_MODELING_RULES.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
-- [IoT Contract](IOT_CONTRACT.md)
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
+- [IoT Contract](../iot/IOT_CONTRACT.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)

@@ -252,11 +252,11 @@ These references are acceptable because the current project uses one database an
 
 ## Related Docs
 
-- [Architecture](../ARCHITECTURE.md)
-- [Working Protocol](WORKING_PROTOCOL.md)
+- [Architecture](../../ARCHITECTURE.md)
+- [Working Protocol](../process/WORKING_PROTOCOL.md)
 - [Dependency Rules](DEPENDENCY_RULES.md)
-- [Naming Rules](NAMING_RULES.md)
-- [Data Modeling Rules](DATA_MODELING_RULES.md)
+- [Naming Rules](../process/NAMING_RULES.md)
+- [Data Modeling Rules](../data/DATA_MODELING_RULES.md)
 - [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
-- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
-- [JSON Field Rules](JSON_FIELD_RULES.md)
+- [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](../data/JSON_FIELD_RULES.md)

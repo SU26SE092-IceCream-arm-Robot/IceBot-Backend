@@ -103,7 +103,7 @@ Soft delete is preferred for mutable business records. Append-only event/evidenc
 
 Stable workflow states should use enums. Vendor-specific or externally extensible values may stay as strings.
 
-See [Naming Rules](NAMING_RULES.md) for enum and status naming.
+See [Naming Rules](../process/NAMING_RULES.md) for enum and status naming.
 
 ## Money And Quantity
 
@@ -174,10 +174,10 @@ Before finishing a new entity or relationship, check:
 
 ## Related Docs
 
-- [Architecture](../ARCHITECTURE.md)
-- [Working Protocol](WORKING_PROTOCOL.md)
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [Dependency Rules](DEPENDENCY_RULES.md)
-- [Naming Rules](NAMING_RULES.md)
+- [Architecture](../../ARCHITECTURE.md)
+- [Working Protocol](../process/WORKING_PROTOCOL.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
+- [Dependency Rules](../architecture/DEPENDENCY_RULES.md)
+- [Naming Rules](../process/NAMING_RULES.md)
 - [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](JSON_FIELD_RULES.md)

@@ -19,7 +19,7 @@ Each doc should answer one ownership question:
 
 Do not duplicate full explanations across docs. Link to the owning doc instead.
 
-Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right backend doc is unclear after direct retrieval, metadata filters, or path filters.
+Use [RAG Context Map](../RAG_CONTEXT_MAP.md) only when the right backend doc is unclear after direct retrieval, metadata filters, or path filters.
 
 ## Standard Shape
 
@@ -105,13 +105,13 @@ RAG should use a lazy retrieval path:
 
 1. Search specific source-of-truth docs with direct query terms and metadata filters.
 2. Narrow by path, source type, document type, or lookup section when the query is ambiguous.
-3. Use [RAG Context Map](RAG_CONTEXT_MAP.md) as a fallback router when the correct doc family is still unclear.
+3. Use [RAG Context Map](../RAG_CONTEXT_MAP.md) as a fallback router when the correct doc family is still unclear.
 4. Use reranking selectively for hard queries, not as a mandatory fix for weak docs or broad queries.
 
 ## Related Docs
 
 - [Working Protocol](WORKING_PROTOCOL.md)
-- [RAG Context Map](RAG_CONTEXT_MAP.md)
-- [API Surface Rules](API_SURFACE_RULES.md)
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
+- [RAG Context Map](../RAG_CONTEXT_MAP.md)
+- [API Surface Rules](../api/API_SURFACE_RULES.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
 - [Naming Rules](NAMING_RULES.md)

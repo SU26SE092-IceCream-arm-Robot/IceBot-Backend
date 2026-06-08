@@ -24,11 +24,40 @@ This document only defines authorization direction for those surfaces.
 | `Technician` | Installation, robot/kiosk setup, technical maintenance, troubleshooting, and device/robot configuration |
 | `OrgAdmin` | Organization admin who can view and manage resources within their assigned organization scope |
 
+## OrgAdmin Flow
+
+OrgAdmin is created through internal account onboarding, not public signup.
+
+Recommended flow:
+
+```text
+SystemAdmin creates Organization
+  -> SystemAdmin creates internal account
+  -> assign RoleCode = OrgAdmin with OrganizationId
+  -> backend creates invitation link
+  -> OrgAdmin accepts invitation
+  -> OrgAdmin can access assigned organization scope
+```
+
+OrgAdmin scope must be stored through `AccountRole`:
+
+```text
+RoleCode = OrgAdmin
+OrganizationId = organizationId
+StoreId = null
+KioskId = null
+```
+
+OrgAdmin access must be checked against role scope. Do not infer tenant access from email domain.
+
 ## Policy Direction
 
 | Policy | Allowed roles | Notes |
 | --- | --- | --- |
 | `accounts.manage` | `SystemAdmin` | Internal account and role management |
+| `organizations.manage` | `SystemAdmin` | Platform-level organization management: create, activate, disable organizations |
+| `organizations.view` | `SystemAdmin`, `OrgAdmin` | View organizations. OrgAdmin can view/read only their assigned organization(s) |
+| `organizations.update` | `SystemAdmin`, `OrgAdmin` | Update organizations. OrgAdmin can update only basic profile/contact info for assigned organization(s); SystemAdmin can update platform-managed fields |
 | `products.manage` | `SystemAdmin`, `Manager` | Product/catalog management. Staff and Technician should not change product pricing/catalog by default |
 | `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |
 | `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |
@@ -48,8 +77,8 @@ This document only defines authorization direction for those surfaces.
 
 ## Related Docs
 
-- [Business Flows](../../Docs/BUSINESS_FLOWS.md)
+- [Business Flows](../../../Docs/BUSINESS_FLOWS.md)
 - [API Surface Rules](API_SURFACE_RULES.md)
 - [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
-- [Dependency Rules](DEPENDENCY_RULES.md)
-- [Naming Rules](NAMING_RULES.md)
+- [Dependency Rules](../architecture/DEPENDENCY_RULES.md)
+- [Naming Rules](../process/NAMING_RULES.md)

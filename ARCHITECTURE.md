@@ -36,7 +36,7 @@ WebAPI -> Infrastructure -> Application -> Domain
 
 This is a pragmatic clean-ish structure. `Domain` remains independent. `Application` owns use cases and contracts. `Infrastructure` owns persistence and external adapters. `WebAPI` owns HTTP concerns.
 
-Detailed dependency rules live in [docs/DEPENDENCY_RULES.md](docs/DEPENDENCY_RULES.md).
+Detailed dependency rules live in [docs/architecture/DEPENDENCY_RULES.md](docs/architecture/DEPENDENCY_RULES.md).
 
 ## Layer Responsibilities
 
@@ -79,7 +79,7 @@ Owns business model and invariants:
 
 Domain must not depend on WebAPI, Infrastructure, EF Core, logging, messaging, or external SDKs.
 
-Domain context ownership is documented in [docs/BOUNDARY_CONTEXTS.md](docs/BOUNDARY_CONTEXTS.md).
+Domain context ownership is documented in [docs/architecture/BOUNDARY_CONTEXTS.md](docs/architecture/BOUNDARY_CONTEXTS.md).
 
 ### Infrastructure
 
@@ -171,13 +171,13 @@ Recommended patterns:
 
 Outbox can be added when the system starts publishing reliable integration events from local transactions.
 
-See [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md).
+See [Idempotency and Retry Rules](docs/data/IDEMPOTENCY_RETRY_RULES.md).
 
 ## JSON Fields
 
 JSON fields are allowed for robot SDK payloads, provider payloads, snapshots, and metadata, but workflow-critical values should be typed columns.
 
-Detailed JSON rules live in [JSON Field Rules](docs/JSON_FIELD_RULES.md).
+Detailed JSON rules live in [JSON Field Rules](docs/data/JSON_FIELD_RULES.md).
 
 ## Multi-Tenancy
 
@@ -191,7 +191,7 @@ Device > Kiosk > Store > Organization > Global
 
 Tenant filters should be explicit and safe for admin/platform queries.
 
-See [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md).
+See [Multi-Tenancy Rules](docs/architecture/MULTI_TENANCY_RULES.md).
 
 ## API And Observability
 
@@ -212,7 +212,7 @@ Operational concerns:
 - Serilog file/console logs.
 - Swagger for API visibility.
 
-Detailed API naming and route conventions live in [Naming Rules](docs/NAMING_RULES.md).
+Detailed API naming and route conventions live in [Naming Rules](docs/process/NAMING_RULES.md).
 
 ## Design Constraints
 
@@ -237,18 +237,18 @@ Avoid:
 
 ## Documentation Map
 
-- [Working Protocol](docs/WORKING_PROTOCOL.md)
+- [Working Protocol](docs/process/WORKING_PROTOCOL.md)
 - [RAG Context Map](docs/RAG_CONTEXT_MAP.md)
-- [Documentation Rules](docs/DOCUMENTATION_RULES.md)
-- [Boundary Contexts](docs/BOUNDARY_CONTEXTS.md)
-- [Dependency Rules](docs/DEPENDENCY_RULES.md)
-- [Naming Rules](docs/NAMING_RULES.md)
-- [API Surface Rules](docs/API_SURFACE_RULES.md)
-- [Authorization Rules](docs/AUTHORIZATION_RULES.md)
-- [Data Modeling Rules](docs/DATA_MODELING_RULES.md)
-- [System Flows](docs/SYSTEM_FLOWS.md)
-- [Multi-Tenancy Rules](docs/MULTI_TENANCY_RULES.md)
-- [Idempotency and Retry Rules](docs/IDEMPOTENCY_RETRY_RULES.md)
-- [JSON Field Rules](docs/JSON_FIELD_RULES.md)
-- [IoT Contract](docs/IOT_CONTRACT.md)
-- [Local Edge Runtime ERD](docs/LOCAL_EDGE_RUNTIME_ERD.md)
+- [Documentation Rules](docs/process/DOCUMENTATION_RULES.md)
+- [Boundary Contexts](docs/architecture/BOUNDARY_CONTEXTS.md)
+- [Dependency Rules](docs/architecture/DEPENDENCY_RULES.md)
+- [Naming Rules](docs/process/NAMING_RULES.md)
+- [API Surface Rules](docs/api/API_SURFACE_RULES.md)
+- [Authorization Rules](docs/api/AUTHORIZATION_RULES.md)
+- [Data Modeling Rules](docs/data/DATA_MODELING_RULES.md)
+- [System Flows](docs/flows/SYSTEM_FLOWS.md)
+- [Multi-Tenancy Rules](docs/architecture/MULTI_TENANCY_RULES.md)
+- [Idempotency and Retry Rules](docs/data/IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](docs/data/JSON_FIELD_RULES.md)
+- [IoT Contract](docs/iot/IOT_CONTRACT.md)
+- [Local Edge Runtime ERD](docs/iot/LOCAL_EDGE_RUNTIME_ERD.md)

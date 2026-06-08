@@ -62,11 +62,11 @@ Edge must pull commands from cloud after receiving an MQTT notification. Edge mu
 
 ## System Flow
 
-End-to-end checkout, payment, edge dispatch, robot execution, and failure flows live in [System Flows](SYSTEM_FLOWS.md).
+End-to-end checkout, payment, edge dispatch, robot execution, and failure flows live in [System Flows](../flows/SYSTEM_FLOWS.md).
 
 This document focuses on API/message contract shape, source-of-truth boundaries, state mapping, and idempotency requirements.
 
-Backend API surface categories and route ownership live in [API Surface Rules](API_SURFACE_RULES.md). This document only expands the IoT/tablet/edge contracts that need integration detail.
+Backend API surface categories and route ownership live in [API Surface Rules](../api/API_SURFACE_RULES.md). This document only expands the IoT/tablet/edge contracts that need integration detail.
 
 ## State Mapping
 
@@ -688,7 +688,7 @@ Retry behavior:
 
 ## Failure Paths
 
-Failure flows live in [System Flows](SYSTEM_FLOWS.md).
+Failure flows live in [System Flows](../flows/SYSTEM_FLOWS.md).
 
 Contract-level rules:
 
@@ -727,11 +727,11 @@ Future hardening:
 
 ## Related Docs
 
-- [Architecture](../ARCHITECTURE.md)
-- [API Surface Rules](API_SURFACE_RULES.md)
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [System Flows](SYSTEM_FLOWS.md)
+- [Architecture](../../ARCHITECTURE.md)
+- [API Surface Rules](../api/API_SURFACE_RULES.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
+- [System Flows](../flows/SYSTEM_FLOWS.md)
 - [Local Edge Runtime ERD](LOCAL_EDGE_RUNTIME_ERD.md)
-- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
-- [JSON Field Rules](JSON_FIELD_RULES.md)
-- [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
+- [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](../data/JSON_FIELD_RULES.md)
+- [Multi-Tenancy Rules](../architecture/MULTI_TENANCY_RULES.md)

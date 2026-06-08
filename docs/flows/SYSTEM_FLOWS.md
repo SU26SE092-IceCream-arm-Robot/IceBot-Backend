@@ -4,7 +4,7 @@ This document captures backend-facing system flows for IceBot. It describes how 
 
 Business/user-facing flows live in the project-level `Docs/BUSINESS_FLOWS.md`.
 
-Detailed API and message contracts live in [IoT Contract](IOT_CONTRACT.md).
+Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md).
 
 ## Search Keywords
 
@@ -236,7 +236,7 @@ Required behavior:
 
 ## Related Docs
 
-- [IoT Contract](IOT_CONTRACT.md)
-- [Local Edge Runtime ERD](LOCAL_EDGE_RUNTIME_ERD.md)
-- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
-- [Data Modeling Rules](DATA_MODELING_RULES.md)
+- [IoT Contract](../iot/IOT_CONTRACT.md)
+- [Local Edge Runtime ERD](../iot/LOCAL_EDGE_RUNTIME_ERD.md)
+- [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
+- [Data Modeling Rules](../data/DATA_MODELING_RULES.md)

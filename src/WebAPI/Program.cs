@@ -89,6 +89,15 @@ try
 
         options.AddPolicy("menus.manage", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager")));
+
+        options.AddPolicy("organizations.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin")));
+
+        options.AddPolicy("organizations.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin")));
+
+        options.AddPolicy("organizations.update", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin")));
     });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();

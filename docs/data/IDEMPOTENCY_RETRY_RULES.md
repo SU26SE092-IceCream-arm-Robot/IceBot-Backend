@@ -340,5 +340,5 @@ If data is wrong, append a correction/reversal event instead of deleting or soft
 
 - [Data Modeling Rules](DATA_MODELING_RULES.md)
 - [JSON Field Rules](JSON_FIELD_RULES.md)
-- [IoT Contract](IOT_CONTRACT.md)
-- [Naming Rules](NAMING_RULES.md)
+- [IoT Contract](../iot/IOT_CONTRACT.md)
+- [Naming Rules](../process/NAMING_RULES.md)

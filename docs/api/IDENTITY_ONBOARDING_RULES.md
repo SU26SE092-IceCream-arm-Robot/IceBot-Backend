@@ -268,4 +268,4 @@ Login must reject non-`Active` accounts.
 
 - [API Surface Rules](API_SURFACE_RULES.md)
 - [Authorization Rules](AUTHORIZATION_RULES.md)
-- [Data Modeling Rules](DATA_MODELING_RULES.md)
+- [Data Modeling Rules](../data/DATA_MODELING_RULES.md)

@@ -5,7 +5,7 @@ namespace Domain.Tenants.Entities;
 
 public partial class Store : BusinessEntity
 {
-    public Guid? OrganizationId { get; set; }
+    public Guid OrganizationId { get; set; }
 
     public string Code { get; set; } = null!;
 
@@ -39,5 +39,5 @@ public partial class Store : BusinessEntity
 
     public virtual ICollection<Kiosk> Kiosks { get; set; } = new List<Kiosk>();
 
-    public virtual Organization? Organization { get; set; }
+    public virtual Organization Organization { get; set; } = null!;
 }

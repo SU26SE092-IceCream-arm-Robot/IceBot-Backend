@@ -18,7 +18,7 @@ This document defines naming conventions for IceBot domain, application, infrast
 
 ## Bounded Context Names
 
-Folder and namespace names should follow bounded context ownership. The current context map lives in [Boundary Contexts](BOUNDARY_CONTEXTS.md).
+Folder and namespace names should follow bounded context ownership. The current context map lives in [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md).
 
 Use singular entity names:
 
@@ -91,7 +91,7 @@ Use these external id names consistently:
 - `CorrelationId`: traces one business flow.
 - `CausationId`: command/event that caused the current command/event.
 
-See [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md).
+See [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md).
 
 ## Status And Enums
 
@@ -165,7 +165,16 @@ RobotJobRepository
 
 Repositories should stay thin. They may expose query composition and persistence operations, but should not contain workflow transitions or business decisions.
 
-Repository placement and dependency rules live in [Dependency Rules](DEPENDENCY_RULES.md).
+Repository placement and dependency rules live in [Dependency Rules](../architecture/DEPENDENCY_RULES.md).
+
+Context-specific persistence ports may use `Store` when the term means a thin persistence boundary, for example:
+
+```text
+IOrganizationStore
+OrganizationStore
+```
+
+Keep these under the owning context namespace such as `Application.Tenants.Abstractions` and `Infrastructure.Tenants.Persistence`. Do not move them into generic `Infrastructure.Persistence.Repositories` unless they are truly shared repository infrastructure.
 
 Do not create generic service/controller names such as:
 
@@ -231,7 +240,7 @@ Route names should be stable and resource-oriented:
 /api/v1/me
 ```
 
-API surface categories and route prefix ownership live in [API Surface Rules](API_SURFACE_RULES.md). Naming rules should not duplicate the full route map.
+API surface categories and route prefix ownership live in [API Surface Rules](../api/API_SURFACE_RULES.md). Naming rules should not duplicate the full route map.
 
 Action method names may map to use cases:
 
@@ -263,7 +272,7 @@ ProgramPayloadJson
 ProgramPayloadSchemaVersion
 ```
 
-See [JSON Field Rules](JSON_FIELD_RULES.md).
+See [JSON Field Rules](../data/JSON_FIELD_RULES.md).
 
 ## Retry And Idempotency Names
 
@@ -306,15 +315,15 @@ Group related small enums by context only when it improves readability. Do not r
 
 ## Related Docs
 
-- [Architecture](../ARCHITECTURE.md)
+- [Architecture](../../ARCHITECTURE.md)
 - [Working Protocol](WORKING_PROTOCOL.md)
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [Dependency Rules](DEPENDENCY_RULES.md)
-- [API Surface Rules](API_SURFACE_RULES.md)
-- [Authorization Rules](AUTHORIZATION_RULES.md)
-- [Data Modeling Rules](DATA_MODELING_RULES.md)
-- [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md)
-- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
-- [JSON Field Rules](JSON_FIELD_RULES.md)
-- [IoT Contract](IOT_CONTRACT.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
+- [Dependency Rules](../architecture/DEPENDENCY_RULES.md)
+- [API Surface Rules](../api/API_SURFACE_RULES.md)
+- [Authorization Rules](../api/AUTHORIZATION_RULES.md)
+- [Data Modeling Rules](../data/DATA_MODELING_RULES.md)
+- [Multi-Tenancy Rules](../architecture/MULTI_TENANCY_RULES.md)
+- [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](../data/JSON_FIELD_RULES.md)
+- [IoT Contract](../iot/IOT_CONTRACT.md)
 - [Documentation Rules](DOCUMENTATION_RULES.md)

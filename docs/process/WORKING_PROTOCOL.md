@@ -118,15 +118,15 @@ Links are routing hints, not mandatory recursive reads. If a linked file was alr
 
 Use:
 
-- [RAG Context Map](RAG_CONTEXT_MAP.md) when the right backend doc is unclear.
+- [RAG Context Map](../RAG_CONTEXT_MAP.md) when the right backend doc is unclear.
 - [Documentation Rules](DOCUMENTATION_RULES.md) for RAG-friendly document structure.
-- [Architecture](../ARCHITECTURE.md) for high-level architecture.
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md) for domain ownership.
-- [Dependency Rules](DEPENDENCY_RULES.md) for layer boundaries.
+- [Architecture](../../ARCHITECTURE.md) for high-level architecture.
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md) for domain ownership.
+- [Dependency Rules](../architecture/DEPENDENCY_RULES.md) for layer boundaries.
 - [Naming Rules](NAMING_RULES.md) for naming conventions.
-- [Data Modeling Rules](DATA_MODELING_RULES.md) for persistence and ERD checks.
-- [System Flows](SYSTEM_FLOWS.md) for backend/tablet-edge-cloud flows.
-- [IoT Contract](IOT_CONTRACT.md) for tablet-edge-cloud flow.
+- [Data Modeling Rules](../data/DATA_MODELING_RULES.md) for persistence and ERD checks.
+- [System Flows](../flows/SYSTEM_FLOWS.md) for backend/tablet-edge-cloud flows.
+- [IoT Contract](../iot/IOT_CONTRACT.md) for tablet-edge-cloud flow.
 
 The project-level `Vault/` folder is a personal reasoning notebook, not implementation truth. Use it only as background context unless a decision has been promoted into `Docs/` or repository docs.
 
@@ -173,8 +173,8 @@ A change is done when:
 ## Related Docs
 
 - [Documentation Rules](DOCUMENTATION_RULES.md)
-- [RAG Context Map](RAG_CONTEXT_MAP.md)
-- [Architecture](../ARCHITECTURE.md)
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [Dependency Rules](DEPENDENCY_RULES.md)
+- [RAG Context Map](../RAG_CONTEXT_MAP.md)
+- [Architecture](../../ARCHITECTURE.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
+- [Dependency Rules](../architecture/DEPENDENCY_RULES.md)
 - [Naming Rules](NAMING_RULES.md)

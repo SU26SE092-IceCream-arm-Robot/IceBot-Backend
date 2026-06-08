@@ -10,9 +10,59 @@ This document defines tenant isolation and configurable override scope for organ
 
 `Organization` is the tenant root.
 
-`Store` belongs to an organization.
+`Store` belongs to an organization. `Store.OrganizationId` is required (non-nullable) to ensure all stores are bound to an organization.
 
-`Kiosk` belongs to a store and carries `OrganizationId` as a denormalized filter key. Keep `StoreId` required for the operational hierarchy, and use `OrganizationId` for tenant isolation and query filters.
+`Kiosk` belongs to a store. `Kiosk.OrganizationId` and `Kiosk.StoreId` are both required (non-nullable) to ensure all kiosks are bound to an organization and store. When creating or updating a kiosk, validate that `Kiosk.OrganizationId == Store.OrganizationId`. OrganizationId is used for tenant isolation, reporting, and query filters.
+
+## Organization Management
+
+Organization management APIs live under:
+
+```text
+/api/v1/management/organizations
+```
+
+`SystemAdmin` owns platform-level organization lifecycle:
+
+- create organization
+- update all organization fields
+- activate organization
+- disable organization
+- list/view all organizations
+
+`OrgAdmin` is scoped to assigned organizations through `AccountRole`:
+
+```text
+RoleCode = OrgAdmin
+OrganizationId = organizationId
+StoreId = null
+KioskId = null
+```
+
+`OrgAdmin` can:
+
+- view assigned organization(s)
+- update basic profile/contact fields for assigned organization(s)
+
+`OrgAdmin` cannot:
+
+- create organizations
+- activate or disable organizations
+- change `Code`
+- change `Status`
+- change legal/platform-managed fields such as `LegalName`, `TaxCode`, or `MetadataJson`
+- access organizations outside assigned `AccountRole` scope
+
+Do not infer organization access from email domain. Tenant access must come from scoped roles, not from addresses such as `@gmail.com`, `@company.com`, or `@corp.xyz.vn`.
+
+Organization persistence ports should stay context-specific:
+
+```text
+Application.Tenants.Abstractions.IOrganizationStore
+Infrastructure.Tenants.Persistence.OrganizationStore
+```
+
+Do not place organization-specific persistence in the generic `Infrastructure.Persistence.Repositories` namespace. That namespace is for generic/shared repository infrastructure.
 
 ## Scope Model
 
@@ -220,6 +270,6 @@ When edge creates tenant-owned rows, it must include `OrganizationId` if known. 
 ## Related Docs
 
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [Authorization Rules](AUTHORIZATION_RULES.md)
-- [Data Modeling Rules](DATA_MODELING_RULES.md)
-- [API Surface Rules](API_SURFACE_RULES.md)
+- [Authorization Rules](../api/AUTHORIZATION_RULES.md)
+- [Data Modeling Rules](../data/DATA_MODELING_RULES.md)
+- [API Surface Rules](../api/API_SURFACE_RULES.md)

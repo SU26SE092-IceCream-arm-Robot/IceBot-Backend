@@ -5,10 +5,10 @@ Operational rules for coding agents working in this repository.
 ## Source Of Truth
 
 - Architecture decisions: [ARCHITECTURE.md](ARCHITECTURE.md)
-- Domain context map: [docs/BOUNDARY_CONTEXTS.md](docs/BOUNDARY_CONTEXTS.md)
-- Dependency boundaries: [docs/DEPENDENCY_RULES.md](docs/DEPENDENCY_RULES.md)
+- Domain context map: [docs/architecture/BOUNDARY_CONTEXTS.md](docs/architecture/BOUNDARY_CONTEXTS.md)
+- Dependency boundaries: [docs/architecture/DEPENDENCY_RULES.md](docs/architecture/DEPENDENCY_RULES.md)
 - RAG/docs routing map: [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md)
-- Documentation structure: [docs/DOCUMENTATION_RULES.md](docs/DOCUMENTATION_RULES.md)
+- Documentation structure: [docs/process/DOCUMENTATION_RULES.md](docs/process/DOCUMENTATION_RULES.md)
 
 Do not duplicate long architecture explanations here. This file is for execution rules.
 

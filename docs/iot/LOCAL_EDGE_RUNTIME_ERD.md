@@ -1037,6 +1037,6 @@ Add only if the local runtime needs them:
 ## Related Docs
 
 - [IoT Contract](IOT_CONTRACT.md)
-- [Boundary Contexts](BOUNDARY_CONTEXTS.md)
-- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
-- [JSON Field Rules](JSON_FIELD_RULES.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
+- [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
+- [JSON Field Rules](../data/JSON_FIELD_RULES.md)

@@ -6,7 +6,13 @@ namespace Domain.Tenants.Entities;
 
 public partial class Kiosk : BusinessEntity, IOrganizationScoped
 {
-    public Guid? OrganizationId { get; set; }
+    public Guid OrganizationId { get; set; }
+
+    Guid? IOrganizationScoped.OrganizationId
+    {
+        get => OrganizationId;
+        set => OrganizationId = value ?? throw new InvalidOperationException("Kiosk.OrganizationId is required.");
+    }
 
     public Guid StoreId { get; set; }
 
@@ -42,7 +48,7 @@ public partial class Kiosk : BusinessEntity, IOrganizationScoped
 
     public virtual ICollection<Device> Devices { get; set; } = new List<Device>();
 
-    public virtual Organization? Organization { get; set; }
+    public virtual Organization Organization { get; set; } = null!;
 
     public virtual Store Store { get; set; } = null!;
 }

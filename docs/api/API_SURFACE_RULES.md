@@ -1,6 +1,6 @@
 # API Surface Rules
 
-This document defines the backend API surface categories for IceBot. It is an ownership map, not a full endpoint contract. Detailed request/response contracts belong in Swagger, feature docs, or integration docs such as [IoT Contract](IOT_CONTRACT.md).
+This document defines the backend API surface categories for IceBot. It is an ownership map, not a full endpoint contract. Detailed request/response contracts belong in Swagger, feature docs, or integration docs such as [IoT Contract](../iot/IOT_CONTRACT.md).
 
 ## Search Keywords
 
@@ -33,6 +33,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password, accept invitation |
 | Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password` | own profile, edit profile, change password while logged in |
 | Account management | `/api/v1/management/accounts/*` | create internal account, invitation link generation, assign roles, disable account, set password |
+| Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
@@ -71,6 +72,12 @@ GET /api/v1/management/products
 GET /api/v1/management/menus
 GET /api/v1/management/accounts
 GET /api/v1/management/payment-methods
+GET /api/v1/management/organizations
+GET /api/v1/management/organizations/{organizationId}
+POST /api/v1/management/organizations
+PUT /api/v1/management/organizations/{organizationId}
+PATCH /api/v1/management/organizations/{organizationId}/disable
+PATCH /api/v1/management/organizations/{organizationId}/activate
 ```
 
 Rules:
@@ -79,6 +86,7 @@ Rules:
 - Access is controlled by authorization policies, not the route prefix.
 - It is valid for multiple roles to share the same management endpoint when policy allows it.
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
+- Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
 
 ## Current Account APIs
 
@@ -174,7 +182,7 @@ Rules:
 
 - [Authorization Rules](AUTHORIZATION_RULES.md)
 - [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
-- [Naming Rules](NAMING_RULES.md)
-- [IoT Contract](IOT_CONTRACT.md)
-- [System Flows](SYSTEM_FLOWS.md)
-- [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md)
+- [Naming Rules](../process/NAMING_RULES.md)
+- [IoT Contract](../iot/IOT_CONTRACT.md)
+- [System Flows](../flows/SYSTEM_FLOWS.md)
+- [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
