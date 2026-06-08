@@ -50,5 +50,6 @@ This document only defines authorization direction for those surfaces.
 
 - [Business Flows](../../Docs/BUSINESS_FLOWS.md)
 - [API Surface Rules](API_SURFACE_RULES.md)
+- [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
 - [Dependency Rules](DEPENDENCY_RULES.md)
 - [Naming Rules](NAMING_RULES.md)

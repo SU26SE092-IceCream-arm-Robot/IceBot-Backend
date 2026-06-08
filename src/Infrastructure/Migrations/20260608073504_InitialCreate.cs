@@ -262,6 +262,33 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "AccountInvitations",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    AccountId = table.Column<Guid>(type: "uuid", nullable: false),
+                    TokenHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    InvitedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    AcceptedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    RevokedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    InvitedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    AcceptedByIp = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    AcceptedByUserAgent = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    Purpose = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AccountInvitations", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_AccountInvitations_Accounts_AccountId",
+                        column: x => x.AccountId,
+                        principalTable: "Accounts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "PasswordResetRequests",
                 columns: table => new
                 {
@@ -2194,6 +2221,17 @@ namespace Infrastructure.Migrations
                 columns: new[] { "AccountId", "DeviceTokenHash" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_AccountInvitations_AccountId_InvitedAt",
+                table: "AccountInvitations",
+                columns: new[] { "AccountId", "InvitedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AccountInvitations_TokenHash",
+                table: "AccountInvitations",
+                column: "TokenHash",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AccountRoles_AccountId_RoleId_OrganizationId_StoreId_KioskId",
                 table: "AccountRoles",
                 columns: new[] { "AccountId", "RoleId", "OrganizationId", "StoreId", "KioskId" },
@@ -3180,6 +3218,9 @@ namespace Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "AccountInvitations");
+
             migrationBuilder.DropTable(
                 name: "AccountRoles");
 

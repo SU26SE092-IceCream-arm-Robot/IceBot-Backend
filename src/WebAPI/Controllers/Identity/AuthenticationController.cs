@@ -1,5 +1,7 @@
 using Application.Identity.Abstractions;
 using Application.Identity.Authentication.Requests;
+using Application.Identity.Invitations.Requests;
+using Application.Identity.Invitations.Services;
 using Application.Identity.PasswordReset.Requests;
 using Application.Identity.PasswordReset.Services;
 using Application.Identity.Tokens.Services;
@@ -20,15 +22,18 @@ namespace WebAPI.Controllers.Identity
         private readonly IAccountAuthenticationService _authenticationService;
         private readonly AccountTokenService _tokenService;
         private readonly PasswordResetService _passwordResetService;
+        private readonly AccountInvitationService _invitationService;
 
         public AuthenticationController(
             IAccountAuthenticationService authenticationService,
             AccountTokenService tokenService,
-            PasswordResetService passwordResetService)
+            PasswordResetService passwordResetService,
+            AccountInvitationService invitationService)
         {
             _authenticationService = authenticationService;
             _tokenService = tokenService;
             _passwordResetService = passwordResetService;
+            _invitationService = invitationService;
         }
 
         [HttpPost("login")]
@@ -112,6 +117,23 @@ namespace WebAPI.Controllers.Identity
             EnsureValidModel();
 
             var result = await _passwordResetService.ResetAsync(
+                request,
+                GetRemoteIpAddress(),
+                GetUserAgent(),
+                cancellationToken);
+
+            return StatusCode(result.StatusCode, result);
+        }
+
+        [HttpPost("accept-invitation")]
+        [AllowAnonymous]
+        public async Task<IActionResult> AcceptInvitation(
+            [FromBody] AcceptInvitationRequest request,
+            CancellationToken cancellationToken)
+        {
+            EnsureValidModel();
+
+            var result = await _invitationService.AcceptAsync(
                 request,
                 GetRemoteIpAddress(),
                 GetUserAgent(),

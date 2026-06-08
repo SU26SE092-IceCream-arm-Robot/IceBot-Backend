@@ -19,4 +19,6 @@ public sealed class EmailOptions
     public bool EnableSsl { get; set; } = true;
 
     public string? PasswordResetBaseUrl { get; set; }
+
+    public string? InvitationBaseUrl { get; set; }
 }

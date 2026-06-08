@@ -1,5 +1,6 @@
 using Application.Identity.InternalAccounts.Requests;
 using Application.Identity.InternalAccounts.Services;
+using Application.Identity.Invitations.Requests;
 using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
@@ -119,6 +120,21 @@ namespace WebAPI.Controllers.Identity
                 accountId,
                 request,
                 GetCurrentAccountId(),
+                cancellationToken);
+
+            return StatusCode(result.StatusCode, result);
+        }
+
+        [HttpPost("{accountId:guid}/invitation")]
+        public async Task<IActionResult> CreateInvitation(
+            Guid accountId,
+            [FromBody] CreateAccountInvitationRequest? request,
+            CancellationToken cancellationToken)
+        {
+            var result = await _internalAccounts.CreateInvitationAsync(
+                accountId,
+                GetCurrentAccountId(),
+                request?.SendEmail ?? true,
                 cancellationToken);
 
             return StatusCode(result.StatusCode, result);

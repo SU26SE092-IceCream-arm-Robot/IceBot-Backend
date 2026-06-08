@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    [Migration("20260524185146_InitialCreate")]
+    [Migration("20260608073504_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -1238,6 +1238,57 @@ namespace Infrastructure.Migrations
                     b.HasIndex("AccountId", "DeviceTokenHash");
 
                     b.ToTable("AccountDevices", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Identity.Entities.AccountInvitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("AcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AcceptedByIp")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("AcceptedByUserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("InvitedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InvitedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Purpose")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.HasIndex("AccountId", "InvitedAt");
+
+                    b.ToTable("AccountInvitations", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Identity.Entities.AccountRole", b =>
@@ -4413,6 +4464,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("Account");
                 });
 
+            modelBuilder.Entity("Domain.Identity.Entities.AccountInvitation", b =>
+                {
+                    b.HasOne("Domain.Identity.Entities.Account", "Account")
+                        .WithMany("AccountInvitations")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+                });
+
             modelBuilder.Entity("Domain.Identity.Entities.AccountRole", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "Account")
@@ -5206,6 +5268,8 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Identity.Entities.Account", b =>
                 {
                     b.Navigation("AccountDevices");
+
+                    b.Navigation("AccountInvitations");
 
                     b.Navigation("AccountRoles");
 

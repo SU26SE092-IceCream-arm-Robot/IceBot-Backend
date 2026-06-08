@@ -1,12 +1,18 @@
 using Application.Identity.Abstractions;
 using Application.Identity.InternalAccounts.Requests;
 using Application.Identity.InternalAccounts.Results;
+using Application.Identity.Invitations.Results;
+using Application.Identity.Invitations.Services;
 using Application.Identity.Tokens.Services;
 using Application.Shared.Wrappers;
 using Domain.Identity.Entities;
 using Domain.Identity.Enums;
 using Domain.Identity.ValueObjects;
+using System;
+using System.Linq;
 using System.Text.RegularExpressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Application.Identity.InternalAccounts.Services
 {
@@ -15,15 +21,18 @@ namespace Application.Identity.InternalAccounts.Services
         private readonly IIdentityAccountStore _accounts;
         private readonly IPasswordHasher _passwordHasher;
         private readonly RefreshTokenService _refreshTokens;
+        private readonly AccountInvitationService _invitationService;
 
         public InternalAccountService(
             IIdentityAccountStore accounts,
             IPasswordHasher passwordHasher,
-            RefreshTokenService refreshTokens)
+            RefreshTokenService refreshTokens,
+            AccountInvitationService invitationService)
         {
             _accounts = accounts;
             _passwordHasher = passwordHasher;
             _refreshTokens = refreshTokens;
+            _invitationService = invitationService;
         }
 
         public async Task<ApiResult<InternalAccountResult>> CreateInternalAccountAsync(
@@ -66,11 +75,13 @@ namespace Application.Identity.InternalAccounts.Services
                 PhoneNumber = request.PhoneNumber?.Trim(),
                 Address = request.Address?.Trim(),
                 Gender = string.IsNullOrWhiteSpace(request.Gender) ? "Other" : request.Gender.Trim(),
-                Status = AccountStatus.Active,
+                Status = request.CreateInvitation ? AccountStatus.Invited : AccountStatus.Active,
                 LocalLoginEnabled = request.LocalLoginEnabled,
                 GoogleLoginEnabled = request.GoogleLoginEnabled,
                 GoogleEmail = request.GoogleLoginEnabled ? NormalizeEmail(request.GoogleEmail!) : null,
-                Password = request.LocalLoginEnabled ? HashedPassword.From(_passwordHasher.HashPassword(request.InitialPassword!)) : null,
+                Password = (request.LocalLoginEnabled && !request.CreateInvitation && !string.IsNullOrWhiteSpace(request.InitialPassword))
+                    ? HashedPassword.From(_passwordHasher.HashPassword(request.InitialPassword))
+                    : null,
                 CreatedAt = now,
                 CreatedByAccountId = createdByAccountId
             };
@@ -92,7 +103,29 @@ namespace Application.Identity.InternalAccounts.Services
             await _accounts.AddAsync(account, cancellationToken);
             await _accounts.SaveChangesAsync(cancellationToken);
 
-            return ApiResult<InternalAccountResult>.Success(ToResult(account), "Internal account created.", 201);
+            AccountInvitationResult? invitation = null;
+            string message = "Internal account created.";
+
+            if (request.CreateInvitation)
+            {
+                var invitationResult = await _invitationService.CreateInvitationAsync(
+                    account,
+                    createdByAccountId,
+                    request.SendInvitationEmail,
+                    cancellationToken);
+
+                if (!invitationResult.Succeeded || invitationResult.Data is null)
+                {
+                    return ApiResult<InternalAccountResult>.Fail(
+                        invitationResult.Message ?? "Invitation could not be created.",
+                        invitationResult.StatusCode);
+                }
+
+                invitation = invitationResult.Data;
+                message = invitationResult.Message ?? message;
+            }
+
+            return ApiResult<InternalAccountResult>.Success(ToResult(account, invitation), message, 201);
         }
 
         public async Task<ApiResult<InternalAccountResult>> GetInternalAccountAsync(
@@ -118,7 +151,7 @@ namespace Application.Identity.InternalAccounts.Services
             var totalCount = await _accounts.CountAsync(search, status, cancellationToken);
             var accounts = await _accounts.ListAsync(search, status, pageNumber, pageSize, cancellationToken);
             return PagedResult<InternalAccountResult>.Success(
-                accounts.Select(ToResult),
+                accounts.Select(account => ToResult(account)),
                 totalCount,
                 pageNumber,
                 pageSize);
@@ -285,6 +318,27 @@ namespace Application.Identity.InternalAccounts.Services
             return ApiResult<InternalAccountResult>.Success(ToResult(account), "Role assigned.");
         }
 
+        public async Task<ApiResult<AccountInvitationResult>> CreateInvitationAsync(
+            Guid accountId,
+            Guid? invitedByAccountId = null,
+            bool sendEmail = true,
+            CancellationToken cancellationToken = default)
+        {
+            var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
+            if (account is null)
+            {
+                return ApiResult<AccountInvitationResult>.Fail("Account not found.", 404);
+            }
+
+            if (account.Status != AccountStatus.Invited)
+            {
+                return ApiResult<AccountInvitationResult>.Fail("Invitation can only be created for accounts with Invited status.", 400);
+            }
+
+            var result = await _invitationService.CreateInvitationAsync(account, invitedByAccountId, sendEmail, cancellationToken);
+            return result;
+        }
+
         private static string? ValidateRequest(CreateInternalAccountRequest request)
         {
             if (!request.LocalLoginEnabled && !request.GoogleLoginEnabled)
@@ -292,9 +346,14 @@ namespace Application.Identity.InternalAccounts.Services
                 return "At least one authentication method must be enabled.";
             }
 
-            if (request.LocalLoginEnabled && string.IsNullOrWhiteSpace(request.InitialPassword))
+            if (request.CreateInvitation && !string.IsNullOrWhiteSpace(request.InitialPassword))
             {
-                return "Initial password is required when local login is enabled.";
+                return "Initial password is not allowed when creating an invitation. The invited user must set their own password.";
+            }
+
+            if (request.LocalLoginEnabled && !request.CreateInvitation && string.IsNullOrWhiteSpace(request.InitialPassword))
+            {
+                return "Initial password is required when local login is enabled and no invitation is created.";
             }
 
             if (request.GoogleLoginEnabled && string.IsNullOrWhiteSpace(request.GoogleEmail))
@@ -310,7 +369,7 @@ namespace Application.Identity.InternalAccounts.Services
             return null;
         }
 
-        private static InternalAccountResult ToResult(Account account)
+        private static InternalAccountResult ToResult(Account account, AccountInvitationResult? invitation = null)
         {
             return new InternalAccountResult
             {
@@ -321,6 +380,15 @@ namespace Application.Identity.InternalAccounts.Services
                 Status = account.Status.ToString(),
                 LocalLoginEnabled = account.LocalLoginEnabled,
                 GoogleLoginEnabled = account.GoogleLoginEnabled,
+                Invitation = invitation is null
+                    ? null
+                    : new InternalAccountInvitationResult
+                    {
+                        InvitationToken = invitation.InvitationToken,
+                        InvitationUrl = invitation.InvitationUrl,
+                        ExpiresAt = invitation.ExpiresAt,
+                        EmailSent = invitation.EmailSent
+                    },
                 Roles = account.AccountRoles.Select(accountRole => new InternalAccountRoleResult
                 {
                     RoleCode = accountRole.Role.Code,

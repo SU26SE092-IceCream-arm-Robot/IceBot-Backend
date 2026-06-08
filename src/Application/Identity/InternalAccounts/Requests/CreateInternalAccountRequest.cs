@@ -31,6 +31,10 @@ namespace Application.Identity.InternalAccounts.Requests
         [EmailAddress]
         public string? GoogleEmail { get; set; }
 
+        public bool CreateInvitation { get; set; } = true;
+
+        public bool SendInvitationEmail { get; set; } = true;
+
         [MinLength(1)]
         public List<AccountRoleScopeRequest> Roles { get; set; } = [];
     }

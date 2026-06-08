@@ -28,7 +28,8 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Domain ownership, entity belongs to which bounded context | [Boundary Contexts](BOUNDARY_CONTEXTS.md) | [Dependency Rules](DEPENDENCY_RULES.md) |
 | Layer dependency, repository, DbContext, application/domain/infrastructure boundary | [Dependency Rules](DEPENDENCY_RULES.md) | [Architecture](../ARCHITECTURE.md) |
 | Route prefixes, API surface, tablet vs management vs auth vs IoT API | [API Surface Rules](API_SURFACE_RULES.md) | [Naming Rules](NAMING_RULES.md), [Authorization Rules](AUTHORIZATION_RULES.md) |
-| Authentication endpoints, forgot/reset/change password, current account routes | [API Surface Rules](API_SURFACE_RULES.md) | [Authorization Rules](AUTHORIZATION_RULES.md) |
+| Authentication endpoints, forgot/reset/change password, current account routes | [API Surface Rules](API_SURFACE_RULES.md) | [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md), [Authorization Rules](AUTHORIZATION_RULES.md) |
+| Admin-created account onboarding, invitation link, accept invitation, temporary password fallback | [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md) | [API Surface Rules](API_SURFACE_RULES.md), [Authorization Rules](AUTHORIZATION_RULES.md) |
 | Role policy, scoped RBAC, SystemAdmin/Manager/Staff/Technician/OrgAdmin | [Authorization Rules](AUTHORIZATION_RULES.md) | [API Surface Rules](API_SURFACE_RULES.md), [Multi-Tenancy Rules](MULTI_TENANCY_RULES.md) |
 | Naming conventions for entities, fields, APIs, application use cases | [Naming Rules](NAMING_RULES.md) | [Boundary Contexts](BOUNDARY_CONTEXTS.md), [API Surface Rules](API_SURFACE_RULES.md) |
 | EF Core indexes, soft delete, unique constraints, snapshots, partitioning | [Data Modeling Rules](DATA_MODELING_RULES.md) | [JSON Field Rules](JSON_FIELD_RULES.md), [Idempotency and Retry Rules](IDEMPOTENCY_RETRY_RULES.md) |
@@ -44,6 +45,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Query contains | Useful filters or docs |
 | --- | --- |
 | `auth`, `login`, `forgot password`, `reset password`, `refresh token` | [API Surface Rules](API_SURFACE_RULES.md), section `Authentication And Password Recovery APIs` |
+| `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md) |
 | `management accounts`, `role scope`, `RBAC`, `policy` | [Authorization Rules](AUTHORIZATION_RULES.md) |
 | `order paid`, `ready for execution`, `refund required`, `edge offline` | [System Flows](SYSTEM_FLOWS.md), [IoT Contract](IOT_CONTRACT.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](DATA_MODELING_RULES.md) |

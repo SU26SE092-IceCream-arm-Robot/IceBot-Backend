@@ -15,6 +15,7 @@ public static class IdentityInfrastructureRegistration
         services.AddScoped<IIdentityAccountStore, IdentityAccountStore>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
         services.AddScoped<IPasswordResetRequestStore, PasswordResetRequestStore>();
+        services.AddScoped<IAccountInvitationStore, AccountInvitationStore>();
         services.AddSingleton<IFirebaseClient, FirebaseClient>();
         services.AddSingleton<IExternalIdentityProvider, FirebaseExternalIdentityProvider>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();

@@ -31,6 +31,7 @@ public class IceBotDbContext : DbContext
     public DbSet<AccountRole> AccountRoles => Set<AccountRole>();
     public DbSet<AccountDevice> AccountDevices => Set<AccountDevice>();
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
+    public DbSet<AccountInvitation> AccountInvitations => Set<AccountInvitation>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Role> Roles => Set<Role>();
 
@@ -144,6 +145,19 @@ public class IceBotDbContext : DbContext
             entity.Property(x => x.TokenHash).HasMaxLength(128);
             entity.HasOne(x => x.Account)
                 .WithMany(x => x.PasswordResetRequests)
+                .HasForeignKey(x => x.AccountId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AccountInvitation>(entity =>
+        {
+            entity.ToTable("AccountInvitations");
+            entity.HasIndex(x => x.TokenHash).IsUnique();
+            entity.HasIndex(x => new { x.AccountId, x.InvitedAt });
+            entity.Property(x => x.TokenHash).HasMaxLength(128).IsRequired();
+            entity.Property(x => x.Purpose).HasMaxLength(50).IsRequired();
+            entity.HasOne(x => x.Account)
+                .WithMany(x => x.AccountInvitations)
                 .HasForeignKey(x => x.AccountId)
                 .OnDelete(DeleteBehavior.Restrict);
         });

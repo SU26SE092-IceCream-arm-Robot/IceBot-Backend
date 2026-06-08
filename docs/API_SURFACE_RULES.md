@@ -4,7 +4,7 @@ This document defines the backend API surface categories for IceBot. It is an ow
 
 ## Search Keywords
 
-`API surface`, `route prefix`, `tablet API`, `customer API`, `management API`, `current account`, `me API`, `authentication`, `auth`, `login`, `external login`, `Firebase Google login`, `refresh token`, `forgot password`, `reset password`, `change password`, `payment webhook`, `IoT API`, `edge API`, `health`, `info`
+`API surface`, `route prefix`, `tablet API`, `customer API`, `management API`, `current account`, `me API`, `authentication`, `auth`, `login`, `external login`, `Firebase Google login`, `refresh token`, `forgot password`, `reset password`, `change password`, `invitation`, `accept invitation`, `account onboarding`, `payment webhook`, `IoT API`, `edge API`, `health`, `info`
 
 ## Purpose
 
@@ -30,9 +30,9 @@ Application services and stores may still reuse lower-level query/persistence lo
 
 | Area | Main routes | Read when asking about |
 | --- | --- | --- |
-| Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password |
+| Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password, accept invitation |
 | Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password` | own profile, edit profile, change password while logged in |
-| Account management | `/api/v1/management/accounts/*` | create internal account, assign roles, disable account, set password |
+| Account management | `/api/v1/management/accounts/*` | create internal account, invitation link generation, assign roles, disable account, set password |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
@@ -99,7 +99,7 @@ Rules:
 
 ## Authentication And Password Recovery APIs
 
-Search keywords: `authentication`, `auth`, `local login`, `username password login`, `Firebase Google login`, `external login`, `refresh token`, `revoke refresh token`, `forgot password`, `reset password`, `change password`, `current account password`, `management accounts`.
+Search keywords: `authentication`, `auth`, `local login`, `username password login`, `Firebase Google login`, `external login`, `refresh token`, `revoke refresh token`, `forgot password`, `reset password`, `change password`, `accept invitation`, `invitation link`, `current account password`, `management accounts`.
 
 Current examples:
 
@@ -110,6 +110,7 @@ POST /api/v1/authentication/refresh-token
 POST /api/v1/authentication/revoke-refresh-token
 POST /api/v1/authentication/forgot-password
 POST /api/v1/authentication/reset-password
+POST /api/v1/authentication/accept-invitation
 ```
 
 Rules:
@@ -117,6 +118,7 @@ Rules:
 - Login and forgot/reset password endpoints can be public.
 - Account management remains under `/management/accounts`.
 - Change password for a logged-in user stays under `/me/password`.
+- Account onboarding and invitation lifecycle rules live in [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md).
 
 ## Provider Webhook APIs
 
@@ -171,6 +173,7 @@ Rules:
 ## Related Docs
 
 - [Authorization Rules](AUTHORIZATION_RULES.md)
+- [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
 - [Naming Rules](NAMING_RULES.md)
 - [IoT Contract](IOT_CONTRACT.md)
 - [System Flows](SYSTEM_FLOWS.md)
