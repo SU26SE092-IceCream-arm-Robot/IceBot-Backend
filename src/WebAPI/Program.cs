@@ -116,6 +116,9 @@ try
 
         options.AddPolicy("kiosks.update", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
+
+        options.AddPolicy("tenant-tree.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
     });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();

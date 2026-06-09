@@ -72,6 +72,53 @@ Add `Permission` and `RolePermission` entities only when there is a concrete nee
 - hardcoded policies becoming too large to maintain safely,
 - permission changes needing their own audit and lifecycle.
 
+## RBAC Support API Backlog
+
+These APIs are useful for making RBAC easier to manage and debug, but they are not required immediately.
+
+Later candidates:
+
+```http
+GET /api/v1/management/roles
+GET /api/v1/management/authorization/policies
+PUT /api/v1/management/accounts/{accountId}/roles
+GET /api/v1/management/accounts/{accountId}/effective-access
+GET /api/v1/me/access
+```
+
+Do not implement these until the management UI or debugging need is concrete.
+
+Current Tenant priority is scope/resource lookup so admins can choose valid tenant scopes.
+
+Immediate tenant candidate:
+
+```http
+GET /api/v1/management/tenant-tree
+```
+
+`GET /management/tenant-tree` should return the management-visible tenant hierarchy:
+
+```text
+Organization
+  -> Store
+      -> Kiosk
+```
+
+Use it for role scope selection and tenant navigation. This is not dynamic permission management.
+
+When assigning roles, the backend must validate scope hierarchy:
+
+```text
+Organization exists
+Store exists
+Kiosk exists
+Store.OrganizationId == OrganizationId
+Kiosk.StoreId == StoreId
+Kiosk.OrganizationId == OrganizationId
+```
+
+This is a tenant RBAC usability proposal. It is not a decision to add `Permission` or `RolePermission` tables.
+
 ## Policy Direction
 
 | Policy | Allowed roles | Notes |
@@ -86,6 +133,7 @@ Add `Permission` and `RolePermission` entities only when there is a concrete nee
 | `kiosks.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View kiosks. Scoped to assigned organization/store/kiosk |
 | `kiosks.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create and change status of kiosks. Scoped to assigned organization/store/kiosk |
 | `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Update kiosk details. Scoped to assigned organization/store/kiosk |
+| `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |
 | `products.manage` | `SystemAdmin`, `Manager` | Product/catalog management. Staff and Technician should not change product pricing/catalog by default |
 | `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |
 | `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |

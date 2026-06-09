@@ -36,6 +36,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
+| Tenant scope lookup | `/api/v1/management/tenant-tree` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
@@ -91,6 +92,7 @@ GET /api/v1/management/kiosks/{kioskId}
 POST /api/v1/management/stores/{storeId}/kiosks
 PUT /api/v1/management/kiosks/{kioskId}
 PATCH /api/v1/management/kiosks/{kioskId}/status
+GET /api/v1/management/tenant-tree
 ```
 
 Rules:
@@ -100,6 +102,7 @@ Rules:
 - It is valid for multiple roles to share the same management endpoint when policy allows it.
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
 - Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
+- `tenant-tree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
 
 ## Current Account APIs
 

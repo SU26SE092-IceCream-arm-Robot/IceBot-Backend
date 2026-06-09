@@ -11,6 +11,7 @@ public static class TenantsInfrastructureRegistration
         services.AddScoped<IOrganizationStore, OrganizationStore>();
         services.AddScoped<IStoreStore, StoreStore>();
         services.AddScoped<IKioskStore, KioskStore>();
+        services.AddScoped<ITenantTreeStore, TenantTreeStore>();
         return services;
     }
 }

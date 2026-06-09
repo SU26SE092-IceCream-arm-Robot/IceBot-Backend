@@ -117,6 +117,32 @@ Infrastructure.Tenants.Persistence.KioskStore
 
 Do not place kiosk-specific persistence in the generic repositories namespace.
 
+## Tenant Tree
+
+Tenant tree is a management read model for scope selection and tenant navigation:
+
+```text
+GET /api/v1/management/tenant-tree
+```
+
+It returns:
+
+```text
+Organization
+  -> Store
+      -> Kiosk
+```
+
+Use it for:
+
+- choosing valid `OrganizationId`, `StoreId`, and `KioskId` values when assigning role scope;
+- management UI tenant navigation;
+- avoiding invalid cross-tenant scope combinations.
+
+Do not use `tenant-tree` as an operations overview endpoint. Keep revenue, alerts, runtime state, inventory, and dashboard metrics in separate overview/reporting APIs.
+
+REST is sufficient for this endpoint. Do not introduce GraphQL or OData for tenant tree unless broader read-query requirements appear.
+
 ## Scope Model
 
 Use `TenantScopeType` for configurable data that can exist as global defaults and tenant overrides:

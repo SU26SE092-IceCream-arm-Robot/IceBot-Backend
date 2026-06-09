@@ -36,6 +36,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | JSONB fields, payloads, snapshots, robot parameters, schema versions | [JSON Field Rules](data/JSON_FIELD_RULES.md) | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | Idempotency, retry fields, dead letters, callback deduplication | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md) | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | Tenant isolation, Organization/Store/Kiosk scope, override hierarchy | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md) | [Authorization Rules](api/AUTHORIZATION_RULES.md), [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
+| Tenant tree, tenant scope lookup, RBAC scope selector | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Tablet, cloud, edge, payment, MQTT, execution flow | [System Flows](flows/SYSTEM_FLOWS.md) | [IoT Contract](iot/IOT_CONTRACT.md) |
 | Exact tablet-edge-cloud API/message contract | [IoT Contract](iot/IOT_CONTRACT.md) | [System Flows](flows/SYSTEM_FLOWS.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Local edge runtime database design | [Local Edge Runtime ERD](iot/LOCAL_EDGE_RUNTIME_ERD.md) | [IoT Contract](iot/IOT_CONTRACT.md), [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
