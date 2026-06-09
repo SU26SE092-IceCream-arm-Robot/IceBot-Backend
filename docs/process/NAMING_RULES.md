@@ -300,6 +300,55 @@ LastErrorCode
 LastErrorMessage
 ```
 
+## CQRS Handler And Service Names
+
+Use CQRS-style handlers for controller-facing Application use cases.
+
+```text
+Controller-facing Application operation -> CommandHandler / QueryHandler
+```
+
+Examples:
+
+```text
+GetTenantTreeQueryHandler
+CreateKioskCommandHandler
+UpdateKioskCommandHandler
+SetKioskStatusCommandHandler
+PlaceOrderCommandHandler
+CreatePaymentSessionCommandHandler
+```
+
+Handlers are use case boundaries. They should orchestrate the request flow, call stores/repositories, domain methods, policies, calculators, provider clients, or helper services as needed, and return `ApiResult<T>` when the result goes directly to WebAPI.
+
+Use `Service` only when the class is a reusable capability, internal helper, domain policy/calculator, or integration component rather than a controller-facing use case.
+
+Examples:
+
+```text
+AccountTokenService
+RefreshTokenService
+TenantScopeResolver
+PriceCalculator
+PayOsSignatureService
+EmailSender
+FirebaseClient
+```
+
+Do not create service wrappers that only repeat what a handler can do directly:
+
+```text
+Controller -> Handler -> CrudService -> Store
+```
+
+Prefer:
+
+```text
+Controller -> Handler -> Store/DbContext
+```
+
+For now, this is the convention for new Application use cases. Existing `*Service` use cases may be migrated when they are touched or when the team decides to standardize a module.
+
 ## Result Wrapper Names
 
 Use `ApiResult<T>` for Application use cases whose result is returned directly by WebAPI controllers.
