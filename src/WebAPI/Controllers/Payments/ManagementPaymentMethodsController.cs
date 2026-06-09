@@ -1,5 +1,6 @@
+using Application.Payments.PaymentMethods.Commands;
 using Application.Payments.PaymentMethods.DTOs;
-using Application.Payments.PaymentMethods.Interfaces;
+using Application.Payments.PaymentMethods.Queries;
 using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
@@ -13,17 +14,22 @@ namespace WebAPI.Controllers.Payments;
 [Authorize(Policy = "payments.manage")]
 public sealed class ManagementPaymentMethodsController : ControllerBase
 {
-    private readonly IManagePaymentMethodService _paymentMethodService;
+    private readonly ListPaymentMethodsQueryHandler _listPaymentMethodsHandler;
+    private readonly SetPaymentMethodStatusCommandHandler _setStatusHandler;
 
-    public ManagementPaymentMethodsController(IManagePaymentMethodService paymentMethodService)
+    public ManagementPaymentMethodsController(
+        ListPaymentMethodsQueryHandler listPaymentMethodsHandler,
+        SetPaymentMethodStatusCommandHandler setStatusHandler)
     {
-        _paymentMethodService = paymentMethodService;
+        _listPaymentMethodsHandler = listPaymentMethodsHandler;
+        _setStatusHandler = setStatusHandler;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var result = await _paymentMethodService.GetAllAsync();
+        var query = new ListPaymentMethodsQuery(activeOnly: null);
+        var result = await _listPaymentMethodsHandler.HandleAsync(query);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -38,7 +44,8 @@ public sealed class ManagementPaymentMethodsController : ControllerBase
             throw new ValidationException(errors);
         }
 
-        var result = await _paymentMethodService.SetStatusAsync(id, request.IsActive);
+        var command = new SetPaymentMethodStatusCommand(id, request.IsActive);
+        var result = await _setStatusHandler.HandleAsync(command);
         return StatusCode(result.StatusCode, result);
     }
 }

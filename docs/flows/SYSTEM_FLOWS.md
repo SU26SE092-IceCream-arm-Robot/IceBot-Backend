@@ -13,7 +13,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 ## Current Assumptions
 
 - One tablet per kiosk.
-- Tablet uses local edge for runtime menu availability.
+- Tablet may use Cloud runtime menu for catalog display, but should prefer Local Edge runtime projection for final device/robot availability when the edge service is available.
 - Tablet uses cloud for order/payment.
 - Bank transfer QR is the first payment method.
 - No inventory reservation before payment.
@@ -126,6 +126,22 @@ State mapping:
 | `Order = Preparing` | Making item |
 | `Order = Completed` | Ready / pick up |
 | `Order = ExecutionRejected` / `RefundRequired` | Staff support / manual refund required |
+
+Tablet Status Projection mapping (v1):
+
+| CustomerStatus | CanRetryPayment | RequiresStaffSupport | CustomerStatusMessage | Tablet screen / action |
+| --- | --- | --- | --- | --- |
+| `WaitingForPayment` | true | false | Waiting for payment. Please scan the QR code. | QR payment screen |
+| `PaymentCancelled` | true | false | Payment was cancelled. You can try paying again. | QR payment screen + retry |
+| `PaymentExpired` | true | false | Payment session expired. Please retry. | QR payment screen + retry |
+| `PaymentFailed` | true | false | Payment failed. You can try paying again. | QR payment screen + retry |
+| `Preparing` | false | false | Payment successful. Preparing your order. | Payment successful, preparing order |
+| `Ready` | false | false | Your order is ready. Please pick it up! | Ready / pick up |
+| `Completed` | false | false | Order completed. Thank you! | Completed |
+| `Cancelled` | false | false | Order cancelled. | Order cancelled / aborted |
+| `RefundRequired` | false | true | Order cancelled after payment. Please contact staff... / Order execution failed... | Staff support / manual refund required |
+
+Order tracking read model boundary limitations and data exclusions are detailed in [API Surface Rules](../api/API_SURFACE_RULES.md#read-model-api-boundaries).
 
 ## Edge Command Flow
 

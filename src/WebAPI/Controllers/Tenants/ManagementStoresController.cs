@@ -1,13 +1,10 @@
 using Application.Shared.Exceptions;
+using Application.Tenants.Stores.Commands;
+using Application.Tenants.Stores.Queries;
 using Application.Tenants.Stores.Requests;
-using Application.Tenants.Stores.Services;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Tenants;
@@ -17,11 +14,27 @@ namespace WebAPI.Controllers.Tenants;
 [Route("api/v{version:apiVersion}/management")]
 public class ManagementStoresController : ControllerBase
 {
-    private readonly StoreManagementService _storeManagement;
+    private readonly ListStoresQueryHandler _listStores;
+    private readonly GetStoreQueryHandler _getStore;
+    private readonly CreateStoreCommandHandler _createStore;
+    private readonly UpdateStoreCommandHandler _updateStore;
+    private readonly DisableStoreCommandHandler _disableStore;
+    private readonly ActivateStoreCommandHandler _activateStore;
 
-    public ManagementStoresController(StoreManagementService storeManagement)
+    public ManagementStoresController(
+        ListStoresQueryHandler listStores,
+        GetStoreQueryHandler getStore,
+        CreateStoreCommandHandler createStore,
+        UpdateStoreCommandHandler updateStore,
+        DisableStoreCommandHandler disableStore,
+        ActivateStoreCommandHandler activateStore)
     {
-        _storeManagement = storeManagement;
+        _listStores = listStores;
+        _getStore = getStore;
+        _createStore = createStore;
+        _updateStore = updateStore;
+        _disableStore = disableStore;
+        _activateStore = activateStore;
     }
 
     [HttpGet("stores")]
@@ -33,7 +46,14 @@ public class ManagementStoresController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _storeManagement.ListStoresAsync(context, organizationId, status, search, cancellationToken);
+        var query = new ListStoresQuery
+        {
+            UserContext = context,
+            OrganizationId = organizationId,
+            Status = status,
+            Search = search
+        };
+        var result = await _listStores.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -44,7 +64,12 @@ public class ManagementStoresController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _storeManagement.GetStoreAsync(context, storeId, cancellationToken);
+        var query = new GetStoreQuery
+        {
+            UserContext = context,
+            StoreId = storeId
+        };
+        var result = await _getStore.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -55,9 +80,14 @@ public class ManagementStoresController : ControllerBase
         [FromBody] CreateStoreRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
         var context = User.GetUserContext();
-        var result = await _storeManagement.CreateStoreAsync(context, organizationId, request, cancellationToken);
+        var command = new CreateStoreCommand
+        {
+            UserContext = context,
+            OrganizationId = organizationId,
+            Request = request
+        };
+        var result = await _createStore.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -68,9 +98,14 @@ public class ManagementStoresController : ControllerBase
         [FromBody] UpdateStoreRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
         var context = User.GetUserContext();
-        var result = await _storeManagement.UpdateStoreAsync(context, storeId, request, cancellationToken);
+        var command = new UpdateStoreCommand
+        {
+            UserContext = context,
+            StoreId = storeId,
+            Request = request
+        };
+        var result = await _updateStore.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -81,7 +116,12 @@ public class ManagementStoresController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _storeManagement.DisableStoreAsync(context, storeId, cancellationToken);
+        var command = new DisableStoreCommand
+        {
+            UserContext = context,
+            StoreId = storeId
+        };
+        var result = await _disableStore.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -92,21 +132,12 @@ public class ManagementStoresController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _storeManagement.ActivateStoreAsync(context, storeId, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    private void EnsureValidModel()
-    {
-        if (ModelState.IsValid)
+        var command = new ActivateStoreCommand
         {
-            return;
-        }
-
-        var errors = ModelState.ToDictionary(
-            item => item.Key,
-            item => item.Value?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid");
-
-        throw new ValidationException(errors);
+            UserContext = context,
+            StoreId = storeId
+        };
+        var result = await _activateStore.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 }

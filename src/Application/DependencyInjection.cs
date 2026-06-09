@@ -1,5 +1,5 @@
-using Application.Identity;
 using Application.Catalog;
+using Application.Identity;
 using Application.Orders;
 using Application.Payments;
 using Application.SalesCatalog;

@@ -18,6 +18,10 @@ public sealed class PaymentStore : IPaymentStore
     public Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Orders
+            .Include(order => order.Kiosk)
+                .ThenInclude(kiosk => kiosk.Store)
+            .Include(order => order.Kiosk)
+                .ThenInclude(kiosk => kiosk.Organization)
             .Include(order => order.OrderItems)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     }

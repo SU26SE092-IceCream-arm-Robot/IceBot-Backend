@@ -266,6 +266,13 @@ Recommended unique constraint:
 
 Reason: inbox is the primary deduplication boundary for edge-cloud sync.
 
+Current audit conclusion:
+
+- `SyncEventInbox` already has the core infrastructure retry shape: processing attempts, max attempts, next retry, last attempt, lock id, locked until, and last error.
+- Keep the `(Status, NextRetryAt, LockedUntil)` index for retry worker scans.
+- Preserve `EventId` as the deduplication boundary for sync ingestion.
+- Raw `PayloadJson` is acceptable as event evidence and transport payload. Business state that needs filtering or lifecycle rules should be projected into typed tables by processors.
+
 ### KioskHeartbeat
 
 Recommended fields:

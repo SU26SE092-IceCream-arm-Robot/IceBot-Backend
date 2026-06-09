@@ -4,11 +4,6 @@ using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Infrastructure.Tenants.Persistence;
 

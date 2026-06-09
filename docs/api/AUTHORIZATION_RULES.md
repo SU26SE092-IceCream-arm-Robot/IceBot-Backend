@@ -72,31 +72,35 @@ Add `Permission` and `RolePermission` entities only when there is a concrete nee
 - hardcoded policies becoming too large to maintain safely,
 - permission changes needing their own audit and lifecycle.
 
-## RBAC Support API Backlog
+## Implemented RBAC APIs
 
-These APIs are useful for making RBAC easier to manage and debug, but they are not required immediately.
-
-Later candidates:
+These APIs are implemented to make RBAC and tenant scope selection easier to manage in FE/admin screens:
 
 ```http
 GET /api/v1/management/roles
-GET /api/v1/management/authorization/policies
+GET /api/v1/management/role-scope-options
+GET /api/v1/management/permission-matrix
+```
+
+## RBAC Support API Backlog
+
+These APIs are useful for making RBAC easier to manage and debug, but they are not required immediately:
+
+```http
 PUT /api/v1/management/accounts/{accountId}/roles
 GET /api/v1/management/accounts/{accountId}/effective-access
 GET /api/v1/me/access
 ```
 
-Do not implement these until the management UI or debugging need is concrete.
-
 Current Tenant priority is scope/resource lookup so admins can choose valid tenant scopes.
 
-Immediate tenant candidate:
+Immediate tenant support:
 
 ```http
 GET /api/v1/management/tenant-tree
 ```
 
-`GET /management/tenant-tree` should return the management-visible tenant hierarchy:
+`GET /management/tenant-tree` returns the management-visible tenant hierarchy:
 
 ```text
 Organization
@@ -117,13 +121,16 @@ Kiosk.StoreId == StoreId
 Kiosk.OrganizationId == OrganizationId
 ```
 
-This is a tenant RBAC usability proposal. It is not a decision to add `Permission` or `RolePermission` tables.
+This is a tenant RBAC usability implementation. It does not add `Permission` or `RolePermission` tables.
 
 ## Policy Direction
 
 | Policy | Allowed roles | Notes |
 | --- | --- | --- |
-| `accounts.manage` | `SystemAdmin` | Internal account and role management |
+| `roles.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View roles catalog and static permission matrix |
+| `role-scope-options.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View valid organizational scope options for a target role |
+| `accounts.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read internal accounts. SystemAdmin can read all accounts; OrgAdmin and Manager are scope-filtered |
+| `accounts.manage` | `SystemAdmin` | Create, update, disable, assign roles, set password, and send invitations for internal accounts |
 | `organizations.manage` | `SystemAdmin` | Platform-level organization management: create, activate, disable organizations |
 | `organizations.view` | `SystemAdmin`, `OrgAdmin` | View organizations. OrgAdmin can view/read only their assigned organization(s) |
 | `organizations.update` | `SystemAdmin`, `OrgAdmin` | Update organizations. OrgAdmin can update only basic profile/contact info for assigned organization(s); SystemAdmin can update platform-managed fields |
@@ -149,6 +156,7 @@ This is a tenant RBAC usability proposal. It is not a decision to add `Permissio
 - Store management APIs perform service-level scope checks using `OrganizationId` and `StoreId` from role scope claims.
 - Other route/resource scope matching is still added incrementally as APIs pass `OrganizationId`, `StoreId`, or `KioskId` authorization context.
 - Role checks must validate requested resource scope before returning scoped tenant data.
+- Account read APIs use `accounts.read` and must remain scope-filtered for non-`SystemAdmin` callers. Account mutation APIs use `accounts.manage` and remain `SystemAdmin` only.
 - Do not add `Staff` or `Technician` to product/menu pricing policies unless the business explicitly gives them that responsibility.
 
 ## Related Docs

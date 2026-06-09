@@ -1,13 +1,10 @@
 using Application.Shared.Exceptions;
+using Application.Tenants.Kiosks.Commands;
+using Application.Tenants.Kiosks.Queries;
 using Application.Tenants.Kiosks.Requests;
-using Application.Tenants.Kiosks.Services;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Tenants;
@@ -17,11 +14,24 @@ namespace WebAPI.Controllers.Tenants;
 [Route("api/v{version:apiVersion}/management")]
 public class ManagementKiosksController : ControllerBase
 {
-    private readonly KioskManagementService _kioskManagement;
+    private readonly ListKiosksQueryHandler _listKiosks;
+    private readonly GetKioskQueryHandler _getKiosk;
+    private readonly CreateKioskCommandHandler _createKiosk;
+    private readonly UpdateKioskCommandHandler _updateKiosk;
+    private readonly SetKioskStatusCommandHandler _setKioskStatus;
 
-    public ManagementKiosksController(KioskManagementService kioskManagement)
+    public ManagementKiosksController(
+        ListKiosksQueryHandler listKiosks,
+        GetKioskQueryHandler getKiosk,
+        CreateKioskCommandHandler createKiosk,
+        UpdateKioskCommandHandler updateKiosk,
+        SetKioskStatusCommandHandler setKioskStatus)
     {
-        _kioskManagement = kioskManagement;
+        _listKiosks = listKiosks;
+        _getKiosk = getKiosk;
+        _createKiosk = createKiosk;
+        _updateKiosk = updateKiosk;
+        _setKioskStatus = setKioskStatus;
     }
 
     [HttpGet("kiosks")]
@@ -34,8 +44,15 @@ public class ManagementKiosksController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _kioskManagement.ListKiosksAsync(
-            context, organizationId, storeId, status, search, cancellationToken);
+        var query = new ListKiosksQuery
+        {
+            UserContext = context,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            Status = status,
+            Search = search
+        };
+        var result = await _listKiosks.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -46,7 +63,12 @@ public class ManagementKiosksController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _kioskManagement.GetKioskAsync(context, kioskId, cancellationToken);
+        var query = new GetKioskQuery
+        {
+            UserContext = context,
+            KioskId = kioskId
+        };
+        var result = await _getKiosk.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -57,9 +79,14 @@ public class ManagementKiosksController : ControllerBase
         [FromBody] CreateKioskRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
         var context = User.GetUserContext();
-        var result = await _kioskManagement.CreateKioskAsync(context, storeId, request, cancellationToken);
+        var command = new CreateKioskCommand
+        {
+            UserContext = context,
+            StoreId = storeId,
+            Request = request
+        };
+        var result = await _createKiosk.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -70,9 +97,14 @@ public class ManagementKiosksController : ControllerBase
         [FromBody] UpdateKioskRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
         var context = User.GetUserContext();
-        var result = await _kioskManagement.UpdateKioskAsync(context, kioskId, request, cancellationToken);
+        var command = new UpdateKioskCommand
+        {
+            UserContext = context,
+            KioskId = kioskId,
+            Request = request
+        };
+        var result = await _updateKiosk.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -83,23 +115,14 @@ public class ManagementKiosksController : ControllerBase
         [FromBody] SetKioskStatusRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
         var context = User.GetUserContext();
-        var result = await _kioskManagement.SetKioskStatusAsync(context, kioskId, request, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    private void EnsureValidModel()
-    {
-        if (ModelState.IsValid)
+        var command = new SetKioskStatusCommand
         {
-            return;
-        }
-
-        var errors = ModelState.ToDictionary(
-            item => item.Key,
-            item => item.Value?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid");
-
-        throw new ValidationException(errors);
+            UserContext = context,
+            KioskId = kioskId,
+            Request = request
+        };
+        var result = await _setKioskStatus.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 }

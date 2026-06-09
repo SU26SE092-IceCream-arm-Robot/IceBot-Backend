@@ -22,6 +22,8 @@ public sealed class MenuStore : IMenuStore
     {
         return _dbContext.Kiosks
             .AsNoTracking()
+            .Include(kiosk => kiosk.Store)
+            .Include(kiosk => kiosk.Organization)
             .FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
     }
 
@@ -30,9 +32,22 @@ public sealed class MenuStore : IMenuStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds,
         CancellationToken cancellationToken = default)
     {
-        return ApplyMenuFilters(_dbContext.Menus.AsNoTracking(), search, organizationId, storeId, kioskId)
+        return ApplyMenuFilters(
+                _dbContext.Menus.AsNoTracking(),
+                search,
+                organizationId,
+                storeId,
+                kioskId,
+                isSystemAdmin,
+                allowedOrganizationIds,
+                allowedStoreIds,
+                allowedKioskIds)
             .CountAsync(cancellationToken);
     }
 
@@ -41,6 +56,10 @@ public sealed class MenuStore : IMenuStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds,
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default)
@@ -52,7 +71,11 @@ public sealed class MenuStore : IMenuStore
                 search,
                 organizationId,
                 storeId,
-                kioskId)
+                kioskId,
+                isSystemAdmin,
+                allowedOrganizationIds,
+                allowedStoreIds,
+                allowedKioskIds)
             .OrderBy(menu => menu.DisplayOrder)
             .ThenBy(menu => menu.Name)
             .Skip((pageNumber - 1) * pageSize)
@@ -203,8 +226,30 @@ public sealed class MenuStore : IMenuStore
         string? search,
         Guid? organizationId,
         Guid? storeId,
-        Guid? kioskId)
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds)
     {
+        if (!isSystemAdmin)
+        {
+            var allowedOrgIds = allowedOrganizationIds.ToArray();
+            var allowedStoreScopeIds = allowedStoreIds.ToArray();
+            var allowedKioskScopeIds = allowedKioskIds.ToArray();
+
+            if (allowedOrgIds.Length == 0 && allowedStoreScopeIds.Length == 0 && allowedKioskScopeIds.Length == 0)
+            {
+                return query.Where(_ => false);
+            }
+
+            query = query.Where(menu =>
+                (menu.OrganizationId != null && allowedOrgIds.Contains(menu.OrganizationId.Value)) ||
+                (menu.StoreId != null && allowedStoreScopeIds.Contains(menu.StoreId.Value)) ||
+                (menu.KioskId != null && allowedKioskScopeIds.Contains(menu.KioskId.Value))
+            );
+        }
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             var normalizedSearch = search.Trim();

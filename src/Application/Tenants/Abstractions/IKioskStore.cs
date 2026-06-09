@@ -1,9 +1,5 @@
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Tenants.Abstractions;
 

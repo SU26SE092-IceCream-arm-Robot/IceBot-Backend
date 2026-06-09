@@ -1,0 +1,12 @@
+using Application.Catalog.Products.Requests;
+using System;
+
+namespace Application.Catalog.Products.Commands;
+
+public sealed class UpdateProductVariantCommand
+{
+    public Guid ProductId { get; init; }
+    public Guid VariantId { get; init; }
+    public UpdateProductVariantRequest Request { get; init; } = null!;
+    public Guid? UpdatedByAccountId { get; init; }
+}

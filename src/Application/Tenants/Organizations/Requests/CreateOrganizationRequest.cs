@@ -13,7 +13,7 @@ public sealed class CreateOrganizationRequest
     public string Name { get; set; } = null!;
 
     public string? LegalName { get; set; }
-    
+
     public string? TaxCode { get; set; }
 
     [EmailAddress]
@@ -23,6 +23,6 @@ public sealed class CreateOrganizationRequest
     public string? PhoneNumber { get; set; }
 
     public string? Address { get; set; }
-    
+
     public string? MetadataJson { get; set; }
 }

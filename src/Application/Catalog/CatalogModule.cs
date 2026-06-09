@@ -1,4 +1,5 @@
-using Application.Catalog.Products.Services;
+using Application.Catalog.Products.Queries;
+using Application.Catalog.Products.Commands;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Catalog;
@@ -7,7 +8,17 @@ public static class CatalogModule
 {
     public static IServiceCollection AddCatalogModule(this IServiceCollection services)
     {
-        services.AddScoped<ProductManagementService>();
+        services.AddScoped<ListProductsQueryHandler>();
+        services.AddScoped<GetProductQueryHandler>();
+        services.AddScoped<CreateProductCommandHandler>();
+        services.AddScoped<UpdateProductCommandHandler>();
+        services.AddScoped<SetProductAvailabilityCommandHandler>();
+        services.AddScoped<DeleteProductCommandHandler>();
+        services.AddScoped<AddProductVariantCommandHandler>();
+        services.AddScoped<UpdateProductVariantCommandHandler>();
+        services.AddScoped<SetProductVariantAvailabilityCommandHandler>();
+        services.AddScoped<DeleteProductVariantCommandHandler>();
+
         return services;
     }
 }

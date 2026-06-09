@@ -1,5 +1,5 @@
 using Application.Payments.PaymentSessions.Requests;
-using Application.Payments.PaymentSessions.Services;
+using Application.Payments.PaymentSessions.Commands;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,11 +11,11 @@ namespace WebAPI.Controllers.Payments;
 [Route("api/v{version:apiVersion}/payments/payos")]
 public sealed class PayOsWebhookController : ControllerBase
 {
-    private readonly PaymentSessionService _paymentSessionService;
+    private readonly HandlePaymentProviderNotificationCommandHandler _notificationHandler;
 
-    public PayOsWebhookController(PaymentSessionService paymentSessionService)
+    public PayOsWebhookController(HandlePaymentProviderNotificationCommandHandler notificationHandler)
     {
-        _paymentSessionService = paymentSessionService;
+        _notificationHandler = notificationHandler;
     }
 
     [HttpPost("webhook")]
@@ -33,7 +33,8 @@ public sealed class PayOsWebhookController : ControllerBase
                 : null
         };
 
-        var result = await _paymentSessionService.HandleProviderNotificationAsync(request, cancellationToken);
+        var command = new HandlePaymentProviderNotificationCommand { Request = request };
+        var result = await _notificationHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

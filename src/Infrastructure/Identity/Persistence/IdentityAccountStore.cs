@@ -42,18 +42,57 @@ namespace Infrastructure.Identity.Persistence
             return _dbContext.Roles.FirstOrDefaultAsync(role => role.Code == code && role.IsActive, cancellationToken);
         }
 
-        public Task<List<Account>> ListAsync(string? search, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+        public Task<List<Role>> ListActiveRolesAsync(CancellationToken cancellationToken = default)
         {
-            return ApplyFilters(BuildAccountQuery(asNoTracking: true), search, status)
+            return _dbContext.Roles
+                .AsNoTracking()
+                .Where(role => role.IsActive)
+                .OrderBy(role => role.Priority)
+                .ToListAsync(cancellationToken);
+        }
+
+        public Task<List<Account>> ListAsync(
+            string? search,
+            string? status,
+            bool isSystemAdmin,
+            IReadOnlySet<Guid> allowedOrganizationIds,
+            IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default)
+        {
+            return ApplyFilters(
+                    BuildAccountQuery(asNoTracking: true),
+                    search,
+                    status,
+                    isSystemAdmin,
+                    allowedOrganizationIds,
+                    allowedStoreIds,
+                    allowedKioskIds)
                 .OrderBy(account => account.UserName)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync(cancellationToken);
         }
 
-        public Task<int> CountAsync(string? search, string? status, CancellationToken cancellationToken = default)
+        public Task<int> CountAsync(
+            string? search,
+            string? status,
+            bool isSystemAdmin,
+            IReadOnlySet<Guid> allowedOrganizationIds,
+            IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds,
+            CancellationToken cancellationToken = default)
         {
-            return ApplyFilters(_dbContext.Accounts.AsNoTracking(), search, status)
+            return ApplyFilters(
+                    _dbContext.Accounts.AsNoTracking(),
+                    search,
+                    status,
+                    isSystemAdmin,
+                    allowedOrganizationIds,
+                    allowedStoreIds,
+                    allowedKioskIds)
                 .CountAsync(cancellationToken);
         }
 
@@ -98,8 +137,36 @@ namespace Infrastructure.Identity.Persistence
             return asNoTracking ? query.AsNoTracking() : query;
         }
 
-        private static IQueryable<Account> ApplyFilters(IQueryable<Account> query, string? search, string? status)
+        private static IQueryable<Account> ApplyFilters(
+            IQueryable<Account> query,
+            string? search,
+            string? status,
+            bool isSystemAdmin,
+            IReadOnlySet<Guid> allowedOrganizationIds,
+            IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds)
         {
+            if (!isSystemAdmin)
+            {
+                var allowedOrgIds = allowedOrganizationIds.ToArray();
+                var allowedStoreScopeIds = allowedStoreIds.ToArray();
+                var allowedKioskScopeIds = allowedKioskIds.ToArray();
+
+                if (allowedOrgIds.Length == 0 && allowedStoreScopeIds.Length == 0 && allowedKioskScopeIds.Length == 0)
+                {
+                    return query.Where(_ => false);
+                }
+
+                query = query.Where(account => account.AccountRoles.Any(role =>
+                    role.IsActive &&
+                    (
+                        (role.OrganizationId != null && allowedOrgIds.Contains(role.OrganizationId.Value)) ||
+                        (role.StoreId != null && allowedStoreScopeIds.Contains(role.StoreId.Value)) ||
+                        (role.KioskId != null && allowedKioskScopeIds.Contains(role.KioskId.Value))
+                    )
+                ));
+            }
+
             if (!string.IsNullOrWhiteSpace(search))
             {
                 var normalized = search.Trim().ToLowerInvariant();

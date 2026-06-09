@@ -77,6 +77,20 @@ Examples:
 
 Database foreign keys only prove the referenced row exists. They do not prove the scope combination is meaningful. Enforce this in admin/application use cases or domain methods.
 
+## Audit Field Automation
+
+Current v1 audit convention:
+
+- `CreatedAt` and `UpdatedAt` may be auto-filled in `IceBotDbContext.SaveChangesAsync`.
+- Timestamp automation belongs in `IceBotDbContext.SaveChangesAsync`, not in generic CRUD repository methods.
+- Timestamp automation should not overwrite explicit values already set by handlers, repositories, seed/bootstrap code, or tests.
+- Do not auto-fill `CreatedByAccountId` or `UpdatedByAccountId` yet.
+- Actor fields remain manually assigned where needed by the use case.
+- Do not introduce `ICurrentActorContext` until auth, background worker, payment callback, sync, and system actor requirements are clear.
+- Do not inject HTTP/JWT concepts directly into `IceBotDbContext`.
+
+Reason: timestamp automation is a low-risk persistence mechanic, while actor attribution depends on workflow ownership and system/background behavior.
+
 ## Historical Snapshots
 
 Orders, payments, robot jobs, stock movements, and audit/event tables should not rely only on mutable foreign rows for historical truth.

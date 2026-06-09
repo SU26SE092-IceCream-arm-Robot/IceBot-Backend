@@ -56,15 +56,15 @@ Controllers should delegate to Application use cases. They should not contain do
 
 Owns use-case orchestration:
 
-- Commands and queries.
+- Command/query handlers for controller-facing use cases.
 - Request/response DTOs.
 - Validators.
-- Application handlers/services.
+- Reusable Application services for capabilities and internal workflow helpers.
 - Transaction boundaries.
 - Idempotency checks at API/use-case boundary.
 - Contracts for external dependencies.
 
-Use CQRS-lite for workflows with meaningful behavior: order checkout, payment processing, robot job creation, sync ingestion, and stock reporting. Simple admin CRUD can stay lightweight.
+Use CQRS-lite handlers for controller-facing Application use cases. Reusable services remain appropriate for capabilities such as token issuance, authentication, invitation generation, provider integration, policies, and calculators.
 
 ### Domain
 

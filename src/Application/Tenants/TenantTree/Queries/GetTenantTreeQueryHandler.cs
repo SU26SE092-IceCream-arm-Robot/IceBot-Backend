@@ -2,11 +2,6 @@ using Application.Shared.Wrappers;
 using Application.Tenants.Abstractions;
 using Application.Tenants.TenantTree.Results;
 using Domain.Tenants.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Tenants.TenantTree.Queries;
 

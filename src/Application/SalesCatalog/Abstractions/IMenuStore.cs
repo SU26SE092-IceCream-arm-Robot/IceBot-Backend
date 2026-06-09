@@ -13,6 +13,10 @@ public interface IMenuStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds,
         CancellationToken cancellationToken = default);
 
     Task<List<Menu>> ListMenusAsync(
@@ -20,6 +24,10 @@ public interface IMenuStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds,
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default);

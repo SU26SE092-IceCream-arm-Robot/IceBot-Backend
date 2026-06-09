@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Identity.Invitations.Results;
 
 public sealed class AccountInvitationResult

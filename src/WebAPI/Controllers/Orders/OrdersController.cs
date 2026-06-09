@@ -1,7 +1,9 @@
+using Application.Orders.PlaceOrder.Commands;
+using Application.Orders.PlaceOrder.Queries;
 using Application.Orders.PlaceOrder.Requests;
-using Application.Orders.PlaceOrder.Services;
+using Application.Payments.PaymentSessions.Commands;
+using Application.Payments.PaymentSessions.Queries;
 using Application.Payments.PaymentSessions.Requests;
-using Application.Payments.PaymentSessions.Services;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,15 +15,24 @@ namespace WebAPI.Controllers.Orders;
 [Route("api/v{version:apiVersion}/orders")]
 public sealed class OrdersController : ControllerBase
 {
-    private readonly PlaceOrderService _placeOrderService;
-    private readonly PaymentSessionService _paymentSessionService;
+    private readonly PlaceOrderCommandHandler _placeOrderHandler;
+    private readonly GetOrderStatusQueryHandler _getOrderStatusHandler;
+    private readonly CancelPendingOrderCommandHandler _cancelOrderHandler;
+    private readonly CreatePaymentSessionCommandHandler _createPaymentSessionHandler;
+    private readonly GetOrderPaymentStatusQueryHandler _getOrderPaymentStatusHandler;
 
     public OrdersController(
-        PlaceOrderService placeOrderService,
-        PaymentSessionService paymentSessionService)
+        PlaceOrderCommandHandler placeOrderHandler,
+        GetOrderStatusQueryHandler getOrderStatusHandler,
+        CancelPendingOrderCommandHandler cancelOrderHandler,
+        CreatePaymentSessionCommandHandler createPaymentSessionHandler,
+        GetOrderPaymentStatusQueryHandler getOrderPaymentStatusHandler)
     {
-        _placeOrderService = placeOrderService;
-        _paymentSessionService = paymentSessionService;
+        _placeOrderHandler = placeOrderHandler;
+        _getOrderStatusHandler = getOrderStatusHandler;
+        _cancelOrderHandler = cancelOrderHandler;
+        _createPaymentSessionHandler = createPaymentSessionHandler;
+        _getOrderPaymentStatusHandler = getOrderPaymentStatusHandler;
     }
 
     [HttpPost]
@@ -38,7 +49,8 @@ public sealed class OrdersController : ControllerBase
             request.IdempotencyKey = idempotencyKey.ToString();
         }
 
-        var result = await _placeOrderService.PlaceOrderAsync(request, cancellationToken);
+        var command = new PlaceOrderCommand { Request = request };
+        var result = await _placeOrderHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -46,7 +58,8 @@ public sealed class OrdersController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetOrderStatus(Guid orderId, CancellationToken cancellationToken)
     {
-        var result = await _placeOrderService.GetOrderStatusAsync(orderId, cancellationToken);
+        var query = new GetOrderStatusQuery { OrderId = orderId };
+        var result = await _getOrderStatusHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -65,7 +78,8 @@ public sealed class OrdersController : ControllerBase
             request.IdempotencyKey = idempotencyKey.ToString();
         }
 
-        var result = await _paymentSessionService.CreatePaymentSessionAsync(orderId, request, cancellationToken);
+        var command = new CreatePaymentSessionCommand { OrderId = orderId, Request = request };
+        var result = await _createPaymentSessionHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -73,7 +87,8 @@ public sealed class OrdersController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetOrderPaymentStatus(Guid orderId, CancellationToken cancellationToken)
     {
-        var result = await _paymentSessionService.GetOrderPaymentStatusAsync(orderId, cancellationToken);
+        var query = new GetOrderPaymentStatusQuery { OrderId = orderId };
+        var result = await _getOrderPaymentStatusHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -86,7 +101,8 @@ public sealed class OrdersController : ControllerBase
     {
         request ??= new CancelPendingOrderRequest();
 
-        var result = await _placeOrderService.CancelPendingOrderAsync(orderId, request, cancellationToken);
+        var command = new CancelPendingOrderCommand { OrderId = orderId, Request = request };
+        var result = await _cancelOrderHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

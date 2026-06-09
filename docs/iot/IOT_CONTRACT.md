@@ -211,7 +211,7 @@ GET /api/v1/kiosks/{kioskId}/runtime-menu
 
 Purpose: return the Cloud Sales Catalog snapshot that is currently sellable for a kiosk.
 
-This endpoint is useful when the tablet needs a Cloud-backed menu snapshot, but it is not a replacement for the Local Edge runtime projection. It does not include live machine availability, ingredient sufficiency, robot status, or local queue state.
+This endpoint is useful when the tablet needs a Cloud-backed menu snapshot, but it is not a replacement for the Local Edge runtime projection. It does not include live machine availability, ingredient sufficiency, robot status, or local queue state. Read-model boundaries and data exclusions for this endpoint are documented in [API Surface Rules](../api/API_SURFACE_RULES.md#read-model-api-boundaries).
 
 Response:
 
@@ -250,6 +250,9 @@ Response:
 Rules:
 
 - Use this endpoint only for Cloud Sales Catalog truth.
+- Cloud online sales require `KioskStatus.Active` and active parent tenant scope.
+- `KioskStatus.Offline` is a connectivity/availability signal, not permission to create new online sales.
+- Offline-created orders may be synchronized later only if they were created under a valid offline sales session issued while the kiosk was active and offline sales was enabled.
 - For final runtime availability before checkout, the tablet should still prefer the Local Edge runtime projection when the edge service is available.
 - The returned `snapshotId` can be sent to `POST /api/v1/orders` as `runtimeSnapshotId`, but Cloud still recalculates prices from `MenuItem.Price`.
 
@@ -379,27 +382,28 @@ If either fan-out fails, retry that handler independently. Payment remains paid 
 
 ## Cloud To Tablet Status
 
-Tablet needs fast feedback after the customer pays. Cloud can support this through polling first, then MQTT/WebSocket/SSE later if needed.
+Tablet needs fast feedback after the customer pays. Cloud supports this through polling `GET /api/v1/orders/{orderId}` or `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds.
 
-Recommended v1:
+Rather than parsing raw database enums, the tablet client should consume the following projected fields on `OrderResult` and `PaymentStatusResult`:
 
-- Tablet polls `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds while QR is displayed.
-- When `Order.PaymentStatus = Paid`, Tablet shows payment success immediately.
-- If `Order.Status = ReadyForExecution` but Edge has not accepted yet, Tablet shows "payment successful, preparing order".
-- If `Order.Status = Preparing`, Tablet shows "making item".
-- If `Order.Status = Completed`, Tablet shows "ready/pick up".
-- If `Order.Status = Failed` after payment, Tablet shows staff support/manual refund message.
+- `CustomerStatus` (string code)
+- `CustomerStatusMessage` (client-facing fallback message; frontend may localize by `CustomerStatus`)
+- `CanRetryPayment` (boolean indicator)
+- `RequiresStaffSupport` (boolean indicator)
 
-Tablet state mapping:
+Tablet screen mapping based on projections (v1):
 
-| Cloud state | Tablet screen |
-| --- | --- |
-| `PaymentTransaction = Pending` | QR payment screen |
-| `PaymentTransaction = Paid`, `Order = ReadyForExecution` | Payment successful, preparing order |
-| `Order = Accepted` | Machine accepted order |
-| `Order = Preparing` | Making item |
-| `Order = Completed` | Ready / pick up |
-| `Order = ExecutionRejected` / `RefundRequired` | Staff support / manual refund required |
+| CustomerStatus | CanRetryPayment | RequiresStaffSupport | CustomerStatusMessage | Tablet screen / action |
+| --- | --- | --- | --- | --- |
+| `WaitingForPayment` | true | false | Waiting for payment. Please scan the QR code. | QR payment screen |
+| `PaymentCancelled` | true | false | Payment was cancelled. You can try paying again. | QR payment screen + retry |
+| `PaymentExpired` | true | false | Payment session expired. Please retry. | QR payment screen + retry |
+| `PaymentFailed` | true | false | Payment failed. You can try paying again. | QR payment screen + retry |
+| `Preparing` | false | false | Payment successful. Preparing your order. | Payment successful, preparing order |
+| `Ready` | false | false | Your order is ready. Please pick it up! | Ready / pick up |
+| `Completed` | false | false | Order completed. Thank you! | Completed |
+| `Cancelled` | false | false | Order cancelled. | Order cancelled / aborted |
+| `RefundRequired` | false | true | Order cancelled after payment. Please contact staff... / Order execution failed... | Staff support / manual refund required |
 
 ## Cloud To Edge Notification
 

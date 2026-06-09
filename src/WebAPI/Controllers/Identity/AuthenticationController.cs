@@ -1,10 +1,9 @@
-using Application.Identity.Abstractions;
+using Application.Identity.Authentication.Commands;
 using Application.Identity.Authentication.Requests;
+using Application.Identity.Invitations.Commands;
 using Application.Identity.Invitations.Requests;
-using Application.Identity.Invitations.Services;
+using Application.Identity.PasswordReset.Commands;
 using Application.Identity.PasswordReset.Requests;
-using Application.Identity.PasswordReset.Services;
-using Application.Identity.Tokens.Services;
 using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
 using Asp.Versioning;
@@ -19,29 +18,46 @@ namespace WebAPI.Controllers.Identity
     [Route("api/v{version:apiVersion}/authentication")]
     public class AuthenticationController : ControllerBase
     {
-        private readonly IAccountAuthenticationService _authenticationService;
-        private readonly AccountTokenService _tokenService;
-        private readonly PasswordResetService _passwordResetService;
-        private readonly AccountInvitationService _invitationService;
+        private readonly LoginAccountCommandHandler _loginHandler;
+        private readonly GoogleLoginCommandHandler _googleLoginHandler;
+        private readonly RefreshAccessTokenCommandHandler _refreshHandler;
+        private readonly RevokeRefreshTokenCommandHandler _revokeHandler;
+        private readonly RevokeCurrentAccountTokensCommandHandler _revokeAllHandler;
+        private readonly RequestPasswordResetCommandHandler _requestPasswordResetHandler;
+        private readonly ResetPasswordCommandHandler _resetPasswordHandler;
+        private readonly AcceptInvitationCommandHandler _acceptInvitationHandler;
 
         public AuthenticationController(
-            IAccountAuthenticationService authenticationService,
-            AccountTokenService tokenService,
-            PasswordResetService passwordResetService,
-            AccountInvitationService invitationService)
+            LoginAccountCommandHandler loginHandler,
+            GoogleLoginCommandHandler googleLoginHandler,
+            RefreshAccessTokenCommandHandler refreshHandler,
+            RevokeRefreshTokenCommandHandler revokeHandler,
+            RevokeCurrentAccountTokensCommandHandler revokeAllHandler,
+            RequestPasswordResetCommandHandler requestPasswordResetHandler,
+            ResetPasswordCommandHandler resetPasswordHandler,
+            AcceptInvitationCommandHandler acceptInvitationHandler)
         {
-            _authenticationService = authenticationService;
-            _tokenService = tokenService;
-            _passwordResetService = passwordResetService;
-            _invitationService = invitationService;
+            _loginHandler = loginHandler;
+            _googleLoginHandler = googleLoginHandler;
+            _refreshHandler = refreshHandler;
+            _revokeHandler = revokeHandler;
+            _revokeAllHandler = revokeAllHandler;
+            _requestPasswordResetHandler = requestPasswordResetHandler;
+            _resetPasswordHandler = resetPasswordHandler;
+            _acceptInvitationHandler = acceptInvitationHandler;
         }
 
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginAccountRequest request)
         {
-            EnsureValidModel();
-            var result = await _authenticationService.LoginAsync(request, GetRemoteIpAddress(), GetUserAgent());
+            var command = new LoginAccountCommand
+            {
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
+            var result = await _loginHandler.HandleAsync(command);
             return StatusCode(result.StatusCode, result);
         }
 
@@ -49,8 +65,13 @@ namespace WebAPI.Controllers.Identity
         [AllowAnonymous]
         public async Task<IActionResult> GoogleLogin([FromBody] ExternalLoginRequest request)
         {
-            EnsureValidModel();
-            var result = await _authenticationService.LoginWithExternalProviderAsync(request, GetRemoteIpAddress(), GetUserAgent());
+            var command = new GoogleLoginCommand
+            {
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
+            var result = await _googleLoginHandler.HandleAsync(command);
             return StatusCode(result.StatusCode, result);
         }
 
@@ -58,8 +79,13 @@ namespace WebAPI.Controllers.Identity
         [AllowAnonymous]
         public async Task<IActionResult> Refresh([FromBody] RefreshAccessTokenRequest request)
         {
-            EnsureValidModel();
-            var result = await _authenticationService.RefreshAsync(request, GetRemoteIpAddress(), GetUserAgent());
+            var command = new RefreshAccessTokenCommand
+            {
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
+            var result = await _refreshHandler.HandleAsync(command);
             return StatusCode(result.StatusCode, result);
         }
 
@@ -67,13 +93,13 @@ namespace WebAPI.Controllers.Identity
         [AllowAnonymous]
         public async Task<IActionResult> Revoke([FromBody] RevokeRefreshTokenRequest request)
         {
-            if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            var command = new RevokeRefreshTokenCommand
             {
-                return StatusCode(400, ApiResult<object>.Fail("Refresh token is required.", 400));
-            }
-
-            var revoked = await _tokenService.RevokeByTokenAsync(request.RefreshToken, request.Reason, GetRemoteIpAddress(), GetUserAgent());
-            var result = ApiResult<object>.Success(new { revoked }, revoked ? "Revoked" : "Not found", revoked ? 200 : 404);
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
+            var result = await _revokeHandler.HandleAsync(command);
             return StatusCode(result.StatusCode, result);
         }
 
@@ -87,8 +113,14 @@ namespace WebAPI.Controllers.Identity
                 return StatusCode(401, ApiResult<object>.Fail("Unauthorized", 401));
             }
 
-            var revokedCount = await _tokenService.RevokeAllForAccountAsync(parsedAccountId, request?.Reason, GetRemoteIpAddress(), GetUserAgent());
-            var result = ApiResult<object>.Success(new { revoked = revokedCount }, "All sessions revoked", 200);
+            var command = new RevokeCurrentAccountTokensCommand
+            {
+                AccountId = parsedAccountId,
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
+            var result = await _revokeAllHandler.HandleAsync(command);
             return StatusCode(result.StatusCode, result);
         }
 
@@ -98,13 +130,14 @@ namespace WebAPI.Controllers.Identity
             [FromBody] RequestPasswordResetRequest request,
             CancellationToken cancellationToken)
         {
-            EnsureValidModel();
+            var command = new RequestPasswordResetCommand
+            {
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
 
-            var result = await _passwordResetService.RequestResetAsync(
-                request,
-                GetRemoteIpAddress(),
-                GetUserAgent(),
-                cancellationToken);
+            var result = await _requestPasswordResetHandler.HandleAsync(command, cancellationToken);
             return StatusCode(result.StatusCode, result);
         }
 
@@ -114,13 +147,14 @@ namespace WebAPI.Controllers.Identity
             [FromBody] ResetPasswordRequest request,
             CancellationToken cancellationToken)
         {
-            EnsureValidModel();
+            var command = new ResetPasswordCommand
+            {
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
 
-            var result = await _passwordResetService.ResetAsync(
-                request,
-                GetRemoteIpAddress(),
-                GetUserAgent(),
-                cancellationToken);
+            var result = await _resetPasswordHandler.HandleAsync(command, cancellationToken);
 
             return StatusCode(result.StatusCode, result);
         }
@@ -131,30 +165,19 @@ namespace WebAPI.Controllers.Identity
             [FromBody] AcceptInvitationRequest request,
             CancellationToken cancellationToken)
         {
-            EnsureValidModel();
+            var command = new AcceptInvitationCommand
+            {
+                Request = request,
+                IpAddress = GetRemoteIpAddress(),
+                UserAgent = GetUserAgent()
+            };
 
-            var result = await _invitationService.AcceptAsync(
-                request,
-                GetRemoteIpAddress(),
-                GetUserAgent(),
-                cancellationToken);
+            var result = await _acceptInvitationHandler.HandleAsync(command, cancellationToken);
 
             return StatusCode(result.StatusCode, result);
         }
 
-        private void EnsureValidModel()
-        {
-            if (ModelState.IsValid)
-            {
-                return;
-            }
 
-            var errors = ModelState.ToDictionary(
-                item => item.Key,
-                item => item.Value?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid");
-
-            throw new ValidationException(errors);
-        }
 
         private string? GetRemoteIpAddress()
         {

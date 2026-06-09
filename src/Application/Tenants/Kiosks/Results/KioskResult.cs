@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Tenants.Kiosks.Results;
 
 public sealed class KioskResult

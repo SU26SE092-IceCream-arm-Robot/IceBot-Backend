@@ -2,8 +2,6 @@ using Application.Tenants.TenantTree.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Threading;
-using System.Threading.Tasks;
 using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Tenants;

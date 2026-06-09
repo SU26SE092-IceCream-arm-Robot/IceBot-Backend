@@ -62,6 +62,9 @@ Rules:
 - Keep payloads small and UX-oriented.
 - Do not expose internal management fields or back-office-only metadata.
 - Use idempotency for retried checkout/payment commands.
+- Online sales require `KioskStatus.Active` and active parent tenant scope.
+- `KioskStatus.Offline` does not allow new online sales through Cloud APIs.
+- Offline-created orders may be synchronized later only when they were created under a valid offline sales session issued while the kiosk was active and offline sales was enabled.
 - Cloud sales catalog snapshots do not replace Local Edge runtime truth for inventory/device/robot availability.
 
 ## Internal Management APIs
@@ -93,6 +96,9 @@ POST /api/v1/management/stores/{storeId}/kiosks
 PUT /api/v1/management/kiosks/{kioskId}
 PATCH /api/v1/management/kiosks/{kioskId}/status
 GET /api/v1/management/tenant-tree
+GET /api/v1/management/roles
+GET /api/v1/management/role-scope-options
+GET /api/v1/management/permission-matrix
 ```
 
 Rules:
@@ -193,6 +199,82 @@ Rules:
 - `/info` exposes non-sensitive service/build metadata.
 - Do not require user JWT for health probes.
 - Do not expose secrets, connection strings, stack traces, or sensitive dependency details.
+
+## Read Model API Boundaries
+
+To ensure stability, performance, and security, read-model endpoints are strictly scoped to their intended UI or integration workflows. They must not be expanded to aggregate cross-cutting operational or reporting details.
+
+### 1. Tenant Navigation & Scope Selection Boundaries
+* **Endpoints:** 
+  - `GET /api/v1/management/tenant-tree`
+  - `GET /api/v1/management/role-scope-options`
+* **Purpose:** Administrative layout navigation and validation of scopes when creating/assigning user roles.
+* **Includes:** Hierarchy structural identifiers (Organization -> Store -> Kiosk) and scope codes.
+* **EXCLUDES:** Revenue metrics, active alerts, device health, inventory levels, or machine runtime logs.
+* **Ownership:** Excluded metrics must be served by future dashboard or reporting-specific APIs.
+
+### 2. Kiosk Sales Menu Boundaries
+* **Endpoint:** `GET /api/v1/kiosks/{kioskId}/runtime-menu`
+* **Purpose:** Rendering customer-facing catalog pricing and availability on the order tablet.
+* **Includes:** Product name, variant codes, prices, discount figures, images, and recipe versions.
+* **EXCLUDES:** Recipe preparation details (coordinates, Fairino robot points), manufacturing cost margin data, and live dispenser levels.
+* **Ownership:** Deep robot configuration lives in IoT sync profiles, while cost metrics belong to product inventory reporting.
+
+### 3. Customer Order Tracking Boundaries
+* **Endpoints:**
+  - `GET /api/v1/orders/{orderId}`
+  - `GET /api/v1/orders/{orderId}/payment-status`
+* **Purpose:** Real-time customer receipt and preparation status tracking.
+* **Includes:** Quantity, item status, billing totals, payment confirmation, preparation state, and tablet-friendly status projections (CustomerStatus, CustomerStatusMessage, CanRetryPayment, RequiresStaffSupport).
+* **EXCLUDES:** Raw payment provider callback bodies, device error codes, robot joint telemetry.
+* **Ownership:** System error analytics are scoped to maintenance/operations portals, not client order details.
+
+## API Result And Error Handling
+
+Controller-facing Application handlers return `ApiResult<T>` or `PagedResult<T>`, and controllers should preserve the wrapper status code:
+
+```csharp
+return StatusCode(result.StatusCode, result);
+```
+
+Rules:
+
+- `ApiResult<T>.StatusCode` must match the HTTP response status code.
+- `InternalResult<T>` is not an API response contract and must not be returned directly by controllers.
+- `AppException` subclasses must preserve their intended HTTP status through `GlobalExceptionMiddleware`.
+- Middleware must not collapse `NotFoundException`, `ForbiddenException`, or `ConflictException` into `400 Bad Request`.
+- Provider/system failures may include `SystemError` for diagnostics, but public responses must not expose secrets or sensitive config.
+
+Recommended status use:
+
+| Case | Status |
+| --- | --- |
+| Read/update success | `200 OK` |
+| Created success | `201 Created` |
+| Validation failure | `400 Bad Request` |
+| Unauthorized | `401 Unauthorized` |
+| Forbidden/scoped denied | `403 Forbidden` |
+| Resource not found | `404 Not Found` |
+| Business conflict/duplicate | `409 Conflict` |
+| Provider/system failure | `500 Internal Server Error` unless a more specific application status is intentionally returned |
+
+## Validation Strategy
+
+Current v1 validation convention:
+
+- Do not introduce FluentValidation yet.
+- **Request DTO / DataAnnotations (Format & Syntax):** Use DataAnnotations for simple request DTO shape validation, such as required fields, string length, numeric range, and basic format.
+- **Application Validators / Rule Helpers (Cross-Field / Request-Level):** Use static `RequestValidator` / rule helper classes for cross-field or request-level rules that do not need database access.
+- **Handlers & Stores (Business constraints & Database-dependent):** Use handlers and stores for database-dependent validation, such as uniqueness, parent existence, active parent checks, and tenant-scope ownership.
+- **Domain Methods (Invariants):** Use domain methods for entity invariants and state transitions.
+- **Failure Returns & Exceptions:**
+  - Handlers should return `ApiResult<T>.Fail(..., 400)` (or `409 Conflict` / `404 Not Found` as appropriate) for business rule / database-dependent validation failures, rather than throwing exceptions, to preserve clean control flow.
+  - `ValidationException` is strictly reserved for automatic request DTO binding and DataAnnotations validation failures caught at the controller level before the handler is invoked.
+  - Domain entities throw `DomainRuleException` if invariants are violated during processing.
+- **Controller Cleanup:** Gradually remove repeated controller `EnsureValidModel()` helpers by relying on `[ApiController]` plus centralized `InvalidModelStateResponseFactory`.
+- **Response Shape:** Keep the current validation response shape unless a separate API contract decision changes it.
+
+Do not move business validation into controllers. Controllers should validate transport/request shape and then call Application handlers.
 
 ## Related Docs
 

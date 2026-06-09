@@ -1,5 +1,6 @@
+using Application.Identity.CurrentAccount.Commands;
+using Application.Identity.CurrentAccount.Queries;
 using Application.Identity.CurrentAccount.Requests;
-using Application.Identity.CurrentAccount.Services;
 using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
@@ -14,18 +15,29 @@ namespace WebAPI.Controllers.Identity;
 [Authorize]
 public sealed class CurrentAccountController : ControllerBase
 {
-    private readonly CurrentAccountService _currentAccount;
+    private readonly GetCurrentAccountQueryHandler _getCurrentAccount;
+    private readonly UpdateCurrentAccountProfileCommandHandler _updateProfile;
+    private readonly ChangeCurrentAccountPasswordCommandHandler _changePassword;
 
-    public CurrentAccountController(CurrentAccountService currentAccount)
+    public CurrentAccountController(
+        GetCurrentAccountQueryHandler getCurrentAccount,
+        UpdateCurrentAccountProfileCommandHandler updateProfile,
+        ChangeCurrentAccountPasswordCommandHandler changePassword)
     {
-        _currentAccount = currentAccount;
+        _getCurrentAccount = getCurrentAccount;
+        _updateProfile = updateProfile;
+        _changePassword = changePassword;
     }
 
     [HttpGet]
     public async Task<IActionResult> GetCurrentAccount(CancellationToken cancellationToken)
     {
         var accountId = GetCurrentAccountId();
-        var result = await _currentAccount.GetAsync(accountId, cancellationToken);
+        var query = new GetCurrentAccountQuery
+        {
+            AccountId = accountId
+        };
+        var result = await _getCurrentAccount.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -34,10 +46,13 @@ public sealed class CurrentAccountController : ControllerBase
         [FromBody] UpdateCurrentAccountProfileRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
         var accountId = GetCurrentAccountId();
-        var result = await _currentAccount.UpdateProfileAsync(accountId, request, cancellationToken);
+        var command = new UpdateCurrentAccountProfileCommand
+        {
+            AccountId = accountId,
+            Request = request
+        };
+        var result = await _updateProfile.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -46,15 +61,15 @@ public sealed class CurrentAccountController : ControllerBase
         [FromBody] ChangeCurrentAccountPasswordRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
         var accountId = GetCurrentAccountId();
-        var result = await _currentAccount.ChangePasswordAsync(
-            accountId,
-            request,
-            HttpContext.Connection.RemoteIpAddress?.ToString(),
-            Request.Headers.UserAgent.ToString(),
-            cancellationToken);
+        var command = new ChangeCurrentAccountPasswordCommand
+        {
+            AccountId = accountId,
+            Request = request,
+            IpAddress = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            UserAgent = Request.Headers.UserAgent.ToString()
+        };
+        var result = await _changePassword.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -70,17 +85,4 @@ public sealed class CurrentAccountController : ControllerBase
         throw new UnauthorizedAccessException("Current account id claim is missing or invalid.");
     }
 
-    private void EnsureValidModel()
-    {
-        if (ModelState.IsValid)
-        {
-            return;
-        }
-
-        var errors = ModelState.ToDictionary(
-            item => item.Key,
-            item => item.Value?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid");
-
-        throw new ValidationException(errors);
-    }
 }

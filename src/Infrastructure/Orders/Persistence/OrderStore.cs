@@ -18,7 +18,10 @@ public sealed class OrderStore : IOrderStore
 
     public Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks.FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
+        return _dbContext.Kiosks
+            .Include(kiosk => kiosk.Store)
+            .Include(kiosk => kiosk.Organization)
+            .FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
     }
 
     public Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default)

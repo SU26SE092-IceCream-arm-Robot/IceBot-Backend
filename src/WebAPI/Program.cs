@@ -12,6 +12,8 @@ using System.Text.Json.Serialization;
 using WebAPI.Authorization;
 using WebAPI.Configuration;
 using WebAPI.Middlewares;
+using Application.Shared.Wrappers;
+using Microsoft.AspNetCore.Mvc;
 
 Log.Logger = new LoggerConfiguration()
                         .WriteTo.Console()
@@ -81,6 +83,9 @@ try
         options.AddPolicy("accounts.manage", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin")));
 
+        options.AddPolicy("accounts.read", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
+
         options.AddPolicy("payments.manage", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager")));
 
@@ -119,6 +124,12 @@ try
 
         options.AddPolicy("tenant-tree.view", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
+
+        options.AddPolicy("roles.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
+
+        options.AddPolicy("role-scope-options.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
     });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
@@ -128,6 +139,22 @@ try
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.Converters.Add(
             new JsonStringEnumConverter(null, allowIntegerValues: true));
+    })
+    .ConfigureApiBehaviorOptions(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var response = ApiResult<object>.Fail("Validation failed", 400);
+            foreach (var item in context.ModelState)
+            {
+                var firstError = item.Value?.Errors.FirstOrDefault();
+                if (firstError is not null)
+                {
+                    response.AddValidationError(item.Key, firstError.ErrorMessage ?? "Invalid");
+                }
+            }
+            return new BadRequestObjectResult(response);
+        };
     });
 
     builder.Services.AddApiVersioning(options =>

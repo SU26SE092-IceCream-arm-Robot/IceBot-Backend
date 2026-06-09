@@ -1,10 +1,12 @@
+using Application.Catalog.Products.Commands;
+using Application.Catalog.Products.Queries;
 using Application.Catalog.Products.Requests;
-using Application.Catalog.Products.Services;
 using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Catalog;
 
@@ -14,11 +16,39 @@ namespace WebAPI.Controllers.Catalog;
 [Authorize(Policy = "products.manage")]
 public sealed class ManagementProductsController : ControllerBase
 {
-    private readonly ProductManagementService _products;
+    private readonly ListProductsQueryHandler _listProductsHandler;
+    private readonly GetProductQueryHandler _getProductHandler;
+    private readonly CreateProductCommandHandler _createProductHandler;
+    private readonly UpdateProductCommandHandler _updateProductHandler;
+    private readonly SetProductAvailabilityCommandHandler _setProductAvailabilityHandler;
+    private readonly DeleteProductCommandHandler _deleteProductHandler;
+    private readonly AddProductVariantCommandHandler _addVariantHandler;
+    private readonly UpdateProductVariantCommandHandler _updateVariantHandler;
+    private readonly SetProductVariantAvailabilityCommandHandler _setVariantAvailabilityHandler;
+    private readonly DeleteProductVariantCommandHandler _deleteVariantHandler;
 
-    public ManagementProductsController(ProductManagementService products)
+    public ManagementProductsController(
+        ListProductsQueryHandler listProductsHandler,
+        GetProductQueryHandler getProductHandler,
+        CreateProductCommandHandler createProductHandler,
+        UpdateProductCommandHandler updateProductHandler,
+        SetProductAvailabilityCommandHandler setProductAvailabilityHandler,
+        DeleteProductCommandHandler deleteProductHandler,
+        AddProductVariantCommandHandler addVariantHandler,
+        UpdateProductVariantCommandHandler updateVariantHandler,
+        SetProductVariantAvailabilityCommandHandler setVariantAvailabilityHandler,
+        DeleteProductVariantCommandHandler deleteVariantHandler)
     {
-        _products = products;
+        _listProductsHandler = listProductsHandler;
+        _getProductHandler = getProductHandler;
+        _createProductHandler = createProductHandler;
+        _updateProductHandler = updateProductHandler;
+        _setProductAvailabilityHandler = setProductAvailabilityHandler;
+        _deleteProductHandler = deleteProductHandler;
+        _addVariantHandler = addVariantHandler;
+        _updateVariantHandler = updateVariantHandler;
+        _setVariantAvailabilityHandler = setVariantAvailabilityHandler;
+        _deleteVariantHandler = deleteVariantHandler;
     }
 
     [HttpGet]
@@ -31,22 +61,28 @@ public sealed class ManagementProductsController : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        var result = await _products.ListProductsAsync(
-            search,
-            organizationId,
-            storeId,
-            kioskId,
-            pageNumber,
-            pageSize,
-            cancellationToken);
-
+        var query = new ListProductsQuery
+        {
+            UserContext = User.GetUserContext(),
+            Search = search,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+        var result = await _listProductsHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
     [HttpGet("{productId:guid}")]
     public async Task<IActionResult> GetProduct(Guid productId, CancellationToken cancellationToken)
     {
-        var result = await _products.GetProductAsync(productId, cancellationToken);
+        var query = new GetProductQuery(productId)
+        {
+            UserContext = User.GetUserContext()
+        };
+        var result = await _getProductHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -55,12 +91,12 @@ public sealed class ManagementProductsController : ControllerBase
         [FromBody] CreateProductRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _products.CreateProductAsync(
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new CreateProductCommand
+        {
+            Request = request,
+            CreatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _createProductHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -71,13 +107,13 @@ public sealed class ManagementProductsController : ControllerBase
         [FromBody] UpdateProductRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _products.UpdateProductAsync(
-            productId,
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new UpdateProductCommand
+        {
+            ProductId = productId,
+            Request = request,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _updateProductHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -88,13 +124,13 @@ public sealed class ManagementProductsController : ControllerBase
         [FromBody] SetAvailabilityRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _products.SetProductAvailabilityAsync(
-            productId,
-            request.IsAvailable,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new SetProductAvailabilityCommand
+        {
+            ProductId = productId,
+            IsAvailable = request.IsAvailable,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _setProductAvailabilityHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -102,10 +138,12 @@ public sealed class ManagementProductsController : ControllerBase
     [HttpDelete("{productId:guid}")]
     public async Task<IActionResult> DeleteProduct(Guid productId, CancellationToken cancellationToken)
     {
-        var result = await _products.DeleteProductAsync(
-            productId,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new DeleteProductCommand
+        {
+            ProductId = productId,
+            DeletedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _deleteProductHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -116,13 +154,13 @@ public sealed class ManagementProductsController : ControllerBase
         [FromBody] UpsertProductVariantRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _products.AddVariantAsync(
-            productId,
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new AddProductVariantCommand
+        {
+            ProductId = productId,
+            Request = request,
+            CreatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _addVariantHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -134,14 +172,14 @@ public sealed class ManagementProductsController : ControllerBase
         [FromBody] UpdateProductVariantRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _products.UpdateVariantAsync(
-            productId,
-            variantId,
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new UpdateProductVariantCommand
+        {
+            ProductId = productId,
+            VariantId = variantId,
+            Request = request,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _updateVariantHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -153,14 +191,14 @@ public sealed class ManagementProductsController : ControllerBase
         [FromBody] SetAvailabilityRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _products.SetVariantAvailabilityAsync(
-            productId,
-            variantId,
-            request.IsAvailable,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new SetProductVariantAvailabilityCommand
+        {
+            ProductId = productId,
+            VariantId = variantId,
+            IsAvailable = request.IsAvailable,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _setVariantAvailabilityHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -171,11 +209,13 @@ public sealed class ManagementProductsController : ControllerBase
         Guid variantId,
         CancellationToken cancellationToken)
     {
-        var result = await _products.DeleteVariantAsync(
-            productId,
-            variantId,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new DeleteProductVariantCommand
+        {
+            ProductId = productId,
+            VariantId = variantId,
+            DeletedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _deleteVariantHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -184,19 +224,5 @@ public sealed class ManagementProductsController : ControllerBase
     {
         var accountId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(accountId, out var parsedAccountId) ? parsedAccountId : null;
-    }
-
-    private void EnsureValidModel()
-    {
-        if (ModelState.IsValid)
-        {
-            return;
-        }
-
-        var errors = ModelState.ToDictionary(
-            item => item.Key,
-            item => item.Value?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid");
-
-        throw new ValidationException(errors);
     }
 }

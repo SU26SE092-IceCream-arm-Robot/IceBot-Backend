@@ -19,9 +19,22 @@ public sealed class ProductStore : IProductStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds,
         CancellationToken cancellationToken = default)
     {
-        return ApplyProductFilters(_dbContext.Products.AsNoTracking(), search, organizationId, storeId, kioskId)
+        return ApplyProductFilters(
+                _dbContext.Products.AsNoTracking(),
+                search,
+                organizationId,
+                storeId,
+                kioskId,
+                isSystemAdmin,
+                allowedOrganizationIds,
+                allowedStoreIds,
+                allowedKioskIds)
             .CountAsync(cancellationToken);
     }
 
@@ -30,6 +43,10 @@ public sealed class ProductStore : IProductStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds,
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default)
@@ -41,7 +58,11 @@ public sealed class ProductStore : IProductStore
                 search,
                 organizationId,
                 storeId,
-                kioskId)
+                kioskId,
+                isSystemAdmin,
+                allowedOrganizationIds,
+                allowedStoreIds,
+                allowedKioskIds)
             .OrderBy(product => product.Name)
             .ThenBy(product => product.Code)
             .Skip((pageNumber - 1) * pageSize)
@@ -140,8 +161,30 @@ public sealed class ProductStore : IProductStore
         string? search,
         Guid? organizationId,
         Guid? storeId,
-        Guid? kioskId)
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlySet<Guid> allowedOrganizationIds,
+        IReadOnlySet<Guid> allowedStoreIds,
+        IReadOnlySet<Guid> allowedKioskIds)
     {
+        if (!isSystemAdmin)
+        {
+            var allowedOrgIds = allowedOrganizationIds.ToArray();
+            var allowedStoreScopeIds = allowedStoreIds.ToArray();
+            var allowedKioskScopeIds = allowedKioskIds.ToArray();
+
+            if (allowedOrgIds.Length == 0 && allowedStoreScopeIds.Length == 0 && allowedKioskScopeIds.Length == 0)
+            {
+                return query.Where(_ => false);
+            }
+
+            query = query.Where(product =>
+                (product.OrganizationId != null && allowedOrgIds.Contains(product.OrganizationId.Value)) ||
+                (product.StoreId != null && allowedStoreScopeIds.Contains(product.StoreId.Value)) ||
+                (product.KioskId != null && allowedKioskScopeIds.Contains(product.KioskId.Value))
+            );
+        }
+
         if (!string.IsNullOrWhiteSpace(search))
         {
             var normalizedSearch = search.Trim();

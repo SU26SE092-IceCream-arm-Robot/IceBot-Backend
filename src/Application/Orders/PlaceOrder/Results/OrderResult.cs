@@ -46,5 +46,13 @@ public sealed class OrderResult
 
     public DateTimeOffset? CancelledAt { get; set; }
 
+    public string CustomerStatus { get; set; } = null!;
+
+    public string CustomerStatusMessage { get; set; } = null!;
+
+    public bool CanRetryPayment { get; set; }
+
+    public bool RequiresStaffSupport { get; set; }
+
     public List<OrderItemResult> Items { get; set; } = new();
 }

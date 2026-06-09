@@ -73,6 +73,34 @@ When a repository abstraction exists, keep it thin:
 
 Do not delete an existing repository abstraction during cleanup unless removal is explicitly requested or agreed as part of the fix. Prefer reshaping the abstraction to match the current architecture.
 
+Repository/store audit conclusion:
+
+- Current `I*Store` contracts are acceptable as thin persistence boundaries.
+- The project direction is rich handler plus thin repository/store.
+- `BaseRepository` is not the main Application persistence pattern. It may exist only as an Infrastructure helper when a present use case needs repeated low-level EF mechanics.
+- Cross-context lookup methods are allowed when they are read-only validation helpers for the owning handler, such as checking parent store/kiosk/product/recipe existence before a command mutates its aggregate.
+- These lookup methods must not grow into workflow orchestration, authorization, or response mapping.
+- If a store method starts making business decisions, move that rule back to a handler, domain method, or focused rule helper.
+- Do not introduce generic repositories to "standardize" store contracts. Standardize naming and behavior instead.
+
+Do not refactor context stores to inherit from `BaseRepository` just because the helper exists. Current stores may keep direct EF Core access when that keeps the use case explicit.
+
+Reusable techniques from older generic repository implementations:
+
+- Use `AsNoTracking()` for read-only queries and projections.
+- Keep soft-delete behavior consistent through EF filters or clearly named active/scoped store methods.
+- Separate hard delete from business actions such as disable, revoke, cancel, or archive.
+- Centralize low-risk timestamp mechanics in `IceBotDbContext.SaveChangesAsync`, not in generic CRUD methods.
+
+Avoid carrying over these generic repository habits:
+
+- string-based include lists;
+- generic `GetAll` / `GetById` / `Update` methods as the default workflow API;
+- hidden tenant-scope, authorization, state transition, or response mapping logic;
+- base entity constraints that do not match all bounded contexts.
+
+If `BaseRepository` is used later, it must not contain authorization, tenant-scope decisions, use-case validation, status transitions, payment/order/robot workflow, response mapping, or `ApiResult<T>` logic.
+
 ## Infrastructure Rules
 
 Infrastructure owns:

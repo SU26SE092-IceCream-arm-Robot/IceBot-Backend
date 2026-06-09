@@ -27,6 +27,44 @@ public class IceBotDbContext : DbContext
     {
     }
 
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        OnBeforeSaving();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    public override int SaveChanges()
+    {
+        OnBeforeSaving();
+        return base.SaveChanges();
+    }
+
+    private void OnBeforeSaving()
+    {
+        var entries = ChangeTracker.Entries();
+        var utcNow = DateTimeOffset.UtcNow;
+
+        foreach (var entry in entries)
+        {
+            if (entry.Entity is IAuditable auditable)
+            {
+                switch (entry.State)
+                {
+                    case EntityState.Added:
+                        if (auditable.CreatedAt == default)
+                        {
+                            auditable.CreatedAt = utcNow;
+                        }
+                        break;
+
+                    case EntityState.Modified:
+                        auditable.UpdatedAt = utcNow;
+                        break;
+                }
+            }
+        }
+    }
+
     public DbSet<Account> Accounts => Set<Account>();
     public DbSet<AccountRole> AccountRoles => Set<AccountRole>();
     public DbSet<AccountDevice> AccountDevices => Set<AccountDevice>();

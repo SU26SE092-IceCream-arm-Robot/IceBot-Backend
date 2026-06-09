@@ -64,6 +64,8 @@ Infrastructure.Tenants.Persistence.OrganizationStore
 
 Do not place organization-specific persistence in the generic `Infrastructure.Persistence.Repositories` namespace. That namespace is for generic/shared repository infrastructure.
 
+Organization management APIs are implemented as command/query handlers, not a CRUD service.
+
 ## Store Management
 
 Store management APIs live under:
@@ -91,6 +93,8 @@ Infrastructure.Tenants.Persistence.StoreStore
 
 Do not place store-specific persistence in the generic repositories namespace.
 
+Store management APIs are implemented as command/query handlers, not a CRUD service.
+
 ## Kiosk Management
 
 Kiosk management APIs live under:
@@ -117,6 +121,8 @@ Infrastructure.Tenants.Persistence.KioskStore
 
 Do not place kiosk-specific persistence in the generic repositories namespace.
 
+Kiosk management APIs are implemented as command/query handlers, not a CRUD service.
+
 ## Tenant Tree
 
 Tenant tree is a management read model for scope selection and tenant navigation:
@@ -139,9 +145,53 @@ Use it for:
 - management UI tenant navigation;
 - avoiding invalid cross-tenant scope combinations.
 
-Do not use `tenant-tree` as an operations overview endpoint. Keep revenue, alerts, runtime state, inventory, and dashboard metrics in separate overview/reporting APIs.
-
 REST is sufficient for this endpoint. Do not introduce GraphQL or OData for tenant tree unless broader read-query requirements appear.
+
+Do not use `tenant-tree` as an operations overview endpoint. Keep revenue, alerts, runtime state, inventory, and dashboard metrics in separate overview/reporting APIs. See [API Surface Rules](../api/API_SURFACE_RULES.md#read-model-api-boundaries) for read model boundary definitions.
+
+## Role Scope Options
+
+To select valid scopes for a target role being assigned to an account, use:
+
+```text
+GET /api/v1/management/role-scope-options?roleCode={roleCode}
+```
+
+It enforces scope boundaries based on the current user context, and projects allowed scope types:
+- `OrgAdmin` allows Organization scope.
+- `Manager` allows Organization and Store scope.
+- `Technician` / `Staff` allows Store and Kiosk scope.
+
+## Tenant Scope Enforcement
+
+Current v1 tenant-scope convention:
+
+- Do not use global EF tenant query filters yet.
+- Enforce tenant scope explicitly in handlers, stores, and focused rule/helper methods.
+- Use clearly named scoped query methods where useful, such as:
+  - `GetByIdForTenantAsync`
+  - `GetByIdForStoreScopeAsync`
+  - `GetByIdForSystemAdminAsync`
+- `SystemAdmin`, background workers, payment callbacks, and sync processors must use explicit bypass/system paths. Bypass behavior must not be hidden in generic query methods.
+- Global/cross-tenant reads should be visible in method names or handler logic.
+- Scoped reads should validate against `CurrentUserContext.AllowedOrganizationIds`, `AllowedStoreIds`, and `AllowedKioskIds` where applicable.
+
+Reason: global EF tenant filters require a mature tenant context and bypass model. Until that is clear, explicit scoped methods are safer and easier to review.
+
+### Management Read-Path Guardrails
+
+The following management read paths enforce explicit tenant scope:
+
+- `ManagementProductsController`: list/detail reads pass `CurrentUserContext` and enforce allowed organization/store/kiosk scope.
+- `ManagementMenusController`: list/detail reads pass `CurrentUserContext` and enforce allowed organization/store/kiosk scope.
+- `ManagementAccountsController`: list/detail reads use `accounts.read`; non-`SystemAdmin` reads are limited to accounts sharing an active organization/store/kiosk role scope.
+
+Implementation rule:
+
+- pass `CurrentUserContext` from WebAPI controller to the query object for management reads;
+- for list queries, intersect requested filters with `AllowedOrganizationIds`, `AllowedStoreIds`, and `AllowedKioskIds`;
+- for detail queries, fetch the row and return `403 Forbidden` when the caller does not share an allowed scope;
+- keep public/runtime read paths separate from management read paths.
 
 ## Scope Model
 

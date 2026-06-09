@@ -1,4 +1,4 @@
-﻿using Application.Shared.Exceptions;
+using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
 using Microsoft.EntityFrameworkCore;
 using Serilog.Context;
@@ -40,7 +40,7 @@ namespace WebAPI.Middlewares
                 {
                     _logger.LogError(ex, "AppException caught for path {Path} in middleware", path);
 
-                    var response = ApiResult<object>.Fail(ex.Message, (int)HttpStatusCode.BadRequest);
+                    var response = ApiResult<object>.Fail(ex.Message, ex.StatusCode);
 
                     if (ex.Errors != null)
                     {
@@ -51,7 +51,12 @@ namespace WebAPI.Middlewares
                     }
 
                     ApplyExceptionDetails(response, ex);
-                    await WriteResponseAsync(context, response, HttpStatusCode.BadRequest);
+
+                    var httpStatusCode = Enum.IsDefined(typeof(HttpStatusCode), ex.StatusCode)
+                        ? (HttpStatusCode)ex.StatusCode
+                        : HttpStatusCode.BadRequest;
+
+                    await WriteResponseAsync(context, response, httpStatusCode);
                 }
                 catch (DbUpdateException ex)
                 {

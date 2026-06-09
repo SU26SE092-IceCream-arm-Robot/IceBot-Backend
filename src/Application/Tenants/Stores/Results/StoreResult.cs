@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Tenants.Stores.Results;
 
 public sealed class StoreResult

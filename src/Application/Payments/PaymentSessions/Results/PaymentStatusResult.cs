@@ -26,4 +26,12 @@ public sealed class PaymentStatusResult
     public DateTimeOffset? PaidAt { get; set; }
 
     public DateTimeOffset? ExpiresAt { get; set; }
+
+    public string CustomerStatus { get; set; } = null!;
+
+    public string CustomerStatusMessage { get; set; } = null!;
+
+    public bool CanRetryPayment { get; set; }
+
+    public bool RequiresStaffSupport { get; set; }
 }

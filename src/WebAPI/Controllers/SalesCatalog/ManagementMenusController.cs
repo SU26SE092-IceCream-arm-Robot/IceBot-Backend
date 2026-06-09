@@ -1,10 +1,12 @@
+using Application.SalesCatalog.Menus.Commands;
+using Application.SalesCatalog.Menus.Queries;
 using Application.SalesCatalog.Menus.Requests;
-using Application.SalesCatalog.Menus.Services;
 using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.SalesCatalog;
 
@@ -14,11 +16,39 @@ namespace WebAPI.Controllers.SalesCatalog;
 [Authorize(Policy = "menus.manage")]
 public sealed class ManagementMenusController : ControllerBase
 {
-    private readonly MenuManagementService _menus;
+    private readonly ListMenusQueryHandler _listMenusHandler;
+    private readonly GetMenuQueryHandler _getMenuHandler;
+    private readonly CreateMenuCommandHandler _createMenuHandler;
+    private readonly UpdateMenuCommandHandler _updateMenuHandler;
+    private readonly SetMenuStatusCommandHandler _setMenuStatusHandler;
+    private readonly DeleteMenuCommandHandler _deleteMenuHandler;
+    private readonly AddMenuItemCommandHandler _addMenuItemHandler;
+    private readonly UpdateMenuItemCommandHandler _updateMenuItemHandler;
+    private readonly SetMenuItemStatusCommandHandler _setMenuItemStatusHandler;
+    private readonly DeleteMenuItemCommandHandler _deleteMenuItemHandler;
 
-    public ManagementMenusController(MenuManagementService menus)
+    public ManagementMenusController(
+        ListMenusQueryHandler listMenusHandler,
+        GetMenuQueryHandler getMenuHandler,
+        CreateMenuCommandHandler createMenuHandler,
+        UpdateMenuCommandHandler updateMenuHandler,
+        SetMenuStatusCommandHandler setMenuStatusHandler,
+        DeleteMenuCommandHandler deleteMenuHandler,
+        AddMenuItemCommandHandler addMenuItemHandler,
+        UpdateMenuItemCommandHandler updateMenuItemHandler,
+        SetMenuItemStatusCommandHandler setMenuItemStatusHandler,
+        DeleteMenuItemCommandHandler deleteMenuItemHandler)
     {
-        _menus = menus;
+        _listMenusHandler = listMenusHandler;
+        _getMenuHandler = getMenuHandler;
+        _createMenuHandler = createMenuHandler;
+        _updateMenuHandler = updateMenuHandler;
+        _setMenuStatusHandler = setMenuStatusHandler;
+        _deleteMenuHandler = deleteMenuHandler;
+        _addMenuItemHandler = addMenuItemHandler;
+        _updateMenuItemHandler = updateMenuItemHandler;
+        _setMenuItemStatusHandler = setMenuItemStatusHandler;
+        _deleteMenuItemHandler = deleteMenuItemHandler;
     }
 
     [HttpGet]
@@ -31,22 +61,28 @@ public sealed class ManagementMenusController : ControllerBase
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
     {
-        var result = await _menus.ListMenusAsync(
-            search,
-            organizationId,
-            storeId,
-            kioskId,
-            pageNumber,
-            pageSize,
-            cancellationToken);
-
+        var query = new ListMenusQuery
+        {
+            UserContext = User.GetUserContext(),
+            Search = search,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+        var result = await _listMenusHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
     [HttpGet("{menuId:guid}")]
     public async Task<IActionResult> GetMenu(Guid menuId, CancellationToken cancellationToken)
     {
-        var result = await _menus.GetMenuAsync(menuId, cancellationToken);
+        var query = new GetMenuQuery(menuId)
+        {
+            UserContext = User.GetUserContext()
+        };
+        var result = await _getMenuHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -55,12 +91,12 @@ public sealed class ManagementMenusController : ControllerBase
         [FromBody] CreateMenuRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _menus.CreateMenuAsync(
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new CreateMenuCommand
+        {
+            Request = request,
+            CreatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _createMenuHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -71,13 +107,13 @@ public sealed class ManagementMenusController : ControllerBase
         [FromBody] UpdateMenuRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _menus.UpdateMenuAsync(
-            menuId,
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new UpdateMenuCommand
+        {
+            MenuId = menuId,
+            Request = request,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _updateMenuHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -88,13 +124,13 @@ public sealed class ManagementMenusController : ControllerBase
         [FromBody] SetMenuStatusRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _menus.SetMenuStatusAsync(
-            menuId,
-            request.Status,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new SetMenuStatusCommand
+        {
+            MenuId = menuId,
+            Status = request.Status,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _setMenuStatusHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -102,10 +138,12 @@ public sealed class ManagementMenusController : ControllerBase
     [HttpDelete("{menuId:guid}")]
     public async Task<IActionResult> DeleteMenu(Guid menuId, CancellationToken cancellationToken)
     {
-        var result = await _menus.DeleteMenuAsync(
-            menuId,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new DeleteMenuCommand
+        {
+            MenuId = menuId,
+            DeletedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _deleteMenuHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -116,13 +154,13 @@ public sealed class ManagementMenusController : ControllerBase
         [FromBody] CreateMenuItemRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _menus.AddMenuItemAsync(
-            menuId,
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new AddMenuItemCommand
+        {
+            MenuId = menuId,
+            Request = request,
+            CreatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _addMenuItemHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -134,14 +172,14 @@ public sealed class ManagementMenusController : ControllerBase
         [FromBody] UpdateMenuItemRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _menus.UpdateMenuItemAsync(
-            menuId,
-            menuItemId,
-            request,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new UpdateMenuItemCommand
+        {
+            MenuId = menuId,
+            MenuItemId = menuItemId,
+            Request = request,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _updateMenuItemHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -153,14 +191,14 @@ public sealed class ManagementMenusController : ControllerBase
         [FromBody] SetMenuItemStatusRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
-
-        var result = await _menus.SetMenuItemStatusAsync(
-            menuId,
-            menuItemId,
-            request.Status,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new SetMenuItemStatusCommand
+        {
+            MenuId = menuId,
+            MenuItemId = menuItemId,
+            Status = request.Status,
+            UpdatedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _setMenuItemStatusHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -171,11 +209,13 @@ public sealed class ManagementMenusController : ControllerBase
         Guid menuItemId,
         CancellationToken cancellationToken)
     {
-        var result = await _menus.DeleteMenuItemAsync(
-            menuId,
-            menuItemId,
-            GetCurrentAccountId(),
-            cancellationToken);
+        var command = new DeleteMenuItemCommand
+        {
+            MenuId = menuId,
+            MenuItemId = menuItemId,
+            DeletedByAccountId = GetCurrentAccountId()
+        };
+        var result = await _deleteMenuItemHandler.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
     }
@@ -184,19 +224,5 @@ public sealed class ManagementMenusController : ControllerBase
     {
         var accountId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(accountId, out var parsedAccountId) ? parsedAccountId : null;
-    }
-
-    private void EnsureValidModel()
-    {
-        if (ModelState.IsValid)
-        {
-            return;
-        }
-
-        var errors = ModelState.ToDictionary(
-            item => item.Key,
-            item => item.Value?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid");
-
-        throw new ValidationException(errors);
     }
 }

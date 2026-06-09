@@ -90,6 +90,30 @@ When refactoring copied code from older projects:
 - do not hide assumptions;
 - state which parts were kept, changed, or deferred.
 
+## Working With Other AI Models
+
+Other models such as Gemini can be used for implementation, audit, and checklist work, but their output must be reviewed against this repository's rules before being treated as accepted.
+
+Rules learned from previous collaboration:
+
+- Give Gemini explicit scope, stop conditions, and non-goals.
+- Ask for an audit/plan first when the work touches architecture, validation, tenant isolation, lifecycle, retry, or persistence.
+- For implementation tasks, state clearly:
+  - no EF migrations unless explicitly requested;
+  - preserve existing public routes unless explicitly requested;
+  - do not add dynamic permission entities, generic repositories, or broad service layers unless the plan says so;
+  - build after code changes;
+  - report whether migrations were created.
+- After Gemini finishes, review `git diff` and code behavior directly. Do not rely only on its summary.
+- Treat "build succeeded" as a compile check, not design approval.
+- If Gemini claims "warning-free", verify the build output when warnings matter.
+- If Gemini creates local audit/checklist files in `.project-memory`, keep them only while they are actively useful.
+- Promote durable rules into `docs/`; promote reasoning, trade-offs, and deferred ideas into `../Vault/`; delete completed temporary notes from `.project-memory`.
+- When Gemini proposes large foundation work, separate:
+  - short-term tasks that can be done in hours/days;
+  - long-term topics that need business use cases or integration details.
+- Do not let another model implement deferred topics simply because they are architecturally valid.
+
 ## API And Contract Rules
 
 Before first deployment:

@@ -347,7 +347,7 @@ Prefer:
 Controller -> Handler -> Store/DbContext
 ```
 
-For now, this is the convention for new Application use cases. Existing `*Service` use cases may be migrated when they are touched or when the team decides to standardize a module.
+Current convention: controller-facing Application use cases should be implemented as explicit handlers. If a remaining `*Service` exists, treat it as a reusable capability/internal helper unless direct controller usage proves otherwise.
 
 ## Result Wrapper Names
 

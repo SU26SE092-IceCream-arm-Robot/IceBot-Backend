@@ -1,13 +1,8 @@
 using Application.Tenants.Abstractions;
-using Domain.Tenants.Entities;
 using Domain.Common.Enums;
+using Domain.Tenants.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Infrastructure.Tenants.Persistence;
 

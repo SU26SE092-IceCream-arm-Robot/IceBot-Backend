@@ -1,4 +1,4 @@
-using Application.SalesCatalog.RuntimeMenus.Services;
+using Application.SalesCatalog.RuntimeMenus.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,11 +10,11 @@ namespace WebAPI.Controllers.SalesCatalog;
 [Route("api/v{version:apiVersion}/kiosks/{kioskId:guid}/runtime-menu")]
 public sealed class KioskRuntimeMenusController : ControllerBase
 {
-    private readonly RuntimeMenuService _runtimeMenus;
+    private readonly GetKioskRuntimeMenuQueryHandler _queryHandler;
 
-    public KioskRuntimeMenusController(RuntimeMenuService runtimeMenus)
+    public KioskRuntimeMenusController(GetKioskRuntimeMenuQueryHandler queryHandler)
     {
-        _runtimeMenus = runtimeMenus;
+        _queryHandler = queryHandler;
     }
 
     [HttpGet]
@@ -23,7 +23,8 @@ public sealed class KioskRuntimeMenusController : ControllerBase
         Guid kioskId,
         CancellationToken cancellationToken)
     {
-        var result = await _runtimeMenus.GetKioskRuntimeMenuAsync(kioskId, cancellationToken);
+        var query = new GetKioskRuntimeMenuQuery(kioskId);
+        var result = await _queryHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

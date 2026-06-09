@@ -8,8 +8,26 @@ namespace Application.Identity.Abstractions
         Task<Account?> GetByEmailOrUserNameAsync(string emailOrUserName, bool asNoTracking = true, CancellationToken cancellationToken = default);
         Task<Account?> GetByGoogleSubjectIdAsync(string googleSubjectId, bool asNoTracking = true, CancellationToken cancellationToken = default);
         Task<Role?> GetRoleByCodeAsync(string code, CancellationToken cancellationToken = default);
-        Task<List<Account>> ListAsync(string? search, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
-        Task<int> CountAsync(string? search, string? status, CancellationToken cancellationToken = default);
+        Task<List<Role>> ListActiveRolesAsync(CancellationToken cancellationToken = default);
+        Task<List<Account>> ListAsync(
+            string? search,
+            string? status,
+            bool isSystemAdmin,
+            IReadOnlySet<Guid> allowedOrganizationIds,
+            IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds,
+            int pageNumber,
+            int pageSize,
+            CancellationToken cancellationToken = default);
+
+        Task<int> CountAsync(
+            string? search,
+            string? status,
+            bool isSystemAdmin,
+            IReadOnlySet<Guid> allowedOrganizationIds,
+            IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds,
+            CancellationToken cancellationToken = default);
         Task<bool> ExistsByEmailOrUserNameAsync(string email, string userName, CancellationToken cancellationToken = default);
         Task<bool> EmailExistsForOtherAccountAsync(Guid accountId, string email, CancellationToken cancellationToken = default);
         Task<bool> UserNameExistsAsync(string userName, CancellationToken cancellationToken = default);

@@ -1,7 +1,4 @@
 using Application.Identity.Tokens.Claims;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
 
 namespace WebAPI.Authorization;

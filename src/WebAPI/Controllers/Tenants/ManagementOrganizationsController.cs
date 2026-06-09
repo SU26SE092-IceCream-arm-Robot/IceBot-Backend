@@ -1,13 +1,10 @@
 using Application.Shared.Exceptions;
+using Application.Tenants.Organizations.Commands;
+using Application.Tenants.Organizations.Queries;
 using Application.Tenants.Organizations.Requests;
-using Application.Tenants.Organizations.Services;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Tenants;
@@ -17,11 +14,27 @@ namespace WebAPI.Controllers.Tenants;
 [Route("api/v{version:apiVersion}/management/organizations")]
 public class ManagementOrganizationsController : ControllerBase
 {
-    private readonly OrganizationManagementService _organizationManagement;
+    private readonly ListOrganizationsQueryHandler _listOrganizations;
+    private readonly GetOrganizationQueryHandler _getOrganization;
+    private readonly CreateOrganizationCommandHandler _createOrganization;
+    private readonly UpdateOrganizationCommandHandler _updateOrganization;
+    private readonly DisableOrganizationCommandHandler _disableOrganization;
+    private readonly ActivateOrganizationCommandHandler _activateOrganization;
 
-    public ManagementOrganizationsController(OrganizationManagementService organizationManagement)
+    public ManagementOrganizationsController(
+        ListOrganizationsQueryHandler listOrganizations,
+        GetOrganizationQueryHandler getOrganization,
+        CreateOrganizationCommandHandler createOrganization,
+        UpdateOrganizationCommandHandler updateOrganization,
+        DisableOrganizationCommandHandler disableOrganization,
+        ActivateOrganizationCommandHandler activateOrganization)
     {
-        _organizationManagement = organizationManagement;
+        _listOrganizations = listOrganizations;
+        _getOrganization = getOrganization;
+        _createOrganization = createOrganization;
+        _updateOrganization = updateOrganization;
+        _disableOrganization = disableOrganization;
+        _activateOrganization = activateOrganization;
     }
 
     [HttpGet]
@@ -34,14 +47,15 @@ public class ManagementOrganizationsController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var context = User.GetUserContext();
-        var result = await _organizationManagement.ListOrganizationsAsync(
-            context,
-            search,
-            status,
-            pageNumber,
-            pageSize,
-            cancellationToken);
-
+        var query = new ListOrganizationsQuery
+        {
+            UserContext = context,
+            Search = search,
+            Status = status,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+        var result = await _listOrganizations.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -52,7 +66,12 @@ public class ManagementOrganizationsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _organizationManagement.GetOrganizationAsync(context, organizationId, cancellationToken);
+        var query = new GetOrganizationQuery
+        {
+            UserContext = context,
+            OrganizationId = organizationId
+        };
+        var result = await _getOrganization.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -62,9 +81,13 @@ public class ManagementOrganizationsController : ControllerBase
         [FromBody] CreateOrganizationRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
         var context = User.GetUserContext();
-        var result = await _organizationManagement.CreateOrganizationAsync(context, request, cancellationToken);
+        var command = new CreateOrganizationCommand
+        {
+            UserContext = context,
+            Request = request
+        };
+        var result = await _createOrganization.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -75,9 +98,14 @@ public class ManagementOrganizationsController : ControllerBase
         [FromBody] UpdateOrganizationRequest request,
         CancellationToken cancellationToken)
     {
-        EnsureValidModel();
         var context = User.GetUserContext();
-        var result = await _organizationManagement.UpdateOrganizationAsync(context, organizationId, request, cancellationToken);
+        var command = new UpdateOrganizationCommand
+        {
+            UserContext = context,
+            OrganizationId = organizationId,
+            Request = request
+        };
+        var result = await _updateOrganization.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -88,7 +116,12 @@ public class ManagementOrganizationsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _organizationManagement.DisableOrganizationAsync(context, organizationId, cancellationToken);
+        var command = new DisableOrganizationCommand
+        {
+            UserContext = context,
+            OrganizationId = organizationId
+        };
+        var result = await _disableOrganization.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -99,21 +132,12 @@ public class ManagementOrganizationsController : ControllerBase
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
-        var result = await _organizationManagement.ActivateOrganizationAsync(context, organizationId, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    private void EnsureValidModel()
-    {
-        if (ModelState.IsValid)
+        var command = new ActivateOrganizationCommand
         {
-            return;
-        }
-
-        var errors = ModelState.ToDictionary(
-            item => item.Key,
-            item => item.Value?.Errors.FirstOrDefault()?.ErrorMessage ?? "Invalid");
-
-        throw new ValidationException(errors);
+            UserContext = context,
+            OrganizationId = organizationId
+        };
+        var result = await _activateOrganization.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 }
