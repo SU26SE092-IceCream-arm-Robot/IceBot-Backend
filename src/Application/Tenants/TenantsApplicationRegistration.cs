@@ -1,7 +1,7 @@
 using Application.Tenants.Kiosks.Services;
 using Application.Tenants.Organizations.Services;
 using Application.Tenants.Stores.Services;
-using Application.Tenants.TenantTree.Services;
+using Application.Tenants.TenantTree.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Tenants;
@@ -13,7 +13,7 @@ public static class TenantsApplicationRegistration
         services.AddScoped<OrganizationManagementService>();
         services.AddScoped<StoreManagementService>();
         services.AddScoped<KioskManagementService>();
-        services.AddScoped<TenantTreeService>();
+        services.AddScoped<GetTenantTreeQueryHandler>();
         return services;
     }
 }

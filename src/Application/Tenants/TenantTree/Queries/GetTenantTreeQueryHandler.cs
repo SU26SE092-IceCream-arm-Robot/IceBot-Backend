@@ -1,25 +1,31 @@
-using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
 using Application.Tenants.Abstractions;
 using Application.Tenants.TenantTree.Results;
 using Domain.Tenants.Entities;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace Application.Tenants.TenantTree.Services;
+namespace Application.Tenants.TenantTree.Queries;
 
-public sealed class TenantTreeService
+public sealed class GetTenantTreeQueryHandler
 {
     private readonly ITenantTreeStore _tenantTreeStore;
 
-    public TenantTreeService(ITenantTreeStore tenantTreeStore)
+    public GetTenantTreeQueryHandler(ITenantTreeStore tenantTreeStore)
     {
         _tenantTreeStore = tenantTreeStore;
     }
 
-    public async Task<ApiResult<TenantTreeResult>> GetTenantTreeAsync(
-        CurrentUserContext userContext,
-        bool includeInactive = false,
+    public async Task<ApiResult<TenantTreeResult>> HandleAsync(
+        GetTenantTreeQuery query,
         CancellationToken cancellationToken = default)
     {
+        var userContext = query.UserContext;
+        var includeInactive = query.IncludeInactive;
+
         IReadOnlyList<Organization> organizations;
         IReadOnlyList<Store> stores;
         IReadOnlyList<Kiosk> kiosks;

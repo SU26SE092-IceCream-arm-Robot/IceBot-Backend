@@ -1,7 +1,9 @@
-using Application.Tenants.TenantTree.Services;
+using Application.Tenants.TenantTree.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading;
+using System.Threading.Tasks;
 using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Tenants;
@@ -11,11 +13,11 @@ namespace WebAPI.Controllers.Tenants;
 [Route("api/v{version:apiVersion}/management/tenant-tree")]
 public sealed class ManagementTenantTreeController : ControllerBase
 {
-    private readonly TenantTreeService _tenantTreeService;
+    private readonly GetTenantTreeQueryHandler _handler;
 
-    public ManagementTenantTreeController(TenantTreeService tenantTreeService)
+    public ManagementTenantTreeController(GetTenantTreeQueryHandler handler)
     {
-        _tenantTreeService = tenantTreeService;
+        _handler = handler;
     }
 
     [HttpGet]
@@ -25,7 +27,13 @@ public sealed class ManagementTenantTreeController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         var context = User.GetUserContext();
-        var result = await _tenantTreeService.GetTenantTreeAsync(context, includeInactive, cancellationToken);
+        var query = new GetTenantTreeQuery
+        {
+            UserContext = context,
+            IncludeInactive = includeInactive
+        };
+
+        var result = await _handler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

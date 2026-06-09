@@ -346,6 +346,8 @@ Kiosk/edge may create or update:
 
 When edge creates tenant-owned rows, it must include `OrganizationId` if known. If not known at the edge, cloud ingestion must enrich it from `KioskId` before storing/reporting.
 
+Tenant tree is implemented as a management query/read model handler, not an entity CRUD service.
+
 ## Related Docs
 
 - [Boundary Contexts](BOUNDARY_CONTEXTS.md)
