@@ -38,6 +38,8 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
 | Tenant scope lookup | `/api/v1/management/tenant-tree` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
+| Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/refunds` | internal order search, unpaid cancellation, refund-required marking, manual refund tracking |
+| Inventory management | `/api/v1/management/inventory/*` | dispenser states, stock movement history, refill, estimate adjustment |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
 | Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
@@ -99,6 +101,20 @@ GET /api/v1/management/tenant-tree
 GET /api/v1/management/roles
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
+GET /api/v1/management/orders
+GET /api/v1/management/orders/{orderId}
+PATCH /api/v1/management/orders/{orderId}/cancel
+PATCH /api/v1/management/orders/{orderId}/refund-required
+GET /api/v1/management/refunds
+GET /api/v1/management/refunds/{refundId}
+POST /api/v1/management/orders/{orderId}/refunds
+PATCH /api/v1/management/refunds/{refundId}/mark-processed
+PATCH /api/v1/management/refunds/{refundId}/reject
+PATCH /api/v1/management/refunds/{refundId}/cancel
+GET /api/v1/management/inventory/dispenser-states
+GET /api/v1/management/inventory/stock-movements
+POST /api/v1/management/inventory/dispenser-states/{id}/refill
+POST /api/v1/management/inventory/dispenser-states/{id}/adjust-estimate
 ```
 
 Rules:
@@ -109,6 +125,10 @@ Rules:
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
 - Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
 - `tenant-tree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
+- Back-office order operations are manual support workflows. Paid orders should be marked `RefundRequired`; they are not cancelled directly.
+- Refund APIs in v1 track manual full-refund workflow only. They do not call payment-provider refund APIs.
+- `POST /api/v1/management/orders/{orderId}/refunds` should use `Idempotency-Key` for safe manual retries.
+- Inventory management in v1 is reporting/operations only. It does not decide runtime menu sellability or robot execution availability.
 
 ## Current Account APIs
 

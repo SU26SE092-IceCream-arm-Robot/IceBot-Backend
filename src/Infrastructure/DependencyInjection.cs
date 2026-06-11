@@ -44,6 +44,7 @@ namespace Infrastructure
             services.AddPaymentsInfrastructure(config);
             services.AddSalesCatalogInfrastructure();
             services.AddTenantsInfrastructure();
+            services.AddScoped<Application.Inventory.Abstractions.IInventoryStore, Infrastructure.Inventory.Persistence.InventoryStore>();
 
             return services;
         }

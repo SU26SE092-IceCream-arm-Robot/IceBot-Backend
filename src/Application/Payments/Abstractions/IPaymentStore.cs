@@ -19,6 +19,8 @@ public interface IPaymentStore
 
     Task<PaymentTransaction?> GetLatestPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default);
 
+    Task<PaymentTransaction?> GetLatestPaidPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default);
+
     Task<bool> PaymentCallbackExistsAsync(string provider, string providerEventId, CancellationToken cancellationToken = default);
 
     Task AddPaymentMethodAsync(PaymentMethod paymentMethod, CancellationToken cancellationToken = default);
@@ -26,6 +28,42 @@ public interface IPaymentStore
     Task AddPaymentTransactionAsync(PaymentTransaction paymentTransaction, CancellationToken cancellationToken = default);
 
     Task AddPaymentCallbackAsync(PaymentCallback paymentCallback, CancellationToken cancellationToken = default);
+
+    Task AddOrderStatusHistoryAsync(OrderStatusHistory history, CancellationToken cancellationToken = default);
+
+    Task<Refund?> GetRefundByIdAsync(Guid refundId, CancellationToken cancellationToken = default);
+
+    Task<Refund?> GetRefundByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+
+    Task AddRefundAsync(Refund refund, CancellationToken cancellationToken = default);
+
+    Task<bool> RefundExistsForTransactionAsync(Guid transactionId, CancellationToken cancellationToken = default);
+
+    Task<int> CountRefundsAsync(
+        string? search,
+        Domain.Payments.Enums.RefundStatus? status,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default);
+
+    Task<List<Refund>> ListRefundsAsync(
+        string? search,
+        Domain.Payments.Enums.RefundStatus? status,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

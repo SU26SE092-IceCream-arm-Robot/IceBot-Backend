@@ -1,5 +1,6 @@
 using Application.Catalog;
 using Application.Identity;
+using Application.Inventory;
 using Application.Orders;
 using Application.Payments;
 using Application.SalesCatalog;
@@ -14,6 +15,7 @@ namespace Application
         {
             services.AddCatalogModule();
             services.AddIdentityApplication();
+            services.AddInventoryModule();
             services.AddOrderModule();
             services.AddPaymentModule();
             services.AddSalesCatalogModule();

@@ -130,6 +130,21 @@ try
 
         options.AddPolicy("role-scope-options.view", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
+
+        options.AddPolicy("orders.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff")));
+
+        options.AddPolicy("orders.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff")));
+
+        options.AddPolicy("refunds.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager", "Staff")));
+
+        options.AddPolicy("inventory.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
+
+        options.AddPolicy("inventory.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager", "Staff", "Technician")));
     });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();

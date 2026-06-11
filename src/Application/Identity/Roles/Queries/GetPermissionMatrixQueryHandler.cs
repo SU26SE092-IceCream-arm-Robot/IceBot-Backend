@@ -135,6 +135,41 @@ internal static class PermissionMatrixRules
             Description = "View valid organizational scope options for a target role.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "orders.view",
+            Description = "View back-office orders within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "orders.manage",
+            Description = "Manage orders (cancel unpaid, flag refund-required) within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "refunds.manage",
+            Description = "Manage refunds (request, processed, reject, cancel) within allowed scope.",
+            Roles = new[] { "SystemAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "inventory.view",
+            Description = "View inventory (dispenser states, stock movements) within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "inventory.manage",
+            Description = "Manage inventory (refill, adjust estimate) within allowed scope.",
+            Roles = new[] { "SystemAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
         }
     };
 }

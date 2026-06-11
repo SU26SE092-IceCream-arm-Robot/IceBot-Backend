@@ -50,6 +50,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `management accounts`, `role scope`, `RBAC`, `policy`, `role catalog`, `permission matrix`, `roles.view`, `role-scope-options.view` | [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `store`, `organization`, `kiosk`, `tenant scope`, `role scope options` | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `order paid`, `ready for execution`, `refund required`, `edge offline` | [System Flows](flows/SYSTEM_FLOWS.md), [IoT Contract](iot/IOT_CONTRACT.md) |
+| `management orders`, `refund`, `manual refund`, `stock movement`, `dispenser state`, `inventory refill` | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | `PayloadJson`, `SnapshotJson`, `ConfigJson`, `JSONB` | [JSON Field Rules](data/JSON_FIELD_RULES.md) |
 | `SyncEventInbox`, `NextRetryAt`, `LockedUntil`, `dead letter` | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md) |

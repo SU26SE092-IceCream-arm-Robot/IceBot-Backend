@@ -145,7 +145,8 @@ This is a tenant RBAC usability implementation. It does not add `Permission` or 
 | `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |
 | `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |
 | `refunds.manage` | `SystemAdmin`, `Manager`, `Staff` | Manual support/refund workflow. Auto provider refund is future work |
-| `inventory.operate` | `SystemAdmin`, `Manager`, `Staff` | Refill and stock movement operations |
+| `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
+| `inventory.manage` | `SystemAdmin`, `Manager`, `Staff`, `Technician` | Refill dispenser state and adjust inventory estimates within assigned scope |
 | `maintenance.manage` | `SystemAdmin`, `Manager`, `Technician` | Maintenance tickets and technical work coordination |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |
 | `reports.view` | `SystemAdmin`, `Manager`, `OrgAdmin` | Scope filtering must be enforced when scoped authorization is implemented |

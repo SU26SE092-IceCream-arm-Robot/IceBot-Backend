@@ -41,6 +41,132 @@ public sealed class OrderStore : IOrderStore
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     }
 
+    public Task<int> CountOrdersAsync(
+        string? search,
+        Domain.Orders.Enums.OrderStatus? status,
+        Domain.Orders.Enums.PaymentStatus? paymentStatus,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default)
+    {
+        var query = ApplyFiltersAndScope(
+            search,
+            status,
+            paymentStatus,
+            organizationId,
+            storeId,
+            kioskId,
+            isSystemAdmin,
+            allowedOrganizationIds,
+            allowedStoreIds,
+            allowedKioskIds);
+
+        return query.CountAsync(cancellationToken);
+    }
+
+    public Task<List<Order>> ListOrdersAsync(
+        string? search,
+        Domain.Orders.Enums.OrderStatus? status,
+        Domain.Orders.Enums.PaymentStatus? paymentStatus,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        var query = ApplyFiltersAndScope(
+            search,
+            status,
+            paymentStatus,
+            organizationId,
+            storeId,
+            kioskId,
+            isSystemAdmin,
+            allowedOrganizationIds,
+            allowedStoreIds,
+            allowedKioskIds);
+
+        return query
+            .Include(o => o.OrderItems)
+            .OrderByDescending(o => o.PlacedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<Order> ApplyFiltersAndScope(
+        string? search,
+        Domain.Orders.Enums.OrderStatus? status,
+        Domain.Orders.Enums.PaymentStatus? paymentStatus,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds)
+    {
+        var query = _dbContext.Orders.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.Trim().ToLower();
+            query = query.Where(o => 
+                o.OrderNumber.ToLower().Contains(searchLower) ||
+                (o.CustomerName != null && o.CustomerName.ToLower().Contains(searchLower)) ||
+                (o.CustomerPhoneNumber != null && o.CustomerPhoneNumber.ToLower().Contains(searchLower)));
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(o => o.Status == status.Value);
+        }
+
+        if (paymentStatus.HasValue)
+        {
+            query = query.Where(o => o.PaymentStatus == paymentStatus.Value);
+        }
+
+        if (organizationId.HasValue)
+        {
+            query = query.Where(o => o.OrganizationId == organizationId.Value);
+        }
+        
+        if (storeId.HasValue)
+        {
+            query = query.Where(o => o.StoreId == storeId.Value);
+        }
+        
+        if (kioskId.HasValue)
+        {
+            query = query.Where(o => o.KioskId == kioskId.Value);
+        }
+
+        if (!isSystemAdmin)
+        {
+            var allowedOrgs = allowedOrganizationIds ?? Array.Empty<Guid>();
+            var allowedStores = allowedStoreIds ?? Array.Empty<Guid>();
+            var allowedKiosks = allowedKioskIds ?? Array.Empty<Guid>();
+
+            query = query.Where(o =>
+                (o.OrganizationId.HasValue && allowedOrgs.Contains(o.OrganizationId.Value)) ||
+                (o.StoreId.HasValue && allowedStores.Contains(o.StoreId.Value)) ||
+                allowedKiosks.Contains(o.KioskId));
+        }
+
+        return query;
+    }
+
     public Task<Order?> GetOrderByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
     {
         return _dbContext.Orders
@@ -60,6 +186,11 @@ public sealed class OrderStore : IOrderStore
     public async Task AddOrderAsync(Order order, CancellationToken cancellationToken = default)
     {
         await _dbContext.Orders.AddAsync(order, cancellationToken);
+    }
+
+    public async Task AddOrderStatusHistoryAsync(OrderStatusHistory history, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.OrderStatusHistories.AddAsync(history, cancellationToken);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -3,6 +3,7 @@ using Application.Orders.PlaceOrder.Mapping;
 using Application.Orders.PlaceOrder.Results;
 using Application.Shared.Wrappers;
 using Domain.Orders.Enums;
+using Domain.Orders.Entities;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,9 +44,25 @@ public sealed class CancelPendingOrderCommandHandler
                 return ApiResult<OrderResult>.Fail("Only draft or pending-payment orders can be cancelled.", 409);
             }
 
-            order.Cancel(DateTimeOffset.UtcNow, NormalizeOptional(request.Reason));
+            var fromStatus = order.Status;
+            var now = DateTimeOffset.UtcNow;
+            var reason = NormalizeOptional(request.Reason);
+            
+            order.Cancel(now, reason);
             order.PaymentStatus = PaymentStatus.Cancelled;
-            order.UpdatedAt = DateTimeOffset.UtcNow;
+            order.UpdatedAt = now;
+
+            var history = new OrderStatusHistory
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                FromStatus = fromStatus,
+                ToStatus = Domain.Orders.Enums.OrderStatus.Cancelled,
+                ChangedAt = now,
+                Reason = reason ?? "Order cancelled by customer."
+            };
+            await _orderStore.AddOrderStatusHistoryAsync(history, ct);
+
             await _orderStore.SaveChangesAsync(ct);
 
             return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order), "Order cancelled.");

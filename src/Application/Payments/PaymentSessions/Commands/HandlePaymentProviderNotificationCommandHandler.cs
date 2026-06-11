@@ -100,10 +100,25 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
 
             await _paymentStore.AddPaymentCallbackAsync(callback, ct);
 
+            var originalStatus = paymentTransaction.Order.Status;
             var alreadyProcessed = paymentTransaction.Status == PaymentTransactionStatus.Paid;
             if (!alreadyProcessed)
             {
                 PaymentNotificationApplier.ApplyNotification(paymentTransaction, notification);
+
+                if (paymentTransaction.Order.Status != originalStatus)
+                {
+                    var history = new Domain.Orders.Entities.OrderStatusHistory
+                    {
+                        Id = Guid.NewGuid(),
+                        OrderId = paymentTransaction.Order.Id,
+                        FromStatus = originalStatus,
+                        ToStatus = paymentTransaction.Order.Status,
+                        ChangedAt = DateTimeOffset.UtcNow,
+                        Reason = "Payment webhook notification received."
+                    };
+                    await _paymentStore.AddOrderStatusHistoryAsync(history, ct);
+                }
             }
 
             callback.MarkProcessed(DateTimeOffset.UtcNow);

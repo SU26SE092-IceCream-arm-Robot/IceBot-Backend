@@ -198,6 +198,18 @@ public sealed class PlaceOrderCommandHandler
             }
 
             await _orderStore.AddOrderAsync(order, ct);
+
+            var history = new OrderStatusHistory
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                FromStatus = Domain.Orders.Enums.OrderStatus.Draft,
+                ToStatus = Domain.Orders.Enums.OrderStatus.PendingPayment,
+                ChangedAt = now,
+                Reason = "Order placed by customer."
+            };
+            await _orderStore.AddOrderStatusHistoryAsync(history, ct);
+
             await _orderStore.SaveChangesAsync(ct);
 
             return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order), "Order created.", 201);
