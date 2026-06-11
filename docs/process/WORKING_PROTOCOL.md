@@ -151,7 +151,7 @@ Use:
 - [Dependency Rules](../architecture/DEPENDENCY_RULES.md) for layer boundaries.
 - [Naming Rules](NAMING_RULES.md) for naming conventions.
 - [Data Modeling Rules](../data/DATA_MODELING_RULES.md) for persistence and ERD checks.
-- [System Flows](../flows/SYSTEM_FLOWS.md) for backend/tablet-edge-cloud flows.
+- [System Flows](../flows/SYSTEM_FLOWS.md) for the flow index, then the matching flow-specific document.
 - [IoT Contract](../iot/IOT_CONTRACT.md) for tablet-edge-cloud flow.
 
 The project-level `Vault/` folder is a personal reasoning notebook, not implementation truth. Use it only as background context unless a decision has been promoted into `Docs/` or repository docs.

@@ -1,0 +1,35 @@
+# Catalog Runtime Menu Flow
+
+This document describes how catalog data becomes a sellable runtime menu for the tablet and edge runtime.
+
+## Search Keywords
+
+`catalog runtime menu`, `runtime menu`, `sales catalog`, `menu item`, `product variant`, `recipe`, `edge runtime projection`, `tablet menu`, `CloudSalesCatalog`, `menu sellability`, `machine readiness`
+
+## Flow
+
+```text
+Catalog
+  -> Product / ProductVariant / Recipe / Ingredient
+  -> SalesCatalog Menu / MenuItem
+  -> Cloud runtime menu snapshot
+  -> Edge runtime projection
+  -> Tablet display and checkout
+```
+
+## Rules
+
+- Catalog owns product definitions and recipes.
+- Sales Catalog owns sellable menu items and prices.
+- Runtime menu from Cloud is a sales catalog snapshot, not a live machine readiness guarantee.
+- Edge projection may include inventory, device, queue, and robot availability.
+- Order item snapshots preserve historical sale truth after catalog/menu changes.
+- Inventory V1 is reporting/operations only and does not decide runtime menu sellability.
+
+## Related Docs
+
+- [System Flows](SYSTEM_FLOWS.md)
+- [Checkout Execution Flow](CHECKOUT_EXECUTION_FLOW.md)
+- [IoT Contract](../iot/IOT_CONTRACT.md)
+- [API Surface Rules](../api/API_SURFACE_RULES.md)
+- [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)

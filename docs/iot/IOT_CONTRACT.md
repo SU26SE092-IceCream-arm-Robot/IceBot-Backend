@@ -62,7 +62,7 @@ Edge must pull commands from cloud after receiving an MQTT notification. Edge mu
 
 ## System Flow
 
-End-to-end checkout, payment, edge dispatch, robot execution, and failure flows live in [System Flows](../flows/SYSTEM_FLOWS.md).
+End-to-end checkout, payment, edge dispatch, and robot execution flow lives in [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md). Failure flows live in [Failure Flows](../flows/FAILURE_FLOWS.md).
 
 This document focuses on API/message contract shape, source-of-truth boundaries, state mapping, and idempotency requirements.
 
@@ -692,7 +692,7 @@ Retry behavior:
 
 ## Failure Paths
 
-Failure flows live in [System Flows](../flows/SYSTEM_FLOWS.md).
+Failure flows live in [Failure Flows](../flows/FAILURE_FLOWS.md).
 
 Contract-level rules:
 
@@ -735,6 +735,8 @@ Future hardening:
 - [API Surface Rules](../api/API_SURFACE_RULES.md)
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
 - [System Flows](../flows/SYSTEM_FLOWS.md)
+- [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md)
+- [Failure Flows](../flows/FAILURE_FLOWS.md)
 - [Local Edge Runtime ERD](LOCAL_EDGE_RUNTIME_ERD.md)
 - [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](../data/JSON_FIELD_RULES.md)

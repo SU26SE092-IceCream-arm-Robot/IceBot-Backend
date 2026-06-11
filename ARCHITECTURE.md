@@ -247,6 +247,7 @@ Avoid:
 - [Authorization Rules](docs/api/AUTHORIZATION_RULES.md)
 - [Data Modeling Rules](docs/data/DATA_MODELING_RULES.md)
 - [System Flows](docs/flows/SYSTEM_FLOWS.md)
+- [Checkout Execution Flow](docs/flows/CHECKOUT_EXECUTION_FLOW.md)
 - [Multi-Tenancy Rules](docs/architecture/MULTI_TENANCY_RULES.md)
 - [Idempotency and Retry Rules](docs/data/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](docs/data/JSON_FIELD_RULES.md)

@@ -325,4 +325,6 @@ GraphQL is exposed at `/graphql` as an internal read/query surface for frontend 
 - [Naming Rules](../process/NAMING_RULES.md)
 - [IoT Contract](../iot/IOT_CONTRACT.md)
 - [System Flows](../flows/SYSTEM_FLOWS.md)
+- [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md)
+- [Management Read Flow](../flows/MANAGEMENT_READ_FLOW.md)
 - [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
