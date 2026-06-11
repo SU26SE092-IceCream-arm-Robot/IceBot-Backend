@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Payments.PaymentSessions.Support;
 
 internal static class PaymentTransactionNumberGenerator

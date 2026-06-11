@@ -5,9 +5,6 @@ using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
 using Domain.SalesCatalog.Entities;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.SalesCatalog.Menus.Commands;
 

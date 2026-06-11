@@ -4,9 +4,6 @@ using Application.Catalog.Products.Results;
 using Application.Catalog.Products.Rules;
 using Application.Catalog.Products.Support;
 using Application.Shared.Wrappers;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Catalog.Products.Commands;
 

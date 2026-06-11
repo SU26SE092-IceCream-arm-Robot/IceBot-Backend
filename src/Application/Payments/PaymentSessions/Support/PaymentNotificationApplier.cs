@@ -2,7 +2,6 @@ using Application.Payments.Providers;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-using System;
 
 namespace Application.Payments.PaymentSessions.Support;
 

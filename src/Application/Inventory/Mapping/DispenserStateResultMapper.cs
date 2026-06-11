@@ -1,6 +1,5 @@
 using Application.Inventory.Results;
 using Domain.Inventory.Entities;
-using System;
 
 namespace Application.Inventory.Mapping;
 

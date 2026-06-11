@@ -1,4 +1,3 @@
-using Application.Shared.Exceptions;
 using Application.Tenants.Stores.Commands;
 using Application.Tenants.Stores.Queries;
 using Application.Tenants.Stores.Requests;

@@ -1,6 +1,5 @@
 using Domain.Catalog.Enums;
 using Domain.SalesCatalog.Entities;
-using System;
 
 namespace Application.SalesCatalog.RuntimeMenus.Rules;
 

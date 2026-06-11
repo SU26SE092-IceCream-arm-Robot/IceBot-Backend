@@ -2,10 +2,6 @@ using Application.Payments.Abstractions;
 using Application.Payments.PaymentMethods.DTOs;
 using Application.Payments.PaymentMethods.Mapping;
 using Application.Shared.Wrappers;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.PaymentMethods.Queries;
 
@@ -23,7 +19,7 @@ public sealed class ListPaymentMethodsQueryHandler
         CancellationToken cancellationToken = default)
     {
         var methods = await _paymentStore.ListPaymentMethodsAsync(cancellationToken);
-        
+
         var queryable = methods.AsEnumerable();
         if (query.ActiveOnly == true)
         {
@@ -35,8 +31,8 @@ public sealed class ListPaymentMethodsQueryHandler
             .Select(PaymentMethodResultMapper.ToResult)
             .ToList();
 
-        var message = query.ActiveOnly == true 
-            ? "Active payment methods retrieved successfully." 
+        var message = query.ActiveOnly == true
+            ? "Active payment methods retrieved successfully."
             : "Payment methods retrieved successfully.";
 
         return ApiResult<IEnumerable<PaymentMethodResult>>.Success(data, message);

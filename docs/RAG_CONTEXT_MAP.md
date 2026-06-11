@@ -27,7 +27,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | How backend docs should be structured for RAG/search | [Documentation Rules](process/DOCUMENTATION_RULES.md) | this file |
 | Domain ownership, entity belongs to which bounded context | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md) |
 | Layer dependency, repository, DbContext, application/domain/infrastructure boundary | [Dependency Rules](architecture/DEPENDENCY_RULES.md) | [Architecture](../ARCHITECTURE.md) |
-| Route prefixes, API surface, tablet vs management vs auth vs IoT API | [API Surface Rules](api/API_SURFACE_RULES.md) | [Naming Rules](process/NAMING_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
+| Route prefixes, API surface, tablet vs management vs auth vs IoT API, GraphQL vs REST | [API Surface Rules](api/API_SURFACE_RULES.md) | [Naming Rules](process/NAMING_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Authentication endpoints, forgot/reset/change password, current account routes | [API Surface Rules](api/API_SURFACE_RULES.md) | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Admin-created account onboarding, invitation link, accept invitation, temporary password fallback | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Role policy, scoped RBAC, SystemAdmin/Manager/Staff/Technician/OrgAdmin | [Authorization Rules](api/AUTHORIZATION_RULES.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md) |
@@ -47,10 +47,12 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | --- | --- |
 | `auth`, `login`, `forgot password`, `reset password`, `refresh token` | [API Surface Rules](api/API_SURFACE_RULES.md), section `Authentication And Password Recovery APIs` |
 | `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
-| `management accounts`, `role scope`, `RBAC`, `policy`, `role catalog`, `permission matrix`, `roles.view`, `role-scope-options.view` | [Authorization Rules](api/AUTHORIZATION_RULES.md) |
+| `management accounts`, `role scope`, `RBAC`, `policy`, `role catalog`, `permission matrix`, `roles.view`, `role-scope-options.view`, `effective access`, `me access` | [Authorization Rules](api/AUTHORIZATION_RULES.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | `store`, `organization`, `kiosk`, `tenant scope`, `role scope options` | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `order paid`, `ready for execution`, `refund required`, `edge offline` | [System Flows](flows/SYSTEM_FLOWS.md), [IoT Contract](iot/IOT_CONTRACT.md) |
-| `management orders`, `refund`, `manual refund`, `stock movement`, `dispenser state`, `inventory refill` | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
+| `management orders`, `order status history`, `refund`, `manual refund`, `stock movement`, `dispenser state`, `inventory refill` | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
+| `GraphQL`, `REST`, `read model aggregation`, `dashboard query`, `overview query` | [API Surface Rules](api/API_SURFACE_RULES.md), section `GraphQL Management Reads` |
+| `heartbeat`, `device event`, `kiosk event`, `operations telemetry`, `lost connection` | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | `PayloadJson`, `SnapshotJson`, `ConfigJson`, `JSONB` | [JSON Field Rules](data/JSON_FIELD_RULES.md) |
 | `SyncEventInbox`, `NextRetryAt`, `LockedUntil`, `dead letter` | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md) |

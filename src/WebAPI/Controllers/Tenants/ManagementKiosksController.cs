@@ -1,4 +1,3 @@
-using Application.Shared.Exceptions;
 using Application.Tenants.Kiosks.Commands;
 using Application.Tenants.Kiosks.Queries;
 using Application.Tenants.Kiosks.Requests;

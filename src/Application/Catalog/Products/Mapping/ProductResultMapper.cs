@@ -1,6 +1,5 @@
 using Application.Catalog.Products.Results;
 using Domain.Catalog.Entities;
-using System.Linq;
 
 namespace Application.Catalog.Products.Mapping;
 

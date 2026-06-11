@@ -1,7 +1,4 @@
 using Application.Shared.Wrappers;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Identity.Roles.Queries;
 
@@ -169,6 +166,27 @@ internal static class PermissionMatrixRules
             Policy = "inventory.manage",
             Description = "Manage inventory (refill, adjust estimate) within allowed scope.",
             Roles = new[] { "SystemAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "maintenance.view",
+            Description = "View maintenance tickets within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "maintenance.manage",
+            Description = "Manage maintenance tickets within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "operations.view",
+            Description = "View kiosk operations telemetry such as heartbeats and device events within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
             ScopeRequired = true
         }
     };

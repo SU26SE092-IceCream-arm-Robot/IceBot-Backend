@@ -5,9 +5,6 @@ using Application.Payments.Providers;
 using Application.Shared.Wrappers;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.PaymentSessions.Commands;
 

@@ -3,8 +3,6 @@ using Application.Payments.Refunds.Mapping;
 using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.Refunds.Queries;
 

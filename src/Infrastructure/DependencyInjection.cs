@@ -1,9 +1,15 @@
 using Application.Abstractions.Persistence;
+using Application.Dashboard.Abstractions;
+using Application.Devices.Abstractions;
 using Application.Email;
+using Application.Inventory.Abstractions;
 using Infrastructure.Catalog;
+using Infrastructure.Dashboard.Persistence;
 using Infrastructure.Data;
+using Infrastructure.Devices.Persistence;
 using Infrastructure.Email;
 using Infrastructure.Identity;
+using Infrastructure.Inventory.Persistence;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
 using Infrastructure.Persistence.Repositories;
@@ -44,7 +50,10 @@ namespace Infrastructure
             services.AddPaymentsInfrastructure(config);
             services.AddSalesCatalogInfrastructure();
             services.AddTenantsInfrastructure();
-            services.AddScoped<Application.Inventory.Abstractions.IInventoryStore, Infrastructure.Inventory.Persistence.InventoryStore>();
+            services.AddScoped<IInventoryStore, InventoryStore>();
+            services.AddHostedService<Persistence.Jobs.DataRetentionJob>();
+            services.AddScoped<IKioskTelemetryStore, KioskTelemetryStore>();
+            services.AddScoped<IDashboardStore, DashboardStore>();
 
             return services;
         }

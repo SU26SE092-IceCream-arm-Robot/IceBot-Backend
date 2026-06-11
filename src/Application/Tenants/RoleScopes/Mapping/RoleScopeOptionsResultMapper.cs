@@ -1,9 +1,6 @@
 using Application.Tenants.RoleScopes.Results;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Application.Tenants.RoleScopes.Mapping;
 

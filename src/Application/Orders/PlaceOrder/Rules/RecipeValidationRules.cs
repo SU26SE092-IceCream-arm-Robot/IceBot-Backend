@@ -1,16 +1,15 @@
 using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
-using System;
 
 namespace Application.Orders.PlaceOrder.Rules;
 
 internal static class RecipeValidationRules
 {
     public static string? ValidateRecipe(
-        Recipe recipe, 
-        ProductVariant productVariant, 
-        Guid? organizationId, 
-        Guid? storeId, 
+        Recipe recipe,
+        ProductVariant productVariant,
+        Guid? organizationId,
+        Guid? storeId,
         Guid kioskId)
     {
         if (recipe.ProductVariantId != productVariant.Id)

@@ -1,5 +1,4 @@
 using Application.Payments.PaymentSessions.Requests;
-using System;
 
 namespace Application.Payments.PaymentSessions.Commands;
 

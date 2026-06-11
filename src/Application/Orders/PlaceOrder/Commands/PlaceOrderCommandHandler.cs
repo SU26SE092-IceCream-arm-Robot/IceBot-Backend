@@ -5,13 +5,8 @@ using Application.Orders.PlaceOrder.Rules;
 using Application.Orders.PlaceOrder.Support;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
-using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Enums;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Orders.PlaceOrder.Commands;
 

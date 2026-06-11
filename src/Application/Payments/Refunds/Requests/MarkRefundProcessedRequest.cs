@@ -6,4 +6,5 @@ public sealed class MarkRefundProcessedRequest
 {
     [StringLength(100)]
     public string? ProviderRefundId { get; set; }
+    public bool? MoneyWasRefunded { get; set; }
 }

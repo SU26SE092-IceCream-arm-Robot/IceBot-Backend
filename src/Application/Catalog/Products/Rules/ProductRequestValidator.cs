@@ -2,10 +2,6 @@ using Application.Catalog.Abstractions;
 using Application.Catalog.Products.Requests;
 using Application.Catalog.Products.Support;
 using Domain.Tenants.Enums;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Catalog.Products.Rules;
 

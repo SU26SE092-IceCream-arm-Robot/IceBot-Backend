@@ -3,8 +3,6 @@ using Application.Orders.PlaceOrder.Mapping;
 using Application.Orders.PlaceOrder.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Orders.Management.Queries;
 

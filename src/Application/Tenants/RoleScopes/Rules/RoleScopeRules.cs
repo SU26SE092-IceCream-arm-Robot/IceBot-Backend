@@ -1,6 +1,4 @@
 using Domain.Tenants.Enums;
-using System;
-using System.Collections.Generic;
 
 namespace Application.Tenants.RoleScopes.Rules;
 

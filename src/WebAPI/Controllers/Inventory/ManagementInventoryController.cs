@@ -5,9 +5,6 @@ using Asp.Versioning;
 using Domain.Inventory.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Inventory;

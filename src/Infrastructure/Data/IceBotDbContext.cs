@@ -615,6 +615,7 @@ public class IceBotDbContext : DbContext
             entity.ToTable("DeviceEvents");
             entity.HasIndex(x => x.EventId).IsUnique();
             entity.HasIndex(x => new { x.DeviceId, x.OccurredAt });
+            entity.HasIndex(x => new { x.KioskId, x.OccurredAt });
             entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.RobotJob).WithMany().HasForeignKey(x => x.RobotJobId).OnDelete(DeleteBehavior.Restrict);

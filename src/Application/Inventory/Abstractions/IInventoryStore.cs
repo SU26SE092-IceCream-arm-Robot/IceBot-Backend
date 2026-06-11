@@ -1,13 +1,19 @@
+using Application.Inventory.Results;
 using Domain.Inventory.Entities;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Inventory.Abstractions;
 
 public interface IInventoryStore
 {
+    Task<InventorySummaryResult> GetInventorySummaryAsync(
+        Guid? kioskId,
+        Guid? storeId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default);
+
     Task<IngredientDispenserState?> GetDispenserStateByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);

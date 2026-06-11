@@ -6,9 +6,6 @@ using Application.Tenants;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.Refunds.Commands;
 
@@ -94,6 +91,51 @@ public sealed class RequestRefundCommandHandler
                 return ApiResult<RefundResult>.Fail("A refund has already been requested/processed for this transaction.", 409);
             }
 
+            if (!string.Equals(command.RefundMethod, "FullMoneyRefund", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(command.RefundMethod, "Voucher", StringComparison.OrdinalIgnoreCase))
+            {
+                return ApiResult<RefundResult>.Fail("Invalid refund method. Supported methods: FullMoneyRefund, Voucher.", 400);
+            }
+
+            if (transaction.Amount != order.TotalAmount)
+            {
+                return ApiResult<RefundResult>.Fail("Paid transaction amount must match order total for refund V1.", 409);
+            }
+
+            decimal refundAmount = order.TotalAmount;
+            if (string.Equals(command.RefundMethod, "Voucher", StringComparison.OrdinalIgnoreCase))
+            {
+                if (command.VoucherValue.HasValue)
+                {
+                    if (command.VoucherValue.Value <= 0)
+                    {
+                        return ApiResult<RefundResult>.Fail("Voucher value must be greater than zero.", 400);
+                    }
+
+                    if (command.VoucherValue.Value != order.TotalAmount)
+                    {
+                        return ApiResult<RefundResult>.Fail("Voucher value must equal order total amount in refund V1.", 400);
+                    }
+                }
+            }
+
+            var note = command.Note;
+            if (note?.Length > 100) note = note[..100];
+            var reasonText = reason ?? string.Empty;
+            if (reasonText.Length > 200) reasonText = reasonText[..200];
+
+            var metadata = new
+            {
+                Method = command.RefundMethod,
+                Code = command.VoucherCode,
+                Value = string.Equals(command.RefundMethod, "Voucher", StringComparison.OrdinalIgnoreCase)
+                    ? command.VoucherValue
+                    : null,
+                Note = note,
+                Text = reasonText
+            };
+            var serializedReason = System.Text.Json.JsonSerializer.Serialize(metadata);
+
             var now = DateTimeOffset.UtcNow;
 
             var refundNumber = $"REF-{now:yyyyMMdd}-{Guid.NewGuid().ToString()[..8].ToUpperInvariant()}";
@@ -104,9 +146,9 @@ public sealed class RequestRefundCommandHandler
                 RequestedByAccountId = command.UserContext.AccountId,
                 RefundNumber = refundNumber,
                 IdempotencyKey = idempotencyKey,
-                Amount = transaction.Amount,
+                Amount = refundAmount,
                 Currency = transaction.Currency,
-                Reason = reason,
+                Reason = serializedReason,
                 Status = RefundStatus.Requested,
                 RequestedAt = now,
                 CreatedAt = now

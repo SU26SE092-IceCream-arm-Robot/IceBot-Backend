@@ -88,7 +88,7 @@ namespace WebAPI.Middlewares
                     ApplyExceptionDetails(response, ex);
                     await WriteResponseAsync(context, response, HttpStatusCode.Unauthorized);
                 }
-                catch (KeyNotFoundException ex)
+                catch (System.Collections.Generic.KeyNotFoundException ex)
                 {
                     _logger.LogError(ex, "KeyNotFoundException caught in middleware");
 

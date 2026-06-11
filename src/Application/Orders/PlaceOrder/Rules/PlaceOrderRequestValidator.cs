@@ -1,6 +1,4 @@
 using Application.Orders.PlaceOrder.Requests;
-using System;
-using System.Linq;
 
 namespace Application.Orders.PlaceOrder.Rules;
 

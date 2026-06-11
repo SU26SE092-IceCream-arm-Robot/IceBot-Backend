@@ -6,11 +6,6 @@ using Application.Tenants.RoleScopes.Mapping;
 using Application.Tenants.RoleScopes.Results;
 using Application.Tenants.RoleScopes.Rules;
 using Domain.Tenants.Entities;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Tenants.RoleScopes.Queries;
 

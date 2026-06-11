@@ -1,8 +1,5 @@
 using Application.Payments.Abstractions;
 using Domain.Payments.Entities;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.PaymentSessions.Support;
 

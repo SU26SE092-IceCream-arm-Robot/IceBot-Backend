@@ -1,4 +1,4 @@
-﻿namespace Domain.Orders.Enums
+namespace Domain.Orders.Enums
 {
     public enum OrderStatus
     {
@@ -13,6 +13,8 @@
         Cancelled = 9,
         Failed = 10,
         ExecutionRejected = 11,
-        RefundRequired = 12
+        RefundRequired = 12,
+        Refunded = 13,
+        Compensated = 14
     }
 }

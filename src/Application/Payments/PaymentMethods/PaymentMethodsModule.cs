@@ -1,5 +1,5 @@
-using Application.Payments.PaymentMethods.Queries;
 using Application.Payments.PaymentMethods.Commands;
+using Application.Payments.PaymentMethods.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Payments.PaymentMethods;

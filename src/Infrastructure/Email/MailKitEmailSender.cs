@@ -38,7 +38,7 @@ namespace Infrastructure.Email
             try
             {
                 using var client = new SmtpClient();
-                var secureOption = _options.EnableSsl ? SecureSocketOptions.StartTls : SecureSocketOptions.Auto;
+                var secureOption = ResolveSecureSocketOption();
                 await client.ConnectAsync(_options.Host, _options.Port, secureOption, cancellationToken);
 
                 if (!string.IsNullOrWhiteSpace(_options.UserName) &&
@@ -55,6 +55,18 @@ namespace Infrastructure.Email
                 _logger.LogError(ex, "Failed to send email to {Recipient}", to);
                 throw;
             }
+        }
+
+        private SecureSocketOptions ResolveSecureSocketOption()
+        {
+            if (!_options.EnableSsl)
+            {
+                return SecureSocketOptions.Auto;
+            }
+
+            return _options.Port == 465
+                ? SecureSocketOptions.SslOnConnect
+                : SecureSocketOptions.StartTls;
         }
     }
 }

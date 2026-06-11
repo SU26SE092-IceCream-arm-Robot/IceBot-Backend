@@ -1,5 +1,4 @@
 using Application.Catalog.Products.Requests;
-using System;
 
 namespace Application.Catalog.Products.Commands;
 

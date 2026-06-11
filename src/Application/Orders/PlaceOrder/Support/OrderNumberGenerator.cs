@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Orders.PlaceOrder.Support;
 
 internal static class OrderNumberGenerator

@@ -2,11 +2,8 @@ using Application.Orders.Abstractions;
 using Application.Orders.PlaceOrder.Mapping;
 using Application.Orders.PlaceOrder.Results;
 using Application.Shared.Wrappers;
-using Domain.Orders.Enums;
 using Domain.Orders.Entities;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
+using Domain.Orders.Enums;
 
 namespace Application.Orders.PlaceOrder.Commands;
 
@@ -47,7 +44,7 @@ public sealed class CancelPendingOrderCommandHandler
             var fromStatus = order.Status;
             var now = DateTimeOffset.UtcNow;
             var reason = NormalizeOptional(request.Reason);
-            
+
             order.Cancel(now, reason);
             order.PaymentStatus = PaymentStatus.Cancelled;
             order.UpdatedAt = now;

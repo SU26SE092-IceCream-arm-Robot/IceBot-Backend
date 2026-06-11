@@ -1,11 +1,7 @@
 using Application.Payments.Abstractions;
-using Application.Payments.Refunds.Mapping;
 using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.Refunds.Commands;
 
@@ -42,14 +38,15 @@ public sealed class CancelRefundCommandHandler
             }
 
             var now = DateTimeOffset.UtcNow;
-            
+
             refund.Cancel();
+            refund.LastErrorMessage = command.Reason ?? "Cancelled by staff";
             refund.UpdatedAt = now;
 
             await _paymentStore.SaveChangesAsync(ct);
 
             return ApiResult<RefundResult>.Success(
-                RefundResultMapper.ToResult(refund),
+                Mapping.RefundResultMapper.ToResult(refund),
                 "Refund cancelled successfully.");
         }, cancellationToken);
     }

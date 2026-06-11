@@ -3,8 +3,6 @@ using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Catalog.Products.Queries;
 

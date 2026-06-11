@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Application.Identity.Roles.Results;
 
 public sealed class ManagementRoleResult

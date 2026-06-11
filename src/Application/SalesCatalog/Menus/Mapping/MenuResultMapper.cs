@@ -1,6 +1,5 @@
 using Application.SalesCatalog.Menus.Results;
 using Domain.SalesCatalog.Entities;
-using System.Linq;
 
 namespace Application.SalesCatalog.Menus.Mapping;
 

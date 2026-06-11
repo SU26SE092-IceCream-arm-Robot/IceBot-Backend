@@ -1,5 +1,4 @@
 using Domain.Inventory.Enums;
-using System;
 
 namespace Application.Inventory.Results;
 

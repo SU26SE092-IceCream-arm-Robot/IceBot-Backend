@@ -1,5 +1,4 @@
 using Application.SalesCatalog.Menus.Requests;
-using System;
 
 namespace Application.SalesCatalog.Menus.Commands;
 

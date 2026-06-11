@@ -60,6 +60,16 @@ public static class OrderStatusProjector
             return ("RefundRequired", "Order execution failed. Please contact staff for support.", false, true);
         }
 
+        if (order.Status == OrderStatus.Refunded)
+        {
+            return ("Refunded", "Order has been refunded.", false, false);
+        }
+
+        if (order.Status == OrderStatus.Compensated)
+        {
+            return ("Compensated", "Order has been compensated (Voucher issued).", false, false);
+        }
+
         return ("Unknown", "Unknown order state.", false, false);
     }
 

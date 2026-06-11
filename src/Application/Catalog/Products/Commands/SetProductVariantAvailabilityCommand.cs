@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Catalog.Products.Commands;
 
 public sealed class SetProductVariantAvailabilityCommand

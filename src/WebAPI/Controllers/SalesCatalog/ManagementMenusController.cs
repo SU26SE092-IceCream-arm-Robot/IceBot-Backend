@@ -1,7 +1,6 @@
 using Application.SalesCatalog.Menus.Commands;
 using Application.SalesCatalog.Menus.Queries;
 using Application.SalesCatalog.Menus.Requests;
-using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

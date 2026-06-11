@@ -97,10 +97,11 @@ Current Tenant priority is scope/resource lookup so admins can choose valid tena
 Immediate tenant support:
 
 ```http
-GET /api/v1/management/tenant-tree
+GraphQL tenantTree
+GET /api/v1/management/role-scope-options
 ```
 
-`GET /management/tenant-tree` returns the management-visible tenant hierarchy:
+GraphQL `tenantTree` returns the management-visible tenant hierarchy:
 
 ```text
 Organization
@@ -108,7 +109,7 @@ Organization
       -> Kiosk
 ```
 
-Use it for role scope selection and tenant navigation. This is not dynamic permission management.
+Use it for role scope selection and tenant navigation. This is not dynamic permission management. The previous REST tenant-tree route is intentionally removed to avoid a duplicated API surface with GraphQL.
 
 When assigning roles, the backend must validate scope hierarchy:
 
@@ -130,7 +131,7 @@ This is a tenant RBAC usability implementation. It does not add `Permission` or 
 | `roles.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View roles catalog and static permission matrix |
 | `role-scope-options.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View valid organizational scope options for a target role |
 | `accounts.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read internal accounts. SystemAdmin can read all accounts; OrgAdmin and Manager are scope-filtered |
-| `accounts.manage` | `SystemAdmin` | Create, update, disable, assign roles, set password, and send invitations for internal accounts |
+| `accounts.manage` | `SystemAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for internal accounts |
 | `organizations.manage` | `SystemAdmin` | Platform-level organization management: create, activate, disable organizations |
 | `organizations.view` | `SystemAdmin`, `OrgAdmin` | View organizations. OrgAdmin can view/read only their assigned organization(s) |
 | `organizations.update` | `SystemAdmin`, `OrgAdmin` | Update organizations. OrgAdmin can update only basic profile/contact info for assigned organization(s); SystemAdmin can update platform-managed fields |
@@ -147,7 +148,9 @@ This is a tenant RBAC usability implementation. It does not add `Permission` or 
 | `refunds.manage` | `SystemAdmin`, `Manager`, `Staff` | Manual support/refund workflow. Auto provider refund is future work |
 | `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
 | `inventory.manage` | `SystemAdmin`, `Manager`, `Staff`, `Technician` | Refill dispenser state and adjust inventory estimates within assigned scope |
-| `maintenance.manage` | `SystemAdmin`, `Manager`, `Technician` | Maintenance tickets and technical work coordination |
+| `operations.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosk heartbeat history and device events within assigned scope |
+| `maintenance.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View maintenance tickets within assigned scope |
+| `maintenance.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Manage, assign, resolve, and close maintenance tickets within assigned scope. Staff can create/view tickets but cannot assign or resolve by default |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |
 | `reports.view` | `SystemAdmin`, `Manager`, `OrgAdmin` | Scope filtering must be enforced when scoped authorization is implemented |
 
@@ -158,6 +161,10 @@ This is a tenant RBAC usability implementation. It does not add `Permission` or 
 - Other route/resource scope matching is still added incrementally as APIs pass `OrganizationId`, `StoreId`, or `KioskId` authorization context.
 - Role checks must validate requested resource scope before returning scoped tenant data.
 - Account read APIs use `accounts.read` and must remain scope-filtered for non-`SystemAdmin` callers. Account mutation APIs use `accounts.manage` and remain `SystemAdmin` only.
+- `GET /management/accounts/{accountId}/effective-access` uses `accounts.read` and returns the target account's active role scopes plus the effective ids used by current scoped authorization rules.
+- Effective access does not expand organization scope into store/kiosk ids. Use GraphQL `tenantTree` or REST `role-scope-options` for UI tree display.
+- `GET /me/access` is a self-inspection endpoint based on the current access token claims. Refresh the token after role changes to see updated access.
+- `PUT /management/accounts/{accountId}/roles` replaces active role assignments for the target account. `POST /management/accounts/{accountId}/roles` remains an add/upsert single-role operation.
 - Do not add `Staff` or `Technician` to product/menu pricing policies unless the business explicitly gives them that responsibility.
 
 ## Related Docs

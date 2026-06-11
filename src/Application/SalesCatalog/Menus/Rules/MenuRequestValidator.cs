@@ -1,9 +1,6 @@
 using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.Menus.Support;
 using Domain.Tenants.Enums;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.SalesCatalog.Menus.Rules;
 

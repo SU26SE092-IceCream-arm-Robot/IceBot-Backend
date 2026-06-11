@@ -1,11 +1,11 @@
 using Application.Identity.CurrentAccount.Commands;
 using Application.Identity.CurrentAccount.Queries;
 using Application.Identity.CurrentAccount.Requests;
-using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.Identity;
 
@@ -16,15 +16,18 @@ namespace WebAPI.Controllers.Identity;
 public sealed class CurrentAccountController : ControllerBase
 {
     private readonly GetCurrentAccountQueryHandler _getCurrentAccount;
+    private readonly GetCurrentAccountAccessQueryHandler _getCurrentAccountAccess;
     private readonly UpdateCurrentAccountProfileCommandHandler _updateProfile;
     private readonly ChangeCurrentAccountPasswordCommandHandler _changePassword;
 
     public CurrentAccountController(
         GetCurrentAccountQueryHandler getCurrentAccount,
+        GetCurrentAccountAccessQueryHandler getCurrentAccountAccess,
         UpdateCurrentAccountProfileCommandHandler updateProfile,
         ChangeCurrentAccountPasswordCommandHandler changePassword)
     {
         _getCurrentAccount = getCurrentAccount;
+        _getCurrentAccountAccess = getCurrentAccountAccess;
         _updateProfile = updateProfile;
         _changePassword = changePassword;
     }
@@ -38,6 +41,19 @@ public sealed class CurrentAccountController : ControllerBase
             AccountId = accountId
         };
         var result = await _getCurrentAccount.HandleAsync(query, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("access")]
+    public async Task<IActionResult> GetCurrentAccess(CancellationToken cancellationToken)
+    {
+        var query = new GetCurrentAccountAccessQuery
+        {
+            UserContext = User.GetUserContext(),
+            RoleCodes = User.FindAll(ClaimTypes.Role).Select(claim => claim.Value).ToList(),
+            RoleScopeClaims = User.FindAll("role_scope").Select(claim => claim.Value).ToList()
+        };
+        var result = await _getCurrentAccountAccess.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

@@ -2,10 +2,6 @@ using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.Menus.Mapping;
 using Application.SalesCatalog.Menus.Results;
 using Application.Shared.Wrappers;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.SalesCatalog.Menus.Queries;
 

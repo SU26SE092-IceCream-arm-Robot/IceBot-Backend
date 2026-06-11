@@ -2,10 +2,6 @@ using Application.Payments.Abstractions;
 using Application.Payments.Refunds.Mapping;
 using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.Refunds.Queries;
 

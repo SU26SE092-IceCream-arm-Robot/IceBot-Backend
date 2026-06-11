@@ -4,9 +4,6 @@ using Application.SalesCatalog.Menus.Results;
 using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.SalesCatalog.Menus.Commands;
 

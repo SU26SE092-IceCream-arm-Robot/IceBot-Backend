@@ -62,7 +62,8 @@ public class FirebaseClient : IFirebaseClient
 
             if (!string.IsNullOrWhiteSpace(inlineCredentials))
             {
-                credential = GoogleCredential.FromJson(inlineCredentials);
+                using var stream = new System.IO.MemoryStream(System.Text.Encoding.UTF8.GetBytes(inlineCredentials));
+                credential = CredentialFactory.FromStream<ServiceAccountCredential>(stream).ToGoogleCredential();
             }
             else
             {
@@ -80,7 +81,7 @@ public class FirebaseClient : IFirebaseClient
                     throw new AppException("Firebase integration is unavailable because credentials are not configured.", 503);
                 }
 
-                credential = GoogleCredential.FromFile(credentialsPath);
+                credential = CredentialFactory.FromFile<ServiceAccountCredential>(credentialsPath).ToGoogleCredential();
             }
 
             _app = FirebaseApp.Create(new AppOptions { Credential = credential });

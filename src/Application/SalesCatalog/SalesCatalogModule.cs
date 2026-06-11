@@ -1,5 +1,5 @@
-using Application.SalesCatalog.Menus.Queries;
 using Application.SalesCatalog.Menus.Commands;
+using Application.SalesCatalog.Menus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Queries;
 using Microsoft.Extensions.DependencyInjection;
 

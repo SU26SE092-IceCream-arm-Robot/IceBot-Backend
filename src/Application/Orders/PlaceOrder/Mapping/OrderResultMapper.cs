@@ -1,6 +1,5 @@
 using Application.Orders.PlaceOrder.Results;
 using Domain.Orders.Entities;
-using System.Linq;
 
 namespace Application.Orders.PlaceOrder.Mapping;
 

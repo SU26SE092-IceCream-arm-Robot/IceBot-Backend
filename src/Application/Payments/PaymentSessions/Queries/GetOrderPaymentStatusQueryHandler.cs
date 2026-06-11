@@ -2,8 +2,6 @@ using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Mapping;
 using Application.Payments.PaymentSessions.Results;
 using Application.Shared.Wrappers;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.PaymentSessions.Queries;
 

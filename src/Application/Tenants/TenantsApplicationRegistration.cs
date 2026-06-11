@@ -2,10 +2,10 @@ using Application.Tenants.Kiosks.Commands;
 using Application.Tenants.Kiosks.Queries;
 using Application.Tenants.Organizations.Commands;
 using Application.Tenants.Organizations.Queries;
+using Application.Tenants.RoleScopes.Queries;
 using Application.Tenants.Stores.Commands;
 using Application.Tenants.Stores.Queries;
 using Application.Tenants.TenantTree.Queries;
-using Application.Tenants.RoleScopes.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Tenants;

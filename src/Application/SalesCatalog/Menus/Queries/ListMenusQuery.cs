@@ -1,5 +1,4 @@
 using Application.Identity.Tokens.Claims;
-using System;
 
 namespace Application.SalesCatalog.Menus.Queries;
 

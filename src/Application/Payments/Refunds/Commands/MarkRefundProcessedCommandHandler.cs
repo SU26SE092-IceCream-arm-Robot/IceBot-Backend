@@ -1,13 +1,9 @@
 using Application.Payments.Abstractions;
-using Application.Payments.Refunds.Mapping;
 using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Orders.Enums;
 using Domain.Payments.Enums;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.Refunds.Commands;
 
@@ -45,19 +41,54 @@ public sealed class MarkRefundProcessedCommandHandler
             }
 
             var now = DateTimeOffset.UtcNow;
-            
+
             // Mark refund as processed
             refund.MarkProcessed(command.ProviderRefundId, now);
 
-            // Update parent payment and order statuses
-            transaction.Status = PaymentTransactionStatus.Refunded;
-            order.PaymentStatus = PaymentStatus.Refunded;
+            // Parse refund method from serialized metadata in Reason
+            var parsed = Mapping.RefundResultMapper.ParseReason(refund.Reason);
+            var method = parsed.Method;
+
+            var previousStatus = order.Status;
+            var newStatus = OrderStatus.Refunded;
+
+            if (string.Equals(method, "Voucher", StringComparison.OrdinalIgnoreCase))
+            {
+                newStatus = OrderStatus.Compensated;
+                order.MarkCompensated();
+                // do not set order.PaymentStatus = PaymentStatus.Refunded because the payment was not reversed
+            }
+            else
+            {
+                newStatus = OrderStatus.Refunded;
+                order.MarkRefunded();
+                var moneyWasRefunded = command.MoneyWasRefunded ?? true;
+                if (moneyWasRefunded)
+                {
+                    order.PaymentStatus = PaymentStatus.Refunded;
+                    transaction.Status = PaymentTransactionStatus.Refunded;
+                }
+            }
+
             order.UpdatedAt = now;
+
+            // Record OrderStatusHistory
+            var history = new Domain.Orders.Entities.OrderStatusHistory
+            {
+                Id = Guid.NewGuid(),
+                OrderId = order.Id,
+                FromStatus = previousStatus,
+                ToStatus = newStatus,
+                ChangedAt = now,
+                Reason = $"Refund processed via {method}.",
+                ChangedByAccountId = command.UserContext.AccountId
+            };
+            await _paymentStore.AddOrderStatusHistoryAsync(history, ct);
 
             await _paymentStore.SaveChangesAsync(ct);
 
             return ApiResult<RefundResult>.Success(
-                RefundResultMapper.ToResult(refund),
+                Mapping.RefundResultMapper.ToResult(refund),
                 "Refund marked as processed successfully.");
         }, cancellationToken);
     }

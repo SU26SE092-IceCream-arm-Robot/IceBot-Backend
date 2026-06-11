@@ -128,7 +128,7 @@ Kiosk management APIs are implemented as command/query handlers, not a CRUD serv
 Tenant tree is a management read model for scope selection and tenant navigation:
 
 ```text
-GET /api/v1/management/tenant-tree
+GraphQL tenantTree
 ```
 
 It returns:
@@ -145,7 +145,7 @@ Use it for:
 - management UI tenant navigation;
 - avoiding invalid cross-tenant scope combinations.
 
-REST is sufficient for this endpoint. Do not introduce GraphQL or OData for tenant tree unless broader read-query requirements appear.
+Expose tenant tree through GraphQL to avoid maintaining a duplicated REST read endpoint for the same UI aggregation surface. REST and GraphQL are API adapters; tenant scope rules live in the Application/domain model, not in the transport. Do not turn tenant tree into an operations dashboard.
 
 Do not use `tenant-tree` as an operations overview endpoint. Keep revenue, alerts, runtime state, inventory, and dashboard metrics in separate overview/reporting APIs. See [API Surface Rules](../api/API_SURFACE_RULES.md#read-model-api-boundaries) for read model boundary definitions.
 

@@ -1,5 +1,4 @@
 using Domain.Payments.Enums;
-using System;
 
 namespace Application.Payments.Refunds.Results;
 
@@ -20,4 +19,8 @@ public sealed class RefundResult
     public string? LastErrorMessage { get; set; }
     public Guid OrderId { get; set; }
     public string OrderNumber { get; set; } = null!;
+    public string RefundMethod { get; set; } = "FullMoneyRefund";
+    public string? VoucherCode { get; set; }
+    public decimal? VoucherValue { get; set; }
+    public string? Note { get; set; }
 }

@@ -4,7 +4,6 @@ using Application.Identity.Invitations.Commands;
 using Application.Identity.Invitations.Requests;
 using Application.Identity.PasswordReset.Commands;
 using Application.Identity.PasswordReset.Requests;
-using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;

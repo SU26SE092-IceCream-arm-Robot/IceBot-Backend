@@ -8,8 +8,8 @@ using Application.Identity.InternalAccounts.Queries;
 using Application.Identity.Invitations.Commands;
 using Application.Identity.Invitations.Services;
 using Application.Identity.PasswordReset.Commands;
-using Application.Identity.Tokens.Services;
 using Application.Identity.Roles.Queries;
+using Application.Identity.Tokens.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Identity;
@@ -39,8 +39,11 @@ public static class IdentityApplicationRegistration
         services.AddScoped<DisableInternalAccountCommandHandler>();
         services.AddScoped<SetInternalAccountPasswordCommandHandler>();
         services.AddScoped<AssignInternalAccountRoleCommandHandler>();
+        services.AddScoped<UpdateInternalAccountRolesCommandHandler>();
         services.AddScoped<CreateInternalAccountInvitationCommandHandler>();
+        services.AddScoped<GetInternalAccountEffectiveAccessQueryHandler>();
         services.AddScoped<AcceptInvitationCommandHandler>();
+        services.AddScoped<GetCurrentAccountAccessQueryHandler>();
 
         services.AddScoped<RequestPasswordResetCommandHandler>();
         services.AddScoped<ResetPasswordCommandHandler>();

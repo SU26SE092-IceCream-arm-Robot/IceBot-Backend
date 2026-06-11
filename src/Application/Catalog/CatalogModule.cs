@@ -1,5 +1,5 @@
-using Application.Catalog.Products.Queries;
 using Application.Catalog.Products.Commands;
+using Application.Catalog.Products.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Catalog;

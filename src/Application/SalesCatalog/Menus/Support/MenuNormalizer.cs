@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.SalesCatalog.Menus.Support;
 
 internal static class MenuNormalizer

@@ -1,4 +1,6 @@
 using Application.Catalog;
+using Application.Dashboard.Queries;
+using Application.Devices;
 using Application.Identity;
 using Application.Inventory;
 using Application.Orders;
@@ -14,12 +16,14 @@ namespace Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddCatalogModule();
+            services.AddDevicesModule();
             services.AddIdentityApplication();
             services.AddInventoryModule();
             services.AddOrderModule();
             services.AddPaymentModule();
             services.AddSalesCatalogModule();
             services.AddTenantsApplication();
+            services.AddScoped<GetManagementDashboardQueryHandler>();
             return services;
         }
     }

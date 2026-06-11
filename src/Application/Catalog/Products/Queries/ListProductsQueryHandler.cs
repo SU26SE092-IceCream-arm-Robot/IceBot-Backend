@@ -2,10 +2,6 @@ using Application.Catalog.Abstractions;
 using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Shared.Wrappers;
-using System;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Catalog.Products.Queries;
 

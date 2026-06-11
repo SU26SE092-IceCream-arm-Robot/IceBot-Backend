@@ -3,8 +3,6 @@ using Application.SalesCatalog.Menus.Mapping;
 using Application.SalesCatalog.Menus.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.SalesCatalog.Menus.Queries;
 

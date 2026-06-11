@@ -238,6 +238,24 @@ public partial class Order : BusinessEntity, IStoreScoped
         Notes = notes ?? Notes;
     }
 
+    public void MarkRefunded()
+    {
+        if (Status != OrderStatus.RefundRequired)
+        {
+            throw new DomainRuleException("Only refund-required orders can be marked as refunded.");
+        }
+        Status = OrderStatus.Refunded;
+    }
+
+    public void MarkCompensated()
+    {
+        if (Status != OrderStatus.RefundRequired)
+        {
+            throw new DomainRuleException("Only refund-required orders can be marked as compensated.");
+        }
+        Status = OrderStatus.Compensated;
+    }
+
     private void EnsureEditable()
     {
         if (Status != OrderStatus.Draft)

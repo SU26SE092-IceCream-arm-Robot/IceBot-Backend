@@ -2,8 +2,6 @@ using Application.Orders.Abstractions;
 using Application.Orders.PlaceOrder.Mapping;
 using Application.Orders.PlaceOrder.Results;
 using Application.Shared.Wrappers;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Orders.PlaceOrder.Queries;
 

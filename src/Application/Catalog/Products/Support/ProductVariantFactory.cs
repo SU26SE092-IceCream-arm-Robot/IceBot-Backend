@@ -1,7 +1,5 @@
 using Application.Catalog.Products.Requests;
-using Application.Catalog.Products.Support;
 using Domain.Catalog.Entities;
-using System;
 
 namespace Application.Catalog.Products.Support;
 

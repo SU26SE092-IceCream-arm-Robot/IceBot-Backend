@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Application.Tenants.RoleScopes.Results;
 
 public sealed class RoleScopeOptionsResult

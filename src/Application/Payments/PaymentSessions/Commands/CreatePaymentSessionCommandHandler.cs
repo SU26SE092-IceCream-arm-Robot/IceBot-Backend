@@ -7,10 +7,7 @@ using Application.Tenants.Kiosks.Rules;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-using System;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Payments.PaymentSessions.Commands;
 

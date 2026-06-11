@@ -1,7 +1,6 @@
 using Application.Catalog.Products.Commands;
 using Application.Catalog.Products.Queries;
 using Application.Catalog.Products.Requests;
-using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

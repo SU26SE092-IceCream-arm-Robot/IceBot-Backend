@@ -66,6 +66,7 @@ Before editing:
 
 - read the current implementation;
 - search usages with `rg`;
+- assemble the smallest relevant context from the task/module instead of reading all docs or all code;
 - identify whether the request is repair, reshape, or removal;
 - avoid broad renames, namespace moves, or folder reshuffles unless requested.
 
@@ -105,6 +106,7 @@ Rules learned from previous collaboration:
   - build after code changes;
   - report whether migrations were created.
 - After Gemini finishes, review `git diff` and code behavior directly. Do not rely only on its summary.
+- Do not infer who made a change from `git diff` alone. If package versions, broad file moves, or unrelated edits appear, identify the source before writing a model-specific failure note.
 - Treat "build succeeded" as a compile check, not design approval.
 - If Gemini claims "warning-free", verify the build output when warnings matter.
 - If Gemini creates local audit/checklist files in `.project-memory`, keep them only while they are actively useful.

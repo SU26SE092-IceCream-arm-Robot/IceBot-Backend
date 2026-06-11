@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Orders.PlaceOrder.Rules;
 
 internal static class PlaceOrderScopeRules

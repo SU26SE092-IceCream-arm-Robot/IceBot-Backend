@@ -2,7 +2,6 @@ using Application.Identity.InternalAccounts.Commands;
 using Application.Identity.InternalAccounts.Queries;
 using Application.Identity.InternalAccounts.Requests;
 using Application.Identity.Invitations.Requests;
-using Application.Shared.Exceptions;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -24,6 +23,8 @@ namespace WebAPI.Controllers.Identity
         private readonly DisableInternalAccountCommandHandler _disableInternalAccount;
         private readonly SetInternalAccountPasswordCommandHandler _setPassword;
         private readonly AssignInternalAccountRoleCommandHandler _assignRole;
+        private readonly UpdateInternalAccountRolesCommandHandler _updateRoles;
+        private readonly GetInternalAccountEffectiveAccessQueryHandler _getEffectiveAccess;
         private readonly CreateInternalAccountInvitationCommandHandler _createInvitation;
 
         public ManagementAccountsController(
@@ -34,6 +35,8 @@ namespace WebAPI.Controllers.Identity
             DisableInternalAccountCommandHandler disableInternalAccount,
             SetInternalAccountPasswordCommandHandler setPassword,
             AssignInternalAccountRoleCommandHandler assignRole,
+            UpdateInternalAccountRolesCommandHandler updateRoles,
+            GetInternalAccountEffectiveAccessQueryHandler getEffectiveAccess,
             CreateInternalAccountInvitationCommandHandler createInvitation)
         {
             _listInternalAccounts = listInternalAccounts;
@@ -43,6 +46,8 @@ namespace WebAPI.Controllers.Identity
             _disableInternalAccount = disableInternalAccount;
             _setPassword = setPassword;
             _assignRole = assignRole;
+            _updateRoles = updateRoles;
+            _getEffectiveAccess = getEffectiveAccess;
             _createInvitation = createInvitation;
         }
 
@@ -163,6 +168,40 @@ namespace WebAPI.Controllers.Identity
                 UserRoles = User.FindAll(ClaimTypes.Role).Select(claim => claim.Value).ToList()
             };
             var result = await _assignRole.HandleAsync(command, cancellationToken);
+            return StatusCode(result.StatusCode, result);
+        }
+
+        [HttpPut("{accountId:guid}/roles")]
+        [Authorize(Policy = "accounts.manage")]
+        public async Task<IActionResult> UpdateRoles(
+            Guid accountId,
+            [FromBody] UpdateAccountRolesRequest request,
+            CancellationToken cancellationToken)
+        {
+            var command = new UpdateInternalAccountRolesCommand
+            {
+                AccountId = accountId,
+                Request = request,
+                UpdatedByAccountId = GetCurrentAccountId(),
+                UserContext = User.GetUserContext(),
+                UserRoles = User.FindAll(ClaimTypes.Role).Select(claim => claim.Value).ToList()
+            };
+            var result = await _updateRoles.HandleAsync(command, cancellationToken);
+            return StatusCode(result.StatusCode, result);
+        }
+
+        [HttpGet("{accountId:guid}/effective-access")]
+        [Authorize(Policy = "accounts.read")]
+        public async Task<IActionResult> GetEffectiveAccess(
+            Guid accountId,
+            CancellationToken cancellationToken)
+        {
+            var query = new GetInternalAccountEffectiveAccessQuery
+            {
+                AccountId = accountId,
+                UserContext = User.GetUserContext()
+            };
+            var result = await _getEffectiveAccess.HandleAsync(query, cancellationToken);
             return StatusCode(result.StatusCode, result);
         }
 

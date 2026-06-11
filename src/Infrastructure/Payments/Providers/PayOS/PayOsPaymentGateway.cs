@@ -210,8 +210,8 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
     private static long GenerateOrderCode(Guid paymentTransactionId)
     {
         var bytes = paymentTransactionId.ToByteArray();
-        var value = Math.Abs(BitConverter.ToInt64(bytes, 0));
-        return value % 9_000_000_000_000 + 1_000_000_000_000;
+        var value = BitConverter.ToUInt64(bytes, 0) & long.MaxValue;
+        return (long)(value % 9_000_000_000_000UL) + 1_000_000_000_000;
     }
 
     private static string SanitizeDescription(string input)

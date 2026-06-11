@@ -15,17 +15,20 @@ public sealed class ManagementOrdersController : ControllerBase
 {
     private readonly ListManagementOrdersQueryHandler _listHandler;
     private readonly GetManagementOrderQueryHandler _getHandler;
+    private readonly GetOrderStatusHistoryQueryHandler _statusHistoryHandler;
     private readonly CancelManagementOrderCommandHandler _cancelHandler;
     private readonly MarkOrderRefundRequiredCommandHandler _refundRequiredHandler;
 
     public ManagementOrdersController(
         ListManagementOrdersQueryHandler listHandler,
         GetManagementOrderQueryHandler getHandler,
+        GetOrderStatusHistoryQueryHandler statusHistoryHandler,
         CancelManagementOrderCommandHandler cancelHandler,
         MarkOrderRefundRequiredCommandHandler refundRequiredHandler)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
+        _statusHistoryHandler = statusHistoryHandler;
         _cancelHandler = cancelHandler;
         _refundRequiredHandler = refundRequiredHandler;
     }
@@ -71,6 +74,26 @@ public sealed class ManagementOrdersController : ControllerBase
         };
 
         var result = await _getHandler.HandleAsync(query, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("{orderId:guid}/status-history")]
+    [Authorize(Policy = "orders.view")]
+    public async Task<IActionResult> GetOrderStatusHistory(
+        Guid orderId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new GetOrderStatusHistoryQuery
+        {
+            OrderId = orderId,
+            UserContext = User.GetUserContext(),
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+
+        var result = await _statusHistoryHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

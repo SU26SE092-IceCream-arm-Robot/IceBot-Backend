@@ -1,8 +1,5 @@
 using Application.SalesCatalog.Abstractions;
 using Application.Shared.Wrappers;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.SalesCatalog.Menus.Commands;
 

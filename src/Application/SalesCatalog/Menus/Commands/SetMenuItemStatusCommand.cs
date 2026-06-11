@@ -1,5 +1,4 @@
 using Domain.SalesCatalog.Enums;
-using System;
 
 namespace Application.SalesCatalog.Menus.Commands;
 

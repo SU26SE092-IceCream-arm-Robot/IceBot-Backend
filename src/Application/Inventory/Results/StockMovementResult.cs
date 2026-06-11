@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Inventory.Results;
 
 public sealed class StockMovementResult

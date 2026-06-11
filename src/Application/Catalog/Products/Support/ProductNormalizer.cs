@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Catalog.Products.Support;
 
 internal static class ProductNormalizer

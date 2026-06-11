@@ -1,4 +1,3 @@
-using Application.Shared.Exceptions;
 using Application.Tenants.Organizations.Commands;
 using Application.Tenants.Organizations.Queries;
 using Application.Tenants.Organizations.Requests;

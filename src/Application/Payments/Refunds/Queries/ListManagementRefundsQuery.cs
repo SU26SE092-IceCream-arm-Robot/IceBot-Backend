@@ -1,6 +1,5 @@
 using Application.Identity.Tokens.Claims;
 using Domain.Payments.Enums;
-using System;
 
 namespace Application.Payments.Refunds.Queries;
 

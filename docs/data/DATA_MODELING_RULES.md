@@ -157,7 +157,7 @@ Rules:
 - Every high-volume table must have a time-based index aligned with its normal query field, such as `ReportedAt`, `OccurredAt`, `ReceivedAt`, or `FailedAt`.
 - Kiosk/device scoped logs should include the scope id before the time field in common query indexes, such as `(KioskId, ReportedAt)` or `(DeviceId, OccurredAt)`.
 - Background-worker queues must have indexes matching their scan predicate. For example, `SyncEventInbox` needs `(Status, NextRetryAt, LockedUntil)` for retry/lock scans.
-- Define retention policy before production. Examples: keep raw heartbeats for a short period, aggregate health metrics, then archive or purge old rows.
+- Define retention policy before production. Current V1 retention keeps raw `KioskHeartbeats` for 30 days and raw `DeviceEvents` for 90 days, then purges them by scheduled job. V1 does not require archive or aggregate tables.
 - Define a PostgreSQL partition plan for high-volume append-only tables before production. Monthly range partitions by the main time field are the default starting point.
 - Do not rely on EF Core fluent configuration alone for partition lifecycle. PostgreSQL partition creation/maintenance should be handled by raw SQL migrations, DBA scripts, or scheduled database maintenance.
 

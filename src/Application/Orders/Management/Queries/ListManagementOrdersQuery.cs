@@ -1,6 +1,5 @@
 using Application.Identity.Tokens.Claims;
 using Domain.Orders.Enums;
-using System;
 
 namespace Application.Orders.Management.Queries;
 

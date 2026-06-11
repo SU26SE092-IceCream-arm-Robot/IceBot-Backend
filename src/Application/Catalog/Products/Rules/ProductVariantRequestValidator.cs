@@ -1,9 +1,6 @@
 using Application.Catalog.Abstractions;
 using Application.Catalog.Products.Requests;
 using Application.Catalog.Products.Support;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Catalog.Products.Rules;
 

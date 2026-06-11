@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Payments.PaymentSessions.Queries;
 
 public sealed class GetPaymentTransactionStatusQuery

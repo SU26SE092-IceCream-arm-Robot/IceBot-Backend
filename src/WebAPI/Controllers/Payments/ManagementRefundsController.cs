@@ -5,8 +5,6 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Authorization;
-using System;
-using System.Threading.Tasks;
 
 namespace WebAPI.Controllers.Payments;
 
@@ -82,7 +80,8 @@ public sealed class ManagementRefundsController : ControllerBase
     [HttpPost("orders/{orderId:guid}/refunds")]
     public async Task<IActionResult> RequestRefund(
         Guid orderId,
-        [FromBody] RefundReasonRequest request,
+        [FromBody] RequestRefundRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
         if (request is null || string.IsNullOrWhiteSpace(request.Reason))
@@ -90,14 +89,21 @@ public sealed class ManagementRefundsController : ControllerBase
             return BadRequest(Application.Shared.Wrappers.ApiResult<object>.Fail("Reason is required to request a refund.", 400));
         }
 
+        if (string.IsNullOrWhiteSpace(request.RefundMethod))
+        {
+            return BadRequest(Application.Shared.Wrappers.ApiResult<object>.Fail("RefundMethod is required.", 400));
+        }
+
         var command = new RequestRefundCommand
         {
             OrderId = orderId,
             UserContext = User.GetUserContext(),
+            RefundMethod = request.RefundMethod,
             Reason = request.Reason,
-            IdempotencyKey = Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey)
-                ? idempotencyKey.ToString()
-                : null
+            VoucherCode = request.VoucherCode,
+            VoucherValue = request.VoucherValue,
+            Note = request.Note,
+            IdempotencyKey = idempotencyKey
         };
 
         var result = await _requestHandler.HandleAsync(command, cancellationToken);
@@ -114,7 +120,8 @@ public sealed class ManagementRefundsController : ControllerBase
         {
             RefundId = refundId,
             UserContext = User.GetUserContext(),
-            ProviderRefundId = request?.ProviderRefundId
+            ProviderRefundId = request?.ProviderRefundId,
+            MoneyWasRefunded = request?.MoneyWasRefunded
         };
 
         var result = await _processedHandler.HandleAsync(command, cancellationToken);
@@ -144,12 +151,16 @@ public sealed class ManagementRefundsController : ControllerBase
     }
 
     [HttpPatch("refunds/{refundId:guid}/cancel")]
-    public async Task<IActionResult> CancelRefund(Guid refundId, CancellationToken cancellationToken)
+    public async Task<IActionResult> CancelRefund(
+        Guid refundId,
+        [FromBody] RefundReasonRequest? request,
+        CancellationToken cancellationToken)
     {
         var command = new CancelRefundCommand
         {
             RefundId = refundId,
-            UserContext = User.GetUserContext()
+            UserContext = User.GetUserContext(),
+            Reason = request?.Reason
         };
 
         var result = await _cancelHandler.HandleAsync(command, cancellationToken);

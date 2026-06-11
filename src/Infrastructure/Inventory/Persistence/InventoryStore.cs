@@ -1,12 +1,8 @@
 using Application.Inventory.Abstractions;
+using Application.Inventory.Results;
 using Domain.Inventory.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Infrastructure.Inventory.Persistence;
 
@@ -17,6 +13,63 @@ public sealed class InventoryStore : IInventoryStore
     public InventoryStore(IceBotDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task<InventorySummaryResult> GetInventorySummaryAsync(
+        Guid? kioskId,
+        Guid? storeId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default)
+    {
+        var query = ApplyDispenserFiltersAndScope(
+            null,
+            storeId,
+            kioskId,
+            isSystemAdmin,
+            allowedOrganizationIds,
+            allowedStoreIds,
+            allowedKioskIds);
+
+        var totalCount = await query.CountAsync(cancellationToken);
+
+        var lowStockCount = await query.CountAsync(
+            x => x.CurrentLevelStatus == Domain.Inventory.Enums.IngredientLevelStatus.Low,
+            cancellationToken);
+
+        var emptyCount = await query.CountAsync(
+            x => x.CurrentLevelStatus == Domain.Inventory.Enums.IngredientLevelStatus.Unknown ||
+                 (x.EstimatedQuantity.HasValue && x.EstimatedQuantity.Value <= 0),
+            cancellationToken);
+
+        var itemsList = await query
+            .Include(x => x.Kiosk)
+            .Include(x => x.Ingredient)
+            .OrderBy(x => x.ContainerCode)
+            .ToListAsync(cancellationToken);
+
+        var items = itemsList.Select(x => new InventorySummaryItemDto
+        {
+            DispenserStateId = x.Id,
+            KioskId = x.KioskId,
+            KioskCode = x.Kiosk?.Code ?? string.Empty,
+            IngredientName = x.Ingredient?.Name ?? string.Empty,
+            EstimatedQuantity = x.EstimatedQuantity,
+            Capacity = x.CapacityQuantity,
+            Unit = x.Unit,
+            Status = x.CurrentLevelStatus.ToString(),
+            UpdatedAt = x.LastMeasuredAt
+        }).ToList();
+
+        return new InventorySummaryResult
+        {
+            TotalDispenserCount = totalCount,
+            LowStockCount = lowStockCount,
+            EmptyCount = emptyCount,
+            Items = items
+        };
     }
 
     public Task<IngredientDispenserState?> GetDispenserStateByIdAsync(Guid id, CancellationToken cancellationToken = default)

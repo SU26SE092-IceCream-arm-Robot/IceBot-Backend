@@ -1,8 +1,10 @@
 using Application;
+using Application.Shared.Wrappers;
 using Asp.Versioning;
 using Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Serilog;
@@ -11,9 +13,13 @@ using System.Text;
 using System.Text.Json.Serialization;
 using WebAPI.Authorization;
 using WebAPI.Configuration;
+using WebAPI.GraphQL.Dashboard;
+using WebAPI.GraphQL.Devices;
+using WebAPI.GraphQL.Inventory;
+using WebAPI.GraphQL.Orders;
+using WebAPI.GraphQL.Tenants;
 using WebAPI.Middlewares;
-using Application.Shared.Wrappers;
-using Microsoft.AspNetCore.Mvc;
+
 
 Log.Logger = new LoggerConfiguration()
                         .WriteTo.Console()
@@ -145,6 +151,15 @@ try
 
         options.AddPolicy("inventory.manage", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager", "Staff", "Technician")));
+
+        options.AddPolicy("maintenance.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
+
+        options.AddPolicy("maintenance.manage", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
+
+        options.AddPolicy("operations.view", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
     });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
@@ -209,14 +224,23 @@ try
         });
 
         var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
-        if (File.Exists(xmlPath))
+        var xmlPath = System.IO.Path.Combine(AppContext.BaseDirectory, xmlFile);
+        if (System.IO.File.Exists(xmlPath))
         {
             c.IncludeXmlComments(xmlPath);
         }
     });
 
     builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
+
+    builder.Services.AddGraphQLServer()
+        .AddQueryType()
+        .AddTypeExtension<DashboardQueries>()
+        .AddTypeExtension<TenantQueries>()
+        .AddTypeExtension<OrderQueries>()
+        .AddTypeExtension<DeviceQueries>()
+        .AddTypeExtension<InventoryQueries>()
+        .AddAuthorization();
 
     var app = builder.Build();
 
@@ -244,6 +268,7 @@ try
     app.MapHealthEndpoints();
     app.MapApplicationInfoEndpoints();
     app.MapControllers();
+    app.MapGraphQL().RequireAuthorization();
 
     app.Run();
 }

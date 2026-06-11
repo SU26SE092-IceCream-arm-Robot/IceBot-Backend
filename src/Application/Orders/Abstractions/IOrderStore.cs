@@ -1,3 +1,4 @@
+using Application.Orders.Management.Results;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
@@ -6,6 +7,18 @@ namespace Application.Orders.Abstractions;
 
 public interface IOrderStore
 {
+    Task<OrderOverviewResult> GetOrderOverviewAsync(
+        DateTimeOffset? from,
+        DateTimeOffset? to,
+        Domain.Orders.Enums.OrderStatus? status,
+        Guid? kioskId,
+        int take,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default);
+
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default);
@@ -36,6 +49,14 @@ public interface IOrderStore
         IReadOnlyCollection<Guid> allowedOrganizationIds,
         IReadOnlyCollection<Guid> allowedStoreIds,
         IReadOnlyCollection<Guid> allowedKioskIds,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountOrderStatusHistoryAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    Task<List<OrderStatusHistory>> ListOrderStatusHistoryAsync(
+        Guid orderId,
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default);

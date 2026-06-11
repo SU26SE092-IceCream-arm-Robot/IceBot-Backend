@@ -210,7 +210,7 @@ public sealed class PaymentStore : IPaymentStore
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchLower = search.Trim().ToLower();
-            query = query.Where(r => 
+            query = query.Where(r =>
                 r.RefundNumber.ToLower().Contains(searchLower) ||
                 r.PaymentTransaction.Order.OrderNumber.ToLower().Contains(searchLower));
         }
@@ -224,12 +224,12 @@ public sealed class PaymentStore : IPaymentStore
         {
             query = query.Where(r => r.PaymentTransaction.Order.OrganizationId == organizationId.Value);
         }
-        
+
         if (storeId.HasValue)
         {
             query = query.Where(r => r.PaymentTransaction.Order.StoreId == storeId.Value);
         }
-        
+
         if (kioskId.HasValue)
         {
             query = query.Where(r => r.PaymentTransaction.Order.KioskId == kioskId.Value);

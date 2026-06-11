@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
 
 public sealed class GetKioskRuntimeMenuQuery

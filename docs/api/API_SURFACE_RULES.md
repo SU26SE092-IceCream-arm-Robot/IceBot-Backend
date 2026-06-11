@@ -31,15 +31,16 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Area | Main routes | Read when asking about |
 | --- | --- | --- |
 | Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password, accept invitation |
-| Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password` | own profile, edit profile, change password while logged in |
-| Account management | `/api/v1/management/accounts/*` | create internal account, invitation link generation, assign roles, disable account, set password |
+| Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password`, `/api/v1/me/access` | own profile, edit profile, change password, inspect current token access while logged in |
+| Account management | `/api/v1/management/accounts/*` | create internal account, invitation link generation, assign/update roles, effective access, disable account, set password |
 | Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
-| Tenant scope lookup | `/api/v1/management/tenant-tree` | select valid organization/store/kiosk scopes for RBAC and management navigation |
+| Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
 | Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/refunds` | internal order search, unpaid cancellation, refund-required marking, manual refund tracking |
 | Inventory management | `/api/v1/management/inventory/*` | dispenser states, stock movement history, refill, estimate adjustment |
+| Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/events` | kiosk connectivity history and device warnings/errors |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
 | Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
@@ -79,6 +80,8 @@ Current examples:
 GET /api/v1/management/products
 GET /api/v1/management/menus
 GET /api/v1/management/accounts
+GET /api/v1/management/accounts/{accountId}/effective-access
+PUT /api/v1/management/accounts/{accountId}/roles
 GET /api/v1/management/payment-methods
 GET /api/v1/management/organizations
 GET /api/v1/management/organizations/{organizationId}
@@ -97,12 +100,12 @@ GET /api/v1/management/kiosks/{kioskId}
 POST /api/v1/management/stores/{storeId}/kiosks
 PUT /api/v1/management/kiosks/{kioskId}
 PATCH /api/v1/management/kiosks/{kioskId}/status
-GET /api/v1/management/tenant-tree
 GET /api/v1/management/roles
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 GET /api/v1/management/orders
 GET /api/v1/management/orders/{orderId}
+GET /api/v1/management/orders/{orderId}/status-history
 PATCH /api/v1/management/orders/{orderId}/cancel
 PATCH /api/v1/management/orders/{orderId}/refund-required
 GET /api/v1/management/refunds
@@ -115,6 +118,8 @@ GET /api/v1/management/inventory/dispenser-states
 GET /api/v1/management/inventory/stock-movements
 POST /api/v1/management/inventory/dispenser-states/{id}/refill
 POST /api/v1/management/inventory/dispenser-states/{id}/adjust-estimate
+GET /api/v1/management/kiosks/{kioskId}/heartbeats
+GET /api/v1/management/kiosks/{kioskId}/events
 ```
 
 Rules:
@@ -124,11 +129,16 @@ Rules:
 - It is valid for multiple roles to share the same management endpoint when policy allows it.
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
 - Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
-- `tenant-tree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
+- GraphQL `tenantTree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
 - Back-office order operations are manual support workflows. Paid orders should be marked `RefundRequired`; they are not cancelled directly.
-- Refund APIs in v1 track manual full-refund workflow only. They do not call payment-provider refund APIs.
+- Order status history is a back-office audit read model. It exposes order status transitions and a small actor snapshot (`changedByAccountId`, `changedByName`, `changedByEmail`), not full account objects, raw payment callback bodies, or robot telemetry.
+- Refund APIs in v1 track manual staff-handled compensation only. Supported methods are `FullMoneyRefund` and `Voucher`; both are full-order compensation flows, not partial refunds or line-item refunds.
+- Full money refund sets `PaymentStatus = Refunded` only when staff confirms the money was actually refunded. Voucher compensation does not reverse payment status.
+- Rejecting or cancelling a refund keeps `OrderStatus = RefundRequired`; staff may create another refund/compensation record later.
 - `POST /api/v1/management/orders/{orderId}/refunds` should use `Idempotency-Key` for safe manual retries.
 - Inventory management in v1 is reporting/operations only. It does not decide runtime menu sellability or robot execution availability.
+- Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
+- `DeviceEvent` is log/evidence, not actionable alert state. Long-term alert UI should use a separate Alert API/entity if needed.
 
 ## Current Account APIs
 
@@ -138,6 +148,7 @@ Current examples:
 
 ```text
 GET /api/v1/me
+GET /api/v1/me/access
 PUT /api/v1/me/profile
 PUT /api/v1/me/password
 ```
@@ -146,6 +157,7 @@ Rules:
 
 - Do not use `/me` for business resources such as orders, kiosks, reports, or maintenance tickets.
 - Password recovery is not `/me` because the user may be logged out.
+- `/me/access` reports the caller's current token roles and effective scoped ids. It is not a fresh database authorization recalculation.
 
 ## Authentication And Password Recovery APIs
 
@@ -226,7 +238,7 @@ To ensure stability, performance, and security, read-model endpoints are strictl
 
 ### 1. Tenant Navigation & Scope Selection Boundaries
 * **Endpoints:** 
-  - `GET /api/v1/management/tenant-tree`
+  - GraphQL `tenantTree`
   - `GET /api/v1/management/role-scope-options`
 * **Purpose:** Administrative layout navigation and validation of scopes when creating/assigning user roles.
 * **Includes:** Hierarchy structural identifiers (Organization -> Store -> Kiosk) and scope codes.
@@ -295,6 +307,16 @@ Current v1 validation convention:
 - **Response Shape:** Keep the current validation response shape unless a separate API contract decision changes it.
 
 Do not move business validation into controllers. Controllers should validate transport/request shape and then call Application handlers.
+
+## GraphQL Management Reads
+
+GraphQL is exposed at `/graphql` as an internal read/query surface for frontend UI aggregation.
+
+- **Scope:** Read/query only. No mutations are implemented in this phase.
+- **REST Surface:** REST remains the existing contract for commands, tablet actions, payment integrations, webhooks, and IoT edge communication.
+- **Implementation:** GraphQL resolvers are thin adapters that delegate execution directly to Application CQRS query handlers. No database queries are performed directly inside the resolvers.
+- **Code Organization:** Keep GraphQL feature/domain-first, not GraphQL-artifact-first. Although `/graphql` is hosted from WebAPI and frontend may see one large query surface, backend code should still be organized around the owning Application/domain features such as Tenants, Orders, Devices, Inventory, and Dashboard. GraphQL root/query classes are transport composition only, similar to controllers.
+- **Authorization:** Reuses JWT authentication and tenant-scoped RBAC rules. Endpoints require authentication via the standard `[Authorize]` attribute.
 
 ## Related Docs
 

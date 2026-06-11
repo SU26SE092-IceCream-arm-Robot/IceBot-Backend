@@ -39,14 +39,14 @@ public sealed class OrdersController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> PlaceOrder(
         [FromBody] PlaceOrderRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
         request ??= new PlaceOrderRequest();
 
-        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) &&
-            Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey))
+        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) && !string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            request.IdempotencyKey = idempotencyKey.ToString();
+            request.IdempotencyKey = idempotencyKey;
         }
 
         var command = new PlaceOrderCommand { Request = request };
@@ -68,14 +68,14 @@ public sealed class OrdersController : ControllerBase
     public async Task<IActionResult> CreatePaymentSession(
         Guid orderId,
         [FromBody] CreatePaymentSessionRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
         request ??= new CreatePaymentSessionRequest();
 
-        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) &&
-            Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey))
+        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) && !string.IsNullOrWhiteSpace(idempotencyKey))
         {
-            request.IdempotencyKey = idempotencyKey.ToString();
+            request.IdempotencyKey = idempotencyKey;
         }
 
         var command = new CreatePaymentSessionCommand { OrderId = orderId, Request = request };
