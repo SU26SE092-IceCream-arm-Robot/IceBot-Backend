@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Application.Identity.Tokens.Claims;
 
 public sealed class CurrentUserContext
@@ -11,4 +14,13 @@ public sealed class CurrentUserContext
     public IReadOnlySet<Guid> AllowedStoreIds { get; init; } = new HashSet<Guid>();
 
     public IReadOnlySet<Guid> AllowedKioskIds { get; init; } = new HashSet<Guid>();
+
+    public IReadOnlyCollection<UserRoleScope> RoleScopes { get; init; } = Array.Empty<UserRoleScope>();
 }
+
+public sealed record UserRoleScope(
+    string RoleCode,
+    Guid? OrganizationId,
+    Guid? StoreId,
+    Guid? KioskId
+);

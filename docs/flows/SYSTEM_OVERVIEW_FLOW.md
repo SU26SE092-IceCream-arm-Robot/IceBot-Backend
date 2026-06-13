@@ -56,4 +56,5 @@ Operations support
 - [Back-Office Setup Flow](BACK_OFFICE_SETUP_FLOW.md)
 - [Checkout Execution Flow](CHECKOUT_EXECUTION_FLOW.md)
 - [Operations Support Flow](OPERATIONS_SUPPORT_FLOW.md)
+- [Maintenance Ticket Flow](MAINTENANCE_TICKET_FLOW.md)
 - [IoT Contract](../iot/IOT_CONTRACT.md)

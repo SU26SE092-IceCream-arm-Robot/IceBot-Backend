@@ -155,6 +155,9 @@ try
         options.AddPolicy("maintenance.view", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
 
+        options.AddPolicy("maintenance.create", policy =>
+            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
+
         options.AddPolicy("maintenance.manage", policy =>
             policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
 

@@ -41,6 +41,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/refunds` | internal order search, unpaid cancellation, refund-required marking, manual refund tracking |
 | Inventory management | `/api/v1/management/inventory/*` | dispenser states, stock movement history, refill, estimate adjustment |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/events` | kiosk connectivity history and device warnings/errors |
+| Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
 | Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
@@ -120,6 +121,15 @@ POST /api/v1/management/inventory/dispenser-states/{id}/refill
 POST /api/v1/management/inventory/dispenser-states/{id}/adjust-estimate
 GET /api/v1/management/kiosks/{kioskId}/heartbeats
 GET /api/v1/management/kiosks/{kioskId}/events
+GET /api/v1/management/maintenance-tickets
+GET /api/v1/management/maintenance-tickets/{ticketId}
+POST /api/v1/management/maintenance-tickets
+PUT /api/v1/management/maintenance-tickets/{ticketId}
+PATCH /api/v1/management/maintenance-tickets/{ticketId}/assign
+PATCH /api/v1/management/maintenance-tickets/{ticketId}/start
+PATCH /api/v1/management/maintenance-tickets/{ticketId}/resolve
+PATCH /api/v1/management/maintenance-tickets/{ticketId}/close
+PATCH /api/v1/management/maintenance-tickets/{ticketId}/cancel
 ```
 
 Rules:
@@ -139,6 +149,7 @@ Rules:
 - Inventory management in v1 is reporting/operations only. It does not decide runtime menu sellability or robot execution availability.
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
 - `DeviceEvent` is log/evidence, not actionable alert state. Long-term alert UI should use a separate Alert API/entity if needed.
+- Maintenance ticket V1 is a manual operations/support workflow. Tickets are kiosk-scoped work items with optional evidence links to device, order, or device event. V1 does not include auto-generated tickets, alert engine, chat, reopen, or GraphQL maintenance aggregate.
 
 ## Current Account APIs
 

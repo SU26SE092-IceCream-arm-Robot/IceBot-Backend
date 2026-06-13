@@ -16,8 +16,9 @@ public static class ClaimsPrincipalExtensions
         var allowedOrgIds = new HashSet<Guid>();
         var allowedStoreIds = new HashSet<Guid>();
         var allowedKioskIds = new HashSet<Guid>();
+        var parsedRoleScopes = new List<UserRoleScope>();
 
-        var allowedRoles = new[] { "OrgAdmin", "Manager", "Technician", "SystemAdmin" };
+        var allowedRoles = new[] { "OrgAdmin", "Manager", "Technician", "SystemAdmin", "Staff" };
         var roleScopes = principal.FindAll("role_scope").Select(c => c.Value).ToList();
 
         foreach (var scopeVal in roleScopes)
@@ -35,18 +36,27 @@ public static class ClaimsPrincipalExtensions
                 var storeIdStr = parts[2];
                 var kioskIdStr = parts[3];
 
-                if (kioskIdStr != "*" && Guid.TryParse(kioskIdStr, out var kioskId))
+                Guid? orgId = null;
+                Guid? storeId = null;
+                Guid? kioskId = null;
+
+                if (kioskIdStr != "*" && Guid.TryParse(kioskIdStr, out var kId))
                 {
-                    allowedKioskIds.Add(kioskId);
+                    kioskId = kId;
+                    allowedKioskIds.Add(kId);
                 }
-                else if (storeIdStr != "*" && Guid.TryParse(storeIdStr, out var storeId))
+                else if (storeIdStr != "*" && Guid.TryParse(storeIdStr, out var sId))
                 {
-                    allowedStoreIds.Add(storeId);
+                    storeId = sId;
+                    allowedStoreIds.Add(sId);
                 }
-                else if (orgIdStr != "*" && Guid.TryParse(orgIdStr, out var orgId))
+                else if (orgIdStr != "*" && Guid.TryParse(orgIdStr, out var oId))
                 {
-                    allowedOrgIds.Add(orgId);
+                    orgId = oId;
+                    allowedOrgIds.Add(oId);
                 }
+
+                parsedRoleScopes.Add(new UserRoleScope(roleCode, orgId, storeId, kioskId));
             }
         }
 
@@ -56,7 +66,8 @@ public static class ClaimsPrincipalExtensions
             IsSystemAdmin = isSystemAdmin,
             AllowedOrganizationIds = allowedOrgIds,
             AllowedStoreIds = allowedStoreIds,
-            AllowedKioskIds = allowedKioskIds
+            AllowedKioskIds = allowedKioskIds,
+            RoleScopes = parsedRoleScopes
         };
     }
 }

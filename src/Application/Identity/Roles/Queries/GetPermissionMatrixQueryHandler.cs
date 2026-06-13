@@ -177,6 +177,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "maintenance.create",
+            Description = "Create maintenance tickets within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "maintenance.manage",
             Description = "Manage maintenance tickets within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
