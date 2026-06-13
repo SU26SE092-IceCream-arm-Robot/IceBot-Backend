@@ -12,6 +12,16 @@ Operational rules for coding agents working in this repository.
 
 Do not duplicate long architecture explanations here. This file is for execution rules.
 
+## Workspace Role
+
+This is the main implementation repository for IceBot backend work.
+
+- Use this file as the primary operational guide for backend/API/domain/database/auth/payment/order/sync tasks.
+- Use `../IceBot-Tools` only as auxiliary tooling: RAG, MCP, code intelligence, docs checks, diagnostics, and local scripts.
+- Use `../Vault` for advisory decisions, research, trade-offs, and history. Vault is not implementation truth.
+- Use `../Docs` for shared project/business docs when the task needs cross-repo project context.
+- The workspace root `AGENTS.md` is only a router/fallback and does not override this file for backend work.
+
 ## Documentation Reading
 
 - Treat links as routing hints, not mandatory recursive reads.
@@ -19,6 +29,14 @@ Do not duplicate long architecture explanations here. This file is for execution
 - If a linked file was already read in the current task, do not reopen it unless the user asks, the file may have changed, or a specific section is needed.
 - Prefer reading the smallest relevant set of docs, then inspect code.
 - When the right backend doc is unclear after direct retrieval or metadata/path filters, use [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md) as a fallback router.
+
+## Working Workflow
+
+- Use current task context first; do not reread docs/code when the answer is already settled in context.
+- For concrete symbols/endpoints/handlers, use Code Intelligence before broad search.
+- For rules/flows/contracts, use docs/RAG only when current context is insufficient.
+- Make the smallest scoped change, then verify with the narrowest relevant check.
+- After meaningful backend code/API/domain changes, run backend preflight as the final check.
 
 ## Change Guardrails
 
@@ -62,11 +80,20 @@ Do not duplicate long architecture explanations here. This file is for execution
 
 ## Verification
 
-Default build command:
+Preferred final check in the full workspace after meaningful backend code/API/domain changes:
+
+```powershell
+cd ..\IceBot-Tools
+python .\backend-preflight\commands\check_backend.py
+```
+
+Fallback/direct compile check:
 
 ```powershell
 dotnet build src\IceBot.slnx
 ```
+
+Use focused lookup or docs tools during investigation. Do not run backend preflight at the start of a task or for design-only discussion.
 
 Do not run build for documentation-only changes unless the user explicitly asks for verification.
 
