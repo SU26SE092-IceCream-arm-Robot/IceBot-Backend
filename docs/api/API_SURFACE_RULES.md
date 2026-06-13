@@ -307,6 +307,7 @@ Current v1 validation convention:
 
 - Do not introduce FluentValidation yet.
 - **Request DTO / DataAnnotations (Format & Syntax):** Use DataAnnotations for simple request DTO shape validation, such as required fields, string length, numeric range, and basic format.
+- **Enum Inputs:** Send enum values as strings. JSON request bodies do not accept integer enum values.
 - **Application Validators / Rule Helpers (Cross-Field / Request-Level):** Use static `RequestValidator` / rule helper classes for cross-field or request-level rules that do not need database access.
 - **Handlers & Stores (Business constraints & Database-dependent):** Use handlers and stores for database-dependent validation, such as uniqueness, parent existence, active parent checks, and tenant-scope ownership.
 - **Domain Methods (Invariants):** Use domain methods for entity invariants and state transitions.

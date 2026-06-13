@@ -35,6 +35,11 @@ public sealed class UpdateMaintenanceTicketCommandHandler
         var user = command.UserContext;
         var req = command.Request;
 
+        if (string.IsNullOrWhiteSpace(req.Title))
+        {
+            return ApiResult<MaintenanceTicketResult>.Fail("Title is required.", 400);
+        }
+
         // 1. Fetch MaintenanceTicket
         var ticket = await _ticketStore.GetByIdAsync(command.TicketId, cancellationToken);
         if (ticket is null)

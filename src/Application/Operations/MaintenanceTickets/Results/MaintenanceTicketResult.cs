@@ -12,6 +12,7 @@ public sealed class MaintenanceTicketResult
     public Guid? DeviceId { get; init; }
     public Guid? OrderId { get; init; }
     public Guid? DeviceEventId { get; init; }
+    public string IssueCode { get; init; } = null!;
     public string Title { get; init; } = null!;
     public string? Description { get; init; }
     public string Priority { get; init; } = null!;

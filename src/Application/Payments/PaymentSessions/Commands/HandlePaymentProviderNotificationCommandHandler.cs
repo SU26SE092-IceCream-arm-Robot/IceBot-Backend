@@ -2,6 +2,7 @@ using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Results;
 using Application.Payments.PaymentSessions.Support;
 using Application.Payments.Providers;
+using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
@@ -37,6 +38,10 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 request.RawPayload,
                 request.Signature,
                 cancellationToken);
+        }
+        catch (AppException ex)
+        {
+            return ApiResult<PaymentNotificationResult>.Fail(ex.Message, ex.StatusCode);
         }
         catch (Exception ex)
         {

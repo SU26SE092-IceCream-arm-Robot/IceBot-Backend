@@ -24,6 +24,8 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | --- | --- | --- |
 | High-level backend architecture | [Architecture](../ARCHITECTURE.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Current work protocol, whether to edit, verification, migrations | [Working Protocol](process/WORKING_PROTOCOL.md) | [Documentation Rules](process/DOCUMENTATION_RULES.md) |
+| Deployment runtime config, environment variables, appsettings, health/info | [Deployment Configuration](process/DEPLOYMENT_CONFIG.md) | [API Surface Rules](api/API_SURFACE_RULES.md) |
+| Manual backend critical rule checks before handoff | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) | [Working Protocol](process/WORKING_PROTOCOL.md) |
 | How backend docs should be structured for RAG/search | [Documentation Rules](process/DOCUMENTATION_RULES.md) | this file |
 | Domain ownership, entity belongs to which bounded context | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md) |
 | Layer dependency, repository, DbContext, application/domain/infrastructure boundary | [Dependency Rules](architecture/DEPENDENCY_RULES.md) | [Architecture](../ARCHITECTURE.md) |
@@ -43,6 +45,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Catalog to runtime menu, menu sellability, Cloud menu vs Edge projection | [Catalog Runtime Menu Flow](flows/CATALOG_RUNTIME_MENU_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Tablet/cloud/edge/payment/MQTT/execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Operations support, telemetry, heartbeat, device events, refund support | [Operations Support Flow](flows/OPERATIONS_SUPPORT_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md) |
+| Maintenance ticket lifecycle, staff support ticket, technician assignment | [Maintenance Ticket Flow](flows/MAINTENANCE_TICKET_FLOW.md) | [Operations Support Flow](flows/OPERATIONS_SUPPORT_FLOW.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Failure flows, edge offline, duplicate notifications, retry behavior | [Failure Flows](flows/FAILURE_FLOWS.md) | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md) |
 | Exact tablet-edge-cloud API/message contract | [IoT Contract](iot/IOT_CONTRACT.md) | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Local edge runtime database design | [Local Edge Runtime ERD](iot/LOCAL_EDGE_RUNTIME_ERD.md) | [IoT Contract](iot/IOT_CONTRACT.md), [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
@@ -52,6 +55,8 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Query contains | Useful filters or docs |
 | --- | --- |
 | `auth`, `login`, `forgot password`, `reset password`, `refresh token` | [API Surface Rules](api/API_SURFACE_RULES.md), section `Authentication And Password Recovery APIs` |
+| `deploy`, `deployment`, `env`, `appsettings`, `JWT`, `SMTP`, `PayOS`, `Firebase`, `health`, `info` | [Deployment Configuration](process/DEPLOYMENT_CONFIG.md) |
+| `manual verification`, `critical rule`, `smoke checklist`, `maintenance lifecycle test`, `payment webhook test` | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 | `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
 | `management accounts`, `role scope`, `RBAC`, `policy`, `role catalog`, `permission matrix`, `roles.view`, `role-scope-options.view`, `effective access`, `me access` | [Authorization Rules](api/AUTHORIZATION_RULES.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | `store`, `organization`, `kiosk`, `tenant scope`, `role scope options` | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
@@ -61,6 +66,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `management orders`, `order status history`, `refund`, `manual refund`, `stock movement`, `dispenser state`, `inventory refill` | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | `GraphQL`, `REST`, `read model aggregation`, `dashboard query`, `overview query` | [API Surface Rules](api/API_SURFACE_RULES.md), section `GraphQL Management Reads` |
 | `heartbeat`, `device event`, `kiosk event`, `operations telemetry`, `lost connection` | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
+| `maintenance ticket`, `support ticket`, `technician assignment`, `maintenance.create`, `maintenance.manage` | [Maintenance Ticket Flow](flows/MAINTENANCE_TICKET_FLOW.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | `PayloadJson`, `SnapshotJson`, `ConfigJson`, `JSONB` | [JSON Field Rules](data/JSON_FIELD_RULES.md) |
 | `SyncEventInbox`, `NextRetryAt`, `LockedUntil`, `dead letter` | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md) |

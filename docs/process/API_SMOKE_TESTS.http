@@ -1,0 +1,216 @@
+### API Smoke Tests Collection
+
+@baseUrl = http://localhost:5000/api/v1
+@accessToken = YOUR_ACCESS_TOKEN
+@sampleGuid = 00000000-0000-0000-0000-000000000000
+
+# ==========================================
+# 1. Health and Probes
+# ==========================================
+
+### Liveness Probe
+GET http://localhost:5000/health
+Accept: application/json
+
+### Readiness Probe
+GET http://localhost:5000/health/ready
+Accept: application/json
+
+### Service Info
+GET http://localhost:5000/info
+Accept: application/json
+
+
+# ==========================================
+# 2. Authentication
+# ==========================================
+
+### Local Username/Password Login
+POST {{baseUrl}}/authentication/login
+Content-Type: application/json
+
+{
+  "email": "admin@icebot.internal",
+  "password": "AdminPassword123!"
+}
+
+### Refresh Access Token
+POST {{baseUrl}}/authentication/refresh-token
+Content-Type: application/json
+
+{
+  "refreshToken": "YOUR_REFRESH_TOKEN"
+}
+
+### Current Account Access Scope Info
+GET {{baseUrl}}/me/access
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+
+# ==========================================
+# 3. Management Accounts & Roles
+# ==========================================
+
+### List Management Accounts
+GET {{baseUrl}}/management/accounts?pageNumber=1&pageSize=10
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Get Account Effective Access Scopes
+GET {{baseUrl}}/management/accounts/{{sampleGuid}}/effective-access
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### List System Roles
+GET {{baseUrl}}/management/roles
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+
+# ==========================================
+# 4. Tenant Management (Org, Store, Kiosk)
+# ==========================================
+
+### List Organizations
+GET {{baseUrl}}/management/organizations
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Create Store under Organization
+POST {{baseUrl}}/management/organizations/{{sampleGuid}}/stores
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "code": "STORE_CODE_1",
+  "name": "First IceBot Store",
+  "address": "123 Main St",
+  "latitude": 10.762622,
+  "longitude": 106.660172
+}
+
+### List Kiosks
+GET {{baseUrl}}/management/kiosks?status=Active
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+
+# ==========================================
+# 5. Product & Menu
+# ==========================================
+
+### Get Customer Kiosk Runtime Menu
+GET {{baseUrl}}/kiosks/{{sampleGuid}}/runtime-menu
+Accept: application/json
+
+### List Management Products
+GET {{baseUrl}}/management/products
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+
+# ==========================================
+# 6. Orders, Payments, & Refunds
+# ==========================================
+
+### Place Kiosk Order
+POST {{baseUrl}}/orders
+Idempotency-Key: PlaceOrder_Unique_Idempotency_Key
+Content-Type: application/json
+
+{
+  "kioskId": "{{sampleGuid}}",
+  "items": [
+    {
+      "productId": "{{sampleGuid}}",
+      "quantity": 1,
+      "price": 35000
+    }
+  ],
+  "paymentMethod": "PayOS",
+  "notes": "No sprinkles please"
+}
+
+### Create Order Payment Session
+POST {{baseUrl}}/orders/{{sampleGuid}}/payment-sessions
+Idempotency-Key: PaymentSession_Unique_Idempotency_Key
+Content-Type: application/json
+
+{
+  "paymentMethod": "PayOS",
+  "returnUrl": "http://localhost:3000/payment-success",
+  "cancelUrl": "http://localhost:3000/payment-cancelled"
+}
+
+### Request Refund (Management Support Flow)
+POST {{baseUrl}}/management/orders/{{sampleGuid}}/refunds
+Idempotency-Key: RefundRequest_Unique_Idempotency_Key
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "refundMethod": "FullMoneyRefund",
+  "reason": "Machine failed to dispense ice cream",
+  "note": "Refund confirmed via operator"
+}
+
+
+# ==========================================
+# 7. Inventory
+# ==========================================
+
+### List Dispenser States
+GET {{baseUrl}}/management/inventory/dispenser-states
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Refill Kiosk Dispenser
+POST {{baseUrl}}/management/inventory/dispenser-states/{{sampleGuid}}/refill
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "refillQuantity": 1000,
+  "batchNumber": "BATCH-001"
+}
+
+
+# ==========================================
+# 8. Operations Telemetry
+# ==========================================
+
+### Get Kiosk Heartbeats History
+GET {{baseUrl}}/management/kiosks/{{sampleGuid}}/heartbeats?from=2026-06-13T00:00:00Z&to=2026-06-14T00:00:00Z&pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Get Kiosk Device Events
+GET {{baseUrl}}/management/kiosks/{{sampleGuid}}/events?minSeverity=Warning&from=2026-06-13T00:00:00Z&to=2026-06-14T00:00:00Z&pageNumber=1&pageSize=20
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+
+# ==========================================
+# 9. Maintenance Tickets
+# ==========================================
+
+### List Maintenance Tickets
+GET {{baseUrl}}/management/maintenance-tickets?status=Open&pageNumber=1&pageSize=10
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Create Maintenance Ticket
+POST {{baseUrl}}/management/maintenance-tickets
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "organizationId": "{{sampleGuid}}",
+  "storeId": "{{sampleGuid}}",
+  "kioskId": "{{sampleGuid}}",
+  "title": "Arm motor calibration error",
+  "description": "Axis 3 motor overheated during dispensing, requires manual check",
+  "priority": "High",
+  "issueCode": "MOTOR_ERR"
+}

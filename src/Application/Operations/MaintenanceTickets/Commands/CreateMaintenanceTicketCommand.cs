@@ -35,6 +35,11 @@ public sealed class CreateMaintenanceTicketCommandHandler
         var user = command.UserContext;
         var req = command.Request;
 
+        if (string.IsNullOrWhiteSpace(req.Title))
+        {
+            return ApiResult<MaintenanceTicketResult>.Fail("Title is required.", 400);
+        }
+
         // 1. Authorization Access Check
         if (!MaintenanceTicketAccessRules.CanCreate(user, req.OrganizationId, req.StoreId, req.KioskId))
         {
@@ -92,7 +97,7 @@ public sealed class CreateMaintenanceTicketCommandHandler
             OrderId = req.OrderId,
             DeviceEventId = req.DeviceEventId,
             TicketNumber = ticketNumber,
-            IssueCode = req.IssueCode ?? "GENERAL",
+            IssueCode = string.IsNullOrWhiteSpace(req.IssueCode) ? "GENERAL" : req.IssueCode.Trim(),
             Title = req.Title.Trim(),
             Description = req.Description?.Trim(),
             Priority = req.Priority ?? MaintenancePriority.Medium,

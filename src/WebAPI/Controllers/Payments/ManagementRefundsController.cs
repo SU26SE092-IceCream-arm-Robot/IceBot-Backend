@@ -77,6 +77,14 @@ public sealed class ManagementRefundsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    /// <summary>
+    /// Requests a refund for an order.
+    /// </summary>
+    /// <param name="orderId">The ID of the order.</param>
+    /// <param name="request">The refund request details.</param>
+    /// <param name="idempotencyKey">A unique key to prevent duplicate refund requests.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created refund details.</returns>
     [HttpPost("orders/{orderId:guid}/refunds")]
     public async Task<IActionResult> RequestRefund(
         Guid orderId,

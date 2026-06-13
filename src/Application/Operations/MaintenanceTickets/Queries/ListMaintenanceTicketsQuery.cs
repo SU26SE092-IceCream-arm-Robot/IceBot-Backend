@@ -43,13 +43,14 @@ public sealed class ListMaintenanceTicketsQueryHandler
     {
         var user = query.UserContext;
         var pageNumber = query.PageNumber <= 0 ? 1 : query.PageNumber;
-        var pageSize = query.PageSize <= 0 ? 10 : query.PageSize;
+        var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
         // Parse Status
         MaintenanceTicketStatus? parsedStatus = null;
         if (!string.IsNullOrWhiteSpace(query.Status))
         {
-            if (!Enum.TryParse<MaintenanceTicketStatus>(query.Status.Trim(), ignoreCase: true, out var statusVal))
+            if (!Enum.TryParse<MaintenanceTicketStatus>(query.Status.Trim(), ignoreCase: true, out var statusVal) ||
+                !Enum.IsDefined(statusVal))
             {
                 return PagedResult<MaintenanceTicketResult>.Fail("Invalid maintenance ticket status.", 400, pageNumber, pageSize);
             }
@@ -60,7 +61,8 @@ public sealed class ListMaintenanceTicketsQueryHandler
         MaintenancePriority? parsedPriority = null;
         if (!string.IsNullOrWhiteSpace(query.Priority))
         {
-            if (!Enum.TryParse<MaintenancePriority>(query.Priority.Trim(), ignoreCase: true, out var priorityVal))
+            if (!Enum.TryParse<MaintenancePriority>(query.Priority.Trim(), ignoreCase: true, out var priorityVal) ||
+                !Enum.IsDefined(priorityVal))
             {
                 return PagedResult<MaintenanceTicketResult>.Fail("Invalid maintenance ticket priority.", 400, pageNumber, pageSize);
             }

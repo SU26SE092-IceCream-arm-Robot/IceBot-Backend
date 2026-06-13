@@ -1,5 +1,6 @@
 using Application.Payments.Abstractions;
 using Application.Payments.Providers;
+using Application.Shared.Exceptions;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using Infrastructure.Payments.Options;
@@ -38,6 +39,8 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         Order order,
         CancellationToken cancellationToken = default)
     {
+        EnsureConfigured();
+
         var amount = decimal.ToInt32(decimal.Round(paymentTransaction.Amount, 0, MidpointRounding.AwayFromZero));
         var orderCode = GenerateOrderCode(paymentTransaction.Id);
         var description = SanitizeDescription($"IceBot {order.OrderNumber}");
@@ -109,6 +112,7 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        EnsureConfigured(requireApiCredentials: false);
 
         using var document = JsonDocument.Parse(rawPayload);
         var root = document.RootElement;
@@ -205,6 +209,28 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_options.ChecksumKey));
         var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
         return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private void EnsureConfigured(bool requireApiCredentials = true)
+    {
+        if (string.IsNullOrWhiteSpace(_options.ChecksumKey))
+        {
+            throw new AppException("PayOS integration is not configured.", 503);
+        }
+
+        if (!requireApiCredentials)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_options.ClientId) ||
+            string.IsNullOrWhiteSpace(_options.ApiKey) ||
+            string.IsNullOrWhiteSpace(_options.BaseUrl) ||
+            string.IsNullOrWhiteSpace(_options.ReturnUrl) ||
+            string.IsNullOrWhiteSpace(_options.CancelUrl))
+        {
+            throw new AppException("PayOS integration is not configured.", 503);
+        }
     }
 
     private static long GenerateOrderCode(Guid paymentTransactionId)

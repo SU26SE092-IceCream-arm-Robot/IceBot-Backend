@@ -24,6 +24,7 @@ public static class MaintenanceTicketResultMapper
             DeviceId = ticket.DeviceId,
             OrderId = ticket.OrderId,
             DeviceEventId = ticket.DeviceEventId,
+            IssueCode = ticket.IssueCode,
             Title = ticket.Title,
             Description = ticket.Description,
             Priority = ticket.Priority.ToString(),

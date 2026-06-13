@@ -35,6 +35,13 @@ public sealed class OrdersController : ControllerBase
         _getOrderPaymentStatusHandler = getOrderPaymentStatusHandler;
     }
 
+    /// <summary>
+    /// Places a new kiosk order.
+    /// </summary>
+    /// <param name="request">The order details.</param>
+    /// <param name="idempotencyKey">A unique key to prevent duplicate order creations.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created order status.</returns>
     [HttpPost]
     [AllowAnonymous]
     public async Task<IActionResult> PlaceOrder(
@@ -63,6 +70,14 @@ public sealed class OrdersController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    /// <summary>
+    /// Creates a payment session for an order.
+    /// </summary>
+    /// <param name="orderId">The ID of the order.</param>
+    /// <param name="request">The payment session request details.</param>
+    /// <param name="idempotencyKey">A unique key to prevent duplicate payment session creations.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>The created payment session details.</returns>
     [HttpPost("{orderId:guid}/payment-sessions")]
     [AllowAnonymous]
     public async Task<IActionResult> CreatePaymentSession(

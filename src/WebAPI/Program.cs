@@ -50,9 +50,25 @@ try
     builder.Services.AddCors(options =>
     {
         options.AddPolicy("FrontendOnly",
-            policy => policy.AllowAnyOrigin()
-                            .AllowAnyMethod()
-                            .AllowAnyHeader());
+            policy =>
+            {
+                var allowedOrigins = builder.Configuration
+                    .GetSection("Cors:AllowedOrigins")
+                    .Get<string[]>() ?? [];
+
+                if (allowedOrigins.Length > 0)
+                {
+                    policy.WithOrigins(allowedOrigins)
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+                }
+                else if (builder.Environment.IsDevelopment())
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyMethod()
+                          .AllowAnyHeader();
+                }
+            });
     });
 
     builder.Services.AddOptions<JwtOptions>()
@@ -171,7 +187,7 @@ try
     {
         options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.Converters.Add(
-            new JsonStringEnumConverter(null, allowIntegerValues: true));
+            new JsonStringEnumConverter(null, allowIntegerValues: false));
     })
     .ConfigureApiBehaviorOptions(options =>
     {
@@ -257,6 +273,8 @@ try
     app.UseSwaggerUI();
 
     app.UseHttpsRedirection();
+
+    app.UseCors("FrontendOnly");
 
     app.UseMiddleware<CorrelationIdMiddleware>();
 
