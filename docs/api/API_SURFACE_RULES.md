@@ -232,16 +232,21 @@ Current examples:
 ```text
 GET /health
 GET /health/ready
+GET /management/diagnostics/health
 GET /info
 ```
 
 Rules:
 
-- `/health` is a lightweight liveness probe.
-- `/health/ready` may check dependencies such as the database.
+- `/health` is a lightweight public liveness probe and does not check database or provider connectivity.
+- `/health/ready` is a public/internal-safe readiness probe. In V1 it checks PostgreSQL database connectivity only. SMTP, Firebase, and PayOS network connectivity do not block readiness in V1.
+- Database failures return a generic `"Database unavailable"` reason. Raw connection strings, credentials, or exception details must not be exposed.
+- `/management/diagnostics/health` is a CI/CD and dev/ops diagnostics probe. It checks PostgreSQL, migration status, and safe config presence for JWT, SMTP, Firebase, and PayOS.
+- Realtime SMTP, Firebase, and PayOS pings are opt-in through `Diagnostics:EnableExternalPing=true`. They must not block `/health/ready`.
+- Diagnostics responses must not expose secret values, connection strings, raw provider exceptions, SMTP passwords, PayOS checksum keys, or Firebase credentials.
+- `Diagnostics:ApiKey` controls diagnostics access. In non-development environments, configure it and send `X-Diagnostics-Key`.
 - `/info` exposes non-sensitive service/build metadata.
 - Do not require user JWT for health probes.
-- Do not expose secrets, connection strings, stack traces, or sensitive dependency details.
 
 ## Read Model API Boundaries
 
