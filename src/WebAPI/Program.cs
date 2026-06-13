@@ -13,11 +13,7 @@ using System.Text;
 using System.Text.Json.Serialization;
 using WebAPI.Authorization;
 using WebAPI.Configuration;
-using WebAPI.GraphQL.Dashboard;
-using WebAPI.GraphQL.Devices;
-using WebAPI.GraphQL.Inventory;
-using WebAPI.GraphQL.Orders;
-using WebAPI.GraphQL.Tenants;
+using WebAPI.GraphQL;
 using WebAPI.Middlewares;
 
 
@@ -100,86 +96,7 @@ try
         };
     });
 
-    builder.Services.AddAuthorization(options =>
-    {
-        options.AddPolicy("accounts.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin")));
-
-        options.AddPolicy("accounts.read", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
-
-        options.AddPolicy("payments.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager")));
-
-        options.AddPolicy("products.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager")));
-
-        options.AddPolicy("menus.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager")));
-
-        options.AddPolicy("organizations.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin")));
-
-        options.AddPolicy("organizations.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin")));
-
-        options.AddPolicy("organizations.update", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin")));
-
-        options.AddPolicy("stores.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
-
-        options.AddPolicy("stores.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin")));
-
-        options.AddPolicy("stores.update", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
-
-        options.AddPolicy("kiosks.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
-
-        options.AddPolicy("kiosks.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
-
-        options.AddPolicy("kiosks.update", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
-
-        options.AddPolicy("tenant-tree.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
-
-        options.AddPolicy("roles.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
-
-        options.AddPolicy("role-scope-options.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager")));
-
-        options.AddPolicy("orders.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff")));
-
-        options.AddPolicy("orders.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff")));
-
-        options.AddPolicy("refunds.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager", "Staff")));
-
-        options.AddPolicy("inventory.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
-
-        options.AddPolicy("inventory.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "Manager", "Staff", "Technician")));
-
-        options.AddPolicy("maintenance.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
-
-        options.AddPolicy("maintenance.create", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
-
-        options.AddPolicy("maintenance.manage", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Technician")));
-
-        options.AddPolicy("operations.view", policy =>
-            policy.Requirements.Add(new ScopedRoleRequirement("SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician")));
-    });
+    builder.Services.AddAuthorization(options => options.AddIceBotAuthorizationPolicies());
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
 
@@ -252,14 +169,7 @@ try
 
     builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
 
-    builder.Services.AddGraphQLServer()
-        .AddQueryType()
-        .AddTypeExtension<DashboardQueries>()
-        .AddTypeExtension<TenantQueries>()
-        .AddTypeExtension<OrderQueries>()
-        .AddTypeExtension<DeviceQueries>()
-        .AddTypeExtension<InventoryQueries>()
-        .AddAuthorization();
+    builder.Services.AddIceBotGraphQL();
 
     var app = builder.Build();
 
@@ -289,7 +199,7 @@ try
     app.MapHealthEndpoints();
     app.MapApplicationInfoEndpoints();
     app.MapControllers();
-    app.MapGraphQL().RequireAuthorization();
+    app.MapIceBotGraphQL();
 
     app.Run();
 }

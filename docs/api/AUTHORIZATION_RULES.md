@@ -126,6 +126,8 @@ This is a tenant RBAC usability implementation. It does not add `Permission` or 
 
 ## Policy Direction
 
+Register backend authorization policies in `src/WebAPI/Configuration/AuthorizationPolicyExtensions.cs`; do not add feature-specific policy registrations directly to `Program.cs`.
+
 | Policy | Allowed roles | Notes |
 | --- | --- | --- |
 | `roles.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View roles catalog and static permission matrix |
