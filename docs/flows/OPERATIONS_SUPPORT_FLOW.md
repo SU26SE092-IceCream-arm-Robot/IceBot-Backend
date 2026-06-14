@@ -38,6 +38,14 @@ Order issue
 - Manual refund/compensation is tracked in the backend, but actual money movement can be staff-handled outside provider integration in V1.
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
 
+## Real-time Operations Updates
+
+To support operations personnel, changes to support tickets and inventory emit real-time SignalR notifications:
+- **`MaintenanceTicketChanged`** is published on `OperationsHub` to group `kiosk:{kioskId}` when tickets are created, updated, assigned, started, resolved, closed, or cancelled.
+- **`InventoryChanged`** is published on `OperationsHub` to group `kiosk:{kioskId}` when a dispenser is refilled or its stock estimate is adjusted.
+
+These events allow operations dashboard screens to reflect live maintenance updates and ingredient levels instantly.
+
 ## Related Docs
 
 - [System Flows](SYSTEM_FLOWS.md)

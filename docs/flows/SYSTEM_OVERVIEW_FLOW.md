@@ -50,6 +50,28 @@ Operations support
 - Cloud owns central business truth; Edge owns local runtime machine truth.
 - MQTT is notification only, not source of truth.
 
+## Integration Transport Boundaries
+
+Use transport by receiver and durability need, not by the broad label "realtime".
+
+| Boundary | Preferred method | Purpose |
+| --- | --- | --- |
+| Cloud to human UI | SignalR | Realtime UI deltas, ephemeral state, dashboard invalidation, order/payment/ticket/status updates |
+| Cloud to Edge/Kiosk/Robot runtime | MQTT plus command pull / durable sync | Wake-up notifications, runtime command availability, device/robot event stream |
+| Edge/Kiosk to Cloud | REST batch sync or MQTT event notification | Heartbeats, device events, execution results, offline order sync evidence |
+| Cloud to payment/external providers | HTTP SDK/webhook | Provider session creation, callback verification, external identity/email/payment operations |
+| Cloud internal async dispatch | Outbox/background worker | Reliable post-commit dispatch to MQTT, provider retry, sync fan-out, future durable realtime |
+| Snapshot/query/CRUD | REST/GraphQL | Initial state, detail reads, search/filter/list, commands, audit/history/reporting |
+
+Rules:
+
+- SignalR is for UI clients, not robot execution commands.
+- MQTT is for machine-to-machine runtime integration, not management UI state delivery.
+- REST/GraphQL remain the recovery path after reconnect, refresh, or missed realtime events.
+- Robot runtime messages should include ids, correlation/causation, timestamp, schema/contract version, and idempotency keys.
+- Payment/provider callbacks must not depend on SignalR or MQTT success.
+- Important machine commands should eventually use outbox-backed dispatch; best-effort SignalR is acceptable for UI notification in V1.
+
 ## Related Docs
 
 - [System Flows](SYSTEM_FLOWS.md)

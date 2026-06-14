@@ -1,0 +1,36 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using Application.Tenants;
+using Application.Tenants.Abstractions;
+using WebAPI.Authorization;
+
+namespace WebAPI.SignalR.Hubs;
+
+[Authorize]
+public sealed class OperationsHub : Hub
+{
+    private readonly IKioskStore _kioskStore;
+
+    public OperationsHub(IKioskStore kioskStore)
+    {
+        _kioskStore = kioskStore;
+    }
+
+    public async Task JoinKiosk(Guid kioskId)
+    {
+        var user = Context.User!.GetUserContext();
+        var kiosk = await _kioskStore.GetByIdAsync(kioskId, Context.ConnectionAborted);
+        if (kiosk is null ||
+            !ScopeAccessRules.CanAccessScopedRow(user, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id))
+        {
+            throw new HubException("Access denied: you do not have access to this kiosk.");
+        }
+
+        await Groups.AddToGroupAsync(Context.ConnectionId, $"kiosk:{kioskId}");
+    }
+
+    public async Task LeaveKiosk(Guid kioskId)
+    {
+        await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"kiosk:{kioskId}");
+    }
+}

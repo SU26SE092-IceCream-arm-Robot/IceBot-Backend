@@ -43,6 +43,11 @@ This is the main implementation repository for IceBot backend work.
 - Preserve existing API route contracts unless the user explicitly asks to change them.
 - Do not keep backward-compatibility or legacy response/request fields unless the user explicitly asks for compatibility, especially before first deployment.
 - Keep changes scoped to the requested work.
+- Do not default to preserving the current design. Existing code is evidence, not proof that the boundary is correct.
+- For meaningful changes, evaluate three options before choosing:
+  - Patch: smallest fix; state whether it increases technical debt.
+  - Refactor: preserve behavior but improve structure/boundaries.
+  - Rewrite: remove a wrong abstraction or boundary and rebuild it.
 - Do not convert a review, challenge, or "why did you do this?" question into code edits. Explain first; wait for an explicit action request before changing files.
 - Treat phrases such as "vì sao", "sao không", "có đang ... không", "cân nhắc", "kiểm tra", and "đánh giá" as inspection/explanation by default, not permission to refactor.
 - Do not justify broad movement, renaming, or added abstraction only because the build passes. Build success verifies compilation, not design fit.

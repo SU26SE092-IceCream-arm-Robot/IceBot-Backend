@@ -2,16 +2,20 @@ using Application.Shared.Wrappers;
 using Application.Tenants.Abstractions;
 using Application.Tenants.Kiosks.Results;
 using Domain.Tenants.Enums;
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 
 namespace Application.Tenants.Kiosks.Commands;
 
 public sealed class SetKioskStatusCommandHandler
 {
     private readonly IKioskStore _kioskStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public SetKioskStatusCommandHandler(IKioskStore kioskStore)
+    public SetKioskStatusCommandHandler(IKioskStore kioskStore, IRealtimeNotificationPublisher publisher)
     {
         _kioskStore = kioskStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<KioskResult>> HandleAsync(
@@ -53,11 +57,32 @@ public sealed class SetKioskStatusCommandHandler
             }
         }
 
+        var oldStatus = kiosk.Status;
+        if (oldStatus == request.Status)
+        {
+            return ApiResult<KioskResult>.Success(KioskResultMapper.ToResult(kiosk), "Kiosk status is unchanged.");
+        }
+
+        var changedAt = DateTimeOffset.UtcNow;
         kiosk.Status = request.Status;
-        kiosk.UpdatedAt = DateTimeOffset.UtcNow;
+        kiosk.UpdatedAt = changedAt;
         kiosk.UpdatedByAccountId = userContext.AccountId;
 
         await _kioskStore.SaveChangesAsync(cancellationToken);
+
+        var kioskStatusEvent = new KioskStatusChangedEvent
+        {
+            KioskId = kiosk.Id,
+            OrganizationId = kiosk.OrganizationId,
+            StoreId = kiosk.StoreId,
+            OldStatus = oldStatus.ToString(),
+            NewStatus = request.Status.ToString(),
+            Connectivity = request.Status.ToString(), // "new status string for now" as per plan
+            Reason = "KioskStatusUpdated",
+            UpdatedAt = changedAt,
+            Version = 1
+        };
+        await _publisher.PublishKioskStatusChangedAsync(kioskStatusEvent, cancellationToken);
 
         return ApiResult<KioskResult>.Success(KioskResultMapper.ToResult(kiosk), "Kiosk status updated successfully.");
     }

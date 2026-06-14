@@ -60,6 +60,8 @@ MQTT is notification only. It is not the source of truth and must not contain la
 
 Edge must pull commands from cloud after receiving an MQTT notification. Edge must also poll/pull periodically in case MQTT is missed while offline.
 
+MQTT is the machine-to-machine runtime integration boundary. It is separate from SignalR, which is used for Cloud-to-human-UI realtime updates. When Edge or robot state changes, Cloud may project the validated state to UI through SignalR, but SignalR must not drive robot execution directly.
+
 ## System Flow
 
 End-to-end checkout, payment, edge dispatch, and robot execution flow lives in [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md). Failure flows live in [Failure Flows](../flows/FAILURE_FLOWS.md).

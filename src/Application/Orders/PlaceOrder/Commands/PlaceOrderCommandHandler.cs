@@ -8,16 +8,21 @@ using Application.Tenants.Kiosks.Rules;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Enums;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Orders.PlaceOrder.Commands;
 
 public sealed class PlaceOrderCommandHandler
 {
     private const string DefaultCurrency = "VND";
     private readonly IOrderStore _orderStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public PlaceOrderCommandHandler(IOrderStore orderStore)
+    public PlaceOrderCommandHandler(IOrderStore orderStore, IRealtimeNotificationPublisher publisher)
     {
         _orderStore = orderStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
@@ -52,7 +57,7 @@ public sealed class PlaceOrderCommandHandler
             }
         }
 
-        return await _orderStore.ExecuteInTransactionAsync(async ct =>
+        var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
             var kiosk = await _orderStore.GetKioskByIdAsync(request.KioskId, ct);
             if (kiosk is null)
@@ -209,6 +214,29 @@ public sealed class PlaceOrderCommandHandler
 
             return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order), "Order created.", 201);
         }, cancellationToken);
+
+        if (result.Succeeded && result.Data is not null)
+        {
+            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
+            {
+                OrderId = result.Data.Id,
+                OrderNumber = result.Data.OrderNumber,
+                KioskId = result.Data.KioskId,
+                OrganizationId = result.Data.OrganizationId,
+                StoreId = result.Data.StoreId,
+                OldStatus = "None",
+                NewStatus = result.Data.Status.ToString(),
+                PaymentStatus = result.Data.PaymentStatus.ToString(),
+                CustomerStatus = result.Data.CustomerStatus,
+                CustomerStatusMessage = result.Data.CustomerStatusMessage,
+                CanRetryPayment = result.Data.CanRetryPayment,
+                RequiresStaffSupport = result.Data.RequiresStaffSupport,
+                UpdatedAt = result.Data.PlacedAt,
+                Version = 1
+            }, cancellationToken);
+        }
+
+        return result;
     }
 
     private static bool CurrencyMatches(string orderCurrency, string productCurrency)

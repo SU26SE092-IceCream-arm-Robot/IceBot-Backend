@@ -4,15 +4,20 @@ using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Payments.Refunds.Commands;
 
 public sealed class RejectRefundCommandHandler
 {
     private readonly IPaymentStore _paymentStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public RejectRefundCommandHandler(IPaymentStore paymentStore)
+    public RejectRefundCommandHandler(IPaymentStore paymentStore, IRealtimeNotificationPublisher publisher)
     {
         _paymentStore = paymentStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<RefundResult>> HandleAsync(
@@ -25,7 +30,10 @@ public sealed class RejectRefundCommandHandler
             return ApiResult<RefundResult>.Fail("Reason is required to reject a refund.", 400);
         }
 
-        return await _paymentStore.ExecuteInTransactionAsync(async ct =>
+        Guid? orgId = null;
+        Guid? storeId = null;
+
+        var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
             var refund = await _paymentStore.GetRefundByIdAsync(command.RefundId, ct);
             if (refund is null)
@@ -34,6 +42,9 @@ public sealed class RejectRefundCommandHandler
             }
 
             var order = refund.PaymentTransaction.Order;
+
+            orgId = order.OrganizationId;
+            storeId = order.StoreId;
 
             if (!ScopeAccessRules.CanAccessScopedRow(
                 command.UserContext,
@@ -55,5 +66,19 @@ public sealed class RejectRefundCommandHandler
                 RefundResultMapper.ToResult(refund),
                 "Refund rejected successfully.");
         }, cancellationToken);
+
+        if (result.Succeeded && result.Data is not null)
+        {
+            await _publisher.PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
+            {
+                Scope = "Organization",
+                OrganizationId = orgId,
+                StoreId = storeId,
+                Reason = "RefundChanged",
+                UpdatedAt = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+        }
+
+        return result;
     }
 }

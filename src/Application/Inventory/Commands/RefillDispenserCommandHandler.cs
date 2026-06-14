@@ -4,15 +4,20 @@ using Application.Inventory.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Inventory.Commands;
 
 public sealed class RefillDispenserCommandHandler
 {
     private readonly IInventoryStore _inventoryStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public RefillDispenserCommandHandler(IInventoryStore inventoryStore)
+    public RefillDispenserCommandHandler(IInventoryStore inventoryStore, IRealtimeNotificationPublisher publisher)
     {
         _inventoryStore = inventoryStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<DispenserStateResult>> HandleAsync(
@@ -24,7 +29,10 @@ public sealed class RefillDispenserCommandHandler
             return ApiResult<DispenserStateResult>.Fail("Refill quantity must be greater than zero.", 400);
         }
 
-        return await _inventoryStore.ExecuteInTransactionAsync(async ct =>
+        Guid finalOrgId = Guid.Empty;
+        Guid finalStoreId = Guid.Empty;
+
+        var result = await _inventoryStore.ExecuteInTransactionAsync(async ct =>
         {
             var state = await _inventoryStore.GetDispenserStateByIdAsync(command.DispenserStateId, ct);
             if (state is null)
@@ -44,6 +52,9 @@ public sealed class RefillDispenserCommandHandler
             {
                 return ApiResult<DispenserStateResult>.Fail("Access denied.", 403);
             }
+
+            finalOrgId = orgId ?? Guid.Empty;
+            finalStoreId = storeId ?? Guid.Empty;
 
             var now = DateTimeOffset.UtcNow;
             var reasonCode = string.IsNullOrWhiteSpace(command.ReasonCode) ? "REFILL" : command.ReasonCode.Trim();
@@ -70,5 +81,24 @@ public sealed class RefillDispenserCommandHandler
                 DispenserStateResultMapper.ToResult(state),
                 "Dispenser refilled successfully.");
         }, cancellationToken);
+
+        if (result.Succeeded && result.Data is not null)
+        {
+            await _publisher.PublishInventoryChangedAsync(new InventoryChangedEvent
+            {
+                DispenserStateId = result.Data.Id,
+                KioskId = result.Data.KioskId ?? Guid.Empty,
+                OrganizationId = finalOrgId,
+                StoreId = finalStoreId,
+                IngredientName = result.Data.IngredientName,
+                EstimatedQuantity = result.Data.EstimatedQuantity ?? 0,
+                Unit = result.Data.Unit,
+                Status = result.Data.CurrentLevelStatus.ToString(),
+                UpdatedAt = result.Data.LastRefilledAt ?? DateTimeOffset.UtcNow,
+                Version = 1
+            }, cancellationToken);
+        }
+
+        return result;
     }
 }

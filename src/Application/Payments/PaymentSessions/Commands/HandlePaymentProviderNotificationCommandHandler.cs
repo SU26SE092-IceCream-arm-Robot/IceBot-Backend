@@ -7,17 +7,26 @@ using Application.Shared.Wrappers;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+using Domain.Orders.Enums;
+
 namespace Application.Payments.PaymentSessions.Commands;
 
 public sealed class HandlePaymentProviderNotificationCommandHandler
 {
     private readonly IPaymentStore _paymentStore;
     private readonly IPaymentGateway _paymentGateway;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public HandlePaymentProviderNotificationCommandHandler(IPaymentStore paymentStore, IPaymentGateway paymentGateway)
+    public HandlePaymentProviderNotificationCommandHandler(
+        IPaymentStore paymentStore, 
+        IPaymentGateway paymentGateway,
+        IRealtimeNotificationPublisher publisher)
     {
         _paymentStore = paymentStore;
         _paymentGateway = paymentGateway;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<PaymentNotificationResult>> HandleAsync(
@@ -48,7 +57,25 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
             return ApiResult<PaymentNotificationResult>.Fail(ex.Message, 400);
         }
 
-        return await _paymentStore.ExecuteInTransactionAsync(async ct =>
+        OrderStatus originalStatus = OrderStatus.Draft;
+        OrderStatus newOrderStatus = OrderStatus.Draft;
+        PaymentTransactionStatus originalTxStatus = PaymentTransactionStatus.Pending;
+        PaymentTransactionStatus newTxStatus = PaymentTransactionStatus.Pending;
+        bool statusChanged = false;
+        bool txStatusChanged = false;
+
+        Guid? orgId = null;
+        Guid? storeId = null;
+        Guid kioskId = Guid.Empty;
+        string orderNumber = "";
+        string provider = "";
+        string customerStatus = "";
+        string customerStatusMessage = "";
+        string orderPaymentStatus = "";
+        bool canRetryPayment = false;
+        bool requiresStaffSupport = false;
+
+        var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
             if (!string.IsNullOrWhiteSpace(notification.ProviderEventId) &&
                 await _paymentStore.PaymentCallbackExistsAsync(notification.Provider, notification.ProviderEventId, ct))
@@ -102,13 +129,32 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
 
             await _paymentStore.AddPaymentCallbackAsync(callback, ct);
 
-            var originalStatus = paymentTransaction.Order.Status;
+            originalStatus = paymentTransaction.Order.Status;
+            originalTxStatus = paymentTransaction.Status;
             var alreadyProcessed = paymentTransaction.Status == PaymentTransactionStatus.Paid;
             if (!alreadyProcessed)
             {
                 PaymentNotificationApplier.ApplyNotification(paymentTransaction, notification);
 
-                if (paymentTransaction.Order.Status != originalStatus)
+                newOrderStatus = paymentTransaction.Order.Status;
+                newTxStatus = paymentTransaction.Status;
+                statusChanged = newOrderStatus != originalStatus;
+                txStatusChanged = newTxStatus != originalTxStatus;
+
+                orgId = paymentTransaction.Order.OrganizationId;
+                storeId = paymentTransaction.Order.StoreId;
+                kioskId = paymentTransaction.Order.KioskId;
+                orderNumber = paymentTransaction.Order.OrderNumber;
+                provider = paymentTransaction.Provider;
+                orderPaymentStatus = paymentTransaction.Order.PaymentStatus.ToString();
+
+                var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrder(paymentTransaction.Order);
+                customerStatus = customerStatusInfo.CustomerStatus;
+                customerStatusMessage = customerStatusInfo.CustomerStatusMessage;
+                canRetryPayment = customerStatusInfo.CanRetryPayment;
+                requiresStaffSupport = customerStatusInfo.RequiresStaffSupport;
+
+                if (statusChanged)
                 {
                     var history = new Domain.Orders.Entities.OrderStatusHistory
                     {
@@ -134,5 +180,47 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 AlreadyProcessed = alreadyProcessed
             });
         }, cancellationToken);
+
+        if (result.Succeeded && result.Data is not null)
+        {
+            if (txStatusChanged)
+            {
+                await _publisher.PublishPaymentStatusChangedAsync(new PaymentStatusChangedEvent
+                {
+                    OrderId = result.Data.OrderId,
+                    PaymentTransactionId = result.Data.PaymentTransactionId,
+                    OldStatus = originalTxStatus.ToString(),
+                    NewStatus = newTxStatus.ToString(),
+                    Provider = provider,
+                    UpdatedAt = DateTimeOffset.UtcNow,
+                    Version = 1,
+                    OrganizationId = orgId,
+                    StoreId = storeId
+                }, cancellationToken);
+            }
+
+            if (statusChanged)
+            {
+                await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
+                {
+                    OrderId = result.Data.OrderId,
+                    OrderNumber = orderNumber,
+                    KioskId = kioskId,
+                    OrganizationId = orgId,
+                    StoreId = storeId,
+                    OldStatus = originalStatus.ToString(),
+                    NewStatus = newOrderStatus.ToString(),
+                    PaymentStatus = orderPaymentStatus,
+                    CustomerStatus = customerStatus,
+                    CustomerStatusMessage = customerStatusMessage,
+                    CanRetryPayment = canRetryPayment,
+                    RequiresStaffSupport = requiresStaffSupport,
+                    UpdatedAt = DateTimeOffset.UtcNow,
+                    Version = 1
+                }, cancellationToken);
+            }
+        }
+
+        return result;
     }
 }

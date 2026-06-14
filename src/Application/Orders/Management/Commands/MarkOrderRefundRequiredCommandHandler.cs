@@ -6,15 +6,20 @@ using Application.Tenants;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Orders.Management.Commands;
 
 public sealed class MarkOrderRefundRequiredCommandHandler
 {
     private readonly IOrderStore _orderStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public MarkOrderRefundRequiredCommandHandler(IOrderStore orderStore)
+    public MarkOrderRefundRequiredCommandHandler(IOrderStore orderStore, IRealtimeNotificationPublisher publisher)
     {
         _orderStore = orderStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
@@ -27,13 +32,17 @@ public sealed class MarkOrderRefundRequiredCommandHandler
             return ApiResult<OrderResult>.Fail("Reason is required to flag an order as refund required.", 400);
         }
 
-        return await _orderStore.ExecuteInTransactionAsync(async ct =>
+        OrderStatus fromStatus = OrderStatus.Draft;
+
+        var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
             var order = await _orderStore.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null)
             {
                 return ApiResult<OrderResult>.Fail("Order not found.", 404);
             }
+
+            fromStatus = order.Status;
 
             if (!ScopeAccessRules.CanAccessScopedRow(
                 command.UserContext,
@@ -58,7 +67,6 @@ public sealed class MarkOrderRefundRequiredCommandHandler
                     409);
             }
 
-            var fromStatus = order.Status;
             var now = DateTimeOffset.UtcNow;
 
             order.MarkRefundRequired(reason);
@@ -82,5 +90,28 @@ public sealed class MarkOrderRefundRequiredCommandHandler
                 OrderResultMapper.ToResult(order),
                 "Order flagged as refund required successfully.");
         }, cancellationToken);
+
+        if (result.Succeeded && result.Data is not null)
+        {
+            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
+            {
+                OrderId = result.Data.Id,
+                OrderNumber = result.Data.OrderNumber,
+                KioskId = result.Data.KioskId,
+                OrganizationId = result.Data.OrganizationId,
+                StoreId = result.Data.StoreId,
+                OldStatus = fromStatus.ToString(),
+                NewStatus = result.Data.Status.ToString(),
+                PaymentStatus = result.Data.PaymentStatus.ToString(),
+                CustomerStatus = result.Data.CustomerStatus,
+                CustomerStatusMessage = result.Data.CustomerStatusMessage,
+                CanRetryPayment = result.Data.CanRetryPayment,
+                RequiresStaffSupport = result.Data.RequiresStaffSupport,
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Version = 1
+            }, cancellationToken);
+        }
+
+        return result;
     }
 }

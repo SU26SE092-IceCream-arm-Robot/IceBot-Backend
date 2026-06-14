@@ -35,6 +35,17 @@ inventorySummary
 - Do not duplicate the same read surface in both REST and GraphQL unless there is a deliberate client/integration reason.
 - Scoped RBAC still applies to management read models.
 
+## Real-time Dashboard Invalidation
+
+To ensure back-office managers view up-to-date reports without unnecessary polling, significant state mutations (such as orders, payments, maintenance tickets, and inventory updates) broadcast invalidation events:
+- **`DashboardInvalidated`** is published on `ManagementDashboardHub` to the relevant dashboard groups (`dashboard:system`, `dashboard:organization:{organizationId}`, or `dashboard:store:{storeId}`).
+
+Upon receiving a `DashboardInvalidated` event, the frontend dashboard client invalidates its local GraphQL query cache and triggers a refetch of:
+- `dashboard`
+- `orderOverview`
+- `kioskStatusOverview`
+- `inventorySummary`
+
 ## Related Docs
 
 - [System Flows](SYSTEM_FLOWS.md)

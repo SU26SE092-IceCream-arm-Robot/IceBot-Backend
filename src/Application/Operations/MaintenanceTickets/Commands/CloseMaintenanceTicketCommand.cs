@@ -9,6 +9,9 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Operations.MaintenanceTickets.Commands;
 
 public sealed class CloseMaintenanceTicketCommand
@@ -20,10 +23,14 @@ public sealed class CloseMaintenanceTicketCommand
 public sealed class CloseMaintenanceTicketCommandHandler
 {
     private readonly IMaintenanceTicketStore _ticketStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public CloseMaintenanceTicketCommandHandler(IMaintenanceTicketStore ticketStore)
+    public CloseMaintenanceTicketCommandHandler(
+        IMaintenanceTicketStore ticketStore,
+        IRealtimeNotificationPublisher publisher)
     {
         _ticketStore = ticketStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<MaintenanceTicketResult>> HandleAsync(
@@ -37,6 +44,8 @@ public sealed class CloseMaintenanceTicketCommandHandler
         {
             return ApiResult<MaintenanceTicketResult>.Fail("Maintenance ticket not found.", 404);
         }
+
+        string oldStatus = ticket.Status.ToString();
 
         if (!MaintenanceTicketAccessRules.CanClose(user, ticket.OrganizationId, ticket.StoreId, ticket.KioskId))
         {
@@ -55,6 +64,21 @@ public sealed class CloseMaintenanceTicketCommandHandler
         }
 
         var result = MaintenanceTicketResultMapper.ToResult(ticket);
+
+        await _publisher.PublishMaintenanceTicketChangedAsync(new MaintenanceTicketChangedEvent
+        {
+            TicketId = result.Id,
+            TicketNumber = result.TicketNumber,
+            KioskId = result.KioskId,
+            OrganizationId = result.OrganizationId,
+            StoreId = result.StoreId,
+            OldStatus = oldStatus,
+            NewStatus = result.Status.ToString(),
+            Priority = result.Priority.ToString(),
+            UpdatedAt = result.UpdatedAt ?? DateTimeOffset.UtcNow,
+            Version = 1
+        }, cancellationToken);
+
         return ApiResult<MaintenanceTicketResult>.Success(result, "Maintenance ticket closed successfully.");
     }
 }

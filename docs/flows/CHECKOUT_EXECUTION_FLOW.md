@@ -181,6 +181,14 @@ Check:
 
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
 
+## Real-time Order & Payment Updates
+
+During the checkout and execution flow, state changes (e.g. order placement, cancellation, payment webhook status updates, refund flagging) emit real-time SignalR notifications to subscribed clients:
+- **`OrderStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when order status transitions.
+- **`PaymentStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when payment transaction status changes.
+
+These events allow checkout UIs to automatically update payment success/failure screens or execution status without polling.
+
 ## Related Docs
 
 - [System Flows](SYSTEM_FLOWS.md)

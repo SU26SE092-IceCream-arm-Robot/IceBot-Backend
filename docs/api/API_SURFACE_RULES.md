@@ -331,13 +331,128 @@ GraphQL is exposed at `/graphql` as an internal read/query surface for frontend 
 
 - **Scope:** Read/query only. No mutations are implemented in this phase.
 - **REST Surface:** REST remains the existing contract for commands, tablet actions, payment integrations, webhooks, and IoT edge communication.
+
+## Read Model API Boundaries
+
+To ensure stability, performance, and security, read-model endpoints are strictly scoped to their intended UI or integration workflows. They must not be expanded to aggregate cross-cutting operational or reporting details.
+
+### 1. Tenant Navigation & Scope Selection Boundaries
+* **Endpoints:** 
+  - GraphQL `tenantTree`
+  - `GET /api/v1/management/role-scope-options`
+* **Purpose:** Administrative layout navigation and validation of scopes when creating/assigning user roles.
+* **Includes:** Hierarchy structural identifiers (Organization -> Store -> Kiosk) and scope codes.
+* **EXCLUDES:** Revenue metrics, active alerts, device health, inventory levels, or machine runtime logs.
+* **Ownership:** Excluded metrics must be served by future dashboard or reporting-specific APIs.
+
+### 2. Kiosk Sales Menu Boundaries
+* **Endpoint:** `GET /api/v1/kiosks/{kioskId}/runtime-menu`
+* **Purpose:** Rendering customer-facing catalog pricing and availability on the order tablet.
+* **Includes:** Product name, variant codes, prices, discount figures, images, and recipe versions.
+* **EXCLUDES:** Recipe preparation details (coordinates, Fairino robot points), manufacturing cost margin data, and live dispenser levels.
+* **Ownership:** Deep robot configuration lives in IoT sync profiles, while cost metrics belong to product inventory reporting.
+
+### 3. Customer Order Tracking Boundaries
+* **Endpoints:**
+  - `GET /api/v1/orders/{orderId}`
+  - `GET /api/v1/orders/{orderId}/payment-status`
+* **Purpose:** Real-time customer receipt and preparation status tracking.
+* **Includes:** Quantity, item status, billing totals, payment confirmation, preparation state, and tablet-friendly status projections (CustomerStatus, CustomerStatusMessage, CanRetryPayment, RequiresStaffSupport).
+* **EXCLUDES:** Raw payment provider callback bodies, device error codes, robot joint telemetry.
+* **Ownership:** System error analytics are scoped to maintenance/operations portals, not client order details.
+
+## API Result And Error Handling
+
+Controller-facing Application handlers return `ApiResult<T>` or `PagedResult<T>`, and controllers should preserve the wrapper status code:
+
+```csharp
+return StatusCode(result.StatusCode, result);
+```
+
+Rules:
+
+- `ApiResult<T>.StatusCode` must match the HTTP response status code.
+- `InternalResult<T>` is not an API response contract and must not be returned directly by controllers.
+- `AppException` subclasses must preserve their intended HTTP status through `GlobalExceptionMiddleware`.
+- Middleware must not collapse `NotFoundException`, `ForbiddenException`, or `ConflictException` into `400 Bad Request`.
+- Provider/system failures may include `SystemError` for diagnostics, but public responses must not expose secrets or sensitive config.
+
+Recommended status use:
+
+| Case | Status |
+| --- | --- |
+| Read/update success | `200 OK` |
+| Created success | `201 Created` |
+| Validation failure | `400 Bad Request` |
+| Unauthorized | `401 Unauthorized` |
+| Forbidden/scoped denied | `403 Forbidden` |
+| Resource not found | `404 Not Found` |
+| Business conflict/duplicate | `409 Conflict` |
+| Provider/system failure | `500 Internal Server Error` unless a more specific application status is intentionally returned |
+
+## Validation Strategy
+
+Current v1 validation convention:
+
+- Do not introduce FluentValidation yet.
+- **Request DTO / DataAnnotations (Format & Syntax):** Use DataAnnotations for simple request DTO shape validation, such as required fields, string length, numeric range, and basic format.
+- **Enum Inputs:** Send enum values as strings. JSON request bodies do not accept integer enum values.
+- **Application Validators / Rule Helpers (Cross-Field / Request-Level):** Use static `RequestValidator` / rule helper classes for cross-field or request-level rules that do not need database access.
+- **Handlers & Stores (Business constraints & Database-dependent):** Use handlers and stores for database-dependent validation, such as uniqueness, parent existence, active parent checks, and tenant-scope ownership.
+- **Domain Methods (Invariants):** Use domain methods for entity invariants and state transitions.
+- **Failure Returns & Exceptions:**
+  - Handlers should return `ApiResult<T>.Fail(..., 400)` (or `409 Conflict` / `404 Not Found` as appropriate) for business rule / database-dependent validation failures, rather than throwing exceptions, to preserve clean control flow.
+  - `ValidationException` is strictly reserved for automatic request DTO binding and DataAnnotations validation failures caught at the controller level before the handler is invoked.
+  - Domain entities throw `DomainRuleException` if invariants are violated during processing.
+- **Controller Cleanup:** Gradually remove repeated controller `EnsureValidModel()` helpers by relying on `[ApiController]` plus centralized `InvalidModelStateResponseFactory`.
+- **Response Shape:** Keep the current validation response shape unless a separate API contract decision changes it.
+
+Do not move business validation into controllers. Controllers should validate transport/request shape and then call Application handlers.
+
+## GraphQL Management Reads
+
+GraphQL is exposed at `/graphql` as an internal read/query surface for frontend UI aggregation.
+
+- **Scope:** Read/query only. No mutations are implemented in this phase.
+- **REST Surface:** REST remains the existing contract for commands, tablet actions, payment integrations, webhooks, and IoT edge communication.
 - **Implementation:** GraphQL resolvers are thin adapters that delegate execution directly to Application CQRS query handlers. No database queries are performed directly inside the resolvers.
 - **Code Organization:** Keep GraphQL feature/domain-first, not GraphQL-artifact-first. Although `/graphql` is hosted from WebAPI and frontend may see one large query surface, backend code should still be organized around the owning Application/domain features such as Tenants, Orders, Devices, Inventory, and Dashboard. GraphQL root/query classes are transport composition only, similar to controllers.
 - **Wiring:** Register GraphQL query extensions in `src/WebAPI/GraphQL/GraphQLEndpointExtensions.cs`; do not add feature-specific GraphQL registrations directly to `Program.cs`.
 - **Authorization:** Reuses JWT authentication and tenant-scoped RBAC rules. Endpoints require authentication via the standard `[Authorize]` attribute.
 
+## SignalR Realtime Surface
+
+SignalR is used for push-based real-time UI notifications. It operates as a delta and invalidation stream alongside REST/GraphQL.
+
+SignalR is not the robot runtime bus. Cloud-to-Edge and Edge-to-Cloud runtime integration should use the IoT/MQTT/sync boundary documented in [System Overview Flow](../flows/SYSTEM_OVERVIEW_FLOW.md#integration-transport-boundaries) and [IoT Contract](../iot/IOT_CONTRACT.md).
+
+### Routes and Hubs
+
+| Hub | Route | Scope | Events |
+| --- | --- | --- | --- |
+| `OrderHub` | `/hubs/orders` | Order-specific updates | `OrderStatusChanged`, `PaymentStatusChanged` |
+| `OperationsHub` | `/hubs/operations` | Kiosk & telemetry status | `KioskStatusChanged`, `DeviceEventCreated`, `MaintenanceTicketChanged`, `InventoryChanged` |
+| `ManagementDashboardHub` | `/hubs/management-dashboard` | Scoped dashboards (System, Org, Store) | `DashboardInvalidated` |
+
+### Subscription Groups
+
+Clients must join relevant groups to receive scoped events:
+- `order:{orderId}`
+- `kiosk:{kioskId}`
+- `dashboard:system` (SystemAdmin only)
+- `dashboard:organization:{organizationId}` (OrgAdmin/Manager/Staff/Technician with appropriate scope)
+- `dashboard:store:{storeId}` (OrgAdmin/Manager/Staff/Technician with appropriate scope)
+
+### Client Behavior Rules
+
+1. **Initial Snapshot:** Call REST or GraphQL API on page load.
+2. **Real-time Delta:** Apply updates immediately when a SignalR event is received.
+3. **Re-sync / Fallback:** Re-fetch full REST/GraphQL payload on connection loss, reconnect, refresh, or version gap.
+
 ## Related Docs
 
+- [SignalR Realtime Contract](SIGNALR_REALTIME_CONTRACT.md)
+- [SignalR Smoke Test Workflow](../process/SIGNALR_SMOKE_TEST.md)
 - [Authorization Rules](AUTHORIZATION_RULES.md)
 - [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
 - [Naming Rules](../process/NAMING_RULES.md)

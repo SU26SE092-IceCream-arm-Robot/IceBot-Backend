@@ -42,6 +42,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | System overview, source-of-truth split, which flow doc to read | [System Flows](flows/SYSTEM_FLOWS.md) | [System Overview Flow](flows/SYSTEM_OVERVIEW_FLOW.md) |
 | Back-office setup, tenant/account/catalog/menu preparation | [Back-Office Setup Flow](flows/BACK_OFFICE_SETUP_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Management dashboard, GraphQL read model, aggregated management reads | [Management Read Flow](flows/MANAGEMENT_READ_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
+| SignalR realtime UI updates, hub routes, event names, smoke test | [SignalR Realtime Contract](api/SIGNALR_REALTIME_CONTRACT.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [SignalR Smoke Test](process/SIGNALR_SMOKE_TEST.md) |
 | Catalog to runtime menu, menu sellability, Cloud menu vs Edge projection | [Catalog Runtime Menu Flow](flows/CATALOG_RUNTIME_MENU_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Tablet/cloud/edge/payment/MQTT/execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Operations support, telemetry, heartbeat, device events, refund support | [Operations Support Flow](flows/OPERATIONS_SUPPORT_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md) |
@@ -65,6 +66,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `system overview`, `setup to sale`, `back-office setup`, `catalog to runtime menu`, `operations support`, `management dashboard` | [System Flows](flows/SYSTEM_FLOWS.md), then the matching flow file |
 | `management orders`, `order status history`, `refund`, `manual refund`, `stock movement`, `dispenser state`, `inventory refill` | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | `GraphQL`, `REST`, `read model aggregation`, `dashboard query`, `overview query` | [API Surface Rules](api/API_SURFACE_RULES.md), section `GraphQL Management Reads` |
+| `SignalR`, `hub`, `OrderHub`, `OperationsHub`, `ManagementDashboardHub`, `realtime`, `DashboardInvalidated` | [SignalR Realtime Contract](api/SIGNALR_REALTIME_CONTRACT.md), [SignalR Smoke Test](process/SIGNALR_SMOKE_TEST.md) |
 | `heartbeat`, `device event`, `kiosk event`, `operations telemetry`, `lost connection` | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | `maintenance ticket`, `support ticket`, `technician assignment`, `maintenance.create`, `maintenance.manage` | [Maintenance Ticket Flow](flows/MAINTENANCE_TICKET_FLOW.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |

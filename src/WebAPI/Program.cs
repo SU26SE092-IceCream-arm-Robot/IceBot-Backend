@@ -15,6 +15,7 @@ using WebAPI.Authorization;
 using WebAPI.Configuration;
 using WebAPI.GraphQL;
 using WebAPI.Middlewares;
+using WebAPI.SignalR;
 
 
 Log.Logger = new LoggerConfiguration()
@@ -56,13 +57,15 @@ try
                 {
                     policy.WithOrigins(allowedOrigins)
                           .AllowAnyMethod()
-                          .AllowAnyHeader();
+                          .AllowAnyHeader()
+                          .AllowCredentials();
                 }
                 else if (builder.Environment.IsDevelopment())
                 {
-                    policy.AllowAnyOrigin()
+                    policy.SetIsOriginAllowed(_ => true)
                           .AllowAnyMethod()
-                          .AllowAnyHeader();
+                          .AllowAnyHeader()
+                          .AllowCredentials();
                 }
             });
     });
@@ -93,6 +96,19 @@ try
             RequireExpirationTime = true,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
+        };
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            }
         };
     });
 
@@ -170,6 +186,7 @@ try
     builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
 
     builder.Services.AddIceBotGraphQL();
+    builder.Services.AddIceBotSignalR();
 
     var app = builder.Build();
 
@@ -200,6 +217,7 @@ try
     app.MapApplicationInfoEndpoints();
     app.MapControllers();
     app.MapIceBotGraphQL();
+    app.MapIceBotSignalR();
 
     app.Run();
 }

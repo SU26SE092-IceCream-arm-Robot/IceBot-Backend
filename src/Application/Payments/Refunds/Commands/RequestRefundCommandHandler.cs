@@ -7,15 +7,20 @@ using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Payments.Refunds.Commands;
 
 public sealed class RequestRefundCommandHandler
 {
     private readonly IPaymentStore _paymentStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public RequestRefundCommandHandler(IPaymentStore paymentStore)
+    public RequestRefundCommandHandler(IPaymentStore paymentStore, IRealtimeNotificationPublisher publisher)
     {
         _paymentStore = paymentStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<RefundResult>> HandleAsync(
@@ -28,7 +33,10 @@ public sealed class RequestRefundCommandHandler
             return ApiResult<RefundResult>.Fail("Reason is required to request a refund.", 400);
         }
 
-        return await _paymentStore.ExecuteInTransactionAsync(async ct =>
+        Guid? orgId = null;
+        Guid? storeId = null;
+
+        var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
             var idempotencyKey = command.IdempotencyKey?.Trim();
             if (!string.IsNullOrWhiteSpace(idempotencyKey))
@@ -102,6 +110,9 @@ public sealed class RequestRefundCommandHandler
                 return ApiResult<RefundResult>.Fail("Paid transaction amount must match order total for refund V1.", 409);
             }
 
+            orgId = order.OrganizationId;
+            storeId = order.StoreId;
+
             decimal refundAmount = order.TotalAmount;
             if (string.Equals(command.RefundMethod, "Voucher", StringComparison.OrdinalIgnoreCase))
             {
@@ -164,5 +175,19 @@ public sealed class RequestRefundCommandHandler
                 "Refund requested successfully.",
                 201);
         }, cancellationToken);
+
+        if (result.Succeeded && result.Data is not null)
+        {
+            await _publisher.PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
+            {
+                Scope = "Organization",
+                OrganizationId = orgId,
+                StoreId = storeId,
+                Reason = "RefundChanged",
+                UpdatedAt = DateTimeOffset.UtcNow,
+            }, cancellationToken);
+        }
+
+        return result;
     }
 }

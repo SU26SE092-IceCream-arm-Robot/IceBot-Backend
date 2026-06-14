@@ -11,6 +11,9 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Operations.MaintenanceTickets.Commands;
 
 public sealed class CreateMaintenanceTicketCommand
@@ -22,10 +25,14 @@ public sealed class CreateMaintenanceTicketCommand
 public sealed class CreateMaintenanceTicketCommandHandler
 {
     private readonly IMaintenanceTicketStore _ticketStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public CreateMaintenanceTicketCommandHandler(IMaintenanceTicketStore ticketStore)
+    public CreateMaintenanceTicketCommandHandler(
+        IMaintenanceTicketStore ticketStore,
+        IRealtimeNotificationPublisher publisher)
     {
         _ticketStore = ticketStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<MaintenanceTicketResult>> HandleAsync(
@@ -111,6 +118,21 @@ public sealed class CreateMaintenanceTicketCommandHandler
         await _ticketStore.SaveChangesAsync(cancellationToken);
 
         var result = MaintenanceTicketResultMapper.ToResult(ticket);
+
+        await _publisher.PublishMaintenanceTicketChangedAsync(new MaintenanceTicketChangedEvent
+        {
+            TicketId = result.Id,
+            TicketNumber = result.TicketNumber,
+            KioskId = result.KioskId,
+            OrganizationId = result.OrganizationId,
+            StoreId = result.StoreId,
+            OldStatus = null,
+            NewStatus = result.Status.ToString(),
+            Priority = result.Priority.ToString(),
+            UpdatedAt = result.UpdatedAt ?? result.CreatedAt,
+            Version = 1
+        }, cancellationToken);
+
         return ApiResult<MaintenanceTicketResult>.Success(result, "Maintenance ticket created successfully.", 201);
     }
 }

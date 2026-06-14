@@ -6,28 +6,37 @@ using Application.Tenants;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
+
 namespace Application.Orders.Management.Commands;
 
 public sealed class CancelManagementOrderCommandHandler
 {
     private readonly IOrderStore _orderStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public CancelManagementOrderCommandHandler(IOrderStore orderStore)
+    public CancelManagementOrderCommandHandler(IOrderStore orderStore, IRealtimeNotificationPublisher publisher)
     {
         _orderStore = orderStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
         CancelManagementOrderCommand command,
         CancellationToken cancellationToken = default)
     {
-        return await _orderStore.ExecuteInTransactionAsync(async ct =>
+        OrderStatus fromStatus = OrderStatus.Draft;
+
+        var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
             var order = await _orderStore.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null)
             {
                 return ApiResult<OrderResult>.Fail("Order not found.", 404);
             }
+
+            fromStatus = order.Status;
 
             if (!ScopeAccessRules.CanAccessScopedRow(
                 command.UserContext,
@@ -52,7 +61,6 @@ public sealed class CancelManagementOrderCommandHandler
                     409);
             }
 
-            var fromStatus = order.Status;
             var now = DateTimeOffset.UtcNow;
             var reason = string.IsNullOrWhiteSpace(command.Reason) ? null : command.Reason.Trim();
 
@@ -78,5 +86,28 @@ public sealed class CancelManagementOrderCommandHandler
                 OrderResultMapper.ToResult(order),
                 "Order cancelled successfully.");
         }, cancellationToken);
+
+        if (result.Succeeded && result.Data is not null)
+        {
+            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
+            {
+                OrderId = result.Data.Id,
+                OrderNumber = result.Data.OrderNumber,
+                KioskId = result.Data.KioskId,
+                OrganizationId = result.Data.OrganizationId,
+                StoreId = result.Data.StoreId,
+                OldStatus = fromStatus.ToString(),
+                NewStatus = result.Data.Status.ToString(),
+                PaymentStatus = result.Data.PaymentStatus.ToString(),
+                CustomerStatus = result.Data.CustomerStatus,
+                CustomerStatusMessage = result.Data.CustomerStatusMessage,
+                CanRetryPayment = result.Data.CanRetryPayment,
+                RequiresStaffSupport = result.Data.RequiresStaffSupport,
+                UpdatedAt = result.Data.CancelledAt ?? DateTimeOffset.UtcNow,
+                Version = 1
+            }, cancellationToken);
+        }
+
+        return result;
     }
 }
