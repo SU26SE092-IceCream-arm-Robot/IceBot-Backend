@@ -452,7 +452,7 @@ Clients must join relevant groups to receive scoped events:
 ## Related Docs
 
 - [SignalR Realtime Contract](SIGNALR_REALTIME_CONTRACT.md)
-- [SignalR Smoke Test Workflow](../process/SIGNALR_SMOKE_TEST.md)
+- [SignalR Smoke Test Workflow](../operations/SIGNALR_SMOKE_TEST.md)
 - [Authorization Rules](AUTHORIZATION_RULES.md)
 - [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
 - [Naming Rules](../process/NAMING_RULES.md)

@@ -5,9 +5,6 @@ using Application.Shared.Wrappers;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
-
 namespace Application.Orders.PlaceOrder.Commands;
 
 public sealed class CancelPendingOrderCommandHandler

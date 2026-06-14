@@ -3,7 +3,6 @@ using Application.Dashboard.Abstractions;
 using Application.Devices.Abstractions;
 using Application.Email;
 using Application.Inventory.Abstractions;
-using Application.Operations.Abstractions;
 using Infrastructure.Catalog;
 using Infrastructure.Dashboard.Persistence;
 using Infrastructure.Data;

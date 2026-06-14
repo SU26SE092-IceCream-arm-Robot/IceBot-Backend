@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
-using WebAPI.Authorization;
 
-namespace WebAPI.Configuration;
+namespace WebAPI.Authorization;
 
 public static class AuthorizationPolicyExtensions
 {

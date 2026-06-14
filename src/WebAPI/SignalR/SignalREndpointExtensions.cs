@@ -1,8 +1,4 @@
 using System.Text.Json.Serialization;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
-using Application.Abstractions.Realtime;
 using WebAPI.SignalR.Hubs;
 
 namespace WebAPI.SignalR;

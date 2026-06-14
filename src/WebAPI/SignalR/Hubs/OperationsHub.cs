@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.SignalR;
 using Application.Tenants;
 using Application.Tenants.Abstractions;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
 using WebAPI.Authorization;
 
 namespace WebAPI.SignalR.Hubs;

@@ -1,4 +1,4 @@
-﻿namespace WebAPI.Configuration
+﻿namespace WebAPI.Configuration.Hosting
 {
     public static class KestrelPortConfigurator
     {

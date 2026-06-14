@@ -86,6 +86,7 @@ Use related docs to point to ownership boundaries:
 - JSON columns -> `JSON_FIELD_RULES.md`
 - sync/idempotency/retry -> `IDEMPOTENCY_RETRY_RULES.md`
 - tablet/edge/cloud contract -> `IOT_CONTRACT.md`
+- deployment, diagnostics, observability, and smoke tests -> `operations/`
 
 Do not copy full route maps, entity lists, or rules from the linked doc unless the current doc owns that rule.
 

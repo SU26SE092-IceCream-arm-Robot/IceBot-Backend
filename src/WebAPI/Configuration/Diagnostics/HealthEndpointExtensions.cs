@@ -1,25 +1,12 @@
+using FirebaseAdmin.Auth;
 using Infrastructure.Data;
 using Infrastructure.Firebase;
 using MailKit.Net.Smtp;
 using MailKit.Security;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
-using FirebaseAdmin.Auth;
 
-namespace WebAPI.Configuration;
+namespace WebAPI.Configuration.Diagnostics;
 
 public static class HealthEndpointExtensions
 {

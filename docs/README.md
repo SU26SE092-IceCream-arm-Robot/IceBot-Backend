@@ -13,7 +13,8 @@ Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. Fo
 | `data/` | Data modeling, JSON fields, idempotency, retry, indexes |
 | `flows/` | Backend/system flows |
 | `iot/` | Tablet, cloud, edge, local runtime contracts and ERD |
-| `process/` | Working protocol, documentation rules, naming rules |
+| `operations/` | Deployment config, observability, diagnostics, smoke tests |
+| `process/` | Working protocol, documentation rules, naming rules, handoff checklists |
 
 ## Key Docs
 
@@ -30,7 +31,8 @@ Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. Fo
 | Checkout/payment/edge execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) |
 | Tablet/edge/cloud contract | [IoT Contract](iot/IOT_CONTRACT.md) |
 | Naming conventions | [Naming Rules](process/NAMING_RULES.md) |
-| Deployment/runtime configuration | [Deployment Configuration](process/DEPLOYMENT_CONFIG.md) |
+| Deployment/runtime configuration | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
+| Observability/logging/traces/metrics | [Observability](operations/OBSERVABILITY.md) |
 | Manual critical rule checks | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 
 ## Related

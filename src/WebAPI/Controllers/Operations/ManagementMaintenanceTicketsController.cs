@@ -1,13 +1,7 @@
-using Application.Operations.MaintenanceTickets.Commands;
-using Application.Operations.MaintenanceTickets.Queries;
-using Application.Operations.MaintenanceTickets.Requests;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Authorization;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace WebAPI.Controllers.Operations;
 

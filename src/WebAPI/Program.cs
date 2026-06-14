@@ -1,18 +1,13 @@
 using Application;
-using Application.Shared.Wrappers;
-using Asp.Versioning;
 using Infrastructure;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi;
 using Serilog;
-using System.Reflection;
-using System.Text;
-using System.Text.Json.Serialization;
 using WebAPI.Authorization;
-using WebAPI.Configuration;
+using WebAPI.Configuration.Diagnostics;
+using WebAPI.Configuration.Documentation;
+using WebAPI.Configuration.Hosting;
+using WebAPI.Configuration.Observability;
+using WebAPI.Configuration.Security;
 using WebAPI.GraphQL;
 using WebAPI.Middlewares;
 using WebAPI.SignalR;
@@ -38,153 +33,20 @@ try
         builder.Configuration.AddUserSecrets<Program>(optional: true);
     }
 
-    builder.Host.UseSerilog(
-        (ctx, services, config) =>
-            config.ReadFrom.Configuration(ctx.Configuration)
-                  .ReadFrom.Services(services),
-        writeToProviders: !builder.Environment.IsDevelopment());
+    builder.AddIceBotObservability();
 
-    builder.Services.AddCors(options =>
-    {
-        options.AddPolicy("FrontendOnly",
-            policy =>
-            {
-                var allowedOrigins = builder.Configuration
-                    .GetSection("Cors:AllowedOrigins")
-                    .Get<string[]>() ?? [];
-
-                if (allowedOrigins.Length > 0)
-                {
-                    policy.WithOrigins(allowedOrigins)
-                          .AllowAnyMethod()
-                          .AllowAnyHeader()
-                          .AllowCredentials();
-                }
-                else if (builder.Environment.IsDevelopment())
-                {
-                    policy.SetIsOriginAllowed(_ => true)
-                          .AllowAnyMethod()
-                          .AllowAnyHeader()
-                          .AllowCredentials();
-                }
-            });
-    });
-
-    builder.Services.AddOptions<JwtOptions>()
-                        .Bind(builder.Configuration.GetSection("Authentication:Jwt"))
-                        .Validate(o => !string.IsNullOrWhiteSpace(o.Secret), "JWT Secret is required.")
-                        .ValidateOnStart();
-
-    var jwt = builder.Configuration.GetSection("Authentication:Jwt").Get<JwtOptions>()!;
-    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret));
-
-    builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-    })
-    .AddJwtBearer(options =>
-    {
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = key,
-            ValidateIssuer = !string.IsNullOrWhiteSpace(jwt.Issuer),
-            ValidateAudience = !string.IsNullOrWhiteSpace(jwt.Audience),
-            ValidIssuer = jwt.Issuer,
-            ValidAudience = jwt.Audience,
-            RequireExpirationTime = true,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero
-        };
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = context =>
-            {
-                var accessToken = context.Request.Query["access_token"];
-                var path = context.HttpContext.Request.Path;
-                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
-                {
-                    context.Token = accessToken;
-                }
-                return Task.CompletedTask;
-            }
-        };
-    });
-
+    builder.Services.AddIceBotCors(builder.Configuration, builder.Environment);
+    builder.Services.AddIceBotAuthentication(builder.Configuration);
     builder.Services.AddAuthorization(options => options.AddIceBotAuthorizationPolicies());
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
 
-    builder.Services.AddControllers().AddJsonOptions(options =>
-    {
-        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-        options.JsonSerializerOptions.Converters.Add(
-            new JsonStringEnumConverter(null, allowIntegerValues: false));
-    })
-    .ConfigureApiBehaviorOptions(options =>
-    {
-        options.InvalidModelStateResponseFactory = context =>
-        {
-            var response = ApiResult<object>.Fail("Validation failed", 400);
-            foreach (var item in context.ModelState)
-            {
-                var firstError = item.Value?.Errors.FirstOrDefault();
-                if (firstError is not null)
-                {
-                    response.AddValidationError(item.Key, firstError.ErrorMessage ?? "Invalid");
-                }
-            }
-            return new BadRequestObjectResult(response);
-        };
-    });
-
-    builder.Services.AddApiVersioning(options =>
-    {
-        options.DefaultApiVersion = new ApiVersion(1, 0);
-        options.AssumeDefaultVersionWhenUnspecified = true;
-        options.ReportApiVersions = true;
-        options.ApiVersionReader = new UrlSegmentApiVersionReader();
-    }).AddMvc().AddApiExplorer(options =>
-    {
-        options.GroupNameFormat = "'v'VVV";
-        options.SubstituteApiVersionInUrl = true;
-    });
-
+    builder.Services.AddIceBotControllers();
+    builder.Services.AddIceBotApiVersioning();
     builder.Services.AddApplication();
     builder.Services.AddInfrastructureServices(builder.Configuration);
 
-    builder.Services.AddEndpointsApiExplorer();
-    builder.Services.AddSwaggerGen(c =>
-    {
-        const string securitySchemeId = JwtBearerDefaults.AuthenticationScheme;
-        var securityScheme = new OpenApiSecurityScheme
-        {
-            Name = "Authorization",
-            Description = "Enter JWT Bearer token **_only_**",
-            In = ParameterLocation.Header,
-            Type = SecuritySchemeType.Http,
-            Scheme = "bearer",
-            BearerFormat = "JWT"
-        };
-
-        c.AddSecurityDefinition(securitySchemeId, securityScheme);
-
-        c.AddSecurityRequirement(document => new OpenApiSecurityRequirement
-        {
-            [new OpenApiSecuritySchemeReference(securitySchemeId, document)] = []
-        });
-
-        var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
-        var xmlPath = System.IO.Path.Combine(AppContext.BaseDirectory, xmlFile);
-        if (System.IO.File.Exists(xmlPath))
-        {
-            c.IncludeXmlComments(xmlPath);
-        }
-    });
-
-    builder.Services.ConfigureOptions<ConfigureSwaggerOptions>();
-
+    builder.Services.AddIceBotSwagger();
     builder.Services.AddIceBotGraphQL();
     builder.Services.AddIceBotSignalR();
 
@@ -196,8 +58,7 @@ try
 
     }
 
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseIceBotSwagger();
 
     app.UseHttpsRedirection();
 
@@ -207,7 +68,10 @@ try
 
     app.UseMiddleware<GlobalExceptionMiddleware>();
 
-    app.UseMiddleware<RequestResponseLoggingMiddleware>();
+    if (app.Configuration.GetValue<bool>("Observability:DebugBodyLogging:Enabled"))
+    {
+        app.UseMiddleware<DebugBodyLoggingMiddleware>();
+    }
 
     app.UseAuthentication();
 

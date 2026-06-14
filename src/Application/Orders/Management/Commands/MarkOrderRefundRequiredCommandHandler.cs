@@ -6,9 +6,6 @@ using Application.Tenants;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
-
 namespace Application.Orders.Management.Commands;
 
 public sealed class MarkOrderRefundRequiredCommandHandler

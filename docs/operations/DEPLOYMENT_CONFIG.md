@@ -18,6 +18,12 @@ environment variables
 
 Use environment variables or deployment secrets for real credentials. Do not rely on sample values in `appsettings.json` outside local development.
 
+## Docker Compose Boundary
+
+Backend docker compose, when added, should contain only backend app runtime dependencies such as PostgreSQL, Redis, and backend-owned infrastructure. Do not require `IceBot-Tools` to run the backend.
+
+Tooling infrastructure such as Qdrant, RAG services, local model caches, and agent automation belongs in the `IceBot-Tools` compose lifecycle. If backend and tools need to communicate locally, use environment variables such as `RAG_API_URL` or an explicitly shared Docker network.
+
 ## Required Runtime Settings
 
 | Area | Configuration key |
@@ -45,7 +51,10 @@ Use environment variables or deployment secrets for real credentials. Do not rel
 | PayOS cancel URL | `PayOS__CancelUrl` |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` |
-| Expose sensitive request/response data in logs | `Logging__ExposeSensitiveData` |
+| Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |
+| Enable OpenTelemetry OTLP export | `Observability__OpenTelemetry__OtlpExporterEnabled` |
+| OpenTelemetry OTLP endpoint | `Observability__OpenTelemetry__OtlpEndpoint` |
+| Enable debug body logging | `Observability__DebugBodyLogging__Enabled` |
 | Diagnostics API key | `Diagnostics__ApiKey` |
 | Diagnostics realtime external ping toggle | `Diagnostics__EnableExternalPing` |
 | Diagnostics realtime external ping timeout seconds | `Diagnostics__ExternalPingTimeoutSeconds` |
@@ -93,6 +102,7 @@ When enabled, diagnostics performs provider reachability checks without sending 
 - Firebase can be disabled with `Firebase__Enabled=false`, but Google/Firebase login paths will then return service-unavailable behavior.
 - SMTP failures must not make account onboarding unrecoverable; admins can resend invitations.
 - PayOS webhook/payment behavior depends on correct public return/cancel URLs and checksum key.
-- Set `ErrorHandling__ExposeStackTrace=false` and `Logging__ExposeSensitiveData=false` in deployed environments.
+- Set `ErrorHandling__ExposeStackTrace=false` and `Observability__DebugBodyLogging__Enabled=false` in deployed environments.
+- For production observability, set `Observability__OpenTelemetry__OtlpExporterEnabled=true` for traces/metrics and `Observability__Serilog__OtlpSinkEnabled=true` for structured logs, then configure the OTLP endpoint to point to your collector.
 - Set `Diagnostics__ApiKey` outside Development before using `/management/diagnostics/health`.
 - Keep `Diagnostics__EnableExternalPing=false` unless the deployment check intentionally needs live SMTP/Firebase/PayOS reachability.

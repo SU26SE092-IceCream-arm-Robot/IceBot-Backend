@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace WebAPI.Configuration;
+namespace WebAPI.Configuration.Diagnostics;
 
 public static class ApplicationInfoEndpointExtensions
 {

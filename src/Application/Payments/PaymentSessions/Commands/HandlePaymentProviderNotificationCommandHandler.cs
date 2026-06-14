@@ -4,12 +4,9 @@ using Application.Payments.PaymentSessions.Support;
 using Application.Payments.Providers;
 using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
+using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
-using Domain.Orders.Enums;
 
 namespace Application.Payments.PaymentSessions.Commands;
 
@@ -20,7 +17,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
     private readonly IRealtimeNotificationPublisher _publisher;
 
     public HandlePaymentProviderNotificationCommandHandler(
-        IPaymentStore paymentStore, 
+        IPaymentStore paymentStore,
         IPaymentGateway paymentGateway,
         IRealtimeNotificationPublisher publisher)
     {

@@ -1,4 +1,4 @@
-﻿namespace WebAPI.Configuration
+﻿namespace WebAPI.Configuration.Security
 {
     public sealed class JwtOptions
     {

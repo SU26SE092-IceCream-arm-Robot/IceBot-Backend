@@ -1,10 +1,4 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
 using WebAPI.SignalR.Hubs;
 
 namespace WebAPI.SignalR;

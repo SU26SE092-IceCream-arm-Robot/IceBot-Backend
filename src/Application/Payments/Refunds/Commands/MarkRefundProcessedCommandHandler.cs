@@ -5,9 +5,6 @@ using Application.Tenants;
 using Domain.Orders.Enums;
 using Domain.Payments.Enums;
 
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
-
 namespace Application.Payments.Refunds.Commands;
 
 public sealed class MarkRefundProcessedCommandHandler

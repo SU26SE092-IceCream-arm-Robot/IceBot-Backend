@@ -24,7 +24,8 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | --- | --- | --- |
 | High-level backend architecture | [Architecture](../ARCHITECTURE.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Current work protocol, whether to edit, verification, migrations | [Working Protocol](process/WORKING_PROTOCOL.md) | [Documentation Rules](process/DOCUMENTATION_RULES.md) |
-| Deployment runtime config, environment variables, appsettings, health/info | [Deployment Configuration](process/DEPLOYMENT_CONFIG.md) | [API Surface Rules](api/API_SURFACE_RULES.md) |
+| Deployment runtime config, environment variables, appsettings, health/info | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) | [API Surface Rules](api/API_SURFACE_RULES.md) |
+| Observability, Serilog, OpenTelemetry, Aspire Dashboard, debug body logging, OTLP | [Observability](operations/OBSERVABILITY.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | Manual backend critical rule checks before handoff | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) | [Working Protocol](process/WORKING_PROTOCOL.md) |
 | How backend docs should be structured for RAG/search | [Documentation Rules](process/DOCUMENTATION_RULES.md) | this file |
 | Domain ownership, entity belongs to which bounded context | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md) |
@@ -42,7 +43,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | System overview, source-of-truth split, which flow doc to read | [System Flows](flows/SYSTEM_FLOWS.md) | [System Overview Flow](flows/SYSTEM_OVERVIEW_FLOW.md) |
 | Back-office setup, tenant/account/catalog/menu preparation | [Back-Office Setup Flow](flows/BACK_OFFICE_SETUP_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Management dashboard, GraphQL read model, aggregated management reads | [Management Read Flow](flows/MANAGEMENT_READ_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
-| SignalR realtime UI updates, hub routes, event names, smoke test | [SignalR Realtime Contract](api/SIGNALR_REALTIME_CONTRACT.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [SignalR Smoke Test](process/SIGNALR_SMOKE_TEST.md) |
+| SignalR realtime UI updates, hub routes, event names, smoke test | [SignalR Realtime Contract](api/SIGNALR_REALTIME_CONTRACT.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [SignalR Smoke Test](operations/SIGNALR_SMOKE_TEST.md) |
 | Catalog to runtime menu, menu sellability, Cloud menu vs Edge projection | [Catalog Runtime Menu Flow](flows/CATALOG_RUNTIME_MENU_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Tablet/cloud/edge/payment/MQTT/execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Operations support, telemetry, heartbeat, device events, refund support | [Operations Support Flow](flows/OPERATIONS_SUPPORT_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md) |
@@ -56,7 +57,8 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Query contains | Useful filters or docs |
 | --- | --- |
 | `auth`, `login`, `forgot password`, `reset password`, `refresh token` | [API Surface Rules](api/API_SURFACE_RULES.md), section `Authentication And Password Recovery APIs` |
-| `deploy`, `deployment`, `env`, `appsettings`, `JWT`, `SMTP`, `PayOS`, `Firebase`, `health`, `info` | [Deployment Configuration](process/DEPLOYMENT_CONFIG.md) |
+| `deploy`, `deployment`, `env`, `appsettings`, `JWT`, `SMTP`, `PayOS`, `Firebase`, `health`, `info` | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
+| `observability`, `Serilog`, `OpenTelemetry`, `Aspire`, `OTLP`, `trace`, `metric`, `debug body logging` | [Observability](operations/OBSERVABILITY.md), [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | `manual verification`, `critical rule`, `smoke checklist`, `maintenance lifecycle test`, `payment webhook test` | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 | `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
 | `management accounts`, `role scope`, `RBAC`, `policy`, `role catalog`, `permission matrix`, `roles.view`, `role-scope-options.view`, `effective access`, `me access` | [Authorization Rules](api/AUTHORIZATION_RULES.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
@@ -66,7 +68,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `system overview`, `setup to sale`, `back-office setup`, `catalog to runtime menu`, `operations support`, `management dashboard` | [System Flows](flows/SYSTEM_FLOWS.md), then the matching flow file |
 | `management orders`, `order status history`, `refund`, `manual refund`, `stock movement`, `dispenser state`, `inventory refill` | [API Surface Rules](api/API_SURFACE_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | `GraphQL`, `REST`, `read model aggregation`, `dashboard query`, `overview query` | [API Surface Rules](api/API_SURFACE_RULES.md), section `GraphQL Management Reads` |
-| `SignalR`, `hub`, `OrderHub`, `OperationsHub`, `ManagementDashboardHub`, `realtime`, `DashboardInvalidated` | [SignalR Realtime Contract](api/SIGNALR_REALTIME_CONTRACT.md), [SignalR Smoke Test](process/SIGNALR_SMOKE_TEST.md) |
+| `SignalR`, `hub`, `OrderHub`, `OperationsHub`, `ManagementDashboardHub`, `realtime`, `DashboardInvalidated` | [SignalR Realtime Contract](api/SIGNALR_REALTIME_CONTRACT.md), [SignalR Smoke Test](operations/SIGNALR_SMOKE_TEST.md) |
 | `heartbeat`, `device event`, `kiosk event`, `operations telemetry`, `lost connection` | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | `maintenance ticket`, `support ticket`, `technician assignment`, `maintenance.create`, `maintenance.manage` | [Maintenance Ticket Flow](flows/MAINTENANCE_TICKET_FLOW.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |

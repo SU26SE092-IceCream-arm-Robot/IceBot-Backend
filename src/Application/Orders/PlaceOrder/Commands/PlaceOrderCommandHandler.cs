@@ -8,9 +8,6 @@ using Application.Tenants.Kiosks.Rules;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Enums;
 
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
-
 namespace Application.Orders.PlaceOrder.Commands;
 
 public sealed class PlaceOrderCommandHandler

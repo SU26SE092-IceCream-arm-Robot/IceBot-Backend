@@ -3,7 +3,6 @@ using Application.Dashboard.Queries;
 using Application.Devices;
 using Application.Identity;
 using Application.Inventory;
-using Application.Operations;
 using Application.Orders;
 using Application.Payments;
 using Application.SalesCatalog;

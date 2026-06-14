@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace Application.Identity.Tokens.Claims;
 
 public sealed class CurrentUserContext

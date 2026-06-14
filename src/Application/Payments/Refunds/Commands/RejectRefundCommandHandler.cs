@@ -4,9 +4,6 @@ using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
-
 namespace Application.Payments.Refunds.Commands;
 
 public sealed class RejectRefundCommandHandler

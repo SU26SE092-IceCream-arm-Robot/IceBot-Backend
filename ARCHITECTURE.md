@@ -114,7 +114,7 @@ Cross-cutting WebAPI pipeline:
 
 - `CorrelationIdMiddleware`
 - `GlobalExceptionMiddleware`
-- `RequestResponseLoggingMiddleware`
+- `DebugBodyLoggingMiddleware` only when explicitly enabled for payload debugging
 - Authentication
 - Authorization
 

@@ -4,9 +4,6 @@ using Application.Inventory.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
-
 namespace Application.Inventory.Commands;
 
 public sealed class RefillDispenserCommandHandler

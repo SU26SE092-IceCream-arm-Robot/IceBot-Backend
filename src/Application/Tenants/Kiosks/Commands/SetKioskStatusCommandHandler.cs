@@ -2,8 +2,6 @@ using Application.Shared.Wrappers;
 using Application.Tenants.Abstractions;
 using Application.Tenants.Kiosks.Results;
 using Domain.Tenants.Enums;
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
 
 namespace Application.Tenants.Kiosks.Commands;
 

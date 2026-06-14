@@ -1,13 +1,7 @@
-using Application.Operations.Abstractions;
 using Domain.Operations.Entities;
 using Domain.Operations.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Infrastructure.Operations.Persistence;
 

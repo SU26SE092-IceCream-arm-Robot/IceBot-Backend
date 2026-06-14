@@ -2,8 +2,8 @@ using Domain.Common;
 using Domain.Devices.Entities;
 using Domain.Identity.Entities;
 using Domain.Operations.Enums;
-using Domain.Tenants.Entities;
 using Domain.Orders.Entities;
+using Domain.Tenants.Entities;
 
 namespace Domain.Operations.Entities;
 
