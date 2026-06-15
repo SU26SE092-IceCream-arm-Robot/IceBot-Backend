@@ -4,11 +4,6 @@ using Application.Operations.MaintenanceTickets.Mapping;
 using Application.Operations.MaintenanceTickets.Results;
 using Application.Shared.Wrappers;
 using Domain.Operations.Enums;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Operations.MaintenanceTickets.Queries;
 

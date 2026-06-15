@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Abstractions.Realtime.Events;
 
 public sealed record DeviceEventCreatedEvent

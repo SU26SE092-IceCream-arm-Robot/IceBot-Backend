@@ -1,3 +1,5 @@
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 using Application.Identity.Tokens.Claims;
 using Application.Operations.Abstractions;
 using Application.Operations.MaintenanceTickets.Mapping;
@@ -7,12 +9,6 @@ using Application.Operations.MaintenanceTickets.Rules;
 using Application.Shared.Wrappers;
 using Domain.Operations.Entities;
 using Domain.Operations.Enums;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
-
-using Application.Abstractions.Realtime;
-using Application.Abstractions.Realtime.Events;
 
 namespace Application.Operations.MaintenanceTickets.Commands;
 

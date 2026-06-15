@@ -1,6 +1,4 @@
 using Application.Identity.Tokens.Claims;
-using System;
-using System.Linq;
 
 namespace Application.Operations.MaintenanceTickets.Rules;
 
@@ -12,7 +10,7 @@ public static class MaintenanceTicketAccessRules
 
         foreach (var rs in user.RoleScopes)
         {
-            if (rs.OrganizationId == orgId || rs.StoreId == storeId || rs.KioskId == kioskId || 
+            if (rs.OrganizationId == orgId || rs.StoreId == storeId || rs.KioskId == kioskId ||
                 (rs.OrganizationId == null && rs.StoreId == null && rs.KioskId == null))
             {
                 if (string.Equals(rs.RoleCode, "SystemAdmin", StringComparison.OrdinalIgnoreCase) ||
@@ -32,7 +30,7 @@ public static class MaintenanceTicketAccessRules
 
                 if (string.Equals(rs.RoleCode, "Technician", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (assignedToAccountId == user.AccountId || 
+                    if (assignedToAccountId == user.AccountId ||
                         rs.KioskId == kioskId || rs.StoreId == storeId || rs.OrganizationId == orgId)
                     {
                         return true;

@@ -1,5 +1,4 @@
 using Domain.Operations.Enums;
-using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace Application.Operations.MaintenanceTickets.Requests;

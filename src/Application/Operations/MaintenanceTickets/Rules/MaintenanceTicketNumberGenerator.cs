@@ -1,8 +1,5 @@
 using Application.Operations.Abstractions;
-using System;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Operations.MaintenanceTickets.Rules;
 

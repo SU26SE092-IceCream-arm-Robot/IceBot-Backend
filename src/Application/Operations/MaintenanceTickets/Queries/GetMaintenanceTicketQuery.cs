@@ -4,9 +4,6 @@ using Application.Operations.MaintenanceTickets.Mapping;
 using Application.Operations.MaintenanceTickets.Results;
 using Application.Operations.MaintenanceTickets.Rules;
 using Application.Shared.Wrappers;
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Application.Operations.MaintenanceTickets.Queries;
 

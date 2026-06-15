@@ -1,5 +1,3 @@
-using System.Threading;
-using System.Threading.Tasks;
 using Application.Abstractions.Realtime.Events;
 
 namespace Application.Abstractions.Realtime;

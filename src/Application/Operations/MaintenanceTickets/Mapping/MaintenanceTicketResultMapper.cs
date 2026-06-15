@@ -1,7 +1,5 @@
 using Application.Operations.MaintenanceTickets.Results;
 using Domain.Operations.Entities;
-using Domain.Operations.Enums;
-using System;
 
 namespace Application.Operations.MaintenanceTickets.Mapping;
 

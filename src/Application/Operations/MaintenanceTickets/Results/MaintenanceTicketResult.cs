@@ -1,5 +1,3 @@
-using System;
-
 namespace Application.Operations.MaintenanceTickets.Results;
 
 public sealed class MaintenanceTicketResult

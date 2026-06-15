@@ -24,7 +24,7 @@ public static class GraphQLEndpointExtensions
 
     public static IEndpointRouteBuilder MapIceBotGraphQL(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGraphQL().RequireAuthorization();
+        endpoints.MapGraphQL();
         return endpoints;
     }
 }
