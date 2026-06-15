@@ -1,3 +1,6 @@
+using Application.Operations.MaintenanceTickets.Commands;
+using Application.Operations.MaintenanceTickets.Queries;
+using Application.Operations.MaintenanceTickets.Requests;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;

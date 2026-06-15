@@ -1,3 +1,4 @@
+using Application.Abstractions.Realtime;
 using System.Text.Json.Serialization;
 using WebAPI.SignalR.Hubs;
 

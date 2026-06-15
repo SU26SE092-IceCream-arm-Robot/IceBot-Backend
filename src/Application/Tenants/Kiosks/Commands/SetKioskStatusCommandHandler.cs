@@ -1,3 +1,5 @@
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 using Application.Shared.Wrappers;
 using Application.Tenants.Abstractions;
 using Application.Tenants.Kiosks.Results;

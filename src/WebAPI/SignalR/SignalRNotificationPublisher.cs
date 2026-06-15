@@ -1,3 +1,5 @@
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 using Microsoft.AspNetCore.SignalR;
 using WebAPI.SignalR.Hubs;
 

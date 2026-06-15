@@ -4,6 +4,7 @@ using Application.Devices;
 using Application.Identity;
 using Application.Inventory;
 using Application.Orders;
+using Application.Operations;
 using Application.Payments;
 using Application.SalesCatalog;
 using Application.Tenants;
