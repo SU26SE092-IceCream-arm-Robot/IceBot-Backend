@@ -3,7 +3,14 @@ set -e
 
 echo "Starting deployment for IceBot-Backend..."
 
-git pull origin main
+# 1. Tải toàn bộ thông tin mới nhất từ GitHub về mà chưa áp dụng ngay
+git fetch origin
+
+# 2. Bắt buộc chuyển sang nhánh main
+git checkout main
+
+# 3. Ép code trên VPS phải giống hệt 100% với code trên GitHub (xóa bỏ mọi thay đổi lỡ tay viết nháp trên VPS)
+git reset --hard origin/main
 
 docker compose build
 
