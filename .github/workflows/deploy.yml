@@ -1,0 +1,33 @@
+name: Deploy Backend to VPS
+
+# Pipeline này sẽ được kích hoạt tự động khi có code đẩy vào (hoặc merge PR) nhánh main
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: SSH to VPS and Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Execute Deploy Script via SSH
+        # Sử dụng action có sẵn để SSH vào server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          # Các thông tin nhạy cảm được gọi từ GitHub Secrets
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          # Kịch bản chạy trên VPS sau khi SSH thành công
+          script: |
+            # LƯU Ý: Nhớ đổi đường dẫn dưới đây thành đường dẫn thật trên VPS của bạn
+            cd /opt/apps/IceBot-Backend
+            
+            # Cấp quyền thực thi cho file deploy (đề phòng bị mất quyền)
+            chmod +x deploy.sh
+            
+            # Chạy file deploy
+            ./deploy.sh
