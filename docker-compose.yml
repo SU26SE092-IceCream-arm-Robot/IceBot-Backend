@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: icebot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: IceBotDB
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: p@ssw0rd12345
+    volumes:
+      - icebot_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d IceBotDB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  icebot-backend-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: icebot-backend-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__IceBot_DB: "Host=postgres;Port=5432;Database=IceBotDB;Username=postgres;Password=p@ssw0rd12345"
+
+volumes:
+  icebot_postgres_data:
