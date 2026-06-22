@@ -28,6 +28,7 @@ Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. Fo
 | Tenant scope | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md) |
 | EF/data modeling rules | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | System flow index | [System Flows](flows/SYSTEM_FLOWS.md) |
+| Version direction / future roadmap | [System Overview Flow](flows/SYSTEM_OVERVIEW_FLOW.md) |
 | Checkout/payment/edge execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) |
 | Tablet/edge/cloud contract | [IoT Contract](iot/IOT_CONTRACT.md) |
 | Naming conventions | [Naming Rules](process/NAMING_RULES.md) |

@@ -195,6 +195,20 @@ internal static class PermissionMatrixRules
             Description = "View kiosk operations telemetry such as heartbeats and device events within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
             ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "devices.view",
+            Description = "View devices/hardware details within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "devices.manage",
+            Description = "Create, update, status-change, or retire devices/hardware within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
         }
     };
 }

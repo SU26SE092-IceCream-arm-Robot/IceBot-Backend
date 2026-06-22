@@ -36,6 +36,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
+| Device management | `/api/v1/management/devices/*`, `/api/v1/management/kiosks/*/devices` | create/update/set management status/retire devices, list and view devices |
 | Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
 | Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/refunds` | internal order search, unpaid cancellation, refund-required marking, manual refund tracking |
@@ -101,6 +102,12 @@ GET /api/v1/management/kiosks/{kioskId}
 POST /api/v1/management/stores/{storeId}/kiosks
 PUT /api/v1/management/kiosks/{kioskId}
 PATCH /api/v1/management/kiosks/{kioskId}/status
+GET /api/v1/management/devices
+GET /api/v1/management/devices/{deviceId}
+POST /api/v1/management/kiosks/{kioskId}/devices
+PUT /api/v1/management/devices/{deviceId}
+PATCH /api/v1/management/devices/{deviceId}/status
+DELETE /api/v1/management/devices/{deviceId}
 GET /api/v1/management/roles
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
@@ -131,6 +138,12 @@ PATCH /api/v1/management/maintenance-tickets/{ticketId}/resolve
 PATCH /api/v1/management/maintenance-tickets/{ticketId}/close
 PATCH /api/v1/management/maintenance-tickets/{ticketId}/cancel
 ```
+
+Device management rules:
+
+- `DELETE /api/v1/management/devices/{deviceId}` is a soft retire operation. It sets `DeviceStatus.Retired` and soft-deletes the row; it does not physically delete the device record.
+- `PATCH /api/v1/management/devices/{deviceId}/status` must not set `Retired`; use the retire endpoint instead.
+- `Device.Status` is a management/operations state for configured hardware. Runtime connectivity and error evidence still come from heartbeat and device-event telemetry.
 
 Rules:
 

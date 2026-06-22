@@ -55,6 +55,7 @@ namespace Infrastructure
             services.AddScoped<IInventoryStore, InventoryStore>();
             services.AddHostedService<Persistence.Jobs.DataRetentionJob>();
             services.AddScoped<IKioskTelemetryStore, KioskTelemetryStore>();
+            services.AddScoped<IDeviceManagementStore, DeviceManagementStore>();
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
 
