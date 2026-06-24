@@ -45,6 +45,11 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("devices.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("devices.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
 
+        options.AddScopedRolePolicy("artifact.upload", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("release.publish", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("release.deploy", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("release.rollback", "SystemAdmin", "OrgAdmin", "Manager");
+
         return options;
     }
 
