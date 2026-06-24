@@ -4,7 +4,7 @@ This document defines tenant isolation and configurable override scope for organ
 
 ## Search Keywords
 
-`multi-tenancy`, `tenant`, `tenant isolation`, `Organization`, `Store`, `Kiosk`, `TenantScopeType`, `Global`, `Organization scope`, `Store scope`, `Kiosk scope`, `Device scope`, `global query filter`, `Product`, `ProductVariant`, `Recipe`, `Menu`, `RobotProgram`, `KioskRecipeExecutionProfile`, `OrgAdmin`
+`multi-tenancy`, `tenant`, `tenant isolation`, `Organization`, `Store`, `Kiosk`, `TenantScopeType`, `Global`, `Organization scope`, `Store scope`, `Kiosk scope`, `Device scope`, `global query filter`, `Product`, `ProductVariant`, `Recipe`, `Menu`, `RobotProgram`, `ConfigurationRelease`, `OrgAdmin`
 
 ## Tenant Root
 
@@ -298,11 +298,11 @@ Robot program resolution should use:
 Device > Kiosk > Store > Organization > Global
 ```
 
-Kiosk/device-scoped robot programs may contain local Fairino point/frame references and backup snapshots specific to a physical installation.
+Kiosk/device-scoped robot programs declare ordered robot artifacts. Motion points, calibration and other emulator internals remain outside Cloud configuration persistence.
 
-### KioskRecipeExecutionProfile
+### Configuration Release
 
-`KioskRecipeExecutionProfile` is kiosk/device-scoped robot configuration. It binds a catalog recipe to a robot program for a concrete kiosk/device context.
+`ConfigurationRelease` is organization-scoped approved configuration. Its release-owned `ExecutionRoute` and robot bindings resolve catalog recipe/variant requirements without exposing a direct robot-program mapping in Catalog.
 
 Use:
 
@@ -332,7 +332,7 @@ Already applied:
 
 Consider adding later when implementing persistence/query filters:
 
-- `RobotJob`
+- `OrderExecutionRecord`
 - `Alert`
 - `MaintenanceTicket`
 - `OperationLog`

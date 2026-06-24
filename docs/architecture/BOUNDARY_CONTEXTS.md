@@ -1,10 +1,13 @@
+Exit code: 0
+Wall time: 0.1 seconds
+Output:
 # Boundary Contexts
 
 This project keeps one Domain project, but domain entities are grouped by bounded context. The folder and namespace should describe business ownership, not technical implementation.
 
 ## Search Keywords
 
-`bounded context`, `domain ownership`, `Domain.Identity`, `Domain.Tenants`, `Domain.Catalog`, `Domain.SalesCatalog`, `Domain.Orders`, `Domain.Payments`, `Domain.RobotConfiguration`, `Domain.RobotRuntime`, `Domain.Devices`, `Domain.Inventory`, `Domain.Operations`, `Domain.Sync`, `Domain.Common`, `ProductVariant`, `MenuItem`, `KioskRecipeExecutionProfile`, `RobotProgram`, `RobotJob`, `SyncEventInbox`
+`bounded context`, `domain ownership`, `Domain.Identity`, `Domain.Tenants`, `Domain.Catalog`, `Domain.SalesCatalog`, `Domain.Orders`, `Domain.Payments`, `Domain.RobotConfiguration`, `Domain.ProductionConfiguration`, `Domain.ProductionExecution`, `Domain.Devices`, `Domain.Inventory`, `Domain.Operations`, `Domain.Sync`, `Domain.Common`, `ProductVariant`, `MenuItem`, `RobotArtifact`, `RobotProgram`, `ConfigurationRelease`, `EdgeCommand`, `SyncEventInbox`
 
 ## Bounded Context Ownership
 
@@ -18,12 +21,13 @@ This project keeps one Domain project, but domain entities are grouped by bounde
 | Sales Catalog | `Domain.SalesCatalog` | menus, menu items, sellable offers, pricing |
 | Orders | `Domain.Orders` | order lifecycle, order items, historical order snapshots |
 | Payments | `Domain.Payments` | payment transactions, callbacks, refunds, payment methods |
-| Robot Configuration | `Domain.RobotConfiguration` | robot programs, program steps, recipe execution profiles |
-| Robot Runtime | `Domain.RobotRuntime` | robot jobs, robot job steps, robot job events |
-| Devices | `Domain.Devices` | device catalog, installed devices, telemetry, heartbeats |
+| Robot Configuration | `Domain.RobotConfiguration` | robot Lua artifacts and reusable robot manifests |
+| Production Configuration | `Domain.ProductionConfiguration` | configuration releases, routes, robot bindings and deployment records |
+| Production Execution | `Domain.ProductionExecution` | Cloud execution projections from executor evidence |
+| Devices | `Domain.Devices` | device catalog, telemetry, heartbeats and kiosk execution endpoints |
 | Inventory | `Domain.Inventory` | dispenser state, stock movements |
 | Operations | `Domain.Operations` | alerts, maintenance tickets, operation logs |
-| Sync | `Domain.Sync` | edge-cloud inbox and dead letters |
+| Sync | `Domain.Sync` | edge-cloud inbox/dead letters and dispatch-only edge commands |
 | Common | `Domain.Common` | base entities, shared abstractions, shared primitives |
 
 ### Identity
@@ -103,7 +107,7 @@ Entities:
 - `OrderItem`
 - `OrderStatusHistory`
 
-Orders may reference catalog, payment, kiosk, and robot runtime by id or snapshot, but should not depend on mutable runtime state for historical truth.
+Orders may reference catalog, payment, kiosk, and execution evidence by id or snapshot, but should not depend on mutable Edge runtime state for historical truth.
 
 ### Payments
 
@@ -126,31 +130,45 @@ Current refund phase is manual cash refund. Auto provider refund or payout integ
 
 Namespace: `Domain.RobotConfiguration`
 
-Owns robot program definitions, step definitions, local Fairino point/frame references, and versioned robot configuration shipped to edge kiosks.
+Owns immutable exported robot Lua artifacts and reusable declared robot manifests.
 
 Entities:
 
 - `RobotProgram`
-- `RobotProgramStep`
-- `KioskRecipeExecutionProfile`
+- `RobotProgramArtifact`
+- `RobotArtifact`
 
 This context is configuration-time. It should not own runtime execution state.
 
-`KioskRecipeExecutionProfile` is the cloud-side config/backup binding that says which robot program can execute a recipe for a kiosk/device context. Edge still resolves and executes locally.
+`RobotProgramArtifact` owns ordered artifact membership. This context does not persist Blockly trees, teaching points, calibration, motion coordinates or live runtime work.
 
-### Robot Runtime
+### Production Configuration
 
-Namespace: `Domain.RobotRuntime`
+Namespace: `Domain.ProductionConfiguration`
 
-Owns robot execution instances and append-only robot execution events.
+Owns organization-scoped configuration releases, release-owned route snapshots, ordered robot bindings and Cloud rollout acknowledgement records.
 
 Entities:
 
-- `RobotJob`
-- `RobotJobStep`
-- `RobotJobEvent`
+- `ConfigurationRelease`
+- `ExecutionRoute`
+- `ExecutionRouteRobotBinding`
+- `KioskConfigurationDeployment`
 
-Runtime jobs should use snapshots copied from catalog/configuration where needed.
+Published releases are immutable. A route links catalog variant/recipe requirements to robot programs through bindings, rather than Catalog holding a direct program id.
+
+### Production Execution
+
+Namespace: `Domain.ProductionExecution`
+
+Owns Cloud read/audit projections created from accepted executor evidence.
+
+Entities:
+
+- `OrderExecutionRecord`
+- `ProductionExecutionRecord`
+
+This context does not own an Edge queue, scheduler, workcell lease, local `ProductionJob`, or physical safety transition.
 
 ### Devices
 
@@ -165,6 +183,7 @@ Entities:
 - `Device`
 - `DeviceEvent`
 - `KioskHeartbeat`
+- `KioskExecutionEndpoint`
 
 `KioskHeartbeat` lives here because it is telemetry emitted by the edge node/device runtime. `KioskStatus` stays in Tenants because it describes the kiosk lifecycle.
 
@@ -203,6 +222,8 @@ Entities:
 
 - `SyncEventInbox`
 - `SyncDeadLetter`
+- `EdgeCommand`
+- `EdgeCommandDeliveryAttempt`
 
 Business contexts should not depend on Sync entities. They may expose idempotency, correlation, causation, version, and origin node fields for sync infrastructure to consume.
 
@@ -220,7 +241,7 @@ Allowed here:
 - `BusinessEntity`
 - `CatalogEntity`
 - `RobotConfigurationEntity`
-- `RobotRuntimeAggregateEntity`
+- `SyncAggregateEntity`
 - `IAuditable`
 - `ISoftDeletable`
 - `IRobotSyncEntity`
@@ -244,9 +265,10 @@ Dependency and cross-layer rules live in [Dependency Rules](DEPENDENCY_RULES.md)
 - Orders reference Tenants through `OrganizationId`, `StoreId`, and `KioskId`.
 - Orders reference Sales Catalog through `MenuItemId`, and keep Catalog references through `ProductId`, `ProductVariantId`, `RecipeId`, and item snapshots.
 - Payments reference Orders through `OrderId`.
-- Robot Runtime references Orders, Robot Configuration, Devices, Catalog recipes, and Tenants by ids/snapshots.
+- Production Configuration references Catalog and Robot Configuration by ids/snapshots.
+- Production Execution retains executor evidence by source command, endpoint, release and order ids.
 - Inventory references Devices, Tenants, Catalog ingredients, and dispenser state.
-- Operations references Accounts, Devices, Orders, Robot Runtime, and Tenants as operational evidence.
+- Operations references Accounts, Devices, Orders, execution evidence, and Tenants as operational evidence.
 
 These references are acceptable because the current project uses one database and one Domain assembly. They should still be treated as bounded-context boundaries in application services and APIs.
 

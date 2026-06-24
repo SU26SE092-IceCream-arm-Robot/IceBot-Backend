@@ -49,7 +49,7 @@ The actual content owned by the doc.
 
 Include keywords that a team member or AI agent is likely to ask for:
 
-- domain names: `Order`, `PaymentTransaction`, `RobotJob`
+- domain names: `Order`, `PaymentTransaction`, `RobotArtifact`, `EdgeCommand`
 - route names: `/api/v1/authentication/login`, `/management/accounts`
 - workflow phrases: `forgot password`, `edge command pull`, `payment callback`
 - common synonyms: `auth`, `authentication`, `login`, `external login`
@@ -98,7 +98,6 @@ Do not copy full route maps, entity lists, or rules from the linked doc unless t
 - Prefer tables for lookup data.
 - Prefer specific lookup sections and metadata-friendly terms over generic overview prose.
 - Keep rejected/future ideas out of source-of-truth docs unless clearly marked.
-- Do not put Vault/personal reasoning into backend docs.
 
 ## Retrieval Priority
 

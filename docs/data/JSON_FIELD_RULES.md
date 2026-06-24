@@ -19,15 +19,11 @@ Fields:
 - `Kiosk.SettingsJson` with `SettingsSchemaVersion`
 - `Store.OpeningHoursJson` with `OpeningHoursSchemaVersion`
 - `Recipe.InstructionsJson` with `InstructionsSchemaVersion`
-- `RobotProgram.ProgramPayloadJson` with `ProgramPayloadSchemaVersion`
-- `RobotProgram.PointSnapshotJson` with `PointSnapshotSchemaVersion`
-- `RobotProgram.SafetyZoneJson` with `SafetyZoneSchemaVersion`
-- `RobotProgramStep.ParametersJson` with `ParametersSchemaVersion`
-- `RobotProgramStep.ParametersOverrideJson` with `ParametersOverrideSchemaVersion`
-- `RobotProgramStep.RetryPolicyJson` with `RetryPolicySchemaVersion`
-- `RobotProgramStep.PointSnapshotJson` with `PointSnapshotSchemaVersion`
-- `KioskRecipeExecutionProfile.ResolverPolicyJson` with `ResolverPolicySchemaVersion`
-- `KioskRecipeExecutionProfile.ExecutionSnapshotJson` with `ExecutionSnapshotSchemaVersion`
+- `RobotProgramArtifact.ParametersJson` with `ParametersSchemaVersion`
+- `RobotArtifact.MetadataJson`
+- `ConfigurationRelease.ManifestJson` with `ReleaseManifestSchemaVersion`
+- `ExecutionRoute.RequiredCapabilitiesJson`
+- `EdgeCommand.PayloadJson`
 - `IngredientDispenserState.LevelToQuantityProfileJson` with `LevelToQuantityProfileSchemaVersion`
 
 Rules:
@@ -45,8 +41,7 @@ Fields:
 
 - `OrderItem.OptionsJson` with `OptionsSchemaVersion`
 - `OrderItem.RecipeSnapshotJson` with `RecipeSnapshotSchemaVersion`
-- `RobotJob.RecipeSnapshotJson` with `RecipeSnapshotSchemaVersion`
-- `RobotJobStep.ParametersJson` with `ParametersSchemaVersion`
+- `OrderExecutionRecord` and `ProductionExecutionRecord` keep typed projection fields rather than raw executor payloads.
 - `PaymentTransaction.RawRequestJson`
 - `PaymentTransaction.RawResponseJson`
 
@@ -67,7 +62,7 @@ Fields:
 - `SyncEventInbox.HeadersJson`
 - `SyncDeadLetter.PayloadJson`
 - `DeviceEvent.PayloadJson`
-- `RobotJobEvent.PayloadJson`
+- `EdgeCommand.PayloadJson`
 - `OperationLog.PayloadJson`
 - `KioskHeartbeat.PayloadJson`
 - `IngredientDispenserState.SensorPayloadJson`
@@ -109,8 +104,8 @@ Rules:
 
 For edge-cloud sync, conflict resolution should happen at the aggregate boundary:
 
-- Robot configuration: `RobotProgram`, `RobotProgramStep`, and `KioskRecipeExecutionProfile` versions.
-- Runtime execution: `RobotJob`, `RobotJobStep`, and append-only runtime events.
+- Robot configuration: `RobotArtifact`, `RobotProgram`, `RobotProgramArtifact`, and immutable `ConfigurationRelease` manifests.
+- Cloud execution: typed `OrderExecutionRecord` and `ProductionExecutionRecord` projections. Edge-local runtime events are not Cloud entities.
 - Stock reporting: typed `StockMovement` quantities; JSON sensor payloads are only supporting evidence.
 
 Never resolve sync conflicts by merging arbitrary JSON payloads from cloud and edge. Either reject stale writes, create a new version, or normalize the changed field into typed columns.

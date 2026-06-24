@@ -3,18 +3,15 @@ using Domain.Common.Enums;
 using Domain.Devices.Entities;
 using Domain.Identity.Entities;
 using Domain.Operations.Enums;
-using Domain.RobotRuntime.Entities;
 using Domain.Tenants.Entities;
 
 namespace Domain.Operations.Entities;
 
-public partial class Alert : RobotRuntimeAggregateEntity
+public partial class Alert : SyncAggregateEntity
 {
     public Guid KioskId { get; set; }
 
     public Guid? DeviceId { get; set; }
-
-    public Guid? RobotJobId { get; set; }
 
     public Guid? AcknowledgedByAccountId { get; set; }
 
@@ -43,8 +40,6 @@ public partial class Alert : RobotRuntimeAggregateEntity
     public virtual Account? AcknowledgedByAccount { get; set; }
 
     public virtual Device? Device { get; set; }
-
-    public virtual RobotJob? RobotJob { get; set; }
 
     public virtual Kiosk Kiosk { get; set; } = null!;
 

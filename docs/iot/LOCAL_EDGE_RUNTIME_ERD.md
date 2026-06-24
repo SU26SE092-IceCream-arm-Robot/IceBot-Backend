@@ -1,6 +1,11 @@
+Exit code: 0
+Wall time: 0.1 seconds
+Output:
 # Local Edge Runtime ERD
 
-This document defines the proposed Local Edge PostgreSQL relationship model for the kiosk robot runtime.
+This document preserves the earlier proposed Local Edge PostgreSQL relationship model for reference. It is not the current artifact-first Edge contract and must not be implemented directly.
+
+The current backend owns Cloud configuration, dispatch and projections only. A future Edge schema must use artifact-first configuration and Edge-local `ProductionJob`/`ProductionJobEvent`, not the `RobotJob`/step-first model documented below.
 
 Scope:
 
@@ -11,7 +16,7 @@ Scope:
 
 ## Search Keywords
 
-`local edge DB`, `edge runtime ERD`, `local PostgreSQL`, `runtime snapshot`, `executable order`, `edge command inbox`, `robot execution queue`, `RobotJob`, `RobotJobStep`, `RobotJobEvent`, `RuntimeProductProjection`, `RuntimeRecipeProgramBinding`, `RuntimeRobotProgramStep`, `KioskRuntime`, `IngredientDispenserState`, `StockMovement`, `EdgeOutboxMessage`, `heartbeat`, `sync checkpoint`, `Fairino`
+`local edge DB`, `edge runtime ERD`, `historical step-first schema`, `artifact-first`, `ProductionJob`, `ProductionJobEvent`, `artifact cache`, `workcell scheduler`, `EdgeOutboxMessage`, `heartbeat`, `sync checkpoint`, `Fairino`
 
 ## Table Lookup
 

@@ -7,7 +7,6 @@ public sealed class DeviceEventResult
     public Guid Id { get; set; }
     public Guid DeviceId { get; set; }
     public Guid? KioskId { get; set; }
-    public Guid? RobotJobId { get; set; }
     public Guid EventId { get; set; }
     public Guid OriginNodeId { get; set; }
     public Guid? CorrelationId { get; set; }

@@ -7,8 +7,9 @@ using Domain.Inventory.Entities;
 using Domain.Operations.Entities;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
+using Domain.ProductionExecution.Projections;
+using Domain.ProductionConfiguration.Entities;
 using Domain.RobotConfiguration.Entities;
-using Domain.RobotRuntime.Entities;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
@@ -82,6 +83,9 @@ public class IceBotDbContext : DbContext
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<DeviceEvent> DeviceEvents => Set<DeviceEvent>();
     public DbSet<KioskHeartbeat> KioskHeartbeats => Set<KioskHeartbeat>();
+    public DbSet<KioskExecutionEndpoint> KioskExecutionEndpoints => Set<KioskExecutionEndpoint>();
+    public DbSet<ExecutionEndpointCredentialBinding> ExecutionEndpointCredentialBindings => Set<ExecutionEndpointCredentialBinding>();
+    public DbSet<ExecutionEndpointSupportedRobotTarget> ExecutionEndpointSupportedRobotTargets => Set<ExecutionEndpointSupportedRobotTarget>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();
@@ -107,17 +111,24 @@ public class IceBotDbContext : DbContext
     public DbSet<Refund> Refunds => Set<Refund>();
 
     public DbSet<RobotProgram> RobotPrograms => Set<RobotProgram>();
-    public DbSet<RobotProgramStep> RobotProgramSteps => Set<RobotProgramStep>();
-    public DbSet<KioskRecipeExecutionProfile> KioskRecipeExecutionProfiles => Set<KioskRecipeExecutionProfile>();
-    public DbSet<RobotJob> RobotJobs => Set<RobotJob>();
-    public DbSet<RobotJobStep> RobotJobSteps => Set<RobotJobStep>();
-    public DbSet<RobotJobEvent> RobotJobEvents => Set<RobotJobEvent>();
+    public DbSet<RobotArtifact> RobotArtifacts => Set<RobotArtifact>();
+    public DbSet<RobotProgramArtifact> RobotProgramArtifacts => Set<RobotProgramArtifact>();
+    public DbSet<ConfigurationRelease> ConfigurationReleases => Set<ConfigurationRelease>();
+    public DbSet<ExecutionRoute> ExecutionRoutes => Set<ExecutionRoute>();
+    public DbSet<ExecutionRouteRobotBinding> ExecutionRouteRobotBindings => Set<ExecutionRouteRobotBinding>();
+    public DbSet<KioskConfigurationDeployment> KioskConfigurationDeployments => Set<KioskConfigurationDeployment>();
+    public DbSet<ControllerArtifactSetDeployment> ControllerArtifactSetDeployments => Set<ControllerArtifactSetDeployment>();
+    public DbSet<ControllerArtifactSetItem> ControllerArtifactSetItems => Set<ControllerArtifactSetItem>();
+    public DbSet<OrderExecutionRecord> OrderExecutionRecords => Set<OrderExecutionRecord>();
+    public DbSet<ProductionExecutionRecord> ProductionExecutionRecords => Set<ProductionExecutionRecord>();
 
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<MaintenanceTicket> MaintenanceTickets => Set<MaintenanceTicket>();
     public DbSet<OperationLog> OperationLogs => Set<OperationLog>();
     public DbSet<SyncEventInbox> SyncEventInbox => Set<SyncEventInbox>();
     public DbSet<SyncDeadLetter> SyncDeadLetters => Set<SyncDeadLetter>();
+    public DbSet<EdgeCommand> EdgeCommands => Set<EdgeCommand>();
+    public DbSet<EdgeCommandDeliveryAttempt> EdgeCommandDeliveryAttempts => Set<EdgeCommandDeliveryAttempt>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
@@ -135,6 +146,8 @@ public class IceBotDbContext : DbContext
         ConfigureSalesCatalog(modelBuilder);
         ConfigureOrdersAndPayments(modelBuilder);
         ConfigureRobot(modelBuilder);
+        ConfigureProductionConfiguration(modelBuilder);
+        ConfigureProductionExecution(modelBuilder);
         ConfigureOperations(modelBuilder);
         ConfigureSync(modelBuilder);
         ConfigureEntityConventions(modelBuilder);
@@ -322,6 +335,55 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.DeviceType).WithMany().HasForeignKey(x => x.DeviceTypeId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.DeviceModel).WithMany().HasForeignKey(x => x.DeviceModelId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany(x => x.Devices).HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<KioskExecutionEndpoint>(entity =>
+        {
+            entity.ToTable("KioskExecutionEndpoints", table =>
+                table.HasCheckConstraint(
+                    "CK_KioskExecutionEndpoints_ProfileIdentity",
+                    "((\"ExecutionProfile\" = 1 AND \"ControllerId\" IS NULL) OR (\"ExecutionProfile\" = 2 AND \"FullEdgeRuntimeId\" IS NULL)) AND (\"Status\" <> 2 OR ((\"ExecutionProfile\" = 1 AND \"FullEdgeRuntimeId\" IS NOT NULL) OR (\"ExecutionProfile\" = 2 AND \"ControllerId\" IS NOT NULL)))"));
+            entity.HasIndex(x => new { x.KioskId, x.EndpointCode }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.Id, x.KioskId }).IsUnique();
+            entity.HasIndex(x => new { x.Id, x.KioskId, x.FullEdgeRuntimeId }).IsUnique().HasFilter("\"FullEdgeRuntimeId\" IS NOT NULL");
+            entity.HasIndex(x => x.FullEdgeRuntimeId).IsUnique().HasFilter("\"FullEdgeRuntimeId\" IS NOT NULL");
+            entity.HasIndex(x => x.ControllerId).IsUnique().HasFilter("\"ControllerId\" IS NOT NULL");
+            entity.HasIndex(x => x.CredentialBindingId).IsUnique().HasFilter("\"CredentialBindingId\" IS NOT NULL");
+            entity.HasIndex(x => x.LastEdgeActivationEventId).IsUnique().HasFilter("\"LastEdgeActivationEventId\" IS NOT NULL");
+            entity.HasIndex(x => x.LastControllerActivationReportId).IsUnique().HasFilter("\"LastControllerActivationReportId\" IS NOT NULL");
+            entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.CredentialBinding)
+                .WithMany()
+                .HasForeignKey(x => x.CredentialBindingId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(x => x.SupportedRobotTargets)
+                .WithOne(x => x.KioskExecutionEndpoint)
+                .HasForeignKey(x => x.KioskExecutionEndpointId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.SupportedRobotTargets).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ExecutionEndpointCredentialBinding>(entity =>
+        {
+            entity.ToTable("ExecutionEndpointCredentialBindings");
+            entity.HasIndex(x => x.CredentialReference).IsUnique();
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status });
+            entity.HasOne(x => x.KioskExecutionEndpoint)
+                .WithMany()
+                .HasForeignKey(x => x.KioskExecutionEndpointId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExecutionEndpointSupportedRobotTarget>(entity =>
+        {
+            entity.ToTable("ExecutionEndpointSupportedRobotTargets");
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.RuntimeTargetCode, x.MachineModelCode })
+                .IsUnique()
+                .HasFilter("\"DeviceId\" IS NULL");
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.RuntimeTargetCode, x.MachineModelCode, x.DeviceId })
+                .IsUnique()
+                .HasFilter("\"DeviceId\" IS NOT NULL");
+            entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ProductCategory>(entity =>
@@ -541,70 +603,162 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<RobotProgram>(entity =>
         {
             entity.ToTable("RobotPrograms");
-            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.DeviceId, x.Code, x.ProgramVersion }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.DeviceId, x.Code }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.TemplateProgram).WithMany().HasForeignKey(x => x.TemplateProgramId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.PointValidatedByAccount).WithMany().HasForeignKey(x => x.PointValidatedByAccountId).OnDelete(DeleteBehavior.Restrict);
+            entity.Property(x => x.ProgramManifestJson).HasColumnType("jsonb");
+            entity.HasIndex(x => x.ProgramManifestChecksum).IsUnique().HasFilter("\"ProgramManifestChecksum\" IS NOT NULL");
+            entity.Navigation(x => x.RobotProgramArtifacts).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
-        modelBuilder.Entity<RobotProgramStep>(entity =>
+        modelBuilder.Entity<RobotArtifact>(entity =>
         {
-            entity.ToTable("RobotProgramSteps");
-            entity.HasIndex(x => new { x.RobotProgramId, x.StepNumber }).IsUnique().HasFilter(ActiveRowFilter);
-            entity.HasIndex(x => new { x.RobotProgramId, x.StepCode }).IsUnique().HasFilter(ActiveRowFilter);
-            entity.HasOne(x => x.RobotProgram).WithMany(x => x.RobotProgramSteps).HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.TemplateStep).WithMany().HasForeignKey(x => x.TemplateStepId).OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable("RobotArtifacts");
+            entity.HasIndex(x => new { x.OrganizationId, x.ArtifactCode, x.Checksum }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => x.StorageKey).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.RuntimeTargetCode, x.MachineModelCode, x.Status });
+            entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.RobotProgramArtifacts).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
-        modelBuilder.Entity<KioskRecipeExecutionProfile>(entity =>
+        modelBuilder.Entity<RobotProgramArtifact>(entity =>
         {
-            entity.ToTable("KioskRecipeExecutionProfiles");
-            entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.DeviceId, x.RecipeId, x.Code })
+            entity.ToTable("RobotProgramArtifacts");
+            entity.HasIndex(x => new { x.RobotProgramId, x.RunOrder }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => x.RobotArtifactId);
+            entity.HasOne(x => x.RobotProgram).WithMany(x => x.RobotProgramArtifacts).HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.RobotArtifact).WithMany(x => x.RobotProgramArtifacts).HasForeignKey(x => x.RobotArtifactId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+    }
+
+    private static void ConfigureProductionConfiguration(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<ConfigurationRelease>(entity =>
+        {
+            entity.ToTable("ConfigurationReleases");
+            entity.HasIndex(x => new { x.OrganizationId, x.ReleaseNumber })
                 .IsUnique()
                 .HasFilter(ActiveRowFilter);
-            entity.HasIndex(x => new { x.KioskId, x.DeviceId, x.RecipeId, x.Status, x.Priority });
+            entity.HasIndex(x => new { x.Status, x.PublishedAt });
+            entity.HasIndex(x => x.ReleaseChecksum).IsUnique().HasFilter("\"ReleaseChecksum\" IS NOT NULL");
+            entity.Property(x => x.ManifestJson).HasColumnType("jsonb");
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.ExecutionRoutes).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.Navigation(x => x.KioskConfigurationDeployments).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ExecutionRoute>(entity =>
+        {
+            entity.ToTable("ExecutionRoutes");
+            entity.HasIndex(x => new { x.ConfigurationReleaseId, x.RouteCode })
+                .IsUnique()
+                .HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.ConfigurationReleaseId, x.ProductVariantId, x.RecipeId, x.Priority });
+            entity.Property(x => x.RequiredCapabilitiesJson).HasColumnType("jsonb");
+            entity.HasOne(x => x.ConfigurationRelease)
+                .WithMany(x => x.ExecutionRoutes)
+                .HasForeignKey(x => x.ConfigurationReleaseId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.RobotBindings).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        modelBuilder.Entity<ExecutionRouteRobotBinding>(entity =>
+        {
+            entity.ToTable("ExecutionRouteRobotBindings");
+            entity.HasIndex(x => new { x.ExecutionRouteId, x.BindingOrder })
+                .IsUnique()
+                .HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => x.RobotProgramId);
+            entity.HasOne(x => x.ExecutionRoute)
+                .WithMany(x => x.RobotBindings)
+                .HasForeignKey(x => x.ExecutionRouteId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.RobotProgram).WithMany().HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<RobotJob>(entity =>
+        modelBuilder.Entity<KioskConfigurationDeployment>(entity =>
         {
-            entity.ToTable("RobotJobs");
-            entity.HasIndex(x => x.JobNumber).IsUnique();
-            entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
-            entity.HasIndex(x => new { x.KioskId, x.RequestedAt });
-            entity.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.OrderItem).WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotProgram).WithMany().HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable("KioskConfigurationDeployments");
+            entity.HasIndex(x => new { x.KioskId, x.ConfigurationReleaseId, x.AttemptNo }).IsUnique();
+            entity.HasIndex(x => new { x.KioskId, x.Status, x.RequestedAt });
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status });
+            entity.HasIndex(x => x.KioskId).IsUnique().HasFilter("\"Status\" IN (1, 2)");
+            entity.HasOne(x => x.ConfigurationRelease)
+                .WithMany(x => x.KioskConfigurationDeployments)
+                .HasForeignKey(x => x.ConfigurationReleaseId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.KioskExecutionEndpoint)
+                .WithMany()
+                .HasForeignKey(x => new { x.KioskExecutionEndpointId, x.KioskId, x.EdgeRuntimeId })
+                .HasPrincipalKey(endpoint => new { endpoint.Id, endpoint.KioskId, endpoint.FullEdgeRuntimeId })
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Account>().WithMany().HasForeignKey(x => x.RequestedByAccountId).OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<RobotJobStep>(entity =>
+        modelBuilder.Entity<ControllerArtifactSetDeployment>(entity =>
         {
-            entity.ToTable("RobotJobSteps");
-            entity.HasIndex(x => new { x.RobotJobId, x.StepNumber }).IsUnique().HasFilter(ActiveRowFilter);
-            entity.HasOne(x => x.RobotJob).WithMany(x => x.RobotJobSteps).HasForeignKey(x => x.RobotJobId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotProgramStep).WithMany().HasForeignKey(x => x.RobotProgramStepId).OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable("ControllerArtifactSetDeployments");
+            entity.HasIndex(x => new { x.ControllerId, x.ActiveSetVersion }).IsUnique();
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status, x.RequestedAt });
+            entity.HasIndex(x => new { x.ControllerId, x.LastControllerReportId }).IsUnique().HasFilter("\"LastControllerReportId\" IS NOT NULL");
+            entity.HasOne(x => x.SourceConfigurationRelease).WithMany().HasForeignKey(x => x.SourceConfigurationReleaseId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.KioskExecutionEndpoint).WithMany().HasForeignKey(x => x.KioskExecutionEndpointId).OnDelete(DeleteBehavior.Restrict);
+            entity.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
-        modelBuilder.Entity<RobotJobEvent>(entity =>
+        modelBuilder.Entity<ControllerArtifactSetItem>(entity =>
         {
-            entity.ToTable("RobotJobEvents");
-            entity.HasIndex(x => x.EventId).IsUnique();
-            entity.HasIndex(x => new { x.RobotJobId, x.OccurredAt });
-            entity.HasOne(x => x.RobotJob).WithMany().HasForeignKey(x => x.RobotJobId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotJobStep).WithMany().HasForeignKey(x => x.RobotJobStepId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
+            entity.ToTable("ControllerArtifactSetItems");
+            entity.HasIndex(x => new { x.ControllerArtifactSetDeploymentId, x.ExecutionRouteId, x.RobotProgramId, x.RunOrder, x.RobotArtifactId }).IsUnique();
+            entity.Property(x => x.ParametersJson).HasColumnType("jsonb");
+            entity.HasOne(x => x.ControllerArtifactSetDeployment).WithMany(x => x.Items).HasForeignKey(x => x.ControllerArtifactSetDeploymentId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+    }
+
+    private static void ConfigureProductionExecution(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<OrderExecutionRecord>(entity =>
+        {
+            entity.ToTable("OrderExecutionRecords");
+            entity.HasIndex(x => x.SourceCommandId).IsUnique();
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.SourceExecutorId, x.LastAppliedSourceEventId }).IsUnique();
+            entity.HasIndex(x => new { x.OrderId, x.CloudReceivedAt });
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status, x.LastExecutorReportedAt });
+            entity.HasOne(x => x.KioskExecutionEndpoint)
+                .WithMany()
+                .HasForeignKey(x => x.KioskExecutionEndpointId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SourceCommand)
+                .WithMany()
+                .HasForeignKey(x => x.SourceCommandId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SourceConfigurationRelease)
+                .WithMany()
+                .HasForeignKey(x => x.SourceConfigurationReleaseId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductionExecutionRecord>(entity =>
+        {
+            entity.ToTable("ProductionExecutionRecords");
+            entity.HasIndex(x => new { x.SourceCommandId, x.SourceProductionJobId }).IsUnique().HasFilter("\"SourceProductionJobId\" IS NOT NULL");
+            entity.HasIndex(x => x.SourceCommandId).IsUnique().HasFilter("\"SourceProductionJobId\" IS NULL");
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.SourceExecutorId, x.LastAppliedSourceEventId }).IsUnique();
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status, x.LastExecutorReportedAt });
+            entity.HasOne(x => x.KioskExecutionEndpoint)
+                .WithMany()
+                .HasForeignKey(x => x.KioskExecutionEndpointId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SourceCommand)
+                .WithMany()
+                .HasForeignKey(x => x.SourceCommandId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -618,7 +772,6 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.KioskId, x.OccurredAt });
             entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotJob).WithMany().HasForeignKey(x => x.RobotJobId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<KioskHeartbeat>(entity =>
@@ -635,7 +788,6 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.KioskId, x.Status, x.RaisedAt });
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotJob).WithMany().HasForeignKey(x => x.RobotJobId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.AcknowledgedByAccount).WithMany().HasForeignKey(x => x.AcknowledgedByAccountId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -662,7 +814,6 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotJob).WithMany().HasForeignKey(x => x.RobotJobId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 
@@ -685,6 +836,27 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.SyncEventInbox).WithMany().HasForeignKey(x => x.SyncEventInboxId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.ResolvedByAccount).WithMany().HasForeignKey(x => x.ResolvedByAccountId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<EdgeCommand>(entity =>
+        {
+            entity.ToTable("EdgeCommands");
+            entity.HasIndex(x => new { x.TargetExecutionEndpointId, x.Status, x.CreatedAt });
+            entity.HasIndex(x => new { x.OrderId, x.DispatchAttemptNo }).IsUnique().HasFilter("\"OrderId\" IS NOT NULL AND \"DispatchAttemptNo\" IS NOT NULL");
+            entity.Property(x => x.PayloadJson).HasColumnType("jsonb");
+            entity.Navigation(x => x.DeliveryAttempts).UsePropertyAccessMode(PropertyAccessMode.Field);
+            entity.HasOne(x => x.TargetExecutionEndpoint)
+                .WithMany()
+                .HasForeignKey(x => new { x.TargetExecutionEndpointId, x.KioskId })
+                .HasPrincipalKey(endpoint => new { endpoint.Id, endpoint.KioskId })
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<EdgeCommandDeliveryAttempt>(entity =>
+        {
+            entity.ToTable("EdgeCommandDeliveryAttempts");
+            entity.HasIndex(x => new { x.EdgeCommandId, x.DeliveryAttemptNo }).IsUnique();
+            entity.HasOne(x => x.EdgeCommand).WithMany(x => x.DeliveryAttempts).HasForeignKey(x => x.EdgeCommandId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

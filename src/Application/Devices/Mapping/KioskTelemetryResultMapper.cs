@@ -35,7 +35,6 @@ internal static class KioskTelemetryResultMapper
             Id = deviceEvent.Id,
             DeviceId = deviceEvent.DeviceId,
             KioskId = deviceEvent.KioskId,
-            RobotJobId = deviceEvent.RobotJobId,
             EventId = deviceEvent.EventId,
             OriginNodeId = deviceEvent.OriginNodeId,
             CorrelationId = deviceEvent.CorrelationId,

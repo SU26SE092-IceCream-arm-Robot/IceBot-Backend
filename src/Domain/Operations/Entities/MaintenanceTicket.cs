@@ -7,7 +7,7 @@ using Domain.Tenants.Entities;
 
 namespace Domain.Operations.Entities;
 
-public partial class MaintenanceTicket : RobotRuntimeAggregateEntity, IKioskScoped
+public partial class MaintenanceTicket : SyncAggregateEntity, IKioskScoped
 {
     public Guid OrganizationId { get; set; }
 

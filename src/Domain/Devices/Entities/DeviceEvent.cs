@@ -1,6 +1,5 @@
 using Domain.Common;
 using Domain.Common.Enums;
-using Domain.RobotRuntime.Entities;
 using Domain.Tenants.Entities;
 
 namespace Domain.Devices.Entities;
@@ -10,8 +9,6 @@ public partial class DeviceEvent : AppendOnlySyncEntity
     public Guid DeviceId { get; set; }
 
     public Guid? KioskId { get; set; }
-
-    public Guid? RobotJobId { get; set; }
 
     public Guid EventId { get; set; }
 
@@ -33,5 +30,4 @@ public partial class DeviceEvent : AppendOnlySyncEntity
 
     public virtual Kiosk? Kiosk { get; set; }
 
-    public virtual RobotJob? RobotJob { get; set; }
 }

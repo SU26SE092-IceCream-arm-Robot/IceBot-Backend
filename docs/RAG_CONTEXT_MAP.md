@@ -77,8 +77,9 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | `PayloadJson`, `SnapshotJson`, `ConfigJson`, `JSONB` | [JSON Field Rules](data/JSON_FIELD_RULES.md) |
 | `SyncEventInbox`, `NextRetryAt`, `LockedUntil`, `dead letter` | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md) |
-| `ProductVariant`, `MenuItem`, `KioskRecipeExecutionProfile` | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md), then owning context docs/code |
-| `local edge db`, `runtime table`, `ExecutableOrder`, `RobotExecutionQueue` | [Local Edge Runtime ERD](iot/LOCAL_EDGE_RUNTIME_ERD.md) |
+| `ProductVariant`, `MenuItem` | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md), then owning context docs/code |
+| `RobotArtifact`, `RobotProgramArtifact`, `ConfigurationRelease`, `ExecutionRoute`, `KioskExecutionEndpoint`, `EdgeCommand` | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md), then [IoT Contract](iot/IOT_CONTRACT.md) |
+| `local edge db`, `ProductionJob`, `artifact cache`, `workcell scheduler` | [Local Edge Runtime ERD](iot/LOCAL_EDGE_RUNTIME_ERD.md) |
 
 ## Related Docs
 

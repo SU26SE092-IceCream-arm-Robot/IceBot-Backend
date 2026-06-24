@@ -59,7 +59,7 @@ Required behavior:
 - Tablet to Cloud uses idempotency keys.
 - Provider callback deduplicates provider event id.
 - Edge command creation deduplicates command id/idempotency key.
-- Edge local job creation must not create duplicate RobotJob.
+- Edge command acceptance must deduplicate `CommandId`; accepted execution evidence must preserve the same source command.
 - Edge event sync deduplicates event id.
 
 ## Related Docs
