@@ -2,6 +2,7 @@ using Application.SalesCatalog.Abstractions;
 using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
 using Domain.SalesCatalog.Enums;
+using Domain.ProductionConfiguration.Enums;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
@@ -120,6 +121,25 @@ public sealed class MenuStore : IMenuStore
             .OrderBy(menu => menu.DisplayOrder)
             .ThenBy(menu => menu.Name)
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<bool> HasActiveProductionRouteAsync(
+        Guid kioskId,
+        Guid productVariantId,
+        Guid recipeId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KioskConfigurationDeployments
+            .AsNoTracking()
+            .AnyAsync(deployment =>
+                deployment.KioskId == kioskId &&
+                deployment.Status == KioskConfigurationDeploymentStatus.Active &&
+                deployment.ConfigurationRelease.Status == ConfigurationReleaseStatus.Published &&
+                deployment.ConfigurationRelease.ExecutionRoutes.Any(route =>
+                    route.ProductVariantId == productVariantId &&
+                    route.RecipeId == recipeId &&
+                    route.RobotBindings.Any()),
+                cancellationToken);
     }
 
     public Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default)

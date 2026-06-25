@@ -10,13 +10,17 @@ public abstract class LongEntity
     public long Id { get; set; }
 }
 
-public abstract class AppendOnlyEntity : GuidEntity, IAuditable
+public abstract class AuditedEntity : GuidEntity, IAuditable
 {
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 
     public Guid? CreatedByAccountId { get; set; }
     public Guid? UpdatedByAccountId { get; set; }
+}
+
+public abstract class AppendOnlyEntity : AuditedEntity
+{
 }
 
 public abstract class AppendOnlySyncEntity : AppendOnlyEntity, IRobotSyncEntity

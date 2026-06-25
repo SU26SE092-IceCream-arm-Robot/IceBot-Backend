@@ -1,6 +1,11 @@
+Exit code: 0
+Wall time: 0.1 seconds
+Output:
 # IoT Contract
 
 This document defines the first edge-cloud contract for IceBot. It covers the end-to-end flow between the Flutter tablet, local edge backend, cloud backend, MQTT notification, and robot executor.
+
+The Cloud artifact-first schema is implemented by the current backend migration. Edge-local runtime persistence remains an external implementation. Do not interpret the historical `RobotJob` examples below as Cloud backend entities.
 
 The contract is written for the current pre-deployment system:
 
@@ -37,7 +42,7 @@ The local edge backend owns runtime machine truth:
 - Estimated inventory availability.
 - Device and robot availability.
 - Local execution queue.
-- Robot job execution state.
+- Local production execution state.
 - Runtime telemetry and event capture.
 
 Edge can reject execution after payment if the machine cannot fulfill the order.
@@ -104,17 +109,11 @@ Use:
 - `Failed`, `Cancelled`, or `Expired` based on provider result.
 - `Refunded` after refund completion.
 
-### Robot Job
+### Cloud Execution Projection
 
-Current enum: `Domain.RobotRuntime.Enums.RobotJobStatus`
+Cloud has no runtime `RobotJob` entity. An accepted executor report creates `OrderExecutionRecord` and `ProductionExecutionRecord`; these retain executor status, observation state, physical-output evidence and source command identity for customer/support decisions.
 
-Use:
-
-- `Queued` after Edge accepts command and persists local job.
-- `Running` while robot executor is active.
-- `Completed` after successful execution.
-- `Failed` if execution cannot complete.
-- `Cancelled` if Cloud/Edge cancels before completion.
+The Edge runtime may have local `ProductionJob` records, but it owns their scheduler and status transitions.
 
 ## Common Envelope Rules
 

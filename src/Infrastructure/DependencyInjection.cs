@@ -4,16 +4,22 @@ using Application.Devices.Abstractions;
 using Application.Email;
 using Application.Inventory.Abstractions;
 using Application.Operations.Abstractions;
+using Application.EdgeIntegration.Abstractions;
+using Application.ProductionConfiguration.Abstractions;
+using Application.RobotConfiguration.Abstractions;
 using Infrastructure.Catalog;
 using Infrastructure.Dashboard.Persistence;
 using Infrastructure.Data;
 using Infrastructure.Devices.Persistence;
 using Infrastructure.Email;
+using Infrastructure.EdgeIntegration.Persistence;
 using Infrastructure.Identity;
 using Infrastructure.Inventory.Persistence;
 using Infrastructure.Operations.Persistence;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
+using Infrastructure.ProductionConfiguration.Persistence;
+using Infrastructure.RobotConfiguration.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
 using Infrastructure.Tenants;
@@ -55,8 +61,12 @@ namespace Infrastructure
             services.AddScoped<IInventoryStore, InventoryStore>();
             services.AddHostedService<Persistence.Jobs.DataRetentionJob>();
             services.AddScoped<IKioskTelemetryStore, KioskTelemetryStore>();
+            services.AddScoped<IDeviceManagementStore, DeviceManagementStore>();
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
+            services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
+            services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
+            services.AddScoped<IEdgeCommandStore, EdgeCommandStore>();
 
             return services;
         }

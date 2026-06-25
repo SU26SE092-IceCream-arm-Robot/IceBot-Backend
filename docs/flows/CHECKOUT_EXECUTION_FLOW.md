@@ -6,7 +6,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 
 ## Search Keywords
 
-`checkout to execution`, `tablet checkout`, `payment session`, `QR payment`, `post-payment fan-out`, `tablet status`, `edge command flow`, `runtime readiness check`, `execution event sync`, `payment success`, `ready for execution`, `OrderReadyForExecution`, `MQTT`, `RobotJob`
+`checkout to execution`, `tablet checkout`, `payment session`, `QR payment`, `post-payment fan-out`, `tablet status`, `edge command flow`, `execution event sync`, `payment success`, `ready for execution`, `OrderReadyForExecution`, `MQTT`, `EdgeCommand`, `ProductionExecutionRecord`
 
 ## Checkout To Execution Flow
 
@@ -55,8 +55,8 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 22. Edge receives MQTT notification or finds command by polling.
 23. Edge pulls executable command from Cloud.
 24. Edge performs fast runtime check with 5-10 second timeout.
-25. If ready, Edge accepts command and persists local RobotJob/queue.
-26. Robot executor runs the job through the Fairino SDK/local integration.
+25. If ready, Edge accepts command and creates its own local execution state.
+26. Robot executor runs the approved artifact plan through its local integration.
 27. Edge records:
    - execution status
    - estimated inventory deduction
@@ -143,7 +143,7 @@ Order tracking read model boundary limitations and data exclusions are detailed 
 8. If ready:
    - persist local command/job
    - ack Accepted
-   - enqueue RobotJob
+   - create local execution work
 9. If not ready:
    - ack Rejected
    - include rejection reason and readiness snapshot

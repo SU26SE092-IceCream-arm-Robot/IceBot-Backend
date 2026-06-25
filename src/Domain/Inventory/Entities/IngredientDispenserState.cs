@@ -6,7 +6,7 @@ using Domain.Tenants.Entities;
 
 namespace Domain.Inventory.Entities;
 
-public partial class IngredientDispenserState : RobotRuntimeAggregateEntity
+public partial class IngredientDispenserState : SyncAggregateEntity
 {
     public Guid DeviceId { get; set; }
 

@@ -18,7 +18,6 @@ This is the main implementation repository for IceBot backend work.
 
 - Use this file as the primary operational guide for backend/API/domain/database/auth/payment/order/sync tasks.
 - Use `../IceBot-Tools` only as auxiliary tooling: RAG, MCP, code intelligence, docs checks, diagnostics, and local scripts.
-- Use `../Vault` for advisory decisions, research, trade-offs, and history. Vault is not implementation truth.
 - Use `../Docs` for shared project/business docs when the task needs cross-repo project context.
 - The workspace root `AGENTS.md` is only a router/fallback and does not override this file for backend work.
 
@@ -59,6 +58,21 @@ This is the main implementation repository for IceBot backend work.
 - Do not create EF Core migrations unless the user explicitly asks for migrations.
 - Do not use destructive git commands unless explicitly requested.
 - Work with existing uncommitted changes; do not revert user changes.
+
+## Documentation Preservation
+
+- Treat documentation split, reorganize, move, or rename requests as lossless restructures. Do not summarize, condense, merge, omit, or delete content unless the user explicitly asks for that operation.
+- Before restructuring a tracked document, inspect Git status/diff and preserve uncommitted content with a Git-visible checkpoint or exact copy.
+- Compare headings and content coverage before removing the original; report intentional omissions and replacement decisions first.
+- Write user-chosen architecture as Confirmed Decision. Keep agent proposals as Recommendation and unresolved choices as Open Design Choice.
+- Do not turn a recommended entity name, split, migration, or ownership boundary into a final architecture decision without explicit user approval.
+
+## Decision Traceability
+
+- When implementation depends on a user-chosen architecture, record the decision in its owning document before relying on a compressed summary elsewhere.
+- A Confirmed Decision must state: the problem being solved, the chosen boundary, why it was chosen, rejected or excluded alternatives, and the entity/contract consequences. Recording only the final names or fields is insufficient.
+- If the current documentation and task context do not establish one interpretation, ask the user. Do not infer the missing semantic rule from naming patterns, a previous proposal, or a superficially similar model.
+- A request to inspect, check, or compare supplied material means compare it against current files and report gaps. Do not copy it into documentation unless the user separately asks to apply it.
 
 ## Domain And Application Rules
 

@@ -28,9 +28,10 @@ OrderItem
 Menu
 MenuItem
 ProductVariant
-RobotJob
 RobotProgram
-KioskRecipeExecutionProfile
+RobotArtifact
+ConfigurationRelease
+EdgeCommand
 StockMovement
 ```
 
@@ -53,7 +54,7 @@ Use the existing base entity names as semantic boundaries:
 - `AppendOnlyEntity`: append-only audit/event-style record without soft delete.
 - `AppendOnlySyncEntity`: append-only record that participates in edge-cloud sync.
 - `RobotConfigurationEntity`: versioned robot configuration that can sync to edge.
-- `RobotRuntimeAggregateEntity`: mutable runtime aggregate for robot/operation workflows.
+- `SyncAggregateEntity`: mutable aggregate that participates in edge-cloud sync without becoming robot-runtime-specific.
 
 Do not introduce another generic base such as `BaseFullEntity`. If a new base type is needed, name it after behavior, not inheritance convenience.
 
@@ -75,7 +76,7 @@ Use `{EntityName}Id` for foreign keys:
 ```csharp
 OrderId
 KioskId
-RobotJobId
+SourceCommandId
 PaymentTransactionId
 ```
 
@@ -100,7 +101,7 @@ Use enum names that include the owning concept:
 ```csharp
 OrderStatus
 PaymentTransactionStatus
-RobotJobStatus
+ProductionExecutionStatus
 MaintenanceTicketStatus
 ```
 
@@ -159,8 +160,8 @@ Use repository names only for persistence boundaries:
 ```csharp
 IBaseRepository<TEntity>
 BaseRepository<TEntity>
-IRobotJobRepository
-RobotJobRepository
+IEdgeCommandStore
+EdgeCommandStore
 ```
 
 Repositories should stay thin. They may expose query composition and persistence operations, but should not contain workflow transitions or business decisions.
@@ -192,7 +193,7 @@ Use feature/use-case names:
 PlaceOrder
 ProcessPaymentCallback
 CreatePaymentSession
-DispatchRobotJob
+DispatchEdgeCommand
 RecordStockMovement
 RetrySyncEvent
 ```
@@ -213,8 +214,8 @@ Examples:
 ```csharp
 PlaceOrderCommand
 PlaceOrderHandler
-GetRobotJobQuery
-RobotJobResponse
+GetOrderExecutionQuery
+OrderExecutionResponse
 ```
 
 Avoid actor-based organization such as `AdminProductService` or `CustomerOrderService` unless the actor is part of the actual domain concept.
@@ -228,7 +229,7 @@ Controller names should follow resource/capability names:
 ```csharp
 OrdersController
 PaymentsController
-RobotJobsController
+ConfigurationDeploymentsController
 KiosksController
 ```
 
@@ -247,7 +248,7 @@ Action method names may map to use cases:
 ```text
 OrdersController.PlaceOrder -> PlaceOrderCommand
 OrdersController.Cancel -> CancelOrderCommand
-RobotJobsController.Retry -> RetryRobotJobCommand
+ConfigurationDeploymentsController.Deploy -> RequestConfigurationDeploymentCommand
 ```
 
 Keep public route changes explicit and intentional.

@@ -1,6 +1,6 @@
 using Domain.Common;
 using Domain.Devices.Entities;
-using Domain.Identity.Entities;
+using Domain.RobotConfiguration.Manifests;
 using Domain.RobotConfiguration.Enums;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
@@ -9,130 +9,150 @@ namespace Domain.RobotConfiguration.Entities;
 
 public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 {
-    public Guid? OrganizationId { get; set; }
+    private readonly List<RobotProgramArtifact> _robotProgramArtifacts = [];
 
-    public Guid? StoreId { get; set; }
+    public Guid? OrganizationId { get; private set; }
 
-    public Guid? KioskId { get; set; }
+    public Guid? StoreId { get; private set; }
 
-    public Guid? DeviceId { get; set; }
+    public Guid? KioskId { get; private set; }
 
-    public Guid? TemplateProgramId { get; set; }
+    public Guid? DeviceId { get; private set; }
 
-    public Guid? PointValidatedByAccountId { get; set; }
+    public string Code { get; private set; } = null!;
 
-    public string Code { get; set; } = null!;
+    public string Name { get; private set; } = null!;
 
-    public string Name { get; set; } = null!;
+    public TenantScopeType ScopeType { get; private set; } = TenantScopeType.Global;
 
-    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
+    public RobotProgramStatus Status { get; private set; } = RobotProgramStatus.Draft;
 
-    public string ProductType { get; set; } = "IceCream";
+    public int ProgramManifestSchemaVersion { get; private set; } = 1;
 
-    public int ProgramVersion { get; set; } = 1;
+    public string? ProgramManifestJson { get; private set; }
 
-    public RobotProgramStatus Status { get; set; } = RobotProgramStatus.Draft;
+    public string? ProgramManifestChecksum { get; private set; }
 
-    public string Vendor { get; set; } = "Fairino";
+    public string? Description { get; private set; }
 
-    public string? VendorProgramId { get; set; }
+    public DateTimeOffset? PublishedAt { get; private set; }
 
-    public string? VendorProgramVersion { get; set; }
+    public DateTimeOffset? RetiredAt { get; private set; }
 
-    public long? SupportedDeviceTypeId { get; set; }
+    public virtual Organization? Organization { get; private set; }
 
-    public int? EstimatedDurationSeconds { get; set; }
+    public virtual Store? Store { get; private set; }
 
-    public bool IsDefault { get; set; }
+    public virtual Kiosk? Kiosk { get; private set; }
 
-    public RobotProgramPointStatus PointStatus { get; set; } = RobotProgramPointStatus.NotRequired;
+    public virtual Device? Device { get; private set; }
 
-    public string? Description { get; set; }
+    public IReadOnlyCollection<RobotProgramArtifact> RobotProgramArtifacts => _robotProgramArtifacts;
 
-    public int ProgramPayloadSchemaVersion { get; set; } = 1;
-
-    public string? ProgramPayloadJson { get; set; }
-
-    public int PointSnapshotSchemaVersion { get; set; } = 1;
-
-    public string? PointSnapshotJson { get; set; }
-
-    public int SafetyZoneSchemaVersion { get; set; } = 1;
-
-    public string? SafetyZoneJson { get; set; }
-
-    public DateTimeOffset? EffectiveFrom { get; set; }
-
-    public DateTimeOffset? EffectiveTo { get; set; }
-
-    public DateTimeOffset? PublishedAt { get; set; }
-
-    public DateTimeOffset? PointValidatedAt { get; set; }
-
-    public DateTimeOffset? ActivatedAt { get; set; }
-
-    public DateTimeOffset? RetiredAt { get; set; }
-
-    public virtual Organization? Organization { get; set; }
-
-    public virtual Store? Store { get; set; }
-
-    public virtual Kiosk? Kiosk { get; set; }
-
-    public virtual Device? Device { get; set; }
-
-    public virtual RobotProgram? TemplateProgram { get; set; }
-
-    public virtual Account? PointValidatedByAccount { get; set; }
-
-    public virtual ICollection<RobotProgramStep> RobotProgramSteps { get; set; } = new List<RobotProgramStep>();
-
-    public RobotProgramStep AddStep(
-        int stepNumber,
-        string stepCode,
-        string name,
-        string stepCommandType,
-        string? parametersJson = null)
+    Guid? IOrganizationScoped.OrganizationId
     {
-        EnsureDraft();
-
-        if (RobotProgramSteps.Any(step => step.StepNumber == stepNumber))
-        {
-            throw new DomainRuleException("A robot program step with the same step number already exists.");
-        }
-
-        if (RobotProgramSteps.Any(step => string.Equals(step.StepCode, stepCode, StringComparison.OrdinalIgnoreCase)))
-        {
-            throw new DomainRuleException("A robot program step with the same code already exists.");
-        }
-
-        var step = RobotProgramStep.Create(stepNumber, stepCode, name, stepCommandType, parametersJson);
-        RobotProgramSteps.Add(step);
-        return step;
+        get => OrganizationId;
+        set => throw new InvalidOperationException("Robot program scope is immutable after draft creation.");
     }
 
-    public void Publish(DateTimeOffset publishedAt)
+    Guid? IStoreScoped.StoreId
+    {
+        get => StoreId;
+        set => throw new InvalidOperationException("Robot program scope is immutable after draft creation.");
+    }
+
+    Guid? IKioskScoped.KioskId
+    {
+        get => KioskId;
+        set => throw new InvalidOperationException("Robot program scope is immutable after draft creation.");
+    }
+
+    private RobotProgram()
+    {
+    }
+
+    public static RobotProgram CreateDraft(
+        string code,
+        string name,
+        TenantScopeType scopeType,
+        Guid? organizationId = null,
+        Guid? storeId = null,
+        Guid? kioskId = null,
+        Guid? deviceId = null,
+        string? description = null)
+    {
+        ValidateScope(scopeType, organizationId, storeId, kioskId, deviceId);
+
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
+        {
+            throw new DomainRuleException("Robot program code and name are required.");
+        }
+
+        return new RobotProgram
+        {
+            Code = code.Trim(),
+            Name = name.Trim(),
+            ScopeType = scopeType,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            DeviceId = deviceId,
+            Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim()
+        };
+    }
+
+    public RobotProgramArtifact AddArtifact(
+        Guid robotArtifactId,
+        int runOrder,
+        string? parametersJson = null,
+        int parametersSchemaVersion = 1)
     {
         EnsureDraft();
 
-        if (!RobotProgramSteps.Any())
+        if (_robotProgramArtifacts.Any(artifact => artifact.RunOrder == runOrder))
         {
-            throw new DomainRuleException("Cannot publish a robot program without steps.");
+            throw new DomainRuleException("A robot program artifact with the same run order already exists.");
         }
+
+        var artifact = RobotProgramArtifact.Create(robotArtifactId, runOrder, parametersJson, parametersSchemaVersion);
+        _robotProgramArtifacts.Add(artifact);
+        return artifact;
+    }
+
+    public void RemoveArtifact(Guid robotProgramArtifactId)
+    {
+        EnsureDraft();
+
+        var artifact = _robotProgramArtifacts.SingleOrDefault(item => item.Id == robotProgramArtifactId);
+        if (artifact == null)
+        {
+            throw new DomainRuleException("Robot program artifact was not found.");
+        }
+
+        _robotProgramArtifacts.Remove(artifact);
+    }
+
+    public void Publish(DateTimeOffset publishedAt, int programManifestSchemaVersion = 1)
+    {
+        EnsureDraft();
+
+        if (!_robotProgramArtifacts.Any())
+        {
+            throw new DomainRuleException("Cannot publish a robot program without artifacts.");
+        }
+
+        if (programManifestSchemaVersion <= 0)
+        {
+            throw new DomainRuleException("Robot program manifest schema version must be greater than zero.");
+        }
+
+        var manifest = RobotProgramManifestBuilder.Create(this, programManifestSchemaVersion);
+        ProgramManifestSchemaVersion = programManifestSchemaVersion;
+        ProgramManifestJson = manifest.Json;
+        ProgramManifestChecksum = manifest.Checksum;
 
         Status = RobotProgramStatus.Published;
         PublishedAt = publishedAt;
-    }
-
-    public void Activate(DateTimeOffset activatedAt)
-    {
-        if (Status is not (RobotProgramStatus.Published or RobotProgramStatus.Active))
-        {
-            throw new DomainRuleException("Only published robot programs can be activated.");
-        }
-
-        Status = RobotProgramStatus.Active;
-        ActivatedAt = activatedAt;
     }
 
     public void Retire(DateTimeOffset retiredAt)
@@ -146,34 +166,34 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         RetiredAt = retiredAt;
     }
 
-    public void MarkPointSyncPending()
-    {
-        PointStatus = RobotProgramPointStatus.PendingSync;
-    }
-
-    public void MarkPointSynced(string? pointSnapshotJson = null)
-    {
-        PointSnapshotJson = pointSnapshotJson ?? PointSnapshotJson;
-        PointStatus = RobotProgramPointStatus.Synced;
-    }
-
-    public void MarkPointValidated(DateTimeOffset validatedAt, Guid? validatedByAccountId)
-    {
-        PointStatus = RobotProgramPointStatus.Validated;
-        PointValidatedAt = validatedAt;
-        PointValidatedByAccountId = validatedByAccountId;
-    }
-
-    public void MarkPointSyncFailed()
-    {
-        PointStatus = RobotProgramPointStatus.Failed;
-    }
-
     private void EnsureDraft()
     {
         if (Status != RobotProgramStatus.Draft)
         {
             throw new DomainRuleException("Only draft robot programs can be modified.");
+        }
+    }
+
+    private static void ValidateScope(
+        TenantScopeType scopeType,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        Guid? deviceId)
+    {
+        var valid = scopeType switch
+        {
+            TenantScopeType.Global => organizationId is null && storeId is null && kioskId is null && deviceId is null,
+            TenantScopeType.Organization => organizationId.HasValue && storeId is null && kioskId is null && deviceId is null,
+            TenantScopeType.Store => organizationId.HasValue && storeId.HasValue && kioskId is null && deviceId is null,
+            TenantScopeType.Kiosk => organizationId.HasValue && storeId.HasValue && kioskId.HasValue && deviceId is null,
+            TenantScopeType.Device => organizationId.HasValue && storeId.HasValue && kioskId.HasValue && deviceId.HasValue,
+            _ => false
+        };
+
+        if (!valid)
+        {
+            throw new DomainRuleException("Robot program scope ids do not match the selected scope type.");
         }
     }
 }

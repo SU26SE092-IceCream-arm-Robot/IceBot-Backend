@@ -3,7 +3,6 @@ using Domain.Common.Enums;
 using Domain.Devices.Entities;
 using Domain.Identity.Entities;
 using Domain.Orders.Entities;
-using Domain.RobotRuntime.Entities;
 using Domain.Tenants.Entities;
 
 namespace Domain.Operations.Entities;
@@ -17,8 +16,6 @@ public partial class OperationLog : AppendOnlySyncEntity
     public Guid? DeviceId { get; set; }
 
     public Guid? OrderId { get; set; }
-
-    public Guid? RobotJobId { get; set; }
 
     public Guid? SourceEventId { get; set; }
 
@@ -50,5 +47,4 @@ public partial class OperationLog : AppendOnlySyncEntity
 
     public virtual Order? Order { get; set; }
 
-    public virtual RobotJob? RobotJob { get; set; }
 }

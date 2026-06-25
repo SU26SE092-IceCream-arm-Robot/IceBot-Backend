@@ -1,3 +1,5 @@
+using Domain.Catalog.Enums;
+
 namespace Application.Catalog.Products.Requests;
 
 public sealed class UpsertProductVariantRequest
@@ -11,6 +13,8 @@ public sealed class UpsertProductVariantRequest
     public string? Description { get; set; }
 
     public string VariantType { get; set; } = "Default";
+
+    public FulfillmentType FulfillmentType { get; set; } = FulfillmentType.Packaged;
 
     public string? SizeCode { get; set; }
 

@@ -1,6 +1,7 @@
 using Application.Catalog.Abstractions;
 using Application.Catalog.Products.Requests;
 using Application.Catalog.Products.Support;
+using Domain.Catalog.Enums;
 
 namespace Application.Catalog.Products.Rules;
 
@@ -11,7 +12,8 @@ internal static class ProductVariantRequestValidator
         string name,
         decimal basePrice,
         string currency,
-        int? preparationTimeSeconds)
+        int? preparationTimeSeconds,
+        FulfillmentType fulfillmentType)
     {
         if (string.IsNullOrWhiteSpace(code))
         {
@@ -38,6 +40,11 @@ internal static class ProductVariantRequestValidator
             return "Product variant preparation time cannot be negative.";
         }
 
+        if (!Enum.IsDefined(fulfillmentType))
+        {
+            return "Product variant fulfillment type is invalid.";
+        }
+
         return null;
     }
 
@@ -53,7 +60,8 @@ internal static class ProductVariantRequestValidator
             request.Name,
             request.BasePrice,
             request.Currency,
-            request.PreparationTimeSeconds);
+            request.PreparationTimeSeconds,
+            request.FulfillmentType);
 
         if (validationError is not null)
         {

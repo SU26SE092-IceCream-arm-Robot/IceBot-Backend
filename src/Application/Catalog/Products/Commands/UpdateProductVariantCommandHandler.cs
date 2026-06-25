@@ -48,6 +48,7 @@ public sealed class UpdateProductVariantCommandHandler
         variant.VariantType = string.IsNullOrWhiteSpace(request.VariantType)
             ? variant.VariantType
             : ProductNormalizer.NormalizeCode(request.VariantType);
+        variant.FulfillmentType = request.FulfillmentType ?? variant.FulfillmentType;
         variant.SizeCode = request.SizeCode is null ? variant.SizeCode : ProductNormalizer.NormalizeNullableCode(request.SizeCode);
         variant.BasePrice = request.BasePrice ?? variant.BasePrice;
         variant.Currency = string.IsNullOrWhiteSpace(request.Currency)
@@ -66,7 +67,8 @@ public sealed class UpdateProductVariantCommandHandler
             variant.Name,
             variant.BasePrice,
             variant.Currency,
-            variant.PreparationTimeSeconds);
+            variant.PreparationTimeSeconds,
+            variant.FulfillmentType);
 
         if (validationError is not null)
         {

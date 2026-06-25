@@ -195,6 +195,48 @@ internal static class PermissionMatrixRules
             Description = "View kiosk operations telemetry such as heartbeats and device events within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
             ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "devices.view",
+            Description = "View devices/hardware details within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "devices.manage",
+            Description = "Create, update, status-change, or retire devices/hardware within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "artifact.upload",
+            Description = "Upload immutable robot Lua artifacts within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "release.publish",
+            Description = "Publish immutable production configuration releases within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "release.deploy",
+            Description = "Deploy production configuration to assigned kiosks.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "release.rollback",
+            Description = "Deploy a previously validated release to assigned kiosks as rollback.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
         }
     };
 }

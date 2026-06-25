@@ -4,7 +4,7 @@ This document captures small data-modeling rules that are easy to miss during ER
 
 ## Search Keywords
 
-`data modeling`, `EF Core`, `PostgreSQL`, `soft delete`, `filtered unique index`, `partial unique index`, `DeletedAt IS NULL`, `nullable unique`, `tenant scope`, `historical snapshot`, `DeleteBehavior.Restrict`, `enum status`, `decimal money`, `JSONB`, `high-volume logs`, `partitioning`, `retention`, `SyncEventInbox index`, `KioskHeartbeats`, `DeviceEvents`, `RobotJobEvents`
+`data modeling`, `EF Core`, `PostgreSQL`, `soft delete`, `filtered unique index`, `partial unique index`, `DeletedAt IS NULL`, `nullable unique`, `tenant scope`, `historical snapshot`, `DeleteBehavior.Restrict`, `enum status`, `decimal money`, `JSONB`, `high-volume logs`, `partitioning`, `retention`, `SyncEventInbox index`, `KioskHeartbeats`, `DeviceEvents`, `EdgeCommandDeliveryAttempts`, `ProductionExecutionRecords`
 
 ## Soft Delete And Unique Indexes
 
@@ -35,8 +35,9 @@ Apply this to reusable identifiers such as:
 - `Menu.Code`
 - `MenuItem.Code`
 - `RobotProgram.Code`
-- `RobotProgramStep.StepCode`
-- `KioskRecipeExecutionProfile.Code`
+- `RobotArtifact.ArtifactCode + Checksum`
+- `RobotProgramArtifact.RobotProgramId + RunOrder`
+- `ExecutionRoute.ConfigurationReleaseId + RouteCode`
 - `Device.Code`
 - `Device.SerialNumber`
 
@@ -148,7 +149,8 @@ High-volume tables include:
 - `KioskHeartbeats`
 - `DeviceEvents`
 - `OperationLogs`
-- `RobotJobEvents`
+- `EdgeCommandDeliveryAttempts`
+- `ProductionExecutionRecords`
 - `SyncEventInbox`
 - `SyncDeadLetters`
 
@@ -168,7 +170,8 @@ Partition key direction:
 | `KioskHeartbeats` | `ReportedAt` |
 | `DeviceEvents` | `OccurredAt` |
 | `OperationLogs` | `OccurredAt` |
-| `RobotJobEvents` | `OccurredAt` |
+| `EdgeCommandDeliveryAttempts` | `SentAt` |
+| `ProductionExecutionRecords` | `LastExecutorReportedAt` |
 | `SyncEventInbox` | `ReceivedAt` or `OccurredAt`, depending on worker/query ownership |
 | `SyncDeadLetters` | `FailedAt` |
 

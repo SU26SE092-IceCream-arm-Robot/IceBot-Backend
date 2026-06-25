@@ -143,6 +143,12 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `kiosks.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View kiosks. Scoped to assigned organization/store/kiosk |
 | `kiosks.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create and change status of kiosks. Scoped to assigned organization/store/kiosk |
 | `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Update kiosk details. Scoped to assigned organization/store/kiosk |
+| `devices.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View devices/hardware details within assigned scope |
+| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, or retire devices/hardware within assigned scope |
+| `artifact.upload` | `SystemAdmin`, `OrgAdmin`, `Manager` | Upload immutable robot Lua artifacts within assigned scope; no management route is exposed yet |
+| `release.publish` | `SystemAdmin`, `OrgAdmin`, `Manager` | Publish immutable production configuration releases within assigned scope; no management route is exposed yet |
+| `release.deploy` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request configuration deployment to assigned kiosks; no management route is exposed yet |
+| `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request deployment of a previously validated release to assigned kiosks; no management route is exposed yet |
 | `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |
 | `products.manage` | `SystemAdmin`, `Manager` | Product/catalog management. Staff and Technician should not change product pricing/catalog by default |
 | `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |

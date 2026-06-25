@@ -1,6 +1,7 @@
 using Application.Orders.Abstractions;
 using Application.Orders.Management.Results;
 using Domain.Orders.Entities;
+using Domain.ProductionConfiguration.Enums;
 using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 using Infrastructure.Data;
@@ -127,6 +128,25 @@ public sealed class OrderStore : IOrderStore
             .Include(menuItem => menuItem.ProductVariant)
             .Include(menuItem => menuItem.Recipe)
             .FirstOrDefaultAsync(menuItem => menuItem.Id == menuItemId, cancellationToken);
+    }
+
+    public Task<bool> HasActiveProductionRouteAsync(
+        Guid kioskId,
+        Guid productVariantId,
+        Guid recipeId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KioskConfigurationDeployments
+            .AsNoTracking()
+            .AnyAsync(deployment =>
+                deployment.KioskId == kioskId &&
+                deployment.Status == KioskConfigurationDeploymentStatus.Active &&
+                deployment.ConfigurationRelease.Status == ConfigurationReleaseStatus.Published &&
+                deployment.ConfigurationRelease.ExecutionRoutes.Any(route =>
+                    route.ProductVariantId == productVariantId &&
+                    route.RecipeId == recipeId &&
+                    route.RobotBindings.Any()),
+                cancellationToken);
     }
 
     public Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default)

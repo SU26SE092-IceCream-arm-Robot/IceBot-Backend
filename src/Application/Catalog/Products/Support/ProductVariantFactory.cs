@@ -19,6 +19,7 @@ internal static class ProductVariantFactory
             DisplayName = ProductNormalizer.TrimToNull(request.DisplayName),
             Description = ProductNormalizer.TrimToNull(request.Description),
             VariantType = ProductNormalizer.NormalizeOptionalCode(request.VariantType, "Default"),
+            FulfillmentType = request.FulfillmentType,
             SizeCode = ProductNormalizer.NormalizeNullableCode(request.SizeCode),
             BasePrice = request.BasePrice,
             Currency = ProductNormalizer.NormalizeOptionalCode(request.Currency, "VND"),

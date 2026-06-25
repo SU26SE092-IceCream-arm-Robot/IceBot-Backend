@@ -39,6 +39,12 @@ public interface IMenuStore
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
+    Task<bool> HasActiveProductionRouteAsync(
+        Guid kioskId,
+        Guid productVariantId,
+        Guid recipeId,
+        CancellationToken cancellationToken = default);
+
     Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default);
 
     Task<MenuItem?> GetMenuItemByIdAsync(
