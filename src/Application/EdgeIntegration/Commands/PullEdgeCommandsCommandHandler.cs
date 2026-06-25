@@ -1,0 +1,64 @@
+using Application.EdgeIntegration.Abstractions;
+using Application.EdgeIntegration.Results;
+using Application.Shared.Wrappers;
+using Domain.Devices.Enums;
+using Domain.Sync.Enums;
+
+namespace Application.EdgeIntegration.Commands;
+
+public sealed class PullEdgeCommandsCommandHandler
+{
+    private readonly IEdgeCommandStore _edgeCommandStore;
+
+    public PullEdgeCommandsCommandHandler(IEdgeCommandStore edgeCommandStore)
+    {
+        _edgeCommandStore = edgeCommandStore;
+    }
+
+    public async Task<ApiResult<EdgeCommandPullResult>> HandleAsync(
+        PullEdgeCommandsCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        if (command.KioskId == Guid.Empty || command.EndpointId == Guid.Empty)
+        {
+            return ApiResult<EdgeCommandPullResult>.Fail("Kiosk and execution endpoint are required.", 400);
+        }
+
+        if (string.IsNullOrWhiteSpace(command.Credential))
+        {
+            return ApiResult<EdgeCommandPullResult>.Fail("Execution credential is required.", 401);
+        }
+
+        var endpoint = await _edgeCommandStore.GetEndpointForCommandAuthAsync(command.EndpointId, cancellationToken);
+        if (endpoint is null ||
+            endpoint.KioskId != command.KioskId ||
+            endpoint.Status != KioskExecutionEndpointStatus.Active ||
+            endpoint.CredentialBinding is null ||
+            endpoint.CredentialBinding.Status != ExecutionEndpointCredentialBindingStatus.Active ||
+            !string.Equals(endpoint.CredentialBinding.CredentialReference, command.Credential.Trim(), StringComparison.Ordinal))
+        {
+            return ApiResult<EdgeCommandPullResult>.Fail("Execution endpoint authentication failed.", 401);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var maxCommands = Math.Clamp(command.MaxCommands, 1, 20);
+        var commands = await _edgeCommandStore.ListDispatchableAsync(
+            command.KioskId,
+            command.EndpointId,
+            maxCommands,
+            now,
+            cancellationToken);
+
+        foreach (var edgeCommand in commands)
+        {
+            var nextAttemptNo = edgeCommand.DeliveryAttempts.Count + 1;
+            edgeCommand.RecordDeliveryAttempt(nextAttemptNo, now, EdgeCommandDeliveryOutcome.Sent);
+        }
+
+        await _edgeCommandStore.SaveChangesAsync(cancellationToken);
+
+        return ApiResult<EdgeCommandPullResult>.Success(
+            EdgeCommandPullResult.FromCommands(now, commands),
+            "Edge commands retrieved successfully.");
+    }
+}

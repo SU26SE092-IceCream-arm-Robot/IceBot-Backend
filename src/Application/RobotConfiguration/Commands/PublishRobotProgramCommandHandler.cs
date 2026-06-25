@@ -1,0 +1,45 @@
+using Application.RobotConfiguration.Abstractions;
+using Application.RobotConfiguration.Results;
+using Application.Shared.Wrappers;
+using Application.Tenants;
+using Domain.Common;
+
+namespace Application.RobotConfiguration.Commands;
+
+public sealed class PublishRobotProgramCommandHandler
+{
+    private readonly IRobotConfigurationStore _robotConfigurationStore;
+
+    public PublishRobotProgramCommandHandler(IRobotConfigurationStore robotConfigurationStore)
+    {
+        _robotConfigurationStore = robotConfigurationStore;
+    }
+
+    public async Task<ApiResult<RobotProgramResult>> HandleAsync(
+        PublishRobotProgramCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var program = await _robotConfigurationStore.GetProgramForPublishAsync(command.ProgramId, cancellationToken);
+        if (program is null)
+        {
+            return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
+        }
+
+        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
+        {
+            return ApiResult<RobotProgramResult>.Fail("Access denied.", 403);
+        }
+
+        try
+        {
+            program.Publish(DateTimeOffset.UtcNow);
+            program.UpdatedByAccountId = command.UserContext.AccountId;
+            await _robotConfigurationStore.SaveChangesAsync(cancellationToken);
+            return ApiResult<RobotProgramResult>.Success(RobotProgramResult.FromEntity(program), "Robot program published successfully.");
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<RobotProgramResult>.Fail(ex.Message, 400);
+        }
+    }
+}

@@ -442,14 +442,14 @@ Rules:
 
 ```http
 POST /api/v1/iot/kiosks/{kioskId}/commands/pull
+X-Execution-Endpoint-Id: <endpoint-id>
+X-Execution-Credential: <active endpoint credential>
 ```
 
 Request:
 
 ```json
 {
-  "originNodeId": "kiosk-edge-node-id",
-  "lastCommandSequence": 123,
   "maxCommands": 10,
   "edgeTime": "2026-05-21T10:00:02Z"
 }
@@ -463,32 +463,14 @@ Response:
   "commands": [
     {
       "commandId": "uuid",
-      "commandSequence": 124,
-      "commandType": "StartRobotJob",
+      "commandType": "DeployConfiguration",
       "kioskId": "uuid",
-      "orderId": "uuid",
-      "paymentTransactionId": "uuid",
-      "idempotencyKey": "order:{orderId}:execute",
+      "targetExecutionEndpointId": "uuid",
+      "orderId": null,
+      "dispatchAttemptNo": null,
       "issuedAt": "2026-05-21T10:00:00Z",
       "expiresAt": "2026-05-21T10:10:00Z",
-      "payloadSchemaVersion": 1,
-      "payload": {
-        "orderNumber": "ORD-20260521-0001",
-        "items": [
-          {
-            "orderItemId": "uuid",
-            "menuItemId": "uuid",
-            "productId": "uuid",
-            "productVariantId": "uuid",
-            "productCode": "VANILLA_CUP",
-            "productVariantCode": "M",
-            "recipeId": "uuid",
-            "recipeVersion": 3,
-            "quantity": 1,
-            "recipeSnapshotJson": {}
-          }
-        ]
-      }
+      "payloadJson": "{... canonical command payload ...}"
     }
   ]
 }
@@ -496,35 +478,27 @@ Response:
 
 Rules:
 
-- Edge must deduplicate by `commandId` and `idempotencyKey`.
-- A retried command must not create duplicate `RobotJob`.
-- Edge should persist the command and local job before starting execution.
+- Edge must deduplicate by `commandId`.
+- Pull marks returned commands as `Delivered` and records a delivery attempt.
+- Retrying command pull can return delivered but unacknowledged commands.
+- Runtime execution state is reported through the event/report ingest boundary, not command ack.
 
-### Command Ack And Fast Runtime Check
+### Command Ack
 
 ```http
 POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack
+X-Execution-Endpoint-Id: <endpoint-id>
+X-Execution-Credential: <active endpoint credential>
 ```
 
 Request:
 
 ```json
 {
-  "originNodeId": "kiosk-edge-node-id",
-  "orderId": "uuid",
   "ackStatus": "Accepted",
-  "checkedAt": "2026-05-21T10:00:05Z",
-  "robotJobId": "uuid",
-  "rejectionReason": null,
-  "readinessSnapshot": {
-    "isReady": true,
-    "checkDurationMs": 320,
-    "robotAvailable": true,
-    "deviceHealthy": true,
-    "inventorySufficient": true,
-    "queueCapacityAvailable": true,
-    "runtimeStateTimestamp": "2026-05-21T10:00:04Z"
-  }
+  "acknowledgedAt": "2026-05-21T10:00:05Z",
+  "rejectionCode": null,
+  "rejectionMessage": null
 }
 ```
 
@@ -533,54 +507,37 @@ Allowed `ackStatus` values:
 - `Received`
 - `Accepted`
 - `Rejected`
-- `Started`
-- `Completed`
-- `Failed`
+- `DeliveryFailed`
 
-Fast runtime check timeout: 5-10 seconds.
+Command ack is dispatch-only. `Started`, `Completed`, `Failed`, and
+`RequiresManualIntervention` belong to the execution event/report ingest
+boundary, not this endpoint.
 
-Check:
-
-- Edge process is healthy.
-- Robot executor is available.
-- Required robot program/config version and local point/frame references exist.
-- Required devices are online and not in error.
-- Required ingredients are not below allowed level.
-- Queue capacity is available.
-
-If rejected after payment, Cloud should mark the order as failed/refund-required using the current compensation workflow.
-
-### Sync Events Batch
+### Execution Reports
 
 ```http
-POST /api/v1/iot/kiosks/{kioskId}/events
+POST /api/v1/iot/kiosks/{kioskId}/execution-reports
+X-Execution-Endpoint-Id: <endpoint-id>
+X-Execution-Credential: <active endpoint credential>
 ```
 
 Request:
 
 ```json
 {
-  "batchId": "uuid",
-  "originNodeId": "kiosk-edge-node-id",
-  "sentAt": "2026-05-21T10:02:00Z",
-  "events": [
-    {
-      "eventId": "uuid",
-      "eventType": "RobotJobCompleted",
-      "sequence": 12001,
-      "occurredAt": "2026-05-21T10:01:58Z",
-      "correlationId": "order-id",
-      "causationId": "command-id",
-      "orderId": "uuid",
-      "robotJobId": "uuid",
-      "robotJobStepId": null,
-      "payloadSchemaVersion": 1,
-      "payload": {
-        "status": "Completed",
-        "durationMs": 95000
-      }
-    }
-  ]
+  "commandId": "uuid",
+  "sourceEventId": "uuid",
+  "sequenceNumber": 12001,
+  "edgeCreatedAt": "2026-05-21T10:01:58Z",
+  "executorReportedAt": "2026-05-21T10:01:59Z",
+  "reportType": "Deployment",
+  "status": "Active",
+  "deploymentId": "uuid",
+  "sourceProductionJobId": null,
+  "physicalOutputMayHaveOccurred": null,
+  "errorCode": null,
+  "errorMessage": null,
+  "payloadJson": null
 }
 ```
 
@@ -588,30 +545,56 @@ Response:
 
 ```json
 {
-  "serverTime": "2026-05-21T10:02:01Z",
-  "accepted": ["event-id-1"],
-  "duplicates": ["event-id-2"],
-  "rejected": [
-    {
-      "eventId": "event-id-3",
-      "reason": "InvalidRobotJobState"
-    }
-  ]
+  "succeeded": true,
+  "statusCode": 200,
+  "message": "Execution report applied successfully.",
+  "data": {
+    "commandId": "uuid",
+    "sourceEventId": "uuid",
+    "reportType": "Deployment",
+    "status": "Active",
+    "applied": true,
+    "duplicate": false
+  }
 }
 ```
 
-Event types should map to existing domain tables:
+Allowed `reportType` values in V1:
 
-| Event type | Domain target |
+| Report type | Meaning | Target |
 | --- | --- |
-| `RobotJobQueued` / `RobotJobStarted` / `RobotJobCompleted` / `RobotJobFailed` | `RobotJobEvent`, `RobotJob` |
-| `RobotJobStepStarted` / `RobotJobStepCompleted` / `RobotJobStepFailed` | `RobotJobEvent`, `RobotJobStep` |
-| `DeviceStatusChanged` / `DeviceErrorRaised` | `DeviceEvent` |
-| `IngredientLevelChanged` | `IngredientDispenserState` |
-| `StockConsumed` / `StockRefilled` / `StockAdjusted` | `StockMovement` |
-| `KioskHeartbeatReported` | `KioskHeartbeat` |
+| `Deployment` | Full Edge configuration deployment or low-cost active artifact-set deployment result | `KioskConfigurationDeployment`, `ControllerArtifactSetDeployment`, `KioskExecutionEndpoint` active snapshot |
+| `ProductionExecution` | Execute-order production progress/result | `ProductionExecutionRecord`, `OrderExecutionRecord` when order provenance is present |
 
-Cloud ingestion should use `SyncEventInbox` for deduplication and `SyncDeadLetter` for failed processing.
+Deployment `status` values:
+
+- `Installed`
+- `Active`
+- `Failed`
+
+Production execution `status` values:
+
+- `Accepted`
+- `Running`
+- `Completed`
+- `Failed`
+- `RequiresManualIntervention`
+
+Rules:
+
+- Command ack is dispatch-only. Execution reports are the current V1 boundary for deployment and production status after a command has been accepted.
+- The endpoint deduplicates by `sourceEventId` using `SyncEventInbox`.
+- `sequenceNumber` is executor-local ordering evidence for projection updates.
+- `physicalOutputMayHaveOccurred` must be set when reporting failed production execution. It drives customer/support projection: failure before output can be handled differently from failure after possible physical output.
+- Deployment report `Active` updates the observed active configuration/artifact-set snapshot on `KioskExecutionEndpoint`.
+
+### Future Sync Events Batch
+
+```http
+POST /api/v1/iot/kiosks/{kioskId}/events
+```
+
+`/events` is reserved for a broader batch sync surface. It should be added when Edge needs to replay multiple local events such as telemetry, stock movements, heartbeat evidence, or detailed local runtime logs. It is not the current V1 command execution status endpoint.
 
 ### Heartbeat
 

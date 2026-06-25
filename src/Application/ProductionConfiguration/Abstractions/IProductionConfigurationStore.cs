@@ -11,6 +11,17 @@ public interface IProductionConfigurationStore
 
     Task<KioskExecutionEndpoint?> GetEndpointForDeploymentAsync(Guid endpointId, CancellationToken cancellationToken = default);
 
+    Task<bool> HasPendingFullEdgeDeploymentAsync(Guid kioskId, CancellationToken cancellationToken = default);
+
+    Task<int> GetNextFullEdgeDeploymentAttemptNoAsync(
+        Guid kioskId,
+        Guid configurationReleaseId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> HasPendingControllerArtifactSetDeploymentAsync(Guid controllerId, CancellationToken cancellationToken = default);
+
+    Task<long> GetNextControllerActiveSetVersionAsync(Guid controllerId, CancellationToken cancellationToken = default);
+
     Task AddFullEdgeDeploymentAsync(KioskConfigurationDeployment deployment, CancellationToken cancellationToken = default);
 
     Task AddControllerArtifactSetDeploymentAsync(ControllerArtifactSetDeployment deployment, CancellationToken cancellationToken = default);

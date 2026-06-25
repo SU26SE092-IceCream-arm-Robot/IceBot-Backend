@@ -1,6 +1,7 @@
 using Application.ProductionConfiguration.Abstractions;
 using Domain.Devices.Entities;
 using Domain.ProductionConfiguration.Entities;
+using Domain.ProductionConfiguration.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,6 +36,47 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
             .Include(endpoint => endpoint.SupportedRobotTargets)
                 .ThenInclude(target => target.Device)
             .FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId, cancellationToken);
+    }
+
+    public Task<bool> HasPendingFullEdgeDeploymentAsync(Guid kioskId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KioskConfigurationDeployments.AnyAsync(
+            deployment => deployment.KioskId == kioskId &&
+                (deployment.Status == KioskConfigurationDeploymentStatus.Pending ||
+                    deployment.Status == KioskConfigurationDeploymentStatus.Installed),
+            cancellationToken);
+    }
+
+    public async Task<int> GetNextFullEdgeDeploymentAttemptNoAsync(
+        Guid kioskId,
+        Guid configurationReleaseId,
+        CancellationToken cancellationToken = default)
+    {
+        var maxAttempt = await _dbContext.KioskConfigurationDeployments
+            .Where(deployment => deployment.KioskId == kioskId && deployment.ConfigurationReleaseId == configurationReleaseId)
+            .Select(deployment => (int?)deployment.AttemptNo)
+            .MaxAsync(cancellationToken);
+
+        return (maxAttempt ?? 0) + 1;
+    }
+
+    public Task<bool> HasPendingControllerArtifactSetDeploymentAsync(Guid controllerId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ControllerArtifactSetDeployments.AnyAsync(
+            deployment => deployment.ControllerId == controllerId &&
+                (deployment.Status == ControllerArtifactSetDeploymentStatus.Pending ||
+                    deployment.Status == ControllerArtifactSetDeploymentStatus.Installed),
+            cancellationToken);
+    }
+
+    public async Task<long> GetNextControllerActiveSetVersionAsync(Guid controllerId, CancellationToken cancellationToken = default)
+    {
+        var maxVersion = await _dbContext.ControllerArtifactSetDeployments
+            .Where(deployment => deployment.ControllerId == controllerId)
+            .Select(deployment => (long?)deployment.ActiveSetVersion)
+            .MaxAsync(cancellationToken);
+
+        return (maxVersion ?? 0) + 1;
     }
 
     public Task AddFullEdgeDeploymentAsync(KioskConfigurationDeployment deployment, CancellationToken cancellationToken = default)

@@ -19,6 +19,7 @@ using Infrastructure.Operations.Persistence;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
 using Infrastructure.ProductionConfiguration.Persistence;
+using Infrastructure.RobotConfiguration.ObjectStorage;
 using Infrastructure.RobotConfiguration.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
@@ -62,11 +63,15 @@ namespace Infrastructure
             services.AddHostedService<Persistence.Jobs.DataRetentionJob>();
             services.AddScoped<IKioskTelemetryStore, KioskTelemetryStore>();
             services.AddScoped<IDeviceManagementStore, DeviceManagementStore>();
+            services.AddScoped<IExecutionEndpointStore, ExecutionEndpointStore>();
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
+            services.Configure<RobotArtifactObjectStorageOptions>(config.GetSection(RobotArtifactObjectStorageOptions.SectionName));
+            services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
             services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
             services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
             services.AddScoped<IEdgeCommandStore, EdgeCommandStore>();
+            services.AddScoped<IExecutionReportStore, ExecutionReportStore>();
 
             return services;
         }

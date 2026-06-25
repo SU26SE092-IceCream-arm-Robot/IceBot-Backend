@@ -186,6 +186,21 @@ public class KioskExecutionEndpoint : BusinessEntity
         Status = KioskExecutionEndpointStatus.Active;
     }
 
+    public void ReactivateWithCurrentCredential(DateTimeOffset reactivatedAt)
+    {
+        if (Status != KioskExecutionEndpointStatus.Disabled ||
+            CredentialBindingId is null ||
+            CredentialBinding?.Status != ExecutionEndpointCredentialBindingStatus.Active ||
+            (ExecutionProfile == KioskExecutionProfile.FullEdge && FullEdgeRuntimeId is null) ||
+            (ExecutionProfile == KioskExecutionProfile.LowCostController && ControllerId is null))
+        {
+            throw new DomainRuleException("Only a disabled endpoint with an active credential and existing profile identity can be reactivated.");
+        }
+
+        ProvisionedAt = reactivatedAt;
+        Status = KioskExecutionEndpointStatus.Active;
+    }
+
     public void Disable()
     {
         if (Status != KioskExecutionEndpointStatus.Active)

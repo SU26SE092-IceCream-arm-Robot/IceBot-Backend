@@ -37,14 +37,16 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
 | Device management | `/api/v1/management/devices/*`, `/api/v1/management/kiosks/*/devices` | create/update/set management status/retire devices, list and view devices |
+| Execution endpoint management | `/api/v1/management/execution-endpoints/*` | rotate execution endpoint credentials for Full Edge or low-cost controllers |
 | Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
+| Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/robot-artifacts/*`, `/api/v1/management/robot-programs/*`, `/api/v1/management/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments`, `/api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments` | upload immutable robot Lua artifacts, publish robot programs, publish immutable configuration releases, and request Full Edge or low-cost controller deployment |
 | Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/refunds` | internal order search, unpaid cancellation, refund-required marking, manual refund tracking |
 | Inventory management | `/api/v1/management/inventory/*` | dispenser states, stock movement history, refill, estimate adjustment |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/events` | kiosk connectivity history and device warnings/errors |
 | Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
-| Edge integration | `/api/v1/iot/...` | command pull, command ack, events, heartbeat, configuration sync |
+| Edge integration | `/api/v1/iot/...` | command pull, command ack, execution reports, future event batch sync, heartbeat, configuration sync |
 | Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
 
 ## Tablet / Customer APIs
@@ -108,9 +110,16 @@ POST /api/v1/management/kiosks/{kioskId}/devices
 PUT /api/v1/management/devices/{deviceId}
 PATCH /api/v1/management/devices/{deviceId}/status
 DELETE /api/v1/management/devices/{deviceId}
+PATCH /api/v1/management/execution-endpoints/{endpointId}/credential
 GET /api/v1/management/roles
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
+POST /api/v1/management/organizations/{organizationId}/robot-artifacts
+PATCH /api/v1/management/robot-artifacts/{artifactId}/publish
+PATCH /api/v1/management/robot-programs/{programId}/publish
+PATCH /api/v1/management/configuration-releases/{releaseId}/publish
+POST /api/v1/management/kiosks/{kioskId}/configuration-deployments
+POST /api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments
 GET /api/v1/management/orders
 GET /api/v1/management/orders/{orderId}
 GET /api/v1/management/orders/{orderId}/status-history
@@ -163,6 +172,12 @@ Rules:
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
 - `DeviceEvent` is log/evidence, not actionable alert state. Long-term alert UI should use a separate Alert API/entity if needed.
 - Maintenance ticket V1 is a manual operations/support workflow. Tickets are kiosk-scoped work items with optional evidence links to device, order, or device event. V1 does not include auto-generated tickets, alert engine, chat, reopen, or GraphQL maintenance aggregate.
+- Execution endpoint credential rotation is a maintenance operation. It revokes the current credential binding, attaches and activates the new credential reference, and reactivates the endpoint in one database save. Hot credential overlap is not part of V1.
+- Robot artifact upload is a configuration-management command. It accepts multipart `.lua` files only, stores file bytes in S3-compatible object storage, and stores immutable metadata in `RobotArtifact`.
+- Robot artifact publish makes an uploaded artifact available for `RobotProgram` manifests. Robot program publish calculates `ProgramManifestJson` and `ProgramManifestChecksum` from ordered `RobotProgramArtifact` membership. Configuration release publish calculates immutable release manifest/checksum from execution routes and published robot program bindings.
+- Publish commands do not deploy to an execution endpoint.
+- Full Edge deployment requests create a `KioskConfigurationDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database save. The command payload references the immutable release manifest/checksum and artifact descriptors; the edge runtime still validates checksum and reports install/activation later.
+- Low-cost controller active-set deployment requests create a `ControllerArtifactSetDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database save. The request must explicitly select route/program/artifact/run-order items and provide controller capacity limits for V1.
 
 ## Current Account APIs
 
@@ -225,6 +240,7 @@ Current direction:
 ```text
 POST /api/v1/iot/kiosks/{kioskId}/commands/pull
 POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack
+POST /api/v1/iot/kiosks/{kioskId}/execution-reports
 POST /api/v1/iot/kiosks/{kioskId}/events
 POST /api/v1/iot/kiosks/{kioskId}/heartbeat
 GET /api/v1/iot/kiosks/{kioskId}/configuration
@@ -233,6 +249,9 @@ GET /api/v1/iot/kiosks/{kioskId}/configuration
 Rules:
 
 - Do not use internal account JWT as the long-term kiosk runtime credential.
+- Current V1 command dispatch uses `X-Execution-Endpoint-Id` plus `X-Execution-Credential` to authenticate against the active execution endpoint credential binding. This is a simple transport credential boundary; mTLS or signed-command verification can replace it later without changing the Application command model.
+- `POST /api/v1/iot/kiosks/{kioskId}/execution-reports` is the current V1 execution/deployment report ingest endpoint. It records a `SyncEventInbox` receipt for deduplication and applies the report to deployment state or Cloud execution projections.
+- `POST /api/v1/iot/kiosks/{kioskId}/events` remains the future broader batch event/sync surface and should not be used as the current command execution status endpoint.
 - Keep IoT DTOs separate from EF entities.
 - MQTT is notification only; Edge pulls command details through the API.
 

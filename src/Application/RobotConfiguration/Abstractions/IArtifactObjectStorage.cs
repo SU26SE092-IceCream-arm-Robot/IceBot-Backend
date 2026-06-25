@@ -17,3 +17,14 @@ public sealed record ArtifactObjectWriteRequest(
     string Checksum);
 
 public sealed record ArtifactObjectWriteResult(string StorageKey, string Checksum, long ContentLengthBytes);
+
+public sealed class ArtifactObjectAlreadyExistsException : Exception
+{
+    public ArtifactObjectAlreadyExistsException(string storageKey)
+        : base($"Artifact object already exists: {storageKey}")
+    {
+        StorageKey = storageKey;
+    }
+
+    public string StorageKey { get; }
+}

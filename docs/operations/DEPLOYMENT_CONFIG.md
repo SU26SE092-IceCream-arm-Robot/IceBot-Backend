@@ -4,7 +4,7 @@ This document lists the minimum backend configuration that must be provided outs
 
 ## Search Keywords
 
-`deployment`, `backend config`, `environment variables`, `appsettings`, `JWT`, `database connection`, `Firebase`, `SMTP`, `PayOS`, `PORT`, `health`, `info`
+`deployment`, `backend config`, `environment variables`, `appsettings`, `JWT`, `database connection`, `Firebase`, `SMTP`, `PayOS`, `MinIO`, `S3`, `robot artifact storage`, `PORT`, `health`, `info`
 
 ## Configuration Source
 
@@ -49,6 +49,11 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | PayOS base URL | `PayOS__BaseUrl` |
 | PayOS return URL | `PayOS__ReturnUrl` |
 | PayOS cancel URL | `PayOS__CancelUrl` |
+| Robot artifact object storage endpoint | `RobotArtifacts__ObjectStorage__Endpoint` |
+| Robot artifact object storage access key | `RobotArtifacts__ObjectStorage__AccessKey` |
+| Robot artifact object storage secret key | `RobotArtifacts__ObjectStorage__SecretKey` |
+| Robot artifact object storage bucket | `RobotArtifacts__ObjectStorage__BucketName` |
+| Robot artifact object storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` |
 | Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |
@@ -102,6 +107,7 @@ When enabled, diagnostics performs provider reachability checks without sending 
 - Firebase can be disabled with `Firebase__Enabled=false`, but Google/Firebase login paths will then return service-unavailable behavior.
 - SMTP failures must not make account onboarding unrecoverable; admins can resend invitations.
 - PayOS webhook/payment behavior depends on correct public return/cancel URLs and checksum key.
+- Robot artifact uploads store Lua files in S3-compatible object storage. Use MinIO for local/dev and S3-compatible cloud object storage in production. PostgreSQL stores metadata only.
 - Set `ErrorHandling__ExposeStackTrace=false` and `Observability__DebugBodyLogging__Enabled=false` in deployed environments.
 - For production observability, set `Observability__OpenTelemetry__OtlpExporterEnabled=true` for traces/metrics and `Observability__Serilog__OtlpSinkEnabled=true` for structured logs, then configure the OTLP endpoint to point to your collector.
 - Set `Diagnostics__ApiKey` outside Development before using `/management/diagnostics/health`.

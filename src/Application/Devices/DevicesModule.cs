@@ -18,6 +18,7 @@ public static class DevicesModule
         services.AddScoped<UpdateDeviceCommandHandler>();
         services.AddScoped<SetDeviceStatusCommandHandler>();
         services.AddScoped<RetireDeviceCommandHandler>();
+        services.AddScoped<RotateExecutionEndpointCredentialCommandHandler>();
 
         return services;
     }
