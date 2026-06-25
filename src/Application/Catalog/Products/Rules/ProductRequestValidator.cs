@@ -121,7 +121,8 @@ internal static class ProductRequestValidator
                 variant.Name,
                 variant.BasePrice,
                 variant.Currency,
-                variant.PreparationTimeSeconds);
+                variant.PreparationTimeSeconds,
+                variant.FulfillmentType);
 
             if (variantError is not null)
             {

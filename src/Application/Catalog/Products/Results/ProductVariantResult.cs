@@ -1,3 +1,5 @@
+using Domain.Catalog.Enums;
+
 namespace Application.Catalog.Products.Results;
 
 public sealed class ProductVariantResult
@@ -15,6 +17,8 @@ public sealed class ProductVariantResult
     public string? Description { get; set; }
 
     public string VariantType { get; set; } = null!;
+
+    public FulfillmentType FulfillmentType { get; set; }
 
     public string? SizeCode { get; set; }
 

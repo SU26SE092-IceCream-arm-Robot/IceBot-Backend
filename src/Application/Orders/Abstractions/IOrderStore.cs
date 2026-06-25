@@ -23,6 +23,12 @@ public interface IOrderStore
 
     Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default);
 
+    Task<bool> HasActiveProductionRouteAsync(
+        Guid kioskId,
+        Guid productVariantId,
+        Guid recipeId,
+        CancellationToken cancellationToken = default);
+
     Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default);
 
     Task<int> CountOrdersAsync(

@@ -1,3 +1,5 @@
+using Domain.Catalog.Enums;
+
 namespace Application.Catalog.Products.Requests;
 
 public sealed class UpdateProductVariantRequest
@@ -11,6 +13,8 @@ public sealed class UpdateProductVariantRequest
     public string? Description { get; set; }
 
     public string? VariantType { get; set; }
+
+    public FulfillmentType? FulfillmentType { get; set; }
 
     public string? SizeCode { get; set; }
 

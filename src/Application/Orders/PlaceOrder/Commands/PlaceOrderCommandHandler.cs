@@ -7,6 +7,7 @@ using Application.Orders.PlaceOrder.Rules;
 using Application.Orders.PlaceOrder.Support;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
+using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Enums;
 
@@ -156,12 +157,26 @@ public sealed class PlaceOrderCommandHandler
                     return ApiResult<OrderResult>.Fail($"Product '{product.Name}' is not available for this kiosk.", 409);
                 }
 
+                if (productVariant.FulfillmentType == FulfillmentType.MachineProduced && recipe is null)
+                {
+                    return ApiResult<OrderResult>.Fail($"Menu item '{menuItem.DisplayName}' requires a recipe.", 409);
+                }
+
                 if (recipe is not null)
                 {
-                    var recipeValidationError = RecipeValidationRules.ValidateRecipe(recipe, productVariant, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id);
+                    var recipeValidationError = RecipeValidationRules.ValidateRecipe(recipe, productVariant, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id, now);
                     if (recipeValidationError is not null)
                     {
                         return ApiResult<OrderResult>.Fail(recipeValidationError, 409);
+                    }
+                }
+
+                if (productVariant.FulfillmentType == FulfillmentType.MachineProduced)
+                {
+                    var hasActiveProductionRoute = await _orderStore.HasActiveProductionRouteAsync(kiosk.Id, productVariant.Id, recipe!.Id, ct);
+                    if (!hasActiveProductionRoute)
+                    {
+                        return ApiResult<OrderResult>.Fail($"Menu item '{menuItem.DisplayName}' does not have an active production route for this kiosk.", 409);
                     }
                 }
 

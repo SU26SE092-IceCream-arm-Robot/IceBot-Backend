@@ -42,9 +42,32 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             now,
             cancellationToken);
 
-        var items = menus
+        var candidates = menus
             .SelectMany(menu => menu.MenuItems.Select(item => new { Menu = menu, Item = item }))
-            .Where(entry => RuntimeMenuSellabilityRules.IsSellable(entry.Item, now))
+            .ToList();
+
+        var routeReadiness = new Dictionary<(Guid ProductVariantId, Guid RecipeId), bool>();
+        foreach (var candidate in candidates.Where(candidate => candidate.Item.RecipeId.HasValue))
+        {
+            var recipeId = candidate.Item.RecipeId!.Value;
+            var key = (ProductVariantId: candidate.Item.ProductVariantId, RecipeId: recipeId);
+            if (!routeReadiness.ContainsKey(key))
+            {
+                routeReadiness[key] = await _menus.HasActiveProductionRouteAsync(
+                    kiosk.Id,
+                    key.ProductVariantId,
+                    key.RecipeId,
+                    cancellationToken);
+            }
+        }
+
+        var items = candidates
+            .Where(entry =>
+            {
+                var hasActiveProductionRoute = entry.Item.RecipeId.HasValue &&
+                                               routeReadiness.GetValueOrDefault((entry.Item.ProductVariantId, entry.Item.RecipeId.Value));
+                return RuntimeMenuSellabilityRules.IsSellable(entry.Item, now, hasActiveProductionRoute);
+            })
             .OrderBy(entry => entry.Menu.DisplayOrder)
             .ThenBy(entry => entry.Item.DisplayOrder)
             .ThenBy(entry => entry.Item.DisplayName)

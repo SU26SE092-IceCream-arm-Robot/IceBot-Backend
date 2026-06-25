@@ -48,6 +48,7 @@ internal static class ProductResultMapper
             DisplayName = variant.DisplayName,
             Description = variant.Description,
             VariantType = variant.VariantType,
+            FulfillmentType = variant.FulfillmentType,
             SizeCode = variant.SizeCode,
             BasePrice = variant.BasePrice,
             Currency = variant.Currency,

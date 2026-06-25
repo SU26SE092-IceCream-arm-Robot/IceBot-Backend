@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Catalog.Enums;
 
 namespace Domain.Catalog.Entities;
 
@@ -15,6 +16,8 @@ public partial class ProductVariant : BusinessEntity
     public string? Description { get; set; }
 
     public string VariantType { get; set; } = "Default";
+
+    public FulfillmentType FulfillmentType { get; set; } = FulfillmentType.Packaged;
 
     public string? SizeCode { get; set; }
 
