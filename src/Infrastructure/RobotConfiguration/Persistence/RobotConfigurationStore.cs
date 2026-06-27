@@ -38,10 +38,15 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
             .FirstOrDefaultAsync(program => program.Id == programId, cancellationToken);
     }
 
-    public Task<RobotArtifact?> GetArtifactByIdAsync(Guid artifactId, CancellationToken cancellationToken = default)
+    public Task<RobotArtifact?> GetArtifactByIdAsync(
+        Guid organizationId,
+        Guid artifactId,
+        CancellationToken cancellationToken = default)
     {
         return _dbContext.RobotArtifacts.AsNoTracking()
-            .FirstOrDefaultAsync(artifact => artifact.Id == artifactId, cancellationToken);
+            .FirstOrDefaultAsync(
+                artifact => artifact.Id == artifactId && artifact.OrganizationId == organizationId,
+                cancellationToken);
     }
 
     public Task<RobotProgram?> GetProgramByIdAsync(Guid programId, CancellationToken cancellationToken = default)
@@ -120,13 +125,13 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
             cancellationToken);
     }
 
-    public Task<bool> ArtifactExistsAsync(
+    public Task<RobotArtifact?> GetArtifactByCodeAndChecksumAsync(
         Guid organizationId,
         string artifactCode,
         string checksum,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.RobotArtifacts.AnyAsync(
+        return _dbContext.RobotArtifacts.AsNoTracking().FirstOrDefaultAsync(
             artifact => artifact.OrganizationId == organizationId &&
                 artifact.ArtifactCode == artifactCode &&
                 artifact.Checksum == checksum &&
@@ -189,6 +194,34 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
         return await _dbContext.RobotArtifacts
             .Where(artifact => artifactIds.Contains(artifact.Id))
             .ToListAsync(cancellationToken);
+    }
+
+    public Task<bool> ArtifactIsReferencedByDraftProgramAsync(
+        Guid artifactId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.RobotProgramArtifacts.AnyAsync(
+            item => item.RobotArtifactId == artifactId &&
+                item.RobotProgram.Status == RobotProgramStatus.Draft,
+            cancellationToken);
+    }
+
+    public Task<bool> ProgramIsReferencedByDraftReleaseAsync(
+        Guid programId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ExecutionRouteRobotBindings.AnyAsync(
+            binding => binding.RobotProgramId == programId &&
+                binding.ExecutionRoute.ConfigurationRelease.Status == Domain.ProductionConfiguration.Enums.ConfigurationReleaseStatus.Draft,
+            cancellationToken);
+    }
+
+    public async Task<IReadOnlyCollection<string>> ListArtifactStorageKeysAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.RobotArtifacts.AsNoTracking()
+            .Select(artifact => artifact.StorageKey)
+            .ToArrayAsync(cancellationToken);
     }
 
     public Task AddArtifactAsync(RobotArtifact artifact, CancellationToken cancellationToken = default)

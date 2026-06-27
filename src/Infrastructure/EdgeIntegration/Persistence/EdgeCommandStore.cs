@@ -61,6 +61,26 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
             .FirstOrDefaultAsync(command => command.Id == commandId, cancellationToken);
     }
 
+    public async Task<IReadOnlyList<EdgeCommand>> ListExpiredDeploymentCommandsAsync(
+        DateTimeOffset observedAt,
+        int maxCommands,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.EdgeCommands
+            .Where(command =>
+                command.CommandType == EdgeCommandType.DeployConfiguration &&
+                command.DeploymentId != null &&
+                command.DeploymentKind != null &&
+                command.CommandExpiryAt != null &&
+                command.CommandExpiryAt < observedAt &&
+                (command.Status == EdgeCommandStatus.PendingDelivery ||
+                    command.Status == EdgeCommandStatus.Delivered ||
+                    (command.Status == EdgeCommandStatus.Rejected && command.RejectionCode == "CommandExpired")))
+            .OrderBy(command => command.CommandExpiryAt)
+            .Take(maxCommands)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task AddAsync(EdgeCommand command, CancellationToken cancellationToken = default)
     {
         return _dbContext.EdgeCommands.AddAsync(command, cancellationToken).AsTask();

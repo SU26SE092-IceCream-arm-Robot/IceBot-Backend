@@ -68,8 +68,12 @@ namespace Infrastructure
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
             services.Configure<RobotArtifactObjectStorageOptions>(config.GetSection(RobotArtifactObjectStorageOptions.SectionName));
             services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
+            services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
             services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
+            services.Configure<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions>(
+                config.GetSection(ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions.SectionName));
+            services.AddHostedService<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationJob>();
             services.AddScoped<IEdgeCommandStore, EdgeCommandStore>();
             services.AddScoped<IExecutionReportStore, ExecutionReportStore>();
 

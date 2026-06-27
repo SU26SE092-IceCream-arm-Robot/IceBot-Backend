@@ -177,6 +177,11 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public void Retire(DateTimeOffset retiredAt)
     {
+        if (Status == RobotProgramStatus.Retired)
+        {
+            return;
+        }
+
         if (Status == RobotProgramStatus.Draft)
         {
             throw new DomainRuleException("Draft robot programs should be deleted or disabled, not retired.");

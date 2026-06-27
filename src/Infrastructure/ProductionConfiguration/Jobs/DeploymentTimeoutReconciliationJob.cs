@@ -1,0 +1,72 @@
+using Application.ProductionConfiguration.Commands;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace Infrastructure.ProductionConfiguration.Jobs;
+
+public sealed class DeploymentTimeoutReconciliationJob : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly DeploymentTimeoutReconciliationOptions _options;
+    private readonly ILogger<DeploymentTimeoutReconciliationJob> _logger;
+
+    public DeploymentTimeoutReconciliationJob(
+        IServiceScopeFactory scopeFactory,
+        IOptions<DeploymentTimeoutReconciliationOptions> options,
+        ILogger<DeploymentTimeoutReconciliationJob> logger)
+    {
+        _scopeFactory = scopeFactory;
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        if (!_options.Enabled)
+        {
+            _logger.LogInformation("Deployment timeout reconciliation is disabled.");
+            return;
+        }
+
+        var interval = TimeSpan.FromSeconds(Math.Max(_options.IntervalSeconds, 10));
+        var batchSize = Math.Clamp(_options.MaxCommandsPerRun, 1, 1000);
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var handler = scope.ServiceProvider.GetRequiredService<ReconcileExpiredDeploymentCommandsCommandHandler>();
+                var result = await handler.HandleAsync(DateTimeOffset.UtcNow, batchSize, stoppingToken);
+
+                if (result.ExpiredCommandCount > 0)
+                {
+                    _logger.LogInformation(
+                        "Deployment timeout reconciliation processed {ExpiredCommandCount} commands, failed {ReconciledDeploymentCount} pending deployments, and found {MissingDeploymentCount} missing deployment references.",
+                        result.ExpiredCommandCount,
+                        result.ReconciledDeploymentCount,
+                        result.MissingDeploymentCount);
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Deployment timeout reconciliation failed.");
+            }
+
+            try
+            {
+                await Task.Delay(interval, stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+    }
+}

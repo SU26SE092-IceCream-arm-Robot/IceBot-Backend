@@ -10,8 +10,11 @@ public static class RobotConfigurationModule
     {
         services.AddScoped<UploadRobotArtifactCommandHandler>();
         services.AddScoped<BulkUploadRobotArtifactsCommandHandler>();
+        services.AddScoped<BulkPublishRobotArtifactsCommandHandler>();
         services.AddScoped<PublishRobotArtifactCommandHandler>();
+        services.AddScoped<RetireRobotArtifactCommandHandler>();
         services.AddScoped<PublishRobotProgramCommandHandler>();
+        services.AddScoped<RetireRobotProgramCommandHandler>();
         services.AddScoped<CreateRobotProgramCommandHandler>();
         services.AddScoped<ReplaceRobotProgramArtifactsCommandHandler>();
         services.AddScoped<UpdateRobotProgramCommandHandler>();

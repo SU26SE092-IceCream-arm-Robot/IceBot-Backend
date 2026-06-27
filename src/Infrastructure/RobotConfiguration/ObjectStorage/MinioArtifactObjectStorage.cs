@@ -92,6 +92,43 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         return new ArtifactObjectReadUrlResult(url, expiresAt);
     }
 
+    public async IAsyncEnumerable<ArtifactObjectInfo> ListAsync(
+        string prefix,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var args = new ListObjectsArgs()
+            .WithBucket(_options.BucketName)
+            .WithPrefix(prefix)
+            .WithRecursive(true);
+
+        await foreach (var item in _client.ListObjectsEnumAsync(args, cancellationToken))
+        {
+            if (!item.LastModifiedDateTime.HasValue)
+            {
+                continue;
+            }
+
+            yield return new ArtifactObjectInfo(
+                item.Key,
+                new DateTimeOffset(item.LastModifiedDateTime.Value.ToUniversalTime()),
+                (long)item.Size);
+        }
+    }
+
+    public async Task DeleteIfExistsAsync(string storageKey, CancellationToken cancellationToken = default)
+    {
+        if (!await ExistsAsync(storageKey, cancellationToken))
+        {
+            return;
+        }
+
+        await _client.RemoveObjectAsync(
+            new RemoveObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(storageKey),
+            cancellationToken);
+    }
+
     private IMinioClient BuildClient(string endpoint, bool useSsl)
     {
         return new MinioClient()

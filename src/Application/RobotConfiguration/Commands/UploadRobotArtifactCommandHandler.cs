@@ -6,6 +6,7 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.RobotConfiguration.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace Application.RobotConfiguration.Commands;
 
@@ -14,13 +15,16 @@ public sealed class UploadRobotArtifactCommandHandler
     private const int BufferSize = 81920;
     private readonly IRobotConfigurationStore _robotConfigurationStore;
     private readonly IArtifactObjectStorage _artifactObjectStorage;
+    private readonly ILogger<UploadRobotArtifactCommandHandler> _logger;
 
     public UploadRobotArtifactCommandHandler(
         IRobotConfigurationStore robotConfigurationStore,
-        IArtifactObjectStorage artifactObjectStorage)
+        IArtifactObjectStorage artifactObjectStorage,
+        ILogger<UploadRobotArtifactCommandHandler> logger)
     {
         _robotConfigurationStore = robotConfigurationStore;
         _artifactObjectStorage = artifactObjectStorage;
+        _logger = logger;
     }
 
     public async Task<ApiResult<RobotArtifactResult>> HandleAsync(
@@ -63,9 +67,16 @@ public sealed class UploadRobotArtifactCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("Uploaded content length does not match the request length.", 400);
         }
 
-        if (await _robotConfigurationStore.ArtifactExistsAsync(command.OrganizationId, normalizedArtifactCode, checksum, cancellationToken))
+        var existingArtifact = await _robotConfigurationStore.GetArtifactByCodeAndChecksumAsync(
+            command.OrganizationId,
+            normalizedArtifactCode,
+            checksum,
+            cancellationToken);
+        if (existingArtifact is not null)
         {
-            return ApiResult<RobotArtifactResult>.Fail("Robot artifact with the same code and checksum already exists in this organization.", 409);
+            return ApiResult<RobotArtifactResult>.Success(
+                RobotArtifactResult.FromEntity(existingArtifact),
+                "Matching robot artifact already exists; existing metadata returned.");
         }
 
         var artifactId = Guid.NewGuid();
@@ -89,9 +100,10 @@ public sealed class UploadRobotArtifactCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("Robot artifact object already exists.", 409);
         }
 
+        RobotArtifact artifact;
         try
         {
-            var artifact = RobotArtifact.CreateDraft(
+            artifact = RobotArtifact.CreateDraft(
                 command.OrganizationId,
                 normalizedArtifactCode,
                 command.ArtifactName,
@@ -105,21 +117,25 @@ public sealed class UploadRobotArtifactCommandHandler
                 command.Description,
                 command.MetadataJson?.Trim());
 
-            artifact.Id = artifactId;
-            artifact.CreatedByAccountId = command.UserContext.AccountId;
-
-            await _robotConfigurationStore.AddArtifactAsync(artifact, cancellationToken);
-            await _robotConfigurationStore.SaveChangesAsync(cancellationToken);
-
-            return ApiResult<RobotArtifactResult>.Success(
-                RobotArtifactResult.FromEntity(artifact),
-                "Robot artifact uploaded successfully.",
-                201);
         }
         catch (DomainRuleException ex)
         {
+            await TryDeleteUncommittedObjectAsync(writeResult.StorageKey);
             return ApiResult<RobotArtifactResult>.Fail(ex.Message, 400);
         }
+
+        artifact.Id = artifactId;
+        artifact.CreatedByAccountId = command.UserContext.AccountId;
+
+        // Do not delete on an ambiguous database exception: the commit may have succeeded.
+        // The grace-period cleanup job reconciles object storage against committed metadata.
+        await _robotConfigurationStore.AddArtifactAsync(artifact, cancellationToken);
+        await _robotConfigurationStore.SaveChangesAsync(cancellationToken);
+
+        return ApiResult<RobotArtifactResult>.Success(
+            RobotArtifactResult.FromEntity(artifact),
+            "Robot artifact uploaded successfully.",
+            201);
     }
 
     private static async Task<string> CopyAndHashAsync(Stream source, Stream destination, CancellationToken cancellationToken)
@@ -162,6 +178,21 @@ public sealed class UploadRobotArtifactCommandHandler
         catch (JsonException)
         {
             return false;
+        }
+    }
+
+    private async Task TryDeleteUncommittedObjectAsync(string storageKey)
+    {
+        try
+        {
+            await _artifactObjectStorage.DeleteIfExistsAsync(storageKey, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to compensate uncommitted robot artifact object {StorageKey}; scheduled orphan cleanup will retry.",
+                storageKey);
         }
     }
 }

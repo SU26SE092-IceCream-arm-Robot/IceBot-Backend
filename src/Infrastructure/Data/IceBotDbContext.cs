@@ -842,6 +842,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("EdgeCommands");
             entity.HasIndex(x => new { x.TargetExecutionEndpointId, x.Status, x.CreatedAt });
+            entity.HasIndex(x => x.DeploymentId).IsUnique().HasFilter("\"DeploymentId\" IS NOT NULL");
             entity.HasIndex(x => new { x.OrderId, x.DispatchAttemptNo }).IsUnique().HasFilter("\"OrderId\" IS NOT NULL AND \"DispatchAttemptNo\" IS NOT NULL");
             entity.Property(x => x.PayloadJson).HasColumnType("jsonb");
             entity.Navigation(x => x.DeliveryAttempts).UsePropertyAccessMode(PropertyAccessMode.Field);

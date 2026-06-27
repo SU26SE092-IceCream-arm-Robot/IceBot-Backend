@@ -4123,6 +4123,12 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("DeliveredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("DeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("DeploymentKind")
+                        .HasColumnType("integer");
+
                     b.Property<int?>("DispatchAttemptNo")
                         .HasColumnType("integer");
 
@@ -4161,6 +4167,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("DeploymentId")
+                        .IsUnique()
+                        .HasFilter("\"DeploymentId\" IS NOT NULL");
 
                     b.HasIndex("OrderId", "DispatchAttemptNo")
                         .IsUnique()

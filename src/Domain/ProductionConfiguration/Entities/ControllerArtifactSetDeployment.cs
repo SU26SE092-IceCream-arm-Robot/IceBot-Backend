@@ -49,11 +49,14 @@ public class ControllerArtifactSetDeployment : AuditedEntity
         long maxArtifactStorageBytes,
         Guid? requestedByAccountId,
         DateTimeOffset requestedAt,
-        IEnumerable<ControllerArtifactSetItemSelection> selections)
+        IEnumerable<ControllerArtifactSetItemSelection> selections,
+        bool isRollback = false)
     {
         if (endpoint is null || release is null || endpoint.ExecutionProfile != KioskExecutionProfile.LowCostController ||
             endpoint.Status != KioskExecutionEndpointStatus.Active || endpoint.ControllerId is null ||
-            release.Status != ConfigurationReleaseStatus.Published || string.IsNullOrWhiteSpace(release.ReleaseChecksum) ||
+            (release.Status != ConfigurationReleaseStatus.Published &&
+                !(isRollback && release.Status == ConfigurationReleaseStatus.Retired)) ||
+            string.IsNullOrWhiteSpace(release.ReleaseChecksum) ||
             activeSetVersion <= 0 || maxArtifactCount <= 0 || maxArtifactStorageBytes <= 0)
         {
             throw new DomainRuleException("A published release, active low-cost endpoint, positive active-set version, and capacity limits are required.");
@@ -127,6 +130,19 @@ public class ControllerArtifactSetDeployment : AuditedEntity
         FailureReason = string.IsNullOrWhiteSpace(failureReason) ? null : failureReason.Trim();
         Status = ControllerArtifactSetDeploymentStatus.Failed;
         return true;
+    }
+
+    public void MarkCommandExpired(DateTimeOffset cloudObservedAt)
+    {
+        if (Status != ControllerArtifactSetDeploymentStatus.Pending)
+        {
+            throw new DomainRuleException("Only pending active-set deployments can expire before command acceptance.");
+        }
+
+        CloudReceivedAt = cloudObservedAt;
+        FailureCode = "CommandExpired";
+        FailureReason = "The deployment command expired before the execution endpoint accepted it.";
+        Status = ControllerArtifactSetDeploymentStatus.Failed;
     }
 
     private static ControllerArtifactSetItem ResolveItem(Guid deploymentId, KioskExecutionEndpoint endpoint, ConfigurationRelease release, ControllerArtifactSetItemSelection selection)

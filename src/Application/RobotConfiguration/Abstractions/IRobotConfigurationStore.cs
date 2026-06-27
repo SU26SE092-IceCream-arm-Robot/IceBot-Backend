@@ -12,7 +12,10 @@ public interface IRobotConfigurationStore
 
     Task<RobotProgram?> GetProgramForEditAsync(Guid programId, CancellationToken cancellationToken = default);
 
-    Task<RobotArtifact?> GetArtifactByIdAsync(Guid artifactId, CancellationToken cancellationToken = default);
+    Task<RobotArtifact?> GetArtifactByIdAsync(
+        Guid organizationId,
+        Guid artifactId,
+        CancellationToken cancellationToken = default);
 
     Task<RobotProgram?> GetProgramByIdAsync(Guid programId, CancellationToken cancellationToken = default);
 
@@ -50,7 +53,7 @@ public interface IRobotConfigurationStore
 
     Task<bool> OrganizationExistsAsync(Guid organizationId, CancellationToken cancellationToken = default);
 
-    Task<bool> ArtifactExistsAsync(
+    Task<RobotArtifact?> GetArtifactByCodeAndChecksumAsync(
         Guid organizationId,
         string artifactCode,
         string checksum,
@@ -73,9 +76,19 @@ public interface IRobotConfigurationStore
         Guid? deviceId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> ArtifactIsReferencedByDraftProgramAsync(
+        Guid artifactId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ProgramIsReferencedByDraftReleaseAsync(
+        Guid programId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<RobotArtifact>> ListArtifactsByIdsAsync(
         IReadOnlyCollection<Guid> artifactIds,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyCollection<string>> ListArtifactStorageKeysAsync(CancellationToken cancellationToken = default);
 
     Task AddArtifactAsync(RobotArtifact artifact, CancellationToken cancellationToken = default);
 

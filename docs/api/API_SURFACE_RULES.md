@@ -37,7 +37,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
 | Device management | `/api/v1/management/devices/*`, `/api/v1/management/kiosks/*/devices` | create/update/set management status/retire devices, list and view devices |
-| Execution endpoint management | `/api/v1/management/execution-endpoints/*` | rotate execution endpoint credentials for Full Edge or low-cost controllers |
+| Execution endpoint management | `/api/v1/management/execution-endpoints/*`, `/api/v1/management/kiosks/{kioskId}/execution-endpoints` | create, provision, inspect, configure compatibility, disable/reactivate, rotate credentials, and retire Full Edge or low-cost execution endpoints |
 | Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
 | Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/robot-artifacts/*`, `/api/v1/management/robot-programs/*`, `/api/v1/management/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments`, `/api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments` | upload immutable robot Lua artifacts, publish robot programs, publish immutable configuration releases, and request Full Edge or low-cost controller deployment |
@@ -111,10 +111,21 @@ PUT /api/v1/management/devices/{deviceId}
 PATCH /api/v1/management/devices/{deviceId}/status
 DELETE /api/v1/management/devices/{deviceId}
 PATCH /api/v1/management/execution-endpoints/{endpointId}/credential
+GET /api/v1/management/execution-endpoints
+GET /api/v1/management/execution-endpoints/{endpointId}
+POST /api/v1/management/kiosks/{kioskId}/execution-endpoints
+PUT /api/v1/management/execution-endpoints/{endpointId}/supported-robot-targets
+POST /api/v1/management/execution-endpoints/{endpointId}/provision
+PATCH /api/v1/management/execution-endpoints/{endpointId}/disable
+PATCH /api/v1/management/execution-endpoints/{endpointId}/reactivate
+PATCH /api/v1/management/execution-endpoints/{endpointId}/retire
 GET /api/v1/management/roles
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 PATCH /api/v1/management/robot-artifacts/{artifactId}/publish
+PATCH /api/v1/management/robot-artifacts/{artifactId}/retire
+PATCH /api/v1/management/robot-programs/{programId}/retire
+PATCH /api/v1/management/configuration-releases/{releaseId}/retire
 PATCH /api/v1/management/robot-programs/{programId}/publish
 PATCH /api/v1/management/configuration-releases/{releaseId}/publish
 POST /api/v1/management/kiosks/{kioskId}/configuration-deployments
@@ -122,8 +133,9 @@ POST /api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments
 POST /api/v1/management/organizations/{organizationId}/robot-programs
 PUT /api/v1/management/robot-programs/{programId}/artifacts
 POST /api/v1/management/organizations/{organizationId}/robot-artifacts/bulk
+PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish-bulk
 GET /api/v1/management/organizations/{organizationId}/robot-artifacts
-GET /api/v1/management/robot-artifacts/{artifactId}
+GET /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}
 GET /api/v1/management/robot-programs
 GET /api/v1/management/robot-programs/{programId}
 PUT /api/v1/management/robot-programs/{programId}
@@ -131,6 +143,9 @@ GET /api/v1/management/configuration-releases
 GET /api/v1/management/configuration-releases/{releaseId}
 POST /api/v1/management/organizations/{organizationId}/configuration-releases
 PUT /api/v1/management/configuration-releases/{releaseId}/routes
+GET /api/v1/management/configuration-deployments
+GET /api/v1/management/configuration-deployments/{deploymentId}
+POST /api/v1/management/configuration-deployments/{deploymentId}/rollback
 GET /api/v1/management/orders
 GET /api/v1/management/orders/{orderId}
 GET /api/v1/management/orders/{orderId}/status-history
@@ -186,7 +201,10 @@ Rules:
 - Execution endpoint credential rotation is a maintenance operation. It revokes the current credential binding, attaches and activates the new credential reference, and reactivates the endpoint in one database save. Hot credential overlap is not part of V1.
 - Robot artifact bulk upload is the only public upload contract. It accepts one to 50 multipart `.lua` files, stores file bytes in S3-compatible object storage, and stores immutable metadata in `RobotArtifact`.
 - Bulk robot artifact upload accepts up to 50 files plus a JSON manifest that supplies per-file metadata. Uploaded artifacts remain unassigned Draft inventory and do not change any robot-program sequence. Request-shape errors reject the whole request; upload failures use item-level atomicity and return per-item results without rolling back successful items.
+- Artifact upload retry identity is organization + normalized artifact code + SHA-256. An exact retry returns the existing artifact id and metadata as success; bulk results expose `uploadedCount`, `existingCount`, and per-item `wasExisting`.
+- Bulk artifact publish atomically transitions 1–100 selected Draft artifacts from one organization. Published items are idempotent no-ops; missing, cross-organization, or Retired selections reject the complete publish request.
 - Robot artifact publish makes an uploaded artifact available for `RobotProgram` manifests. Robot program publish calculates `ProgramManifestJson` and `ProgramManifestChecksum` from ordered `RobotProgramArtifact` membership. Configuration release publish calculates immutable release manifest/checksum from execution routes and published robot program bindings.
+- Retire lifecycle commands are idempotent and do not hard-delete artifact bytes, manifests, or deployment history. Artifact retirement is blocked by Draft programs, program retirement by Draft releases, and release retirement by Pending/Installed deployments. Published history can retain retired references for audit and rollback.
 - Robot programs are created as organization-owned drafts. Store, kiosk, and device scope may narrow that ownership, but all scope ids must belong to the same tenant hierarchy. Global robot-program creation is not exposed because `RobotArtifact` is organization-owned.
 - `PUT /management/robot-programs/{programId}/artifacts` replaces the complete ordered membership while the program is Draft. `RunOrder` is explicit API data; backend must not derive execution order from an exported filename prefix.
 - Every assigned artifact must belong to the program organization. Artifact parameters must be valid JSON. Publishing still requires all assigned artifacts to be Published.
@@ -195,10 +213,13 @@ Rules:
 - `RobotProgramArtifact` is aggregate membership, not an independent management resource. Clients replace the ordered collection through the program endpoint instead of creating or deleting membership rows individually.
 - Configuration releases are created as organization-owned drafts with backend-assigned release numbers. Route authoring replaces the complete Draft route/binding collection; `ExecutionRoute` and `ExecutionRouteRobotBinding` are aggregate children, not independent CRUD resources.
 - Release route authoring requires Published/Active recipes to belong to their product variants and bindings to reference Published robot programs from the release organization or global scope. Kiosk/device compatibility remains a deployment-time validation.
+- Configuration deployment reads unify Full Edge and Low-cost histories behind one tenant-scoped, paged management surface. Filters include organization, store, kiosk, release, profile, and status. Profile-specific provenance remains nullable rather than being discarded.
+- Configuration rollback selects a previously Active deployment, then creates a new profile-matching deployment and durable command. It does not mutate or reactivate the historical deployment row. Retired releases are eligible only through this validated rollback path.
 - The complete Fairino export-to-deployment sequence is owned by [Robot Lua Artifact Flow](../flows/ROBOT_LUA_ARTIFACT_FLOW.md); keep this document focused on route and client boundaries.
 - Publish commands do not deploy to an execution endpoint.
 - Full Edge deployment requests create a `KioskConfigurationDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database save. The command payload references the immutable release manifest/checksum and artifact descriptors; the edge runtime still validates checksum and reports install/activation later.
 - Low-cost controller active-set deployment requests create a `ControllerArtifactSetDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database save. The request must explicitly select route/program/artifact/run-order items and provide controller capacity limits for V1.
+- Deploy commands carry typed deployment correlation (`DeploymentId` and `DeploymentKind`). When a command expires before acceptance, background reconciliation marks both the command and its still-Pending deployment terminal with `CommandExpired`; management reads must not show that deployment as Pending indefinitely.
 - Artifact bytes are not exposed through a public REST download endpoint. After execution-endpoint authentication, command pull enriches deployment artifact descriptors with short-lived object-storage read URLs. These URLs are not durable API identifiers and must not be stored as release state.
 
 ## Current Account APIs
@@ -272,6 +293,9 @@ Rules:
 
 - Do not use internal account JWT as the long-term kiosk runtime credential.
 - Current V1 command dispatch uses `X-Execution-Endpoint-Id` plus `X-Execution-Credential` to authenticate against the active execution endpoint credential binding. This is a simple transport credential boundary; mTLS or signed-command verification can replace it later without changing the Application command model.
+- Execution endpoint reads are tenant-scoped and never return `CredentialReference`. Provisioning accepts a write-only credential reference, requires at least one supported robot target, and assigns exactly one profile identity: `FullEdgeRuntimeId` for Full Edge or `ControllerId` for a low-cost controller.
+- Supported robot targets are a complete replacement contract and may change only while the endpoint is `Provisioning` or `Disabled`. A device-specific target must reference a device attached to the same kiosk.
+- Endpoint activation, credential rotation, disable/reactivate, and retirement are management operations. They do not install artifacts; release deployment remains a separate command flow.
 - `POST /api/v1/iot/kiosks/{kioskId}/execution-reports` is the current V1 execution/deployment report ingest endpoint. It records a `SyncEventInbox` receipt for deduplication and applies the report to deployment state or Cloud execution projections.
 - `POST /api/v1/iot/kiosks/{kioskId}/events` remains the future broader batch event/sync surface and should not be used as the current command execution status endpoint.
 - Keep IoT DTOs separate from EF entities.

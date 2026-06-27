@@ -52,23 +52,32 @@ public sealed class BulkUploadRobotArtifactsCommandHandler
                 StatusCode = result.StatusCode,
                 Message = result.Message,
                 RobotArtifactId = result.Data?.Id,
-                Artifact = result.Data
+                Artifact = result.Data,
+                WasExisting = result.Succeeded && result.StatusCode == 200
             });
         }
 
         var succeededCount = results.Count(item => item.Succeeded);
+        var uploadedCount = results.Count(item => item.Succeeded && !item.WasExisting);
+        var existingCount = results.Count(item => item.WasExisting);
         var response = new BulkRobotArtifactUploadResult
         {
             TotalCount = results.Count,
             SucceededCount = succeededCount,
             FailedCount = results.Count - succeededCount,
+            UploadedCount = uploadedCount,
+            ExistingCount = existingCount,
             Items = results
         };
 
         if (succeededCount == results.Count)
         {
             return ApiResult<BulkRobotArtifactUploadResult>.Success(
-                response, "All robot artifacts uploaded successfully.", 201);
+                response,
+                uploadedCount == 0
+                    ? "All robot artifacts already existed; existing metadata returned."
+                    : "All robot artifacts resolved successfully.",
+                existingCount == 0 ? 201 : 200);
         }
 
         if (succeededCount == 0)

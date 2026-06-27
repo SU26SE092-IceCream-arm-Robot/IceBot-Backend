@@ -26,4 +26,15 @@ public sealed class RobotArtifactObjectStorageOptions
 
     [Range(60, 604800)]
     public int DownloadUrlExpirySeconds { get; init; } = 900;
+
+    public bool OrphanCleanupEnabled { get; init; } = true;
+
+    [Range(1, 720)]
+    public int OrphanGracePeriodHours { get; init; } = 24;
+
+    [Range(1, 168)]
+    public int OrphanCleanupIntervalHours { get; init; } = 24;
+
+    [Range(1, 10000)]
+    public int OrphanCleanupMaxDeletesPerRun { get; init; } = 100;
 }

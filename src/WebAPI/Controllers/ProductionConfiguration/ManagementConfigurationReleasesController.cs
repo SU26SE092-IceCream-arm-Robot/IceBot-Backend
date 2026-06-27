@@ -1,6 +1,7 @@
 using Application.ProductionConfiguration.Commands;
 using Application.ProductionConfiguration.Queries;
 using Domain.ProductionConfiguration.Enums;
+using Application.ProductionConfiguration.ReadModels;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,29 +16,101 @@ namespace WebAPI.Controllers.ProductionConfiguration;
 public sealed class ManagementConfigurationReleasesController : ControllerBase
 {
     private readonly PublishConfigurationReleaseCommandHandler _publishConfigurationReleaseHandler;
+    private readonly RetireConfigurationReleaseCommandHandler _retireConfigurationReleaseHandler;
     private readonly DeployFullEdgeConfigurationCommandHandler _deployFullEdgeConfigurationHandler;
     private readonly DeployLowCostArtifactSetCommandHandler _deployLowCostArtifactSetHandler;
     private readonly CreateConfigurationReleaseCommandHandler _createConfigurationReleaseHandler;
     private readonly ReplaceConfigurationReleaseRoutesCommandHandler _replaceConfigurationReleaseRoutesHandler;
     private readonly ListConfigurationReleasesQueryHandler _listConfigurationReleasesHandler;
     private readonly GetConfigurationReleaseQueryHandler _getConfigurationReleaseHandler;
+    private readonly ListConfigurationDeploymentsQueryHandler _listConfigurationDeploymentsHandler;
+    private readonly GetConfigurationDeploymentQueryHandler _getConfigurationDeploymentHandler;
+    private readonly RollbackConfigurationDeploymentCommandHandler _rollbackConfigurationDeploymentHandler;
 
     public ManagementConfigurationReleasesController(
         PublishConfigurationReleaseCommandHandler publishConfigurationReleaseHandler,
+        RetireConfigurationReleaseCommandHandler retireConfigurationReleaseHandler,
         DeployFullEdgeConfigurationCommandHandler deployFullEdgeConfigurationHandler,
         DeployLowCostArtifactSetCommandHandler deployLowCostArtifactSetHandler,
         CreateConfigurationReleaseCommandHandler createConfigurationReleaseHandler,
         ReplaceConfigurationReleaseRoutesCommandHandler replaceConfigurationReleaseRoutesHandler,
         ListConfigurationReleasesQueryHandler listConfigurationReleasesHandler,
-        GetConfigurationReleaseQueryHandler getConfigurationReleaseHandler)
+        GetConfigurationReleaseQueryHandler getConfigurationReleaseHandler,
+        ListConfigurationDeploymentsQueryHandler listConfigurationDeploymentsHandler,
+        GetConfigurationDeploymentQueryHandler getConfigurationDeploymentHandler,
+        RollbackConfigurationDeploymentCommandHandler rollbackConfigurationDeploymentHandler)
     {
         _publishConfigurationReleaseHandler = publishConfigurationReleaseHandler;
+        _retireConfigurationReleaseHandler = retireConfigurationReleaseHandler;
         _deployFullEdgeConfigurationHandler = deployFullEdgeConfigurationHandler;
         _deployLowCostArtifactSetHandler = deployLowCostArtifactSetHandler;
         _createConfigurationReleaseHandler = createConfigurationReleaseHandler;
         _replaceConfigurationReleaseRoutesHandler = replaceConfigurationReleaseRoutesHandler;
         _listConfigurationReleasesHandler = listConfigurationReleasesHandler;
         _getConfigurationReleaseHandler = getConfigurationReleaseHandler;
+        _listConfigurationDeploymentsHandler = listConfigurationDeploymentsHandler;
+        _getConfigurationDeploymentHandler = getConfigurationDeploymentHandler;
+        _rollbackConfigurationDeploymentHandler = rollbackConfigurationDeploymentHandler;
+    }
+
+    [HttpGet("configuration-deployments")]
+    [Authorize(Policy = "release.deploy")]
+    public async Task<IActionResult> ListConfigurationDeployments(
+        [FromQuery] Guid? organizationId,
+        [FromQuery] Guid? storeId,
+        [FromQuery] Guid? kioskId,
+        [FromQuery] Guid? configurationReleaseId,
+        [FromQuery] ConfigurationDeploymentProfile? profile,
+        [FromQuery] ConfigurationDeploymentReadStatus? status,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var query = new ListConfigurationDeploymentsQuery
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            ConfigurationReleaseId = configurationReleaseId,
+            Profile = profile,
+            Status = status,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        };
+        var result = await _listConfigurationDeploymentsHandler.HandleAsync(query, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("configuration-deployments/{deploymentId:guid}")]
+    [Authorize(Policy = "release.deploy")]
+    public async Task<IActionResult> GetConfigurationDeployment(
+        Guid deploymentId,
+        CancellationToken cancellationToken)
+    {
+        var query = new GetConfigurationDeploymentQuery(deploymentId)
+        {
+            UserContext = User.GetUserContext()
+        };
+        var result = await _getConfigurationDeploymentHandler.HandleAsync(query, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("configuration-deployments/{deploymentId:guid}/rollback")]
+    [Authorize(Policy = "release.rollback")]
+    public async Task<IActionResult> RollbackConfigurationDeployment(
+        Guid deploymentId,
+        [FromBody] RollbackConfigurationDeploymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new RollbackConfigurationDeploymentCommand
+        {
+            UserContext = User.GetUserContext(),
+            TargetDeploymentId = deploymentId,
+            CommandExpiryAt = request.CommandExpiryAt
+        };
+        var result = await _rollbackConfigurationDeploymentHandler.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 
     [HttpGet("configuration-releases")]
@@ -149,6 +222,18 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPatch("configuration-releases/{releaseId:guid}/retire")]
+    [Authorize(Policy = "release.publish")]
+    public async Task<IActionResult> RetireConfigurationRelease(Guid releaseId, CancellationToken cancellationToken)
+    {
+        var result = await _retireConfigurationReleaseHandler.HandleAsync(new RetireConfigurationReleaseCommand
+        {
+            UserContext = User.GetUserContext(),
+            ReleaseId = releaseId
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("kiosks/{kioskId:guid}/controller-artifact-set-deployments")]
     [Authorize(Policy = "release.deploy")]
     public async Task<IActionResult> DeployLowCostArtifactSet(
@@ -181,6 +266,11 @@ public sealed class CreateConfigurationReleaseRequest
 {
     [Range(1, int.MaxValue)]
     public int ReleaseManifestSchemaVersion { get; init; } = 1;
+}
+
+public sealed class RollbackConfigurationDeploymentRequest
+{
+    public DateTimeOffset? CommandExpiryAt { get; init; }
 }
 
 public sealed class ReplaceConfigurationReleaseRoutesRequest

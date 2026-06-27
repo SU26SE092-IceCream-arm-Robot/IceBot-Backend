@@ -22,6 +22,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
     private readonly UpdateRobotProgramCommandHandler _updateHandler;
     private readonly ReplaceRobotProgramArtifactsCommandHandler _replaceArtifactsHandler;
     private readonly PublishRobotProgramCommandHandler _publishHandler;
+    private readonly RetireRobotProgramCommandHandler _retireHandler;
 
     public ManagementRobotProgramsController(
         ListRobotProgramsQueryHandler listHandler,
@@ -29,7 +30,8 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         CreateRobotProgramCommandHandler createHandler,
         UpdateRobotProgramCommandHandler updateHandler,
         ReplaceRobotProgramArtifactsCommandHandler replaceArtifactsHandler,
-        PublishRobotProgramCommandHandler publishHandler)
+        PublishRobotProgramCommandHandler publishHandler,
+        RetireRobotProgramCommandHandler retireHandler)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
@@ -37,6 +39,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         _updateHandler = updateHandler;
         _replaceArtifactsHandler = replaceArtifactsHandler;
         _publishHandler = publishHandler;
+        _retireHandler = retireHandler;
     }
 
     [HttpGet("robot-programs")]
@@ -135,6 +138,17 @@ public sealed class ManagementRobotProgramsController : ControllerBase
             ProgramId = programId
         };
         var result = await _publishHandler.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPatch("robot-programs/{programId:guid}/retire")]
+    public async Task<IActionResult> RetireRobotProgram(Guid programId, CancellationToken cancellationToken)
+    {
+        var result = await _retireHandler.HandleAsync(new RetireRobotProgramCommand
+        {
+            UserContext = User.GetUserContext(),
+            ProgramId = programId
+        }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

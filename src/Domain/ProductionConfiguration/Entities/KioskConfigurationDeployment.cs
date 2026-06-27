@@ -46,7 +46,8 @@ public class KioskConfigurationDeployment : BusinessEntity
         ConfigurationRelease configurationRelease,
         int attemptNo,
         DateTimeOffset requestedAt,
-        Guid? requestedByAccountId = null)
+        Guid? requestedByAccountId = null,
+        bool isRollback = false)
     {
         if (kioskExecutionEndpoint is null || configurationRelease is null ||
             kioskExecutionEndpoint.FullEdgeRuntimeId is null ||
@@ -62,7 +63,8 @@ public class KioskConfigurationDeployment : BusinessEntity
 
         configurationRelease.ValidateFullEdgeDeploymentTarget(
             kioskExecutionEndpoint,
-            kioskExecutionEndpoint.FullEdgeRuntimeId.Value);
+            kioskExecutionEndpoint.FullEdgeRuntimeId.Value,
+            allowRetiredRelease: isRollback);
 
         return new KioskConfigurationDeployment
         {
@@ -134,6 +136,19 @@ public class KioskConfigurationDeployment : BusinessEntity
         FailureReason = string.IsNullOrWhiteSpace(failureReason) ? null : failureReason.Trim();
         Status = KioskConfigurationDeploymentStatus.Failed;
         return true;
+    }
+
+    public void MarkCommandExpired(DateTimeOffset cloudObservedAt)
+    {
+        if (Status != KioskConfigurationDeploymentStatus.Pending)
+        {
+            throw new DomainRuleException("Only pending configuration deployments can expire before command acceptance.");
+        }
+
+        CloudReceivedAt = cloudObservedAt;
+        FailureCode = "CommandExpired";
+        FailureReason = "The deployment command expired before the execution endpoint accepted it.";
+        Status = KioskConfigurationDeploymentStatus.Failed;
     }
 
     private void EnsurePending()

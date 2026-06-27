@@ -57,6 +57,13 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | Robot artifact object storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` |
 | Robot artifact download endpoint TLS toggle | `RobotArtifacts__ObjectStorage__DownloadUseSsl` |
 | Robot artifact presigned download lifetime in seconds | `RobotArtifacts__ObjectStorage__DownloadUrlExpirySeconds` |
+| Enable robot artifact orphan cleanup | `RobotArtifacts__ObjectStorage__OrphanCleanupEnabled` |
+| Minimum orphan age before deletion in hours | `RobotArtifacts__ObjectStorage__OrphanGracePeriodHours` |
+| Robot artifact orphan cleanup interval in hours | `RobotArtifacts__ObjectStorage__OrphanCleanupIntervalHours` |
+| Maximum orphan deletes per cleanup run | `RobotArtifacts__ObjectStorage__OrphanCleanupMaxDeletesPerRun` |
+| Enable deployment-command timeout reconciliation | `DeploymentTimeoutReconciliation__Enabled` |
+| Deployment timeout reconciliation interval in seconds | `DeploymentTimeoutReconciliation__IntervalSeconds` |
+| Maximum expired deployment commands per reconciliation run | `DeploymentTimeoutReconciliation__MaxCommandsPerRun` |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` |
 | Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |

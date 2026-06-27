@@ -18,18 +18,24 @@ namespace WebAPI.Controllers.RobotConfiguration;
 public sealed class ManagementRobotArtifactsController : ControllerBase
 {
     private readonly BulkUploadRobotArtifactsCommandHandler _bulkUploadRobotArtifactsHandler;
+    private readonly BulkPublishRobotArtifactsCommandHandler _bulkPublishRobotArtifactsHandler;
     private readonly PublishRobotArtifactCommandHandler _publishRobotArtifactHandler;
+    private readonly RetireRobotArtifactCommandHandler _retireRobotArtifactHandler;
     private readonly ListRobotArtifactsQueryHandler _listRobotArtifactsHandler;
     private readonly GetRobotArtifactQueryHandler _getRobotArtifactHandler;
 
     public ManagementRobotArtifactsController(
         BulkUploadRobotArtifactsCommandHandler bulkUploadRobotArtifactsHandler,
+        BulkPublishRobotArtifactsCommandHandler bulkPublishRobotArtifactsHandler,
         PublishRobotArtifactCommandHandler publishRobotArtifactHandler,
+        RetireRobotArtifactCommandHandler retireRobotArtifactHandler,
         ListRobotArtifactsQueryHandler listRobotArtifactsHandler,
         GetRobotArtifactQueryHandler getRobotArtifactHandler)
     {
         _bulkUploadRobotArtifactsHandler = bulkUploadRobotArtifactsHandler;
+        _bulkPublishRobotArtifactsHandler = bulkPublishRobotArtifactsHandler;
         _publishRobotArtifactHandler = publishRobotArtifactHandler;
+        _retireRobotArtifactHandler = retireRobotArtifactHandler;
         _listRobotArtifactsHandler = listRobotArtifactsHandler;
         _getRobotArtifactHandler = getRobotArtifactHandler;
     }
@@ -57,11 +63,17 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("robot-artifacts/{artifactId:guid}")]
+    [HttpGet("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}")]
     [Authorize(Policy = "artifact.upload")]
-    public async Task<IActionResult> GetRobotArtifact(Guid artifactId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetRobotArtifact(
+        Guid organizationId,
+        Guid artifactId,
+        CancellationToken cancellationToken)
     {
-        var query = new GetRobotArtifactQuery(artifactId) { UserContext = User.GetUserContext() };
+        var query = new GetRobotArtifactQuery(organizationId, artifactId)
+        {
+            UserContext = User.GetUserContext()
+        };
         var result = await _getRobotArtifactHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -160,6 +172,35 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/publish-bulk")]
+    [Authorize(Policy = "artifact.upload")]
+    public async Task<IActionResult> BulkPublishRobotArtifacts(
+        Guid organizationId,
+        [FromBody] BulkPublishRobotArtifactsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new BulkPublishRobotArtifactsCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            RobotArtifactIds = request.RobotArtifactIds
+        };
+        var result = await _bulkPublishRobotArtifactsHandler.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPatch("robot-artifacts/{artifactId:guid}/retire")]
+    [Authorize(Policy = "artifact.upload")]
+    public async Task<IActionResult> RetireRobotArtifact(Guid artifactId, CancellationToken cancellationToken)
+    {
+        var result = await _retireRobotArtifactHandler.HandleAsync(new RetireRobotArtifactCommand
+        {
+            UserContext = User.GetUserContext(),
+            ArtifactId = artifactId
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     private static string? ValidateBulkManifest(
         IReadOnlyCollection<IFormFile> files,
         IReadOnlyCollection<BulkUploadRobotArtifactManifestItemRequest> manifest)
@@ -212,6 +253,12 @@ public sealed class BulkUploadRobotArtifactsRequest
 
     [Required]
     public string ManifestJson { get; init; } = string.Empty;
+}
+
+public sealed class BulkPublishRobotArtifactsRequest
+{
+    [Required, MinLength(1), MaxLength(100)]
+    public IReadOnlyCollection<Guid> RobotArtifactIds { get; init; } = Array.Empty<Guid>();
 }
 
 public sealed class BulkUploadRobotArtifactManifestItemRequest

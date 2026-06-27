@@ -153,6 +153,16 @@ public class KioskExecutionEndpoint : BusinessEntity
             device));
     }
 
+    public void ClearSupportedRobotTargets()
+    {
+        if (Status is KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Retired)
+        {
+            throw new DomainRuleException("Only non-active endpoints can change supported robot targets.");
+        }
+
+        _supportedRobotTargets.Clear();
+    }
+
     public bool SupportsRobotTarget(string runtimeTargetCode, string machineModelCode, Guid? deviceId = null)
     {
         return _supportedRobotTargets.Any(target =>

@@ -114,15 +114,18 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 command.MaxArtifactStorageBytes,
                 command.UserContext.AccountId,
                 now,
-                selections);
+                selections,
+                command.IsRollback);
 
             var edgeCommand = EdgeCommand.Create(
                 EdgeCommandType.DeployConfiguration,
                 deployment.KioskId,
                 deployment.KioskExecutionEndpointId,
-                BuildDeployPayload(deployment),
+                BuildDeployPayload(deployment, command.RollbackTargetDeploymentId),
                 now,
-                commandExpiryAt: commandExpiryAt);
+                commandExpiryAt: commandExpiryAt,
+                deploymentId: deployment.Id,
+                deploymentKind: DeploymentCommandTargetKind.LowCostArtifactSet);
 
             edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
 
@@ -141,7 +144,9 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         }
     }
 
-    private static string BuildDeployPayload(ControllerArtifactSetDeployment deployment)
+    private static string BuildDeployPayload(
+        ControllerArtifactSetDeployment deployment,
+        Guid? rollbackTargetDeploymentId)
     {
         var payload = new
         {
@@ -151,6 +156,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             deployment.ControllerId,
             ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
             deployment.ReleaseChecksum,
+            RollbackTargetDeploymentId = rollbackTargetDeploymentId,
             deployment.ActiveSetVersion,
             deployment.ActiveSetChecksum,
             deployment.MaxArtifactCount,

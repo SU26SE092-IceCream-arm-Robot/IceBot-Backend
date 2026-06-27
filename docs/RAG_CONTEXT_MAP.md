@@ -80,6 +80,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `SyncEventInbox`, `NextRetryAt`, `LockedUntil`, `dead letter` | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md) |
 | `ProductVariant`, `MenuItem` | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md), then owning context docs/code |
 | `RobotArtifact`, `RobotProgramArtifact`, `ConfigurationRelease`, `ExecutionRoute`, `KioskExecutionEndpoint`, `EdgeCommand` | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md), then [IoT Contract](iot/IOT_CONTRACT.md) |
+| `execution endpoint provisioning`, `FullEdgeRuntimeId`, `ControllerId`, `supported robot target`, `credential rotation` | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md), then [API Surface Rules](api/API_SURFACE_RULES.md) and [IoT Contract](iot/IOT_CONTRACT.md) |
 | `Fairino Studio`, `.lua`, `RunOrder`, `presigned artifact download`, `artifact deployment` | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md) |
 | `local edge db`, `ProductionJob`, `artifact cache`, `workcell scheduler` | [Local Edge Runtime ERD](iot/LOCAL_EDGE_RUNTIME_ERD.md) |
 

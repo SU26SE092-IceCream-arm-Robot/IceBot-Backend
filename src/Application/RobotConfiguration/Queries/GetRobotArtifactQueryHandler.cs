@@ -15,15 +15,18 @@ public sealed class GetRobotArtifactQueryHandler
         GetRobotArtifactQuery query,
         CancellationToken cancellationToken = default)
     {
-        var artifact = await _store.GetArtifactByIdAsync(query.ArtifactId, cancellationToken);
-        if (artifact is null)
+        if (!ScopeAccessRules.CanAccessScopedRow(query.UserContext, query.OrganizationId, null, null))
         {
             return ApiResult<RobotArtifactResult>.Fail("Robot artifact not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(query.UserContext, artifact.OrganizationId, null, null))
+        var artifact = await _store.GetArtifactByIdAsync(
+            query.OrganizationId,
+            query.ArtifactId,
+            cancellationToken);
+        if (artifact is null)
         {
-            return ApiResult<RobotArtifactResult>.Fail("Access denied.", 403);
+            return ApiResult<RobotArtifactResult>.Fail("Robot artifact not found.", 404);
         }
 
         return ApiResult<RobotArtifactResult>.Success(RobotArtifactResult.FromEntity(artifact));

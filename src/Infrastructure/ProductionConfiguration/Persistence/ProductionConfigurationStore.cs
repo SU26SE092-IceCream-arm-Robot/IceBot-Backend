@@ -6,6 +6,7 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Catalog.Entities;
 using Domain.RobotConfiguration.Entities;
+using Application.ProductionConfiguration.ReadModels;
 
 namespace Infrastructure.ProductionConfiguration.Persistence;
 
@@ -40,6 +41,22 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
     {
         return ReleaseGraph()
             .FirstOrDefaultAsync(release => release.Id == releaseId, cancellationToken);
+    }
+
+    public Task<KioskConfigurationDeployment?> GetFullEdgeDeploymentForReconciliationAsync(
+        Guid deploymentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KioskConfigurationDeployments
+            .FirstOrDefaultAsync(deployment => deployment.Id == deploymentId, cancellationToken);
+    }
+
+    public Task<ControllerArtifactSetDeployment?> GetControllerDeploymentForReconciliationAsync(
+        Guid deploymentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ControllerArtifactSetDeployments
+            .FirstOrDefaultAsync(deployment => deployment.Id == deploymentId, cancellationToken);
     }
 
     public Task<bool> OrganizationExistsAsync(Guid organizationId, CancellationToken cancellationToken = default)
@@ -120,6 +137,68 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
             .ToListAsync(cancellationToken);
     }
 
+    public Task<int> CountConfigurationDeploymentsAsync(
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        Guid? configurationReleaseId,
+        ConfigurationDeploymentProfile? profile,
+        ConfigurationDeploymentReadStatus? status,
+        bool isSystemAdmin,
+        IEnumerable<Guid> allowedOrganizationIds,
+        IEnumerable<Guid> allowedStoreIds,
+        IEnumerable<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default)
+    {
+        return BuildConfigurationDeploymentQuery(
+            organizationId, storeId, kioskId, configurationReleaseId, profile, status,
+            isSystemAdmin, allowedOrganizationIds, allowedStoreIds, allowedKioskIds)
+            .CountAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ConfigurationDeploymentReadModel>> ListConfigurationDeploymentsAsync(
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        Guid? configurationReleaseId,
+        ConfigurationDeploymentProfile? profile,
+        ConfigurationDeploymentReadStatus? status,
+        bool isSystemAdmin,
+        IEnumerable<Guid> allowedOrganizationIds,
+        IEnumerable<Guid> allowedStoreIds,
+        IEnumerable<Guid> allowedKioskIds,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        return await BuildConfigurationDeploymentQuery(
+                organizationId, storeId, kioskId, configurationReleaseId, profile, status,
+                isSystemAdmin, allowedOrganizationIds, allowedStoreIds, allowedKioskIds)
+            .OrderByDescending(deployment => deployment.RequestedAt)
+            .ThenByDescending(deployment => deployment.Id)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<ConfigurationDeploymentReadModel?> GetConfigurationDeploymentAsync(
+        Guid deploymentId,
+        CancellationToken cancellationToken = default)
+    {
+        return FullEdgeDeploymentQuery().Where(deployment => deployment.Id == deploymentId)
+            .Concat(LowCostDeploymentQuery().Where(deployment => deployment.Id == deploymentId))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<ControllerArtifactSetDeployment?> GetControllerArtifactSetDeploymentForRollbackAsync(
+        Guid deploymentId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ControllerArtifactSetDeployments.AsNoTracking()
+            .Include(deployment => deployment.Items)
+            .FirstOrDefaultAsync(deployment => deployment.Id == deploymentId, cancellationToken);
+    }
+
     public Task<KioskExecutionEndpoint?> GetEndpointForDeploymentAsync(Guid endpointId, CancellationToken cancellationToken = default)
     {
         return _dbContext.KioskExecutionEndpoints
@@ -156,6 +235,25 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
     {
         return _dbContext.ControllerArtifactSetDeployments.AnyAsync(
             deployment => deployment.ControllerId == controllerId &&
+                (deployment.Status == ControllerArtifactSetDeploymentStatus.Pending ||
+                    deployment.Status == ControllerArtifactSetDeploymentStatus.Installed),
+            cancellationToken);
+    }
+
+    public async Task<bool> ReleaseHasPendingDeploymentAsync(
+        Guid releaseId,
+        CancellationToken cancellationToken = default)
+    {
+        var hasFullEdge = await _dbContext.KioskConfigurationDeployments.AnyAsync(
+            deployment => deployment.ConfigurationReleaseId == releaseId &&
+                (deployment.Status == KioskConfigurationDeploymentStatus.Pending ||
+                    deployment.Status == KioskConfigurationDeploymentStatus.Installed),
+            cancellationToken);
+        if (hasFullEdge)
+            return true;
+
+        return await _dbContext.ControllerArtifactSetDeployments.AnyAsync(
+            deployment => deployment.SourceConfigurationReleaseId == releaseId &&
                 (deployment.Status == ControllerArtifactSetDeploymentStatus.Pending ||
                     deployment.Status == ControllerArtifactSetDeploymentStatus.Installed),
             cancellationToken);
@@ -243,5 +341,113 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
         }
 
         return query;
+    }
+
+    private IQueryable<ConfigurationDeploymentReadModel> BuildConfigurationDeploymentQuery(
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        Guid? configurationReleaseId,
+        ConfigurationDeploymentProfile? profile,
+        ConfigurationDeploymentReadStatus? status,
+        bool isSystemAdmin,
+        IEnumerable<Guid> allowedOrganizationIds,
+        IEnumerable<Guid> allowedStoreIds,
+        IEnumerable<Guid> allowedKioskIds)
+    {
+        IQueryable<ConfigurationDeploymentReadModel> query = profile switch
+        {
+            ConfigurationDeploymentProfile.FullEdge => FullEdgeDeploymentQuery(),
+            ConfigurationDeploymentProfile.LowCostController => LowCostDeploymentQuery(),
+            _ => FullEdgeDeploymentQuery().Concat(LowCostDeploymentQuery())
+        };
+
+        if (!isSystemAdmin)
+        {
+            var organizationIds = allowedOrganizationIds.ToArray();
+            var storeIds = allowedStoreIds.ToArray();
+            var kioskIds = allowedKioskIds.ToArray();
+            query = query.Where(deployment =>
+                organizationIds.Contains(deployment.OrganizationId) ||
+                storeIds.Contains(deployment.StoreId) ||
+                kioskIds.Contains(deployment.KioskId));
+        }
+
+        if (organizationId.HasValue) query = query.Where(deployment => deployment.OrganizationId == organizationId.Value);
+        if (storeId.HasValue) query = query.Where(deployment => deployment.StoreId == storeId.Value);
+        if (kioskId.HasValue) query = query.Where(deployment => deployment.KioskId == kioskId.Value);
+        if (configurationReleaseId.HasValue) query = query.Where(deployment => deployment.ConfigurationReleaseId == configurationReleaseId.Value);
+        if (status.HasValue) query = query.Where(deployment => deployment.Status == status.Value);
+        return query;
+    }
+
+    private IQueryable<ConfigurationDeploymentReadModel> FullEdgeDeploymentQuery()
+    {
+        return _dbContext.KioskConfigurationDeployments.AsNoTracking()
+            .Select(deployment => new ConfigurationDeploymentReadModel
+            {
+                Id = deployment.Id,
+                Profile = ConfigurationDeploymentProfile.FullEdge,
+                OrganizationId = deployment.KioskExecutionEndpoint.Kiosk.OrganizationId,
+                StoreId = deployment.KioskExecutionEndpoint.Kiosk.StoreId,
+                KioskId = deployment.KioskId,
+                KioskExecutionEndpointId = deployment.KioskExecutionEndpointId,
+                EndpointCode = deployment.KioskExecutionEndpoint.EndpointCode,
+                ConfigurationReleaseId = deployment.ConfigurationReleaseId,
+                ReleaseNumber = deployment.ConfigurationRelease.ReleaseNumber,
+                ReleaseChecksum = deployment.ReleaseChecksum,
+                Status = (ConfigurationDeploymentReadStatus)deployment.Status,
+                RequestedAt = deployment.RequestedAt,
+                RequestedByAccountId = deployment.RequestedByAccountId,
+                ExecutorReportedAt = deployment.EdgeReportedAt,
+                CloudReceivedAt = deployment.CloudReceivedAt,
+                LastReportId = deployment.LastEdgeDeploymentEventId,
+                FailureCode = deployment.FailureCode,
+                FailureReason = deployment.FailureReason,
+                AttemptNo = deployment.AttemptNo,
+                EdgeRuntimeId = deployment.EdgeRuntimeId,
+                ControllerId = null,
+                ActiveSetVersion = null,
+                ActiveSetChecksum = null,
+                RequestedArtifactCount = null,
+                RequestedArtifactStorageBytes = null,
+                MaxArtifactCount = null,
+                MaxArtifactStorageBytes = null
+            });
+    }
+
+    private IQueryable<ConfigurationDeploymentReadModel> LowCostDeploymentQuery()
+    {
+        return _dbContext.ControllerArtifactSetDeployments.AsNoTracking()
+            .Select(deployment => new ConfigurationDeploymentReadModel
+            {
+                Id = deployment.Id,
+                Profile = ConfigurationDeploymentProfile.LowCostController,
+                OrganizationId = deployment.KioskExecutionEndpoint.Kiosk.OrganizationId,
+                StoreId = deployment.KioskExecutionEndpoint.Kiosk.StoreId,
+                KioskId = deployment.KioskId,
+                KioskExecutionEndpointId = deployment.KioskExecutionEndpointId,
+                EndpointCode = deployment.KioskExecutionEndpoint.EndpointCode,
+                ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
+                ReleaseNumber = deployment.SourceConfigurationRelease.ReleaseNumber,
+                ReleaseChecksum = deployment.ReleaseChecksum,
+                Status = (ConfigurationDeploymentReadStatus)deployment.Status,
+                RequestedAt = deployment.RequestedAt,
+                RequestedByAccountId = deployment.RequestedByAccountId,
+                ExecutorReportedAt = deployment.ControllerReportedAt,
+                CloudReceivedAt = deployment.CloudReceivedAt,
+                LastReportId = deployment.LastControllerReportId,
+                FailureCode = deployment.FailureCode,
+                FailureReason = deployment.FailureReason,
+                AttemptNo = null,
+                EdgeRuntimeId = null,
+                ControllerId = deployment.ControllerId,
+                ActiveSetVersion = deployment.ActiveSetVersion,
+                ActiveSetChecksum = deployment.ActiveSetChecksum,
+                RequestedArtifactCount = deployment.RequestedArtifactCount,
+                RequestedArtifactStorageBytes = deployment.RequestedArtifactStorageBytes,
+                MaxArtifactCount = deployment.MaxArtifactCount,
+                MaxArtifactStorageBytes = deployment.MaxArtifactStorageBytes
+            });
     }
 }

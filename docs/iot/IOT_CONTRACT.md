@@ -479,10 +479,13 @@ Response:
 Rules:
 
 - Edge must deduplicate by `commandId`.
+- Deployment commands include typed Cloud correlation fields for deployment ownership. `PayloadJson` is execution data, not the authoritative link used by timeout reconciliation.
 - Pull marks returned commands as `Delivered` and records a delivery attempt.
 - Retrying command pull can return delivered but unacknowledged commands.
 - Runtime execution state is reported through the event/report ingest boundary, not command ack.
+- If a deployment command expires before acceptance, Cloud marks the command `Rejected` with `CommandExpired` and marks the linked Pending deployment `Failed`. Expiry after command acceptance is not inferred; missing execution reports require a separate report-timeout policy.
 - A `DeployConfiguration` payload contains immutable artifact descriptors. During an authenticated pull, each descriptor with a `StorageKey` is enriched with a short-lived `DownloadUrl` and `DownloadUrlExpiresAt`.
+- Rollback uses the same `DeployConfiguration` command contract and includes `RollbackTargetDeploymentId` as provenance. Edge installs it as a new deployment attempt; it does not locally mutate the historical deployment.
 - Presigned download URLs are transport data only. They are not persisted in `EdgeCommand.PayloadJson`, release manifests, or artifact metadata.
 - The object-storage bucket remains private. Edge must download before URL expiry and must not treat the URL as an artifact identity.
 - `DownloadUrl` must use an endpoint reachable from the execution endpoint. A Docker-internal MinIO hostname is not a valid external Edge download endpoint unless both runtimes share that network.
@@ -490,6 +493,17 @@ Rules:
 - A failed download, expired URL, size mismatch, or checksum mismatch must fail the deployment attempt. Edge may pull the unacknowledged command again to obtain fresh download URLs; it must not activate partial or unverified files.
 - Fairino-Studio currently exports multiple `.lua` files: normally one file per editor step, while a paired loop is exported as one file. Each exported file is stored as one `RobotArtifact`; `RobotProgramArtifact.RunOrder` defines their runtime sequence.
 - Filename prefixes such as `01_` are human-facing export hints, not execution authority. Edge executes the ordered program manifest delivered by Cloud.
+
+### Execution Endpoint Provisioning Boundary
+
+Before command pull, Cloud management must create and activate a `KioskExecutionEndpoint`:
+
+1. Create the endpoint in `Provisioning` for one kiosk and one execution profile.
+2. Replace its supported robot targets using runtime-target code, machine-model code, and optional same-kiosk device binding.
+3. Provision a write-only credential reference and profile identity.
+4. Activate the endpoint; only an Active endpoint with an Active credential may authenticate command pull or report execution state.
+
+Full Edge uses `FullEdgeRuntimeId` and requires `MutualTls`. Low-cost uses `ControllerId` and may use the supported signed-command-over-TLS mode. Cloud stores credential references, not raw credential material in read responses. Disabling or retiring an endpoint blocks runtime authentication without deleting deployment or execution history.
 
 ### Command Ack
 

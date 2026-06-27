@@ -9,4 +9,6 @@ public sealed class DeployFullEdgeConfigurationCommand
     public required Guid ConfigurationReleaseId { get; init; }
     public required Guid KioskExecutionEndpointId { get; init; }
     public DateTimeOffset? CommandExpiryAt { get; init; }
+    public Guid? RollbackTargetDeploymentId { get; init; }
+    public bool IsRollback => RollbackTargetDeploymentId.HasValue;
 }

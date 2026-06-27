@@ -85,15 +85,18 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                 release,
                 attemptNo,
                 now,
-                command.UserContext.AccountId);
+                command.UserContext.AccountId,
+                command.IsRollback);
 
             var edgeCommand = EdgeCommand.Create(
                 EdgeCommandType.DeployConfiguration,
                 deployment.KioskId,
                 deployment.KioskExecutionEndpointId,
-                BuildDeployPayload(deployment, release),
+                BuildDeployPayload(deployment, release, command.RollbackTargetDeploymentId),
                 now,
-                commandExpiryAt: commandExpiryAt);
+                commandExpiryAt: commandExpiryAt,
+                deploymentId: deployment.Id,
+                deploymentKind: DeploymentCommandTargetKind.FullEdgeConfiguration);
 
             edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
 
@@ -112,7 +115,10 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         }
     }
 
-    private static string BuildDeployPayload(KioskConfigurationDeployment deployment, ConfigurationRelease release)
+    private static string BuildDeployPayload(
+        KioskConfigurationDeployment deployment,
+        ConfigurationRelease release,
+        Guid? rollbackTargetDeploymentId)
     {
         var artifacts = release.ExecutionRoutes
             .SelectMany(route => route.RobotBindings)
@@ -139,6 +145,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             TargetExecutionEndpointId = deployment.KioskExecutionEndpointId,
             deployment.ConfigurationReleaseId,
             deployment.ReleaseChecksum,
+            RollbackTargetDeploymentId = rollbackTargetDeploymentId,
             release.ReleaseManifestSchemaVersion,
             release.ManifestJson,
             Artifacts = artifacts

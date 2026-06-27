@@ -144,11 +144,11 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `kiosks.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create and change status of kiosks. Scoped to assigned organization/store/kiosk |
 | `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Update kiosk details. Scoped to assigned organization/store/kiosk |
 | `devices.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View devices/hardware details within assigned scope |
-| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, retire devices/hardware, or rotate execution endpoint credentials within assigned scope |
-| `artifact.upload` | `SystemAdmin`, `OrgAdmin`, `Manager` | Upload immutable robot Lua artifacts within assigned organization scope |
-| `release.publish` | `SystemAdmin`, `OrgAdmin`, `Manager` | Publish robot programs and immutable production configuration releases within assigned scope |
+| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, retire devices/hardware; create, configure, provision, disable/reactivate, rotate credentials, or retire execution endpoints within assigned scope |
+| `artifact.upload` | `SystemAdmin`, `OrgAdmin`, `Manager` | Upload, publish, and retire immutable robot Lua artifacts within assigned organization scope |
+| `release.publish` | `SystemAdmin`, `OrgAdmin`, `Manager` | Author, publish, and retire robot programs and immutable production configuration releases within assigned scope |
 | `release.deploy` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request configuration deployment to assigned kiosks |
-| `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request deployment of a previously validated release to assigned kiosks; no management route is exposed yet |
+| `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request a new deployment from a previously Active Full Edge release or low-cost artifact set within assigned scope |
 | `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |
 | `products.manage` | `SystemAdmin`, `Manager` | Product/catalog management. Staff and Technician should not change product pricing/catalog by default |
 | `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |

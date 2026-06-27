@@ -1,0 +1,175 @@
+using Application.ProductionConfiguration.Abstractions;
+using Application.ProductionConfiguration.ReadModels;
+using Application.ProductionConfiguration.Results;
+using Application.Shared.Wrappers;
+using Application.Tenants;
+using Domain.Devices.Enums;
+
+namespace Application.ProductionConfiguration.Commands;
+
+public sealed class RollbackConfigurationDeploymentCommandHandler
+{
+    private readonly IProductionConfigurationStore _store;
+    private readonly DeployFullEdgeConfigurationCommandHandler _fullEdgeDeployHandler;
+    private readonly DeployLowCostArtifactSetCommandHandler _lowCostDeployHandler;
+
+    public RollbackConfigurationDeploymentCommandHandler(
+        IProductionConfigurationStore store,
+        DeployFullEdgeConfigurationCommandHandler fullEdgeDeployHandler,
+        DeployLowCostArtifactSetCommandHandler lowCostDeployHandler)
+    {
+        _store = store;
+        _fullEdgeDeployHandler = fullEdgeDeployHandler;
+        _lowCostDeployHandler = lowCostDeployHandler;
+    }
+
+    public async Task<ApiResult<ConfigurationDeploymentRollbackResult>> HandleAsync(
+        RollbackConfigurationDeploymentCommand command,
+        CancellationToken cancellationToken = default)
+    {
+        var target = await _store.GetConfigurationDeploymentAsync(command.TargetDeploymentId, cancellationToken);
+        if (target is null)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Rollback target deployment not found.", 404);
+        }
+
+        if (!ScopeAccessRules.CanAccessScopedRow(
+                command.UserContext, target.OrganizationId, target.StoreId, target.KioskId))
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Access denied.", 403);
+        }
+
+        if (target.Status != ConfigurationDeploymentReadStatus.Active)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Only a previously active deployment can be selected as a rollback target.", 400);
+        }
+
+        var endpoint = await _store.GetEndpointForDeploymentAsync(target.KioskExecutionEndpointId, cancellationToken);
+        if (endpoint is null || endpoint.KioskId != target.KioskId)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Rollback target execution endpoint is not available.", 400);
+        }
+
+        return target.Profile switch
+        {
+            ConfigurationDeploymentProfile.FullEdge => await RollbackFullEdgeAsync(command, target, endpoint, cancellationToken),
+            ConfigurationDeploymentProfile.LowCostController => await RollbackLowCostAsync(command, target, endpoint, cancellationToken),
+            _ => ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Rollback target profile is not supported.", 400)
+        };
+    }
+
+    private async Task<ApiResult<ConfigurationDeploymentRollbackResult>> RollbackFullEdgeAsync(
+        RollbackConfigurationDeploymentCommand command,
+        ConfigurationDeploymentReadModel target,
+        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        CancellationToken cancellationToken)
+    {
+        if (endpoint.ExecutionProfile != KioskExecutionProfile.FullEdge)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Execution endpoint profile no longer matches the Full Edge rollback target.", 409);
+        }
+
+        if (endpoint.ActiveConfigurationDeploymentId == target.Id)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("The selected deployment is already active.", 409);
+        }
+
+        var result = await _fullEdgeDeployHandler.HandleAsync(
+            new DeployFullEdgeConfigurationCommand
+            {
+                UserContext = command.UserContext,
+                KioskId = target.KioskId,
+                ConfigurationReleaseId = target.ConfigurationReleaseId,
+                KioskExecutionEndpointId = target.KioskExecutionEndpointId,
+                CommandExpiryAt = command.CommandExpiryAt,
+                RollbackTargetDeploymentId = target.Id
+            },
+            cancellationToken);
+
+        if (!result.Succeeded || result.Data is null || !result.Data.EdgeCommandId.HasValue)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail(
+                result.Message ?? "Full Edge rollback request failed.", result.StatusCode);
+        }
+
+        return ApiResult<ConfigurationDeploymentRollbackResult>.Success(
+            new ConfigurationDeploymentRollbackResult
+            {
+                TargetDeploymentId = target.Id,
+                NewDeploymentId = result.Data.Id,
+                EdgeCommandId = result.Data.EdgeCommandId.Value,
+                Profile = target.Profile.ToString(),
+                KioskId = target.KioskId,
+                KioskExecutionEndpointId = target.KioskExecutionEndpointId,
+                ConfigurationReleaseId = target.ConfigurationReleaseId,
+                ReleaseChecksum = target.ReleaseChecksum,
+                Status = result.Data.Status
+            },
+            "Full Edge rollback deployment requested successfully.",
+            201);
+    }
+
+    private async Task<ApiResult<ConfigurationDeploymentRollbackResult>> RollbackLowCostAsync(
+        RollbackConfigurationDeploymentCommand command,
+        ConfigurationDeploymentReadModel target,
+        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        CancellationToken cancellationToken)
+    {
+        if (endpoint.ExecutionProfile != KioskExecutionProfile.LowCostController)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Execution endpoint profile no longer matches the low-cost rollback target.", 409);
+        }
+
+        if (endpoint.ActiveArtifactSetDeploymentId == target.Id)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("The selected artifact set is already active.", 409);
+        }
+
+        var source = await _store.GetControllerArtifactSetDeploymentForRollbackAsync(target.Id, cancellationToken);
+        if (source is null || source.Items.Count == 0)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Rollback target artifact set is incomplete.", 400);
+        }
+
+        var result = await _lowCostDeployHandler.HandleAsync(
+            new DeployLowCostArtifactSetCommand
+            {
+                UserContext = command.UserContext,
+                KioskId = target.KioskId,
+                ConfigurationReleaseId = target.ConfigurationReleaseId,
+                KioskExecutionEndpointId = target.KioskExecutionEndpointId,
+                MaxArtifactCount = source.MaxArtifactCount,
+                MaxArtifactStorageBytes = source.MaxArtifactStorageBytes,
+                Selections = source.Items.Select(item => new DeployLowCostArtifactSelection(
+                    item.ExecutionRouteId,
+                    item.RobotProgramId,
+                    item.RobotArtifactId,
+                    item.RunOrder)).ToArray(),
+                CommandExpiryAt = command.CommandExpiryAt,
+                RollbackTargetDeploymentId = target.Id
+            },
+            cancellationToken);
+
+        if (!result.Succeeded || result.Data is null || !result.Data.EdgeCommandId.HasValue)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail(
+                result.Message ?? "Low-cost rollback request failed.", result.StatusCode);
+        }
+
+        return ApiResult<ConfigurationDeploymentRollbackResult>.Success(
+            new ConfigurationDeploymentRollbackResult
+            {
+                TargetDeploymentId = target.Id,
+                NewDeploymentId = result.Data.Id,
+                EdgeCommandId = result.Data.EdgeCommandId.Value,
+                Profile = target.Profile.ToString(),
+                KioskId = target.KioskId,
+                KioskExecutionEndpointId = target.KioskExecutionEndpointId,
+                ConfigurationReleaseId = target.ConfigurationReleaseId,
+                ReleaseChecksum = target.ReleaseChecksum,
+                Status = result.Data.Status
+            },
+            "Low-cost artifact-set rollback deployment requested successfully.",
+            201);
+    }
+}
