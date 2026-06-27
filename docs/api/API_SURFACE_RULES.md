@@ -114,12 +114,23 @@ PATCH /api/v1/management/execution-endpoints/{endpointId}/credential
 GET /api/v1/management/roles
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
-POST /api/v1/management/organizations/{organizationId}/robot-artifacts
 PATCH /api/v1/management/robot-artifacts/{artifactId}/publish
 PATCH /api/v1/management/robot-programs/{programId}/publish
 PATCH /api/v1/management/configuration-releases/{releaseId}/publish
 POST /api/v1/management/kiosks/{kioskId}/configuration-deployments
 POST /api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments
+POST /api/v1/management/organizations/{organizationId}/robot-programs
+PUT /api/v1/management/robot-programs/{programId}/artifacts
+POST /api/v1/management/organizations/{organizationId}/robot-artifacts/bulk
+GET /api/v1/management/organizations/{organizationId}/robot-artifacts
+GET /api/v1/management/robot-artifacts/{artifactId}
+GET /api/v1/management/robot-programs
+GET /api/v1/management/robot-programs/{programId}
+PUT /api/v1/management/robot-programs/{programId}
+GET /api/v1/management/configuration-releases
+GET /api/v1/management/configuration-releases/{releaseId}
+POST /api/v1/management/organizations/{organizationId}/configuration-releases
+PUT /api/v1/management/configuration-releases/{releaseId}/routes
 GET /api/v1/management/orders
 GET /api/v1/management/orders/{orderId}
 GET /api/v1/management/orders/{orderId}/status-history
@@ -173,11 +184,22 @@ Rules:
 - `DeviceEvent` is log/evidence, not actionable alert state. Long-term alert UI should use a separate Alert API/entity if needed.
 - Maintenance ticket V1 is a manual operations/support workflow. Tickets are kiosk-scoped work items with optional evidence links to device, order, or device event. V1 does not include auto-generated tickets, alert engine, chat, reopen, or GraphQL maintenance aggregate.
 - Execution endpoint credential rotation is a maintenance operation. It revokes the current credential binding, attaches and activates the new credential reference, and reactivates the endpoint in one database save. Hot credential overlap is not part of V1.
-- Robot artifact upload is a configuration-management command. It accepts multipart `.lua` files only, stores file bytes in S3-compatible object storage, and stores immutable metadata in `RobotArtifact`.
+- Robot artifact bulk upload is the only public upload contract. It accepts one to 50 multipart `.lua` files, stores file bytes in S3-compatible object storage, and stores immutable metadata in `RobotArtifact`.
+- Bulk robot artifact upload accepts up to 50 files plus a JSON manifest that supplies per-file metadata. Uploaded artifacts remain unassigned Draft inventory and do not change any robot-program sequence. Request-shape errors reject the whole request; upload failures use item-level atomicity and return per-item results without rolling back successful items.
 - Robot artifact publish makes an uploaded artifact available for `RobotProgram` manifests. Robot program publish calculates `ProgramManifestJson` and `ProgramManifestChecksum` from ordered `RobotProgramArtifact` membership. Configuration release publish calculates immutable release manifest/checksum from execution routes and published robot program bindings.
+- Robot programs are created as organization-owned drafts. Store, kiosk, and device scope may narrow that ownership, but all scope ids must belong to the same tenant hierarchy. Global robot-program creation is not exposed because `RobotArtifact` is organization-owned.
+- `PUT /management/robot-programs/{programId}/artifacts` replaces the complete ordered membership while the program is Draft. `RunOrder` is explicit API data; backend must not derive execution order from an exported filename prefix.
+- Every assigned artifact must belong to the program organization. Artifact parameters must be valid JSON. Publishing still requires all assigned artifacts to be Published.
+- Artifact and program list endpoints are paged and tenant-scoped. Program detail includes ordered artifact metadata so management clients can edit/reorder a draft without issuing one request per artifact.
+- `PUT /management/robot-programs/{programId}` edits draft code, name, and description only. Program scope is immutable after creation; changing ownership scope requires a new draft program.
+- `RobotProgramArtifact` is aggregate membership, not an independent management resource. Clients replace the ordered collection through the program endpoint instead of creating or deleting membership rows individually.
+- Configuration releases are created as organization-owned drafts with backend-assigned release numbers. Route authoring replaces the complete Draft route/binding collection; `ExecutionRoute` and `ExecutionRouteRobotBinding` are aggregate children, not independent CRUD resources.
+- Release route authoring requires Published/Active recipes to belong to their product variants and bindings to reference Published robot programs from the release organization or global scope. Kiosk/device compatibility remains a deployment-time validation.
+- The complete Fairino export-to-deployment sequence is owned by [Robot Lua Artifact Flow](../flows/ROBOT_LUA_ARTIFACT_FLOW.md); keep this document focused on route and client boundaries.
 - Publish commands do not deploy to an execution endpoint.
 - Full Edge deployment requests create a `KioskConfigurationDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database save. The command payload references the immutable release manifest/checksum and artifact descriptors; the edge runtime still validates checksum and reports install/activation later.
 - Low-cost controller active-set deployment requests create a `ControllerArtifactSetDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database save. The request must explicitly select route/program/artifact/run-order items and provide controller capacity limits for V1.
+- Artifact bytes are not exposed through a public REST download endpoint. After execution-endpoint authentication, command pull enriches deployment artifact descriptors with short-lived object-storage read URLs. These URLs are not durable API identifiers and must not be stored as release state.
 
 ## Current Account APIs
 

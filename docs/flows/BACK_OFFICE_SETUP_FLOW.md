@@ -30,7 +30,8 @@ This document describes the setup flow that prepares a tenant, kiosk, users, cat
    - menu items
    - prices
    - availability windows
-10. Kiosk/edge configuration is prepared for runtime sync.
+10. Robot `.lua` artifacts and ordered robot programs are prepared.
+11. Kiosk/edge configuration release is prepared for runtime deployment.
 ```
 
 ## Rules
@@ -39,7 +40,7 @@ This document describes the setup flow that prepares a tenant, kiosk, users, cat
 - Internal account onboarding uses invitation links; do not send admin-generated permanent passwords as the default flow.
 - Role scopes decide which management data a user can read or manage.
 - Menu sellability in Cloud is not the same as live machine readiness at Edge.
-- Robot runtime/configuration flow is deferred until the emulator/runtime contract is ready; do not assume Cloud directly controls each robot motion step.
+- Cloud manages immutable robot artifacts and ordered program manifests; it does not parse or control motion steps inside exported `.lua` files.
 
 ## Related Docs
 
@@ -48,3 +49,4 @@ This document describes the setup flow that prepares a tenant, kiosk, users, cat
 - [Authorization Rules](../api/AUTHORIZATION_RULES.md)
 - [Multi-Tenancy Rules](../architecture/MULTI_TENANCY_RULES.md)
 - [API Surface Rules](../api/API_SURFACE_RULES.md)
+- [Robot Lua Artifact Flow](ROBOT_LUA_ARTIFACT_FLOW.md)

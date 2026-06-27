@@ -50,10 +50,13 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | PayOS return URL | `PayOS__ReturnUrl` |
 | PayOS cancel URL | `PayOS__CancelUrl` |
 | Robot artifact object storage endpoint | `RobotArtifacts__ObjectStorage__Endpoint` |
+| Robot artifact Edge-reachable download endpoint | `RobotArtifacts__ObjectStorage__DownloadEndpoint` |
 | Robot artifact object storage access key | `RobotArtifacts__ObjectStorage__AccessKey` |
 | Robot artifact object storage secret key | `RobotArtifacts__ObjectStorage__SecretKey` |
 | Robot artifact object storage bucket | `RobotArtifacts__ObjectStorage__BucketName` |
 | Robot artifact object storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` |
+| Robot artifact download endpoint TLS toggle | `RobotArtifacts__ObjectStorage__DownloadUseSsl` |
+| Robot artifact presigned download lifetime in seconds | `RobotArtifacts__ObjectStorage__DownloadUrlExpirySeconds` |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` |
 | Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |

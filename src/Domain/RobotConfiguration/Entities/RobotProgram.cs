@@ -119,6 +119,26 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         return artifact;
     }
 
+    public void ClearArtifacts()
+    {
+        EnsureDraft();
+        _robotProgramArtifacts.Clear();
+    }
+
+    public void UpdateDraftDetails(string code, string name, string? description)
+    {
+        EnsureDraft();
+
+        if (string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name))
+        {
+            throw new DomainRuleException("Robot program code and name are required.");
+        }
+
+        Code = code.Trim();
+        Name = name.Trim();
+        Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
+    }
+
     public void RemoveArtifact(Guid robotProgramArtifactId)
     {
         EnsureDraft();

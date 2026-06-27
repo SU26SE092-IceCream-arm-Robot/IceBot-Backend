@@ -1,4 +1,5 @@
 using Application.EdgeIntegration.Commands;
+using Application.EdgeIntegration.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.EdgeIntegration;
@@ -10,6 +11,7 @@ public static class EdgeIntegrationModule
         services.AddScoped<PullEdgeCommandsCommandHandler>();
         services.AddScoped<AcknowledgeEdgeCommandCommandHandler>();
         services.AddScoped<IngestExecutionReportCommandHandler>();
+        services.AddScoped<ArtifactCommandPayloadEnricher>();
 
         return services;
     }

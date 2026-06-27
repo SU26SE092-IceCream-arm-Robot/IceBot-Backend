@@ -85,6 +85,12 @@ public class ConfigurationRelease : BusinessEntity
         return route;
     }
 
+    public void ClearRoutes()
+    {
+        EnsureDraft();
+        _executionRoutes.Clear();
+    }
+
     public void Publish(DateTimeOffset publishedAt, Guid publishedByAccountId)
     {
         EnsureDraft();

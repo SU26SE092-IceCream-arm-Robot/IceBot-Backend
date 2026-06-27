@@ -10,6 +10,7 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
 {
     private readonly RobotArtifactObjectStorageOptions _options;
     private readonly IMinioClient _client;
+    private readonly IMinioClient _downloadClient;
 
     public MinioArtifactObjectStorage(IOptions<RobotArtifactObjectStorageOptions> options)
     {
@@ -22,11 +23,10 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
             throw new InvalidOperationException("Robot artifact object storage is not configured.");
         }
 
-        _client = new MinioClient()
-            .WithEndpoint(_options.Endpoint)
-            .WithCredentials(_options.AccessKey, _options.SecretKey)
-            .WithSSL(_options.UseSsl)
-            .Build();
+        _client = BuildClient(_options.Endpoint, _options.UseSsl);
+        _downloadClient = string.IsNullOrWhiteSpace(_options.DownloadEndpoint)
+            ? _client
+            : BuildClient(_options.DownloadEndpoint, _options.DownloadUseSsl ?? _options.UseSsl);
     }
 
     public async Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken = default)
@@ -68,6 +68,37 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
             cancellationToken);
 
         return new ArtifactObjectWriteResult(request.StorageKey, request.Checksum, request.ContentLengthBytes);
+    }
+
+    public async Task<ArtifactObjectReadUrlResult> CreateReadUrlAsync(
+        string storageKey,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (string.IsNullOrWhiteSpace(storageKey))
+        {
+            throw new ArgumentException("Artifact storage key is required.", nameof(storageKey));
+        }
+
+        var expirySeconds = Math.Clamp(_options.DownloadUrlExpirySeconds, 60, 604800);
+        var expiresAt = DateTimeOffset.UtcNow.AddSeconds(expirySeconds);
+        var url = await _downloadClient.PresignedGetObjectAsync(
+            new PresignedGetObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(storageKey)
+                .WithExpiry(expirySeconds));
+
+        return new ArtifactObjectReadUrlResult(url, expiresAt);
+    }
+
+    private IMinioClient BuildClient(string endpoint, bool useSsl)
+    {
+        return new MinioClient()
+            .WithEndpoint(endpoint)
+            .WithCredentials(_options.AccessKey, _options.SecretKey)
+            .WithSSL(useSsl)
+            .Build();
     }
 
     private async Task EnsureBucketAsync(CancellationToken cancellationToken)

@@ -482,6 +482,14 @@ Rules:
 - Pull marks returned commands as `Delivered` and records a delivery attempt.
 - Retrying command pull can return delivered but unacknowledged commands.
 - Runtime execution state is reported through the event/report ingest boundary, not command ack.
+- A `DeployConfiguration` payload contains immutable artifact descriptors. During an authenticated pull, each descriptor with a `StorageKey` is enriched with a short-lived `DownloadUrl` and `DownloadUrlExpiresAt`.
+- Presigned download URLs are transport data only. They are not persisted in `EdgeCommand.PayloadJson`, release manifests, or artifact metadata.
+- The object-storage bucket remains private. Edge must download before URL expiry and must not treat the URL as an artifact identity.
+- `DownloadUrl` must use an endpoint reachable from the execution endpoint. A Docker-internal MinIO hostname is not a valid external Edge download endpoint unless both runtimes share that network.
+- After download, Edge must verify both `ContentLengthBytes` and the SHA-256 `ArtifactChecksum` before installing or activating the artifact.
+- A failed download, expired URL, size mismatch, or checksum mismatch must fail the deployment attempt. Edge may pull the unacknowledged command again to obtain fresh download URLs; it must not activate partial or unverified files.
+- Fairino-Studio currently exports multiple `.lua` files: normally one file per editor step, while a paired loop is exported as one file. Each exported file is stored as one `RobotArtifact`; `RobotProgramArtifact.RunOrder` defines their runtime sequence.
+- Filename prefixes such as `01_` are human-facing export hints, not execution authority. Edge executes the ordered program manifest delivered by Cloud.
 
 ### Command Ack
 

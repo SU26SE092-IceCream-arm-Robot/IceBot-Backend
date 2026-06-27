@@ -1,5 +1,6 @@
 using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Results;
+using Application.EdgeIntegration.Services;
 using Application.Shared.Wrappers;
 using Domain.Devices.Enums;
 using Domain.Sync.Enums;
@@ -9,10 +10,14 @@ namespace Application.EdgeIntegration.Commands;
 public sealed class PullEdgeCommandsCommandHandler
 {
     private readonly IEdgeCommandStore _edgeCommandStore;
+    private readonly ArtifactCommandPayloadEnricher _artifactPayloadEnricher;
 
-    public PullEdgeCommandsCommandHandler(IEdgeCommandStore edgeCommandStore)
+    public PullEdgeCommandsCommandHandler(
+        IEdgeCommandStore edgeCommandStore,
+        ArtifactCommandPayloadEnricher artifactPayloadEnricher)
     {
         _edgeCommandStore = edgeCommandStore;
+        _artifactPayloadEnricher = artifactPayloadEnricher;
     }
 
     public async Task<ApiResult<EdgeCommandPullResult>> HandleAsync(
@@ -57,8 +62,15 @@ public sealed class PullEdgeCommandsCommandHandler
 
         await _edgeCommandStore.SaveChangesAsync(cancellationToken);
 
+        var commandResults = new List<(Domain.Sync.Entities.EdgeCommand Command, string PayloadJson)>(commands.Count);
+        foreach (var edgeCommand in commands)
+        {
+            var payloadJson = await _artifactPayloadEnricher.EnrichAsync(edgeCommand, cancellationToken);
+            commandResults.Add((edgeCommand, payloadJson));
+        }
+
         return ApiResult<EdgeCommandPullResult>.Success(
-            EdgeCommandPullResult.FromCommands(now, commands),
+            EdgeCommandPullResult.FromCommands(now, commandResults),
             "Edge commands retrieved successfully.");
     }
 }

@@ -8,6 +8,10 @@ public interface IArtifactObjectStorage
         ArtifactObjectWriteRequest request,
         Stream content,
         CancellationToken cancellationToken = default);
+
+    Task<ArtifactObjectReadUrlResult> CreateReadUrlAsync(
+        string storageKey,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record ArtifactObjectWriteRequest(
@@ -17,6 +21,8 @@ public sealed record ArtifactObjectWriteRequest(
     string Checksum);
 
 public sealed record ArtifactObjectWriteResult(string StorageKey, string Checksum, long ContentLengthBytes);
+
+public sealed record ArtifactObjectReadUrlResult(string Url, DateTimeOffset ExpiresAt);
 
 public sealed class ArtifactObjectAlreadyExistsException : Exception
 {

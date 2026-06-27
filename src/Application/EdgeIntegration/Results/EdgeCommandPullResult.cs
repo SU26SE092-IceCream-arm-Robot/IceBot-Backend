@@ -7,12 +7,14 @@ public sealed class EdgeCommandPullResult
     public DateTimeOffset ServerTime { get; init; }
     public IReadOnlyCollection<EdgeCommandResult> Commands { get; init; } = Array.Empty<EdgeCommandResult>();
 
-    public static EdgeCommandPullResult FromCommands(DateTimeOffset serverTime, IEnumerable<EdgeCommand> commands)
+    public static EdgeCommandPullResult FromCommands(
+        DateTimeOffset serverTime,
+        IEnumerable<(EdgeCommand Command, string PayloadJson)> commands)
     {
         return new EdgeCommandPullResult
         {
             ServerTime = serverTime,
-            Commands = commands.Select(EdgeCommandResult.FromEntity).ToArray()
+            Commands = commands.Select(item => EdgeCommandResult.FromEntity(item.Command, item.PayloadJson)).ToArray()
         };
     }
 }
@@ -29,7 +31,7 @@ public sealed class EdgeCommandResult
     public DateTimeOffset? ExpiresAt { get; init; }
     public string PayloadJson { get; init; } = null!;
 
-    public static EdgeCommandResult FromEntity(EdgeCommand command)
+    public static EdgeCommandResult FromEntity(EdgeCommand command, string payloadJson)
     {
         return new EdgeCommandResult
         {
@@ -41,7 +43,7 @@ public sealed class EdgeCommandResult
             DispatchAttemptNo = command.DispatchAttemptNo,
             IssuedAt = command.CreatedAt,
             ExpiresAt = command.CommandExpiryAt,
-            PayloadJson = command.PayloadJson
+            PayloadJson = payloadJson
         };
     }
 }
