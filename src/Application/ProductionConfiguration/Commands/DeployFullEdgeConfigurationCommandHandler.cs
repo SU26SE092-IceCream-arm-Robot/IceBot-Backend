@@ -30,7 +30,8 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     {
         if (command.KioskId == Guid.Empty ||
             command.ConfigurationReleaseId == Guid.Empty ||
-            command.KioskExecutionEndpointId == Guid.Empty)
+            command.KioskExecutionEndpointId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(command.IdempotencyKey) || command.IdempotencyKey.Trim().Length > 200)
         {
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Kiosk, configuration release, and execution endpoint are required.", 400);
         }
@@ -61,11 +62,6 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Access denied.", 403);
         }
 
-        if (await _productionConfigurationStore.HasPendingFullEdgeDeploymentAsync(command.KioskId, cancellationToken))
-        {
-            return ApiResult<KioskConfigurationDeploymentResult>.Fail("Kiosk already has a pending or installed configuration deployment.", 409);
-        }
-
         var now = DateTimeOffset.UtcNow;
         var commandExpiryAt = command.CommandExpiryAt ?? now.AddMinutes(30);
         if (commandExpiryAt <= now)
@@ -73,17 +69,35 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Command expiry must be later than the deployment request time.", 400);
         }
 
-        var attemptNo = await _productionConfigurationStore.GetNextFullEdgeDeploymentAttemptNoAsync(
+        return await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
             command.KioskId,
-            release.Id,
-            cancellationToken);
+            async ct =>
+            {
+                var existing = await _productionConfigurationStore.GetFullEdgeDeploymentByIdempotencyKeyAsync(
+                    command.KioskExecutionEndpointId, command.IdempotencyKey.Trim(), ct);
+                if (existing is not null)
+                {
+                    var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, ct);
+                    if (existing.ConfigurationReleaseId != command.ConfigurationReleaseId ||
+                        existingCommand is null ||
+                        ReadRollbackTarget(existingCommand.PayloadJson) != command.RollbackTargetDeploymentId)
+                        return ApiResult<KioskConfigurationDeploymentResult>.Fail("Idempotency key was already used for a different deployment request.", 409);
+                    return ApiResult<KioskConfigurationDeploymentResult>.Success(
+                        KioskConfigurationDeploymentResult.FromEntity(existing, existingCommand?.Id),
+                        "Existing configuration deployment returned for idempotent retry.");
+                }
 
-        try
-        {
+                if (await _productionConfigurationStore.HasPendingFullEdgeDeploymentAsync(command.KioskId, ct))
+                    return ApiResult<KioskConfigurationDeploymentResult>.Fail("Kiosk already has a pending or installed configuration deployment.", 409);
+
+                var attemptNo = await _productionConfigurationStore.GetNextFullEdgeDeploymentAttemptNoAsync(command.KioskId, release.Id, ct);
+                try
+                {
             var deployment = KioskConfigurationDeployment.CreatePending(
                 endpoint,
                 release,
                 attemptNo,
+                command.IdempotencyKey.Trim(),
                 now,
                 command.UserContext.AccountId,
                 command.IsRollback);
@@ -100,19 +114,21 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
 
             edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
 
-            await _productionConfigurationStore.AddFullEdgeDeploymentAsync(deployment, cancellationToken);
-            await _edgeCommandStore.AddAsync(edgeCommand, cancellationToken);
-            await _productionConfigurationStore.SaveChangesAsync(cancellationToken);
+            await _productionConfigurationStore.AddFullEdgeDeploymentAsync(deployment, ct);
+            await _edgeCommandStore.AddAsync(edgeCommand, ct);
+            await _productionConfigurationStore.SaveChangesAsync(ct);
 
             return ApiResult<KioskConfigurationDeploymentResult>.Success(
                 KioskConfigurationDeploymentResult.FromEntity(deployment, edgeCommand.Id),
                 "Configuration deployment requested successfully.",
                 201);
-        }
-        catch (DomainRuleException ex)
-        {
-            return ApiResult<KioskConfigurationDeploymentResult>.Fail(ex.Message, 400);
-        }
+                }
+                catch (DomainRuleException ex)
+                {
+                    return ApiResult<KioskConfigurationDeploymentResult>.Fail(ex.Message, 400);
+                }
+            },
+            cancellationToken);
     }
 
     private static string BuildDeployPayload(
@@ -152,5 +168,13 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         };
 
         return JsonSerializer.Serialize(payload);
+    }
+
+    private static Guid? ReadRollbackTarget(string payloadJson)
+    {
+        using var document = JsonDocument.Parse(payloadJson);
+        if (!document.RootElement.TryGetProperty("RollbackTargetDeploymentId", out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        return value.GetGuid();
     }
 }

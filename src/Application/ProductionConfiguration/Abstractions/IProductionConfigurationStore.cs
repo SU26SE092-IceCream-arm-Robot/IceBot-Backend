@@ -9,6 +9,11 @@ namespace Application.ProductionConfiguration.Abstractions;
 
 public interface IProductionConfigurationStore
 {
+    Task<T> ExecuteDeploymentCreationAsync<T>(
+        Guid executionScopeId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
     Task<ConfigurationRelease?> GetReleaseForPublishAsync(Guid releaseId, CancellationToken cancellationToken = default);
 
     Task<ConfigurationRelease?> GetPublishedReleaseForDeploymentAsync(Guid releaseId, CancellationToken cancellationToken = default);
@@ -97,6 +102,16 @@ public interface IProductionConfigurationStore
 
     Task<KioskConfigurationDeployment?> GetFullEdgeDeploymentForReconciliationAsync(
         Guid deploymentId,
+        CancellationToken cancellationToken = default);
+
+    Task<KioskConfigurationDeployment?> GetFullEdgeDeploymentByIdempotencyKeyAsync(
+        Guid endpointId,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default);
+
+    Task<ControllerArtifactSetDeployment?> GetControllerDeploymentByIdempotencyKeyAsync(
+        Guid endpointId,
+        string idempotencyKey,
         CancellationToken cancellationToken = default);
 
     Task<ControllerArtifactSetDeployment?> GetControllerDeploymentForReconciliationAsync(

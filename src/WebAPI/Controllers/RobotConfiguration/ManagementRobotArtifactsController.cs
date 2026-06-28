@@ -251,6 +251,11 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
             return "Files and manifest items must have the same non-zero count.";
         }
 
+        if (files.Any(file => file.Length <= 0 || file.Length > UploadRobotArtifactCommandHandler.MaximumFileSizeBytes))
+        {
+            return $"Each robot artifact file must be between 1 byte and {UploadRobotArtifactCommandHandler.MaximumFileSizeBytes} bytes.";
+        }
+
         if (files.Count > 50)
         {
             return "A maximum of 50 robot artifact files is allowed per request.";

@@ -43,6 +43,19 @@ public sealed class IngestExecutionReportCommandHandler
             return ApiResult<ExecutionReportIngestResult>.Fail("Execution endpoint profile identity is missing.", 400);
         }
 
+        return await _executionReportStore.ExecuteReportIngestionAsync(
+            command.SourceEventId,
+            ct => IngestLockedAsync(command, endpoint!, sourceExecutorId.Value, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<ExecutionReportIngestResult>> IngestLockedAsync(
+        IngestExecutionReportCommand command,
+        KioskExecutionEndpoint endpoint,
+        Guid sourceExecutorId,
+        CancellationToken cancellationToken)
+    {
+
         var existingEvent = await _executionReportStore.GetSyncEventByEventIdAsync(command.SourceEventId, cancellationToken);
         if (existingEvent is not null)
         {
@@ -62,14 +75,14 @@ public sealed class IngestExecutionReportCommandHandler
 
         var cloudReceivedAt = DateTimeOffset.UtcNow;
         var executorReportedAt = command.ExecutorReportedAt ?? command.EdgeCreatedAt;
-        var inboxEvent = BuildInboxEvent(command, sourceExecutorId.Value, cloudReceivedAt);
+        var inboxEvent = BuildInboxEvent(command, sourceExecutorId, cloudReceivedAt);
 
         try
         {
             var applied = await ApplyReportAsync(
                 command,
-                endpoint!,
-                sourceExecutorId.Value,
+                endpoint,
+                sourceExecutorId,
                 edgeCommand,
                 executorReportedAt,
                 cloudReceivedAt,

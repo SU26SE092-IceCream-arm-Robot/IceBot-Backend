@@ -17,6 +17,20 @@ public sealed class ExecutionReportStore : IExecutionReportStore
         _dbContext = dbContext;
     }
 
+    public async Task<T> ExecuteReportIngestionAsync<T>(
+        Guid sourceEventId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"execution-report:{sourceEventId:D}"}, 0));",
+            cancellationToken);
+        var result = await action(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
     public Task<KioskExecutionEndpoint?> GetEndpointForReportAuthAsync(
         Guid endpointId,
         CancellationToken cancellationToken = default)

@@ -9,6 +9,7 @@ using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.ValueObjects;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
+using Microsoft.Extensions.Options;
 
 namespace Application.ProductionConfiguration.Commands;
 
@@ -16,13 +17,16 @@ public sealed class DeployLowCostArtifactSetCommandHandler
 {
     private readonly IProductionConfigurationStore _productionConfigurationStore;
     private readonly IEdgeCommandStore _edgeCommandStore;
+    private readonly LowCostControllerCapacityOptions _capacity;
 
     public DeployLowCostArtifactSetCommandHandler(
         IProductionConfigurationStore productionConfigurationStore,
-        IEdgeCommandStore edgeCommandStore)
+        IEdgeCommandStore edgeCommandStore,
+        IOptions<LowCostControllerCapacityOptions> capacity)
     {
         _productionConfigurationStore = productionConfigurationStore;
         _edgeCommandStore = edgeCommandStore;
+        _capacity = capacity.Value;
     }
 
     public async Task<ApiResult<ControllerArtifactSetDeploymentResult>> HandleAsync(
@@ -31,14 +35,10 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     {
         if (command.KioskId == Guid.Empty ||
             command.ConfigurationReleaseId == Guid.Empty ||
-            command.KioskExecutionEndpointId == Guid.Empty)
+            command.KioskExecutionEndpointId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(command.IdempotencyKey) || command.IdempotencyKey.Trim().Length > 200)
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Kiosk, configuration release, and execution endpoint are required.", 400);
-        }
-
-        if (command.MaxArtifactCount <= 0 || command.MaxArtifactStorageBytes <= 0)
-        {
-            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Controller artifact capacity limits must be positive.", 400);
         }
 
         if (command.Selections.Count == 0)
@@ -82,11 +82,6 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Access denied.", 403);
         }
 
-        if (await _productionConfigurationStore.HasPendingControllerArtifactSetDeploymentAsync(endpoint.ControllerId.Value, cancellationToken))
-        {
-            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Controller already has a pending or installed artifact-set deployment.", 409);
-        }
-
         var now = DateTimeOffset.UtcNow;
         var commandExpiryAt = command.CommandExpiryAt ?? now.AddMinutes(30);
         if (commandExpiryAt <= now)
@@ -94,12 +89,31 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Command expiry must be later than the deployment request time.", 400);
         }
 
-        var activeSetVersion = await _productionConfigurationStore.GetNextControllerActiveSetVersionAsync(
+        return await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
             endpoint.ControllerId.Value,
-            cancellationToken);
+            async ct =>
+            {
+                var existing = await _productionConfigurationStore.GetControllerDeploymentByIdempotencyKeyAsync(
+                    command.KioskExecutionEndpointId, command.IdempotencyKey.Trim(), ct);
+                if (existing is not null)
+                {
+                    var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, ct);
+                    if (existing.SourceConfigurationReleaseId != command.ConfigurationReleaseId ||
+                        !SelectionsMatch(existing, command.Selections) ||
+                        existingCommand is null ||
+                        ReadRollbackTarget(existingCommand.PayloadJson) != command.RollbackTargetDeploymentId)
+                        return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Idempotency key was already used for a different deployment request.", 409);
+                    return ApiResult<ControllerArtifactSetDeploymentResult>.Success(
+                        ControllerArtifactSetDeploymentResult.FromEntity(existing, existingCommand?.Id),
+                        "Existing controller artifact-set deployment returned for idempotent retry.");
+                }
 
-        try
-        {
+                if (await _productionConfigurationStore.HasPendingControllerArtifactSetDeploymentAsync(endpoint.ControllerId.Value, ct))
+                    return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Controller already has a pending or installed artifact-set deployment.", 409);
+
+                var activeSetVersion = await _productionConfigurationStore.GetNextControllerActiveSetVersionAsync(endpoint.ControllerId.Value, ct);
+                try
+                {
             var selections = command.Selections.Select(selection => new ControllerArtifactSetItemSelection(
                 selection.ExecutionRouteId,
                 selection.RobotProgramId,
@@ -110,8 +124,9 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 endpoint,
                 release,
                 activeSetVersion,
-                command.MaxArtifactCount,
-                command.MaxArtifactStorageBytes,
+                command.IdempotencyKey.Trim(),
+                _capacity.MaxArtifactCount,
+                _capacity.MaxArtifactStorageBytes,
                 command.UserContext.AccountId,
                 now,
                 selections,
@@ -129,19 +144,21 @@ public sealed class DeployLowCostArtifactSetCommandHandler
 
             edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
 
-            await _productionConfigurationStore.AddControllerArtifactSetDeploymentAsync(deployment, cancellationToken);
-            await _edgeCommandStore.AddAsync(edgeCommand, cancellationToken);
-            await _productionConfigurationStore.SaveChangesAsync(cancellationToken);
+            await _productionConfigurationStore.AddControllerArtifactSetDeploymentAsync(deployment, ct);
+            await _edgeCommandStore.AddAsync(edgeCommand, ct);
+            await _productionConfigurationStore.SaveChangesAsync(ct);
 
             return ApiResult<ControllerArtifactSetDeploymentResult>.Success(
                 ControllerArtifactSetDeploymentResult.FromEntity(deployment, edgeCommand.Id),
                 "Controller artifact-set deployment requested successfully.",
                 201);
-        }
-        catch (DomainRuleException ex)
-        {
-            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(ex.Message, 400);
-        }
+                }
+                catch (DomainRuleException ex)
+                {
+                    return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(ex.Message, 400);
+                }
+            },
+            cancellationToken);
     }
 
     private static string BuildDeployPayload(
@@ -188,5 +205,30 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         };
 
         return JsonSerializer.Serialize(payload);
+    }
+
+    private static bool SelectionsMatch(
+        ControllerArtifactSetDeployment existing,
+        IReadOnlyCollection<DeployLowCostArtifactSelection> requested)
+    {
+        var existingKeys = existing.Items
+            .Select(item => (item.ExecutionRouteId, item.RobotProgramId, item.RobotArtifactId, item.RunOrder))
+            .OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId)
+            .ThenBy(item => item.RunOrder).ThenBy(item => item.RobotArtifactId)
+            .ToArray();
+        var requestedKeys = requested
+            .Select(item => (item.ExecutionRouteId, item.RobotProgramId, item.RobotArtifactId, item.RunOrder))
+            .OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId)
+            .ThenBy(item => item.RunOrder).ThenBy(item => item.RobotArtifactId)
+            .ToArray();
+        return existingKeys.SequenceEqual(requestedKeys);
+    }
+
+    private static Guid? ReadRollbackTarget(string payloadJson)
+    {
+        using var document = JsonDocument.Parse(payloadJson);
+        if (!document.RootElement.TryGetProperty("RollbackTargetDeploymentId", out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        return value.GetGuid();
     }
 }

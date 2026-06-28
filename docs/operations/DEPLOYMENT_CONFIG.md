@@ -68,6 +68,8 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | Low-cost signed-request maximum clock skew in seconds | `ExecutionEndpointSecurity__SignedRequestMaxClockSkewSeconds` |
 | Used signed-request nonce retention in seconds | `ExecutionEndpointSecurity__NonceRetentionSeconds` |
 | Maximum IoT request body bytes hashed before transport authentication (default 1 MiB) | `ExecutionEndpointSecurity__MaxRequestBodyBytes` |
+| Low-cost controller maximum active artifact count | `LowCostControllerCapacity__MaxArtifactCount` |
+| Low-cost controller maximum active artifact bytes | `LowCostControllerCapacity__MaxArtifactStorageBytes` |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` |
 | Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |

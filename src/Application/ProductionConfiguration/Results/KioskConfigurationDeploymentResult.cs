@@ -10,6 +10,7 @@ public sealed class KioskConfigurationDeploymentResult
     public Guid EdgeRuntimeId { get; init; }
     public Guid ConfigurationReleaseId { get; init; }
     public string ReleaseChecksum { get; init; } = null!;
+    public string IdempotencyKey { get; init; } = null!;
     public int AttemptNo { get; init; }
     public string Status { get; init; } = null!;
     public DateTimeOffset RequestedAt { get; init; }
@@ -28,6 +29,7 @@ public sealed class KioskConfigurationDeploymentResult
             EdgeRuntimeId = deployment.EdgeRuntimeId,
             ConfigurationReleaseId = deployment.ConfigurationReleaseId,
             ReleaseChecksum = deployment.ReleaseChecksum,
+            IdempotencyKey = deployment.IdempotencyKey,
             AttemptNo = deployment.AttemptNo,
             Status = deployment.Status.ToString(),
             RequestedAt = deployment.RequestedAt,

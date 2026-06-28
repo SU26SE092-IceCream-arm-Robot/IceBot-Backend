@@ -17,6 +17,7 @@ public class ControllerArtifactSetDeployment : AuditedEntity
     public Guid ControllerId { get; private set; }
     public Guid SourceConfigurationReleaseId { get; private set; }
     public string ReleaseChecksum { get; private set; } = null!;
+    public string IdempotencyKey { get; private set; } = null!;
     public long ActiveSetVersion { get; private set; }
     public string ActiveSetChecksum { get; private set; } = null!;
     public int MaxArtifactCount { get; private set; }
@@ -45,6 +46,7 @@ public class ControllerArtifactSetDeployment : AuditedEntity
         KioskExecutionEndpoint endpoint,
         ConfigurationRelease release,
         long activeSetVersion,
+        string idempotencyKey,
         int maxArtifactCount,
         long maxArtifactStorageBytes,
         Guid? requestedByAccountId,
@@ -57,7 +59,7 @@ public class ControllerArtifactSetDeployment : AuditedEntity
             (release.Status != ConfigurationReleaseStatus.Published &&
                 !(isRollback && release.Status == ConfigurationReleaseStatus.Retired)) ||
             string.IsNullOrWhiteSpace(release.ReleaseChecksum) ||
-            activeSetVersion <= 0 || maxArtifactCount <= 0 || maxArtifactStorageBytes <= 0)
+            activeSetVersion <= 0 || string.IsNullOrWhiteSpace(idempotencyKey) || maxArtifactCount <= 0 || maxArtifactStorageBytes <= 0)
         {
             throw new DomainRuleException("A published release, active low-cost endpoint, positive active-set version, and capacity limits are required.");
         }
@@ -70,6 +72,7 @@ public class ControllerArtifactSetDeployment : AuditedEntity
             SourceConfigurationReleaseId = release.Id,
             ReleaseChecksum = release.ReleaseChecksum,
             ActiveSetVersion = activeSetVersion,
+            IdempotencyKey = idempotencyKey.Trim(),
             MaxArtifactCount = maxArtifactCount,
             MaxArtifactStorageBytes = maxArtifactStorageBytes,
             RequestedByAccountId = requestedByAccountId,

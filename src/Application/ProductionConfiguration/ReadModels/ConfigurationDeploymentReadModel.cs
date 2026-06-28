@@ -26,6 +26,7 @@ public sealed class ConfigurationDeploymentReadModel
     public Guid ConfigurationReleaseId { get; init; }
     public long ReleaseNumber { get; init; }
     public string ReleaseChecksum { get; init; } = string.Empty;
+    public string IdempotencyKey { get; init; } = string.Empty;
     public ConfigurationDeploymentReadStatus Status { get; init; }
     public DateTimeOffset RequestedAt { get; init; }
     public Guid? RequestedByAccountId { get; init; }

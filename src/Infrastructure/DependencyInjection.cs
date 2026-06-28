@@ -72,6 +72,11 @@ namespace Infrastructure
             services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
             services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
+            services.AddOptions<Application.ProductionConfiguration.LowCostControllerCapacityOptions>()
+                .Bind(config.GetSection(Application.ProductionConfiguration.LowCostControllerCapacityOptions.SectionName))
+                .Validate(options => options.MaxArtifactCount > 0 && options.MaxArtifactStorageBytes > 0,
+                    "Low-cost controller capacity limits must be positive.")
+                .ValidateOnStart();
             services.Configure<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions>(
                 config.GetSection(ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions.SectionName));
             services.AddHostedService<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationJob>();

@@ -7,6 +7,11 @@ namespace Application.EdgeIntegration.Abstractions;
 
 public interface IExecutionReportStore
 {
+    Task<T> ExecuteReportIngestionAsync<T>(
+        Guid sourceEventId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
     Task<KioskExecutionEndpoint?> GetEndpointForReportAuthAsync(
         Guid endpointId,
         CancellationToken cancellationToken = default);

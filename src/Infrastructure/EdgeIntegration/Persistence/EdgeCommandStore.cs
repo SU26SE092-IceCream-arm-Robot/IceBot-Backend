@@ -61,6 +61,12 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
             .FirstOrDefaultAsync(command => command.Id == commandId, cancellationToken);
     }
 
+    public Task<EdgeCommand?> GetByDeploymentIdAsync(Guid deploymentId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.EdgeCommands.AsNoTracking()
+            .FirstOrDefaultAsync(command => command.DeploymentId == deploymentId, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<EdgeCommand>> ListExpiredDeploymentCommandsAsync(
         DateTimeOffset observedAt,
         int maxCommands,

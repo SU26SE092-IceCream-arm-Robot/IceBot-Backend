@@ -481,7 +481,7 @@ Rules:
 
 - Edge must deduplicate by `commandId`.
 - Deployment commands include typed Cloud correlation fields for deployment ownership. `PayloadJson` is execution data, not the authoritative link used by timeout reconciliation.
-- Pull marks returned commands as `Delivered` and records a delivery attempt.
+- Pull first materializes any short-lived artifact download URLs. Only after payload enrichment succeeds does it mark returned commands as `Delivered` and record a delivery attempt.
 - Retrying command pull can return delivered but unacknowledged commands.
 - Runtime execution state is reported through the event/report ingest boundary, not command ack.
 - If a deployment command expires before acceptance, Cloud marks the command `Rejected` with `CommandExpired` and marks the linked Pending deployment `Failed`.
