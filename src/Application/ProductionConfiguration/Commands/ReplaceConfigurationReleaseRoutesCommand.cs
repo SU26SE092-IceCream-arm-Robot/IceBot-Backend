@@ -5,6 +5,7 @@ namespace Application.ProductionConfiguration.Commands;
 public sealed class ReplaceConfigurationReleaseRoutesCommand
 {
     public required CurrentUserContext UserContext { get; init; }
+    public Guid OrganizationId { get; init; }
     public Guid ReleaseId { get; init; }
     public IReadOnlyCollection<ConfigurationReleaseRouteInput> Routes { get; init; } = Array.Empty<ConfigurationReleaseRouteInput>();
 }

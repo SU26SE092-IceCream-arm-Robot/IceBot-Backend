@@ -151,7 +151,9 @@ public interface IProductionConfigurationStore
 
     Task AddControllerArtifactSetDeploymentAsync(ControllerArtifactSetDeployment deployment, CancellationToken cancellationToken = default);
 
-    void DeleteReleaseRoutes(IEnumerable<ExecutionRoute> routes);
+    Task SaveReleaseReplacementAsync(
+        IReadOnlyCollection<ExecutionRoute> removedRoutes,
+        CancellationToken cancellationToken = default);
 
     Task<ConfigurationReleaseDiscardOutcome> DiscardDraftReleaseAsync(
         ConfigurationRelease release,

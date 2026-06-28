@@ -10,12 +10,12 @@ namespace WebAPI.Controllers.IoT;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/iot/kiosks/{kioskId:guid}/execution-reports")]
-public sealed class EdgeExecutionReportsController : ControllerBase
+public sealed class ExecutionReportsController : ControllerBase
 {
     private readonly IngestExecutionReportCommandHandler _ingestExecutionReportHandler;
     private readonly ExecutionEndpointRequestAuthenticator _authenticator;
 
-    public EdgeExecutionReportsController(
+    public ExecutionReportsController(
         IngestExecutionReportCommandHandler ingestExecutionReportHandler,
         ExecutionEndpointRequestAuthenticator authenticator)
     {

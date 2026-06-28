@@ -1,6 +1,6 @@
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
-using Domain.RobotConfiguration.Enums;
+using Domain.ProductionConfiguration.ValueObjects;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -10,7 +10,9 @@ namespace Domain.ProductionConfiguration.Manifests;
 
 public static class ConfigurationReleaseManifestBuilder
 {
-    public static ConfigurationReleaseManifest Create(ConfigurationRelease release)
+    public static ConfigurationReleaseManifest Create(
+        ConfigurationRelease release,
+        IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
         var routes = release.ExecutionRoutes
             .OrderBy(route => route.Priority)
@@ -27,7 +29,7 @@ public static class ConfigurationReleaseManifestBuilder
                 RobotBindings = route.RobotBindings
                     .OrderBy(binding => binding.BindingOrder)
                     .ThenBy(binding => binding.Id)
-                    .Select(binding => CreateBinding(release.OrganizationId, binding))
+                    .Select(binding => CreateBinding(release.OrganizationId, binding, programSnapshots))
                     .ToArray()
             })
             .ToArray();
@@ -46,56 +48,36 @@ public static class ConfigurationReleaseManifestBuilder
         return new ConfigurationReleaseManifest(json, checksum);
     }
 
-    private static object CreateBinding(Guid organizationId, ExecutionRouteRobotBinding binding)
+    private static object CreateBinding(
+        Guid organizationId,
+        ExecutionRouteRobotBinding binding,
+        IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
-        if (binding.RobotProgram is null)
-        {
-            throw new DomainRuleException("Robot program bindings must be loaded before publishing a configuration release.");
-        }
-
-        if (binding.RobotProgram.Status != RobotProgramStatus.Published)
-        {
-            throw new DomainRuleException("Configuration release bindings require published robot programs.");
-        }
-
-        if (binding.RobotProgram.OrganizationId.HasValue && binding.RobotProgram.OrganizationId.Value != organizationId)
+        if (!programSnapshots.TryGetValue(binding.RobotProgramId, out var program))
+            throw new DomainRuleException("Configuration release bindings require published robot program snapshots.");
+        if (program.OrganizationId != organizationId)
         {
             throw new DomainRuleException("Organization-scoped robot programs must belong to the configuration release organization.");
         }
 
-        var artifacts = binding.RobotProgram.RobotProgramArtifacts
+        var artifacts = program.Artifacts
             .OrderBy(artifact => artifact.RunOrder)
-            .ThenBy(artifact => artifact.Id)
-            .Select(programArtifact =>
+            .ThenBy(artifact => artifact.ProgramArtifactId)
+            .Select(artifact =>
             {
-                if (programArtifact.RobotArtifact is null)
-                {
-                    throw new DomainRuleException("Robot program artifacts must be loaded before publishing a configuration release.");
-                }
-
-                if (programArtifact.RobotArtifact.OrganizationId != organizationId)
-                {
-                    throw new DomainRuleException("Robot artifacts must belong to the configuration release organization.");
-                }
-
-                if (programArtifact.RobotArtifact.Status != RobotArtifactStatus.Published)
-                {
-                    throw new DomainRuleException("Configuration release bindings require published robot artifacts.");
-                }
-
                 return new
                 {
-                    programArtifact.Id,
-                    programArtifact.RunOrder,
-                    Parameters = CanonicalizeOptionalJson(programArtifact.ParametersJson, "robot program artifact parameters"),
-                    programArtifact.ParametersSchemaVersion,
+                    Id = artifact.ProgramArtifactId,
+                    artifact.RunOrder,
+                    Parameters = CanonicalizeOptionalJson(artifact.ParametersJson, "robot program artifact parameters"),
+                    artifact.ParametersSchemaVersion,
                     RobotArtifact = new
                     {
-                        programArtifact.RobotArtifact.Id,
-                        programArtifact.RobotArtifact.Checksum,
-                        programArtifact.RobotArtifact.StorageKey,
-                        programArtifact.RobotArtifact.RuntimeTargetCode,
-                        programArtifact.RobotArtifact.MachineModelCode
+                        Id = artifact.RobotArtifactId,
+                        artifact.Checksum,
+                        artifact.StorageKey,
+                        artifact.RuntimeTargetCode,
+                        artifact.MachineModelCode
                     }
                 };
             })
@@ -113,10 +95,10 @@ public static class ConfigurationReleaseManifestBuilder
             binding.RequiredWorkcellCapabilityCode,
             RobotProgram = new
             {
-                binding.RobotProgram.Id,
-                binding.RobotProgram.Code,
-                binding.RobotProgram.ProgramManifestSchemaVersion,
-                binding.RobotProgram.ProgramManifestChecksum,
+                program.Id,
+                program.Code,
+                ProgramManifestSchemaVersion = program.ManifestSchemaVersion,
+                ProgramManifestChecksum = program.ManifestChecksum,
                 Artifacts = artifacts
             }
         };

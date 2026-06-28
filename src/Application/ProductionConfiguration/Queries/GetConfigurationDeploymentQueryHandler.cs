@@ -21,10 +21,10 @@ public sealed class GetConfigurationDeploymentQueryHandler
             return ApiResult<ConfigurationDeploymentResult>.Fail("Configuration deployment not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DeploymentRead,
                 query.UserContext, deployment.OrganizationId, deployment.StoreId, deployment.KioskId))
         {
-            return ApiResult<ConfigurationDeploymentResult>.Fail("Access denied.", 403);
+            return ApiResult<ConfigurationDeploymentResult>.Fail("Configuration deployment not found.", 404);
         }
 
         return ApiResult<ConfigurationDeploymentResult>.Success(

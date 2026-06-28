@@ -6,8 +6,6 @@ namespace Domain.RobotConfiguration.Entities;
 
 public class RobotArtifact : RobotConfigurationEntity
 {
-    private readonly List<RobotProgramArtifact> _robotProgramArtifacts = [];
-
     public Guid OrganizationId { get; private set; }
 
     public string ArtifactCode { get; private set; } = null!;
@@ -33,8 +31,6 @@ public class RobotArtifact : RobotConfigurationEntity
     public string? Description { get; private set; }
 
     public string? MetadataJson { get; private set; }
-
-    public IReadOnlyCollection<RobotProgramArtifact> RobotProgramArtifacts => _robotProgramArtifacts;
 
     public virtual Organization Organization { get; private set; } = null!;
 

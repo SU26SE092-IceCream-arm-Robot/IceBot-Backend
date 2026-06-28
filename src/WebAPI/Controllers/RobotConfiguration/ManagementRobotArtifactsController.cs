@@ -47,7 +47,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     }
 
     [HttpGet("organizations/{organizationId:guid}/robot-artifacts")]
-    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "artifact.read")]
     public async Task<IActionResult> ListRobotArtifacts(
         Guid organizationId,
         [FromQuery] string? search,
@@ -70,7 +70,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     }
 
     [HttpGet("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}")]
-    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "artifact.read")]
     public async Task<IActionResult> GetRobotArtifact(
         Guid organizationId,
         Guid artifactId,
@@ -211,7 +211,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     }
 
     [HttpPost("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/review-url")]
-    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "artifact.read")]
     public async Task<IActionResult> CreateRobotArtifactReviewUrl(
         Guid organizationId,
         Guid artifactId,

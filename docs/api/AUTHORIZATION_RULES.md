@@ -145,8 +145,13 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Update kiosk details. Scoped to assigned organization/store/kiosk |
 | `devices.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View devices/hardware details within assigned scope |
 | `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, retire devices/hardware; create, configure, provision, disable/reactivate, rotate credentials, or retire execution endpoints within assigned scope |
-| `artifact.upload` | `SystemAdmin`, `OrgAdmin`, `Manager` | Upload, review/download, discard Draft, publish, and retire immutable robot Lua artifacts within assigned organization scope |
-| `release.publish` | `SystemAdmin`, `OrgAdmin`, `Manager` | Author, publish, and retire robot programs and immutable production configuration releases within assigned scope |
+| `artifact.read` | `SystemAdmin`, `OrgAdmin` | List, inspect, and request short-lived review URLs for organization-owned robot Lua artifacts |
+| `artifact.upload` | `SystemAdmin`, `OrgAdmin` | Upload, discard Draft, publish, and retire organization-owned robot Lua artifacts |
+| `program.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read robot programs within the actor's matching organization/store/kiosk scope |
+| `program.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Author, publish, and retire robot programs within the actor's matching organization/store/kiosk scope |
+| `release.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read production configuration releases and authoring options within the actor's matching organization scope |
+| `release.publish` | `SystemAdmin`, `OrgAdmin` | Author, publish, and retire organization-owned production configuration releases |
+| `deployment.read` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Monitor configuration deployment state and failure details within assigned kiosk scope |
 | `release.deploy` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request configuration deployment to assigned kiosks |
 | `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request a new deployment from a previously Active Full Edge release or low-cost artifact set within assigned scope |
 | `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |

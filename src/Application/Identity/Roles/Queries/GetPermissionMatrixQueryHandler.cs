@@ -212,8 +212,35 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "artifact.read",
+            Description = "Read and review robot artifacts within assigned scope.",
+            Roles = ["SystemAdmin", "OrgAdmin"]
+        },
+        new()
+        {
             Policy = "artifact.upload",
             Description = "Upload immutable robot Lua artifacts within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "program.read",
+            Description = "Read robot programs within assigned organization, store, or kiosk scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "program.manage",
+            Description = "Manage robot programs within assigned organization, store, or kiosk scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "release.read",
+            Description = "Read production configuration releases and authoring options within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
@@ -221,7 +248,14 @@ internal static class PermissionMatrixRules
         {
             Policy = "release.publish",
             Description = "Publish immutable production configuration releases within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "deployment.read",
+            Description = "Monitor production configuration deployments within assigned kiosk scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
         new()

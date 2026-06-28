@@ -16,8 +16,9 @@ public sealed class RetireConfigurationReleaseCommandHandler
         CancellationToken cancellationToken = default)
     {
         var release = await _store.GetReleaseForPublishAsync(command.ReleaseId, cancellationToken);
-        if (release is null) return ApiResult<ConfigurationReleaseResult>.Fail("Configuration release not found.", 404);
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, release.OrganizationId, null, null))
+        if (release is null || release.OrganizationId != command.OrganizationId)
+            return ApiResult<ConfigurationReleaseResult>.Fail("Configuration release not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleasePublish, command.UserContext, release.OrganizationId, null, null))
             return ApiResult<ConfigurationReleaseResult>.Fail("Access denied.", 403);
         if (await _store.ReleaseHasPendingDeploymentAsync(release.Id, cancellationToken))
             return ApiResult<ConfigurationReleaseResult>.Fail("Wait for pending or installed deployments to finish before retiring the release.", 409);

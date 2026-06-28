@@ -57,7 +57,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Execution endpoint does not belong to the target kiosk.", 400);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseDeploy, command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
         {
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Access denied.", 403);
         }
@@ -93,14 +93,18 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                 var attemptNo = await _productionConfigurationStore.GetNextFullEdgeDeploymentAttemptNoAsync(command.KioskId, release.Id, ct);
                 try
                 {
+            release.ValidateFullEdgeDeploymentTarget(
+                endpoint, endpoint.FullEdgeRuntimeId ?? Guid.Empty, allowRetiredRelease: command.IsRollback);
             var deployment = KioskConfigurationDeployment.CreatePending(
-                endpoint,
-                release,
+                endpoint.KioskId,
+                endpoint.Id,
+                endpoint.FullEdgeRuntimeId!.Value,
+                release.Id,
+                release.ReleaseChecksum!,
                 attemptNo,
                 command.IdempotencyKey.Trim(),
                 now,
-                command.UserContext.AccountId,
-                command.IsRollback);
+                command.UserContext.AccountId);
 
             var edgeCommand = EdgeCommand.Create(
                 EdgeCommandType.DeployConfiguration,

@@ -16,14 +16,14 @@ public sealed class GetRobotProgramQueryHandler
         CancellationToken cancellationToken = default)
     {
         var program = await _store.GetProgramByIdAsync(query.ProgramId, cancellationToken);
-        if (program is null)
+        if (program is null || program.OrganizationId != query.OrganizationId)
         {
             return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(query.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProgramRead, query.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
         {
-            return ApiResult<RobotProgramResult>.Fail("Access denied.", 403);
+            return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
         }
 
         return ApiResult<RobotProgramResult>.Success(RobotProgramResult.FromEntity(program));

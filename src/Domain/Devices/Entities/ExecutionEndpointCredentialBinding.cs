@@ -27,7 +27,7 @@ public class ExecutionEndpointCredentialBinding : AuditedEntity
     {
     }
 
-    public static ExecutionEndpointCredentialBinding CreateProvisioned(
+    internal static ExecutionEndpointCredentialBinding CreateProvisioned(
         Guid kioskExecutionEndpointId,
         ExecutionEndpointAuthenticationMode authenticationMode,
         string credentialReference,

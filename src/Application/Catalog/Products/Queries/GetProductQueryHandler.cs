@@ -25,7 +25,7 @@ public sealed class GetProductQueryHandler
             return ApiResult<ProductResult>.Fail("Product not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProductsManage,
             query.UserContext,
             product.OrganizationId,
             product.StoreId,

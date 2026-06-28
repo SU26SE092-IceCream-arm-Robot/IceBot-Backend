@@ -2,13 +2,13 @@ using Domain.Common;
 using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Tenants.Entities;
+using Domain.ProductionConfiguration.ValueObjects;
 
 namespace Domain.ProductionConfiguration.Entities;
 
 public class ConfigurationRelease : BusinessEntity
 {
     private readonly List<ExecutionRoute> _executionRoutes = [];
-    private readonly List<KioskConfigurationDeployment> _kioskConfigurationDeployments = [];
 
     public Guid OrganizationId { get; private set; }
 
@@ -29,8 +29,6 @@ public class ConfigurationRelease : BusinessEntity
     public DateTimeOffset? RetiredAt { get; private set; }
 
     public IReadOnlyCollection<ExecutionRoute> ExecutionRoutes => _executionRoutes;
-
-    public IReadOnlyCollection<KioskConfigurationDeployment> KioskConfigurationDeployments => _kioskConfigurationDeployments;
 
     public virtual Organization Organization { get; private set; } = null!;
 
@@ -91,7 +89,29 @@ public class ConfigurationRelease : BusinessEntity
         _executionRoutes.Clear();
     }
 
-    public void Publish(DateTimeOffset publishedAt, Guid publishedByAccountId)
+    public IReadOnlyCollection<ExecutionRoute> ReplaceRoutes(
+        IEnumerable<(Guid ProductVariantId, Guid RecipeId, string RouteCode, int Priority,
+            string? RequiredCapabilitiesJson,
+            IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)> Bindings)> replacements)
+    {
+        EnsureDraft();
+        var removed = _executionRoutes.ToArray();
+        _executionRoutes.Clear();
+        foreach (var replacement in replacements)
+        {
+            var route = AddRoute(replacement.ProductVariantId, replacement.RecipeId, replacement.RouteCode,
+                replacement.Priority, replacement.RequiredCapabilitiesJson);
+            foreach (var binding in replacement.Bindings)
+                route.AddRobotBinding(binding.RobotProgramId, binding.BindingOrder, binding.CapabilityCode);
+        }
+
+        return removed;
+    }
+
+    public void Publish(
+        DateTimeOffset publishedAt,
+        Guid publishedByAccountId,
+        IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
         EnsureDraft();
 
@@ -110,12 +130,7 @@ public class ConfigurationRelease : BusinessEntity
             throw new DomainRuleException("Configuration release publisher account id is required.");
         }
 
-        foreach (var route in _executionRoutes)
-        {
-            ValidateRouteOrganization(route);
-        }
-
-        var manifest = ConfigurationReleaseManifestBuilder.Create(this);
+        var manifest = ConfigurationReleaseManifestBuilder.Create(this, programSnapshots);
         ManifestJson = manifest.Json;
         ReleaseChecksum = manifest.Checksum;
         PublishedAt = publishedAt;

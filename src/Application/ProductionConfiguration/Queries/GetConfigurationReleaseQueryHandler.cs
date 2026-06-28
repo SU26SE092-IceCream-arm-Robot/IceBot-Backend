@@ -16,14 +16,14 @@ public sealed class GetConfigurationReleaseQueryHandler
         CancellationToken cancellationToken = default)
     {
         var release = await _store.GetReleaseByIdAsync(query.ReleaseId, cancellationToken);
-        if (release is null)
+        if (release is null || release.OrganizationId != query.OrganizationId)
         {
             return ApiResult<ConfigurationReleaseResult>.Fail("Configuration release not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(query.UserContext, release.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseRead, query.UserContext, release.OrganizationId, null, null))
         {
-            return ApiResult<ConfigurationReleaseResult>.Fail("Access denied.", 403);
+            return ApiResult<ConfigurationReleaseResult>.Fail("Configuration release not found.", 404);
         }
 
         return ApiResult<ConfigurationReleaseResult>.Success(ConfigurationReleaseResult.FromEntity(release));

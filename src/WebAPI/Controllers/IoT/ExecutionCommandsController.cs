@@ -10,13 +10,13 @@ namespace WebAPI.Controllers.IoT;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/iot/kiosks/{kioskId:guid}/commands")]
-public sealed class EdgeCommandsController : ControllerBase
+public sealed class ExecutionCommandsController : ControllerBase
 {
     private readonly PullEdgeCommandsCommandHandler _pullCommandsHandler;
     private readonly AcknowledgeEdgeCommandCommandHandler _acknowledgeCommandHandler;
     private readonly ExecutionEndpointRequestAuthenticator _authenticator;
 
-    public EdgeCommandsController(
+    public ExecutionCommandsController(
         PullEdgeCommandsCommandHandler pullCommandsHandler,
         AcknowledgeEdgeCommandCommandHandler acknowledgeCommandHandler,
         ExecutionEndpointRequestAuthenticator authenticator)

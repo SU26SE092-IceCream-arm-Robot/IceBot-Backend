@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.RobotConfiguration.Entities;
+using Domain.ProductionConfiguration.ValueObjects;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -26,15 +26,9 @@ public class ControllerArtifactSetItem : AuditedEntity
     {
     }
 
-    internal static ControllerArtifactSetItem Create(
-        Guid deploymentId,
-        Guid routeId,
-        RobotProgram program,
-        RobotProgramArtifact programArtifact)
+    internal static ControllerArtifactSetItem Create(Guid deploymentId, ControllerArtifactSetItemSnapshot snapshot)
     {
-        if (programArtifact.RobotArtifact is null ||
-            string.IsNullOrWhiteSpace(program.ProgramManifestChecksum) ||
-            string.IsNullOrWhiteSpace(programArtifact.RobotArtifact.Checksum))
+        if (string.IsNullOrWhiteSpace(snapshot.RobotProgramManifestChecksum) || string.IsNullOrWhiteSpace(snapshot.ArtifactChecksum))
         {
             throw new DomainRuleException("Active-set items require a published program manifest and artifact metadata.");
         }
@@ -42,19 +36,13 @@ public class ControllerArtifactSetItem : AuditedEntity
         return new ControllerArtifactSetItem
         {
             ControllerArtifactSetDeploymentId = deploymentId,
-            ExecutionRouteId = routeId,
-            RobotProgramId = program.Id,
-            RobotProgramManifestChecksum = program.ProgramManifestChecksum,
-            RobotArtifactId = programArtifact.RobotArtifact.Id,
-            ArtifactChecksum = programArtifact.RobotArtifact.Checksum,
-            StorageKey = programArtifact.RobotArtifact.StorageKey,
-            RuntimeTargetCode = programArtifact.RobotArtifact.RuntimeTargetCode,
-            MachineModelCode = programArtifact.RobotArtifact.MachineModelCode,
-            DeviceId = program.DeviceId,
-            ContentLengthBytes = programArtifact.RobotArtifact.ContentLengthBytes,
-            RunOrder = programArtifact.RunOrder,
-            ParametersSchemaVersion = programArtifact.ParametersSchemaVersion,
-            ParametersJson = programArtifact.ParametersJson
+            ExecutionRouteId = snapshot.ExecutionRouteId, RobotProgramId = snapshot.RobotProgramId,
+            RobotProgramManifestChecksum = snapshot.RobotProgramManifestChecksum,
+            RobotArtifactId = snapshot.RobotArtifactId, ArtifactChecksum = snapshot.ArtifactChecksum,
+            StorageKey = snapshot.StorageKey, RuntimeTargetCode = snapshot.RuntimeTargetCode,
+            MachineModelCode = snapshot.MachineModelCode, DeviceId = snapshot.DeviceId,
+            ContentLengthBytes = snapshot.ContentLengthBytes, RunOrder = snapshot.RunOrder,
+            ParametersSchemaVersion = snapshot.ParametersSchemaVersion, ParametersJson = snapshot.ParametersJson
         };
     }
 }

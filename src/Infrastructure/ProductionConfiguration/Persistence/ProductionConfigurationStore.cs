@@ -517,11 +517,14 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
         return _dbContext.ControllerArtifactSetDeployments.AddAsync(deployment, cancellationToken).AsTask();
     }
 
-    public void DeleteReleaseRoutes(IEnumerable<ExecutionRoute> routes)
+    public async Task SaveReleaseReplacementAsync(
+        IReadOnlyCollection<ExecutionRoute> routes,
+        CancellationToken cancellationToken = default)
     {
         var routeArray = routes.ToArray();
         _dbContext.ExecutionRouteRobotBindings.RemoveRange(routeArray.SelectMany(route => route.RobotBindings));
         _dbContext.ExecutionRoutes.RemoveRange(routeArray);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<ConfigurationReleaseDiscardOutcome> DiscardDraftReleaseAsync(
@@ -540,7 +543,9 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
         }
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        DeleteReleaseRoutes(release.ExecutionRoutes);
+        var routeArray = release.ExecutionRoutes.ToArray();
+        _dbContext.ExecutionRouteRobotBindings.RemoveRange(routeArray.SelectMany(route => route.RobotBindings));
+        _dbContext.ExecutionRoutes.RemoveRange(routeArray);
         var entry = _dbContext.ConfigurationReleases.Remove(release);
         try
         {
@@ -661,7 +666,6 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 ConfigurationReleaseId = deployment.ConfigurationReleaseId,
                 ReleaseNumber = deployment.ConfigurationRelease.ReleaseNumber,
                 ReleaseChecksum = deployment.ReleaseChecksum,
-                IdempotencyKey = deployment.IdempotencyKey,
                 Status = (ConfigurationDeploymentReadStatus)deployment.Status,
                 RequestedAt = deployment.RequestedAt,
                 RequestedByAccountId = deployment.RequestedByAccountId,
@@ -697,7 +701,6 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
                 ReleaseNumber = deployment.SourceConfigurationRelease.ReleaseNumber,
                 ReleaseChecksum = deployment.ReleaseChecksum,
-                IdempotencyKey = deployment.IdempotencyKey,
                 Status = (ConfigurationDeploymentReadStatus)deployment.Status,
                 RequestedAt = deployment.RequestedAt,
                 RequestedByAccountId = deployment.RequestedByAccountId,

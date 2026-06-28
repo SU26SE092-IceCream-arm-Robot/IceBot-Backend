@@ -77,7 +77,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Low-cost endpoint controller identity is missing.", 400);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseDeploy, command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Access denied.", 403);
         }
@@ -114,23 +114,21 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 var activeSetVersion = await _productionConfigurationStore.GetNextControllerActiveSetVersionAsync(endpoint.ControllerId.Value, ct);
                 try
                 {
-            var selections = command.Selections.Select(selection => new ControllerArtifactSetItemSelection(
-                selection.ExecutionRouteId,
-                selection.RobotProgramId,
-                selection.RobotArtifactId,
-                selection.RunOrder));
+            var items = MaterializeItems(endpoint, release, command.Selections);
 
             var deployment = ControllerArtifactSetDeployment.CreatePending(
-                endpoint,
-                release,
+                endpoint.KioskId,
+                endpoint.Id,
+                endpoint.ControllerId!.Value,
+                release.Id,
+                release.ReleaseChecksum!,
                 activeSetVersion,
                 command.IdempotencyKey.Trim(),
                 _capacity.MaxArtifactCount,
                 _capacity.MaxArtifactStorageBytes,
                 command.UserContext.AccountId,
                 now,
-                selections,
-                command.IsRollback);
+                items);
 
             var edgeCommand = EdgeCommand.Create(
                 EdgeCommandType.DeployConfiguration,
@@ -222,6 +220,52 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             .ThenBy(item => item.RunOrder).ThenBy(item => item.RobotArtifactId)
             .ToArray();
         return existingKeys.SequenceEqual(requestedKeys);
+    }
+
+    private static IReadOnlyCollection<ControllerArtifactSetItemSnapshot> MaterializeItems(
+        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        ConfigurationRelease release,
+        IReadOnlyCollection<DeployLowCostArtifactSelection> selections)
+    {
+        var items = new List<ControllerArtifactSetItemSnapshot>(selections.Count);
+        foreach (var selection in selections)
+        {
+            var route = release.ExecutionRoutes.SingleOrDefault(item => item.Id == selection.ExecutionRouteId)
+                ?? throw new DomainRuleException("Selected active-set route does not belong to the source release.");
+            var binding = route.RobotBindings.SingleOrDefault(item => item.RobotProgramId == selection.RobotProgramId)
+                ?? throw new DomainRuleException("Selected active-set program does not belong to the source route.");
+            var program = binding.RobotProgram;
+            if (!AppliesToKiosk(route.ProductVariant.Product.OrganizationId, route.ProductVariant.Product.StoreId,
+                    route.ProductVariant.Product.KioskId, endpoint.Kiosk) ||
+                !AppliesToKiosk(route.Recipe.OrganizationId, route.Recipe.StoreId, route.Recipe.KioskId, endpoint.Kiosk) ||
+                !AppliesToKiosk(program.OrganizationId, program.StoreId, program.KioskId, endpoint.Kiosk))
+                throw new DomainRuleException("Selected route, recipe, and robot program must apply to the target kiosk scope.");
+
+            var programArtifact = program.RobotProgramArtifacts.SingleOrDefault(item =>
+                    item.RobotArtifactId == selection.RobotArtifactId && item.RunOrder == selection.RunOrder)
+                ?? throw new DomainRuleException("Selected active-set artifact does not belong to the selected robot program.");
+            var artifact = programArtifact.RobotArtifact;
+            if (!endpoint.SupportsRobotTarget(artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId))
+                throw new DomainRuleException("Selected active-set artifact is not compatible with the controller endpoint.");
+
+            items.Add(new ControllerArtifactSetItemSnapshot(
+                route.Id, program.Id, program.ProgramManifestChecksum!, artifact.Id, artifact.Checksum,
+                artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId,
+                artifact.ContentLengthBytes, programArtifact.RunOrder, programArtifact.ParametersSchemaVersion,
+                programArtifact.ParametersJson));
+        }
+        return items;
+    }
+
+    private static bool AppliesToKiosk(
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        Domain.Tenants.Entities.Kiosk kiosk)
+    {
+        return (!organizationId.HasValue || organizationId == kiosk.OrganizationId) &&
+            (!storeId.HasValue || storeId == kiosk.StoreId) &&
+            (!kioskId.HasValue || kioskId == kiosk.Id);
     }
 
     private static Guid? ReadRollbackTarget(string payloadJson)

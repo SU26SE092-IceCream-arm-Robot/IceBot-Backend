@@ -43,17 +43,18 @@ public class KioskConfigurationDeployment : BusinessEntity
     }
 
     public static KioskConfigurationDeployment CreatePending(
-        Domain.Devices.Entities.KioskExecutionEndpoint kioskExecutionEndpoint,
-        ConfigurationRelease configurationRelease,
+        Guid kioskId,
+        Guid endpointId,
+        Guid edgeRuntimeId,
+        Guid configurationReleaseId,
+        string releaseChecksum,
         int attemptNo,
         string idempotencyKey,
         DateTimeOffset requestedAt,
-        Guid? requestedByAccountId = null,
-        bool isRollback = false)
+        Guid? requestedByAccountId = null)
     {
-        if (kioskExecutionEndpoint is null || configurationRelease is null ||
-            kioskExecutionEndpoint.FullEdgeRuntimeId is null ||
-            string.IsNullOrWhiteSpace(configurationRelease.ReleaseChecksum))
+        if (kioskId == Guid.Empty || endpointId == Guid.Empty || edgeRuntimeId == Guid.Empty ||
+            configurationReleaseId == Guid.Empty || string.IsNullOrWhiteSpace(releaseChecksum))
         {
             throw new DomainRuleException("An active Full Edge endpoint and a published configuration release checksum are required.");
         }
@@ -63,18 +64,13 @@ public class KioskConfigurationDeployment : BusinessEntity
             throw new DomainRuleException("Configuration deployment attempt number must be greater than zero.");
         }
 
-        configurationRelease.ValidateFullEdgeDeploymentTarget(
-            kioskExecutionEndpoint,
-            kioskExecutionEndpoint.FullEdgeRuntimeId.Value,
-            allowRetiredRelease: isRollback);
-
         return new KioskConfigurationDeployment
         {
-            KioskId = kioskExecutionEndpoint.KioskId,
-            KioskExecutionEndpointId = kioskExecutionEndpoint.Id,
-            EdgeRuntimeId = kioskExecutionEndpoint.FullEdgeRuntimeId.Value,
-            ConfigurationReleaseId = configurationRelease.Id,
-            ReleaseChecksum = configurationRelease.ReleaseChecksum,
+            KioskId = kioskId,
+            KioskExecutionEndpointId = endpointId,
+            EdgeRuntimeId = edgeRuntimeId,
+            ConfigurationReleaseId = configurationReleaseId,
+            ReleaseChecksum = releaseChecksum,
             IdempotencyKey = idempotencyKey.Trim(),
             AttemptNo = attemptNo,
             RequestedAt = requestedAt,

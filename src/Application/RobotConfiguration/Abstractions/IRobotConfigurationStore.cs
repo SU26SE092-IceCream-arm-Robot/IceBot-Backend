@@ -105,7 +105,9 @@ public interface IRobotConfigurationStore
 
     Task AddProgramAsync(RobotProgram program, CancellationToken cancellationToken = default);
 
-    void DeleteProgramArtifacts(IEnumerable<RobotProgramArtifact> programArtifacts);
+    Task SaveProgramReplacementAsync(
+        IReadOnlyCollection<RobotProgramArtifact> removedArtifacts,
+        CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

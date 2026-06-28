@@ -65,7 +65,7 @@ public sealed class MarkRefundProcessedCommandHandler
             orderNumber = order.OrderNumber;
             provider = transaction.Provider;
 
-            if (!ScopeAccessRules.CanAccessScopedRow(
+            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
                 command.UserContext,
                 order.OrganizationId,
                 order.StoreId,

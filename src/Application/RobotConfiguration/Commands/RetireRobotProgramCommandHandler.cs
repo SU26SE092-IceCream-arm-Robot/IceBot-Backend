@@ -16,8 +16,9 @@ public sealed class RetireRobotProgramCommandHandler
         CancellationToken cancellationToken = default)
     {
         var program = await _store.GetProgramForPublishAsync(command.ProgramId, cancellationToken);
-        if (program is null) return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
+        if (program is null || program.OrganizationId != command.OrganizationId)
+            return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProgramManage, command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
             return ApiResult<RobotProgramResult>.Fail("Access denied.", 403);
         if (await _store.ProgramIsReferencedByDraftReleaseAsync(program.Id, cancellationToken))
             return ApiResult<RobotProgramResult>.Fail("Remove the robot program from draft configuration releases before retiring it.", 409);

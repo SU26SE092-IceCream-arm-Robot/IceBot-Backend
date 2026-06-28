@@ -33,7 +33,7 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Execution endpoint not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DevicesManage, command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
         {
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Access denied.", 403);
         }
@@ -71,28 +71,13 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
                     "Only active or disabled execution endpoints can rotate credentials.", 400);
             }
 
-            var wasActive = endpoint.Status == KioskExecutionEndpointStatus.Active;
-            if (endpoint.CredentialBinding is not null)
-            {
-                endpoint.RevokeCredential(now);
-            }
-
-            var newCredential = ExecutionEndpointCredentialBinding.CreateProvisioned(
-                endpoint.Id,
-                endpoint.AuthenticationMode,
+            var newCredential = endpoint.RotateCredential(
                 material.Fingerprint,
                 now,
                 material.PublicKeyPem);
             newCredential.CreatedByAccountId = command.UserContext.AccountId;
 
             await _executionEndpointStore.AddCredentialBindingAsync(newCredential, cancellationToken);
-
-            endpoint.AttachCredentialBinding(newCredential);
-            endpoint.ActivateCredentialBinding(now);
-            if (wasActive)
-            {
-                endpoint.ReactivateWithCurrentCredential(now);
-            }
             endpoint.UpdatedByAccountId = command.UserContext.AccountId;
 
             await _executionEndpointStore.SaveChangesAsync(cancellationToken);

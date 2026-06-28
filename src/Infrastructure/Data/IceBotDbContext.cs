@@ -632,7 +632,6 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => x.StorageKey).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasIndex(x => new { x.RuntimeTargetCode, x.MachineModelCode, x.Status });
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
-            entity.Navigation(x => x.RobotProgramArtifacts).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
         modelBuilder.Entity<RobotProgramArtifact>(entity =>
@@ -641,7 +640,7 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.RobotProgramId, x.RunOrder }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasIndex(x => x.RobotArtifactId);
             entity.HasOne(x => x.RobotProgram).WithMany(x => x.RobotProgramArtifacts).HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotArtifact).WithMany(x => x.RobotProgramArtifacts).HasForeignKey(x => x.RobotArtifactId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.RobotArtifact).WithMany().HasForeignKey(x => x.RobotArtifactId).OnDelete(DeleteBehavior.Restrict);
         });
 
     }
@@ -659,7 +658,6 @@ public class IceBotDbContext : DbContext
             entity.Property(x => x.ManifestJson).HasColumnType("jsonb");
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             entity.Navigation(x => x.ExecutionRoutes).UsePropertyAccessMode(PropertyAccessMode.Field);
-            entity.Navigation(x => x.KioskConfigurationDeployments).UsePropertyAccessMode(PropertyAccessMode.Field);
         });
 
         modelBuilder.Entity<ExecutionRoute>(entity =>
@@ -703,7 +701,7 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status });
             entity.HasIndex(x => x.KioskId).IsUnique().HasFilter("\"Status\" IN (1, 2)");
             entity.HasOne(x => x.ConfigurationRelease)
-                .WithMany(x => x.KioskConfigurationDeployments)
+                .WithMany()
                 .HasForeignKey(x => x.ConfigurationReleaseId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.KioskExecutionEndpoint)

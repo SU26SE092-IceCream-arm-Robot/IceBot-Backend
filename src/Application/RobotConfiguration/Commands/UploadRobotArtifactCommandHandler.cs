@@ -32,7 +32,7 @@ public sealed class UploadRobotArtifactCommandHandler
         UploadRobotArtifactCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactUpload, command.UserContext, command.OrganizationId, null, null))
         {
             return ApiResult<RobotArtifactResult>.Fail("Access denied.", 403);
         }

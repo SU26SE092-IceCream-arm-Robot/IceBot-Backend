@@ -17,12 +17,12 @@ public sealed class UpdateRobotProgramCommandHandler
         CancellationToken cancellationToken = default)
     {
         var program = await _store.GetProgramForEditAsync(command.ProgramId, cancellationToken);
-        if (program is null)
+        if (program is null || program.OrganizationId != command.OrganizationId)
         {
             return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProgramManage, command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
         {
             return ApiResult<RobotProgramResult>.Fail("Access denied.", 403);
         }

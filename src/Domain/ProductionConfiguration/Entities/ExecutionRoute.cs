@@ -33,7 +33,7 @@ public class ExecutionRoute : BusinessEntity
     {
     }
 
-    public static ExecutionRoute Create(
+    internal static ExecutionRoute Create(
         Guid productVariantId,
         Guid recipeId,
         string routeCode,
@@ -70,7 +70,7 @@ public class ExecutionRoute : BusinessEntity
         };
     }
 
-    public ExecutionRouteRobotBinding AddRobotBinding(
+    internal ExecutionRouteRobotBinding AddRobotBinding(
         Guid robotProgramId,
         int bindingOrder,
         string requiredWorkcellCapabilityCode)

@@ -4,7 +4,7 @@ This document owns the current backend flow for exporting Fairino `.lua` files, 
 
 ## Search Keywords
 
-`Fairino Studio`, `.lua`, `Lua export`, `RobotArtifact`, `RobotProgram`, `RobotProgramArtifact`, `RunOrder`, `artifact.upload`, `release.publish`, `release.deploy`, `configuration deployment`, `presigned download URL`, `artifact checksum`, `Full Edge`, `Low-cost Controller`
+`Fairino Studio`, `.lua`, `Lua export`, `RobotArtifact`, `RobotProgram`, `RobotProgramArtifact`, `RunOrder`, `artifact.read`, `artifact.upload`, `program.read`, `program.manage`, `release.read`, `release.publish`, `deployment.read`, `release.deploy`, `configuration deployment`, `presigned download URL`, `artifact checksum`, `Full Edge`, `Low-cost Controller`
 
 ## Ownership Boundary
 
@@ -61,27 +61,27 @@ Fairino-Studio project
 | 6. Publish reviewed artifacts | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish-bulk` | Atomically publishes 1-100 unique selected Draft artifacts after staging review. Already Published selections are idempotent success; other states reject the request. Policy: `artifact.upload`. |
 | 6A. Publish one artifact | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/publish` | Single-artifact alternative with explicit organization ownership. |
 | 6B. Retire artifact | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/retire` | Stops new authoring use without deleting Lua bytes or breaking published manifests/rollback. Draft program references must be removed first. |
-| 7. Create program | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-programs` | Creates an organization-owned Draft `RobotProgram`, optionally narrowed to Store, Kiosk, or Device scope. Policy: `release.publish`. |
-| 8. Set execution order | Management UI | `PUT /api/v1/management/robot-programs/{programId}/artifacts` | Atomically replaces the complete `RobotProgramArtifact` membership and explicit `RunOrder` values while the program is Draft. |
-| 9. Edit program metadata | Management UI | `PUT /api/v1/management/robot-programs/{programId}` | Updates Draft code, name, and description. Scope remains immutable. |
-| 10. Review programs | Management UI | `GET /api/v1/management/robot-programs` and `GET /api/v1/management/robot-programs/{programId}` | Returns tenant-scoped program data and ordered artifact metadata for review/reordering. |
-| 11. Publish program | Management UI | `PATCH /api/v1/management/robot-programs/{programId}/publish` | Validates published artifacts and creates immutable `ProgramManifestJson` plus `ProgramManifestChecksum`. |
-| 11A. Retire program | Management UI | `PATCH /api/v1/management/robot-programs/{programId}/retire` | Stops new release authoring while preserving published release and rollback history. Draft release references must be removed first. |
-| 11D. Discard program draft | Management UI | `DELETE /api/v1/management/robot-programs/{programId}` | Hard-deletes only a Draft program and its ordered membership. Published or release-referenced programs are preserved. |
+| 7. Create program | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-programs` | Creates an organization-owned Draft `RobotProgram`, optionally narrowed to Store, Kiosk, or Device scope. Policy: `program.manage`. |
+| 8. Set execution order | Management UI | `PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/artifacts` | Atomically replaces the complete `RobotProgramArtifact` membership and explicit `RunOrder` values while the program is Draft. |
+| 9. Edit program metadata | Management UI | `PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}` | Updates Draft code, name, and description. Scope remains immutable. |
+| 10. Review programs | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-programs` and `GET /api/v1/management/organizations/{organizationId}/robot-programs/{programId}` | Returns tenant-scoped program data and ordered artifact metadata for review/reordering. Policy: `program.read`. |
+| 11. Publish program | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/publish` | Validates published artifacts and creates immutable `ProgramManifestJson` plus `ProgramManifestChecksum`. |
+| 11A. Retire program | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/retire` | Stops new release authoring while preserving published release and rollback history. Draft release references must be removed first. |
+| 11D. Discard program draft | Management UI | `DELETE /api/v1/management/organizations/{organizationId}/robot-programs/{programId}` | Hard-deletes only a Draft program and its ordered membership. Published or release-referenced programs are preserved. |
 | 11B. Load release options | Management UI | `GET /api/v1/management/organizations/{organizationId}/configuration-release-authoring-options` | Returns eligible machine-produced ProductVariant, Published/Active Recipe, and Published RobotProgram options for release authoring. Optional `productVariantId`, `search`, and per-group `limit` reduce selector payloads. |
 | 12. Create release draft | Management UI | `POST /api/v1/management/organizations/{organizationId}/configuration-releases` | Creates a Draft release and allocates the next organization release number. Policy: `release.publish`. |
-| 12A. Author routes | Management UI | `PUT /api/v1/management/configuration-releases/{releaseId}/routes` | Atomically replaces Draft execution routes and ordered robot-program bindings after validating product, recipe, organization, and published-program references. |
-| 12B. Review releases | Management UI | `GET /api/v1/management/configuration-releases` and `GET /api/v1/management/configuration-releases/{releaseId}` | Returns tenant-scoped release summaries/details with route and binding metadata. |
-| 13. Publish release | Management UI | `PATCH /api/v1/management/configuration-releases/{releaseId}/publish` | Validates execution routes/program bindings and creates immutable release manifest/checksum. Policy: `release.publish`. |
-| 13R. Retire release | Management UI | `PATCH /api/v1/management/configuration-releases/{releaseId}/retire` | Stops normal new deployments. Active history and validated rollback remain available; Pending/Installed deployments must finish first. |
-| 13X. Discard release draft | Management UI | `DELETE /api/v1/management/configuration-releases/{releaseId}` | Hard-deletes only a Draft release and its route/binding children when no deployment references exist. |
+| 12A. Author routes | Management UI | `PUT /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}/routes` | Atomically replaces Draft execution routes and ordered robot-program bindings after validating product, recipe, organization, and published-program references. |
+| 12B. Review releases | Management UI | `GET /api/v1/management/organizations/{organizationId}/configuration-releases`, `GET /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}`, and the organization authoring-options lookup | Returns tenant-scoped release summaries/details and authoring lookup data. Policy: `release.read`. |
+| 13. Publish release | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}/publish` | Validates execution routes/program bindings and creates immutable release manifest/checksum. Policy: `release.publish`. |
+| 13R. Retire release | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}/retire` | Stops normal new deployments. Active history and validated rollback remain available; Pending/Installed deployments must finish first. |
+| 13X. Discard release draft | Management UI | `DELETE /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}` | Hard-deletes only a Draft release and its route/binding children when no deployment references exist. |
 | 13A. Create endpoint | Management UI | `POST /api/v1/management/kiosks/{kioskId}/execution-endpoints` | Creates a Full Edge or Low-cost endpoint in `Provisioning`; Full Edge requires mutual TLS authentication mode. Policy: `devices.manage`. |
 | 13B. Set robot compatibility | Management UI | `PUT /api/v1/management/execution-endpoints/{endpointId}/supported-robot-targets` | Replaces the complete runtime-target/machine-model/device compatibility set while the endpoint is not Active or Retired. |
 | 13C. Provision endpoint | Management UI / provisioning operator | `POST /api/v1/management/execution-endpoints/{endpointId}/provision` | Full Edge pins a client-certificate SHA-256 fingerprint; low-cost stores an ECDSA P-256 public key/fingerprint. The private key never enters Cloud. The operation also assigns profile identity and activates the endpoint. |
 | 13D. Operate endpoint | Management UI | `PATCH .../disable`, `PATCH .../reactivate`, `PATCH .../credential`, `PATCH .../retire` | Controls endpoint lifecycle and credential rotation without changing release or artifact history. |
-| 14A. Deploy Full Edge | Management UI | `POST /api/v1/management/kiosks/{kioskId}/configuration-deployments` | Creates `KioskConfigurationDeployment` and durable `DeployConfiguration` command. Policy: `release.deploy`. |
-| 14B. Deploy low-cost set | Management UI | `POST /api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments` | Creates a capacity-limited artifact-set deployment and durable command for a low-cost controller. Policy: `release.deploy`. |
-| 14C. Monitor deployments | Management UI | `GET /api/v1/management/configuration-deployments` and `GET /api/v1/management/configuration-deployments/{deploymentId}` | Reads one unified, tenant-scoped history across Full Edge and Low-cost profiles with `Pending`, `Installed`, `Active`, or `Failed` state and failure provenance. |
+| 14A. Deploy Full Edge | Management UI | `POST /api/v1/management/kiosks/{kioskId}/configuration-deployments/full-edge` | Creates `KioskConfigurationDeployment` and durable `DeployConfiguration` command. Policy: `release.deploy`. |
+| 14B. Deploy low-cost set | Management UI | `POST /api/v1/management/kiosks/{kioskId}/configuration-deployments/low-cost` | Creates a capacity-limited artifact-set deployment and durable command for a low-cost controller. Policy: `release.deploy`. |
+| 14C. Monitor deployments | Management UI | `GET /api/v1/management/configuration-deployments` and `GET /api/v1/management/configuration-deployments/{deploymentId}` | Reads one unified, tenant-scoped history across Full Edge and Low-cost profiles with `Pending`, `Installed`, `Active`, or `Failed` state and failure provenance. Policy: `deployment.read`; idempotency keys are not exposed by these read endpoints. |
 | 14D. Roll back | Management UI | `POST /api/v1/management/configuration-deployments/{deploymentId}/rollback` | Selects a previously Active deployment as the immutable rollback target and creates a new deployment plus command. Policy: `release.rollback`. |
 | 15. Pull command | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/commands/pull` | Authenticates Full Edge by mTLS fingerprint or low-cost by signed request + nonce, returns deployment manifest, and enriches artifact descriptors with short-lived `DownloadUrl` values. |
 | 16. Download files | Execution endpoint | Direct HTTPS GET to presigned object-storage URL | Downloads private `.lua` bytes without exposing a public backend download route. |
@@ -191,7 +191,7 @@ If the HTTP request is interrupted after some items commit, the client may safel
 - Review URLs are short-lived transport data. A discard may invalidate an already-issued review URL before its nominal expiry.
 - Management UI should show newly uploaded files as unassigned relative to the selected program.
 - The user explicitly drags/inserts an artifact into the ordered list, or chooses an explicit append action.
-- Only the subsequent `PUT /management/robot-programs/{programId}/artifacts` assigns membership and `RunOrder`.
+- Only the subsequent `PUT /management/organizations/{organizationId}/robot-programs/{programId}/artifacts` assigns membership and `RunOrder`.
 - Unassigned organization artifacts do not block program publication because they are outside that program aggregate.
 
 ### Bulk Publish
@@ -247,6 +247,8 @@ Rules:
 - Every artifact must belong to the program organization.
 - Publishing requires every referenced artifact to be Published.
 - `RobotProgramArtifact` is aggregate membership, not an independent CRUD resource.
+- `RobotProgram` and `RobotArtifact` are separate aggregate roots. Program publication reads artifact state to create an immutable program manifest; Artifact does not own program membership.
+- `ConfigurationRelease` owns routes and bindings, but not deployments. Release publication consumes immutable published-program snapshots instead of treating RobotProgram/RobotArtifact as children of the release aggregate.
 
 ## Download And Activation Contract
 

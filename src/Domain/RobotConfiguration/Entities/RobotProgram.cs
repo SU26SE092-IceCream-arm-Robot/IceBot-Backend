@@ -125,6 +125,20 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         _robotProgramArtifacts.Clear();
     }
 
+    public IReadOnlyCollection<RobotProgramArtifact> ReplaceArtifacts(
+        IEnumerable<(Guid ArtifactId, int RunOrder, string? ParametersJson, int ParametersSchemaVersion)> replacements)
+    {
+        EnsureDraft();
+        var removed = _robotProgramArtifacts.ToArray();
+        _robotProgramArtifacts.Clear();
+        foreach (var replacement in replacements)
+        {
+            AddArtifact(replacement.ArtifactId, replacement.RunOrder, replacement.ParametersJson, replacement.ParametersSchemaVersion);
+        }
+
+        return removed;
+    }
+
     public void UpdateDraftDetails(string code, string name, string? description)
     {
         EnsureDraft();

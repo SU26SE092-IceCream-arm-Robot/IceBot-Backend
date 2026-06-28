@@ -13,7 +13,6 @@ namespace WebAPI.Controllers.RobotConfiguration;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/management")]
-[Authorize(Policy = "release.publish")]
 public sealed class ManagementRobotProgramsController : ControllerBase
 {
     private readonly ListRobotProgramsQueryHandler _listHandler;
@@ -45,9 +44,10 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         _discardHandler = discardHandler;
     }
 
-    [HttpGet("robot-programs")]
+    [HttpGet("organizations/{organizationId:guid}/robot-programs")]
+    [Authorize(Policy = "program.read")]
     public async Task<IActionResult> ListRobotPrograms(
-        [FromQuery] Guid? organizationId,
+        Guid organizationId,
         [FromQuery] string? search,
         [FromQuery] RobotProgramStatus? status,
         [FromQuery] int pageNumber = 1,
@@ -67,15 +67,17 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("robot-programs/{programId:guid}")]
-    public async Task<IActionResult> GetRobotProgram(Guid programId, CancellationToken cancellationToken)
+    [HttpGet("organizations/{organizationId:guid}/robot-programs/{programId:guid}")]
+    [Authorize(Policy = "program.read")]
+    public async Task<IActionResult> GetRobotProgram(Guid organizationId, Guid programId, CancellationToken cancellationToken)
     {
-        var query = new GetRobotProgramQuery(programId) { UserContext = User.GetUserContext() };
+        var query = new GetRobotProgramQuery(organizationId, programId) { UserContext = User.GetUserContext() };
         var result = await _getHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
     [HttpPost("organizations/{organizationId:guid}/robot-programs")]
+    [Authorize(Policy = "program.manage")]
     public async Task<IActionResult> CreateRobotProgram(
         Guid organizationId,
         [FromBody] CreateRobotProgramRequest request,
@@ -97,8 +99,10 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPut("robot-programs/{programId:guid}")]
+    [HttpPut("organizations/{organizationId:guid}/robot-programs/{programId:guid}")]
+    [Authorize(Policy = "program.manage")]
     public async Task<IActionResult> UpdateRobotProgram(
+        Guid organizationId,
         Guid programId,
         [FromBody] UpdateRobotProgramRequest request,
         CancellationToken cancellationToken)
@@ -106,6 +110,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         var command = new UpdateRobotProgramCommand
         {
             UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
             ProgramId = programId,
             Code = request.Code,
             Name = request.Name,
@@ -115,8 +120,10 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPut("robot-programs/{programId:guid}/artifacts")]
+    [HttpPut("organizations/{organizationId:guid}/robot-programs/{programId:guid}/artifacts")]
+    [Authorize(Policy = "program.manage")]
     public async Task<IActionResult> ReplaceRobotProgramArtifacts(
+        Guid organizationId,
         Guid programId,
         [FromBody] ReplaceRobotProgramArtifactsRequest request,
         CancellationToken cancellationToken)
@@ -124,6 +131,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         var command = new ReplaceRobotProgramArtifactsCommand
         {
             UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
             ProgramId = programId,
             Artifacts = request.Artifacts.Select(item => new RobotProgramArtifactInput(
                 item.RobotArtifactId, item.RunOrder, item.ParametersSchemaVersion, item.ParametersJson)).ToArray()
@@ -132,35 +140,41 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("robot-programs/{programId:guid}/publish")]
-    public async Task<IActionResult> PublishRobotProgram(Guid programId, CancellationToken cancellationToken)
+    [HttpPatch("organizations/{organizationId:guid}/robot-programs/{programId:guid}/publish")]
+    [Authorize(Policy = "program.manage")]
+    public async Task<IActionResult> PublishRobotProgram(Guid organizationId, Guid programId, CancellationToken cancellationToken)
     {
         var command = new PublishRobotProgramCommand
         {
             UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
             ProgramId = programId
         };
         var result = await _publishHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("robot-programs/{programId:guid}/retire")]
-    public async Task<IActionResult> RetireRobotProgram(Guid programId, CancellationToken cancellationToken)
+    [HttpPatch("organizations/{organizationId:guid}/robot-programs/{programId:guid}/retire")]
+    [Authorize(Policy = "program.manage")]
+    public async Task<IActionResult> RetireRobotProgram(Guid organizationId, Guid programId, CancellationToken cancellationToken)
     {
         var result = await _retireHandler.HandleAsync(new RetireRobotProgramCommand
         {
             UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
             ProgramId = programId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpDelete("robot-programs/{programId:guid}")]
-    public async Task<IActionResult> DiscardDraftRobotProgram(Guid programId, CancellationToken cancellationToken)
+    [HttpDelete("organizations/{organizationId:guid}/robot-programs/{programId:guid}")]
+    [Authorize(Policy = "program.manage")]
+    public async Task<IActionResult> DiscardDraftRobotProgram(Guid organizationId, Guid programId, CancellationToken cancellationToken)
     {
         var result = await _discardHandler.HandleAsync(new DiscardDraftRobotProgramCommand
         {
             UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
             ProgramId = programId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);

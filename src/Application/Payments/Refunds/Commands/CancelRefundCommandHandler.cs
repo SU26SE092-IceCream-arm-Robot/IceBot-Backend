@@ -38,7 +38,7 @@ public sealed class CancelRefundCommandHandler
             orgId = order.OrganizationId;
             storeId = order.StoreId;
 
-            if (!ScopeAccessRules.CanAccessScopedRow(
+            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
                 command.UserContext,
                 order.OrganizationId,
                 order.StoreId,

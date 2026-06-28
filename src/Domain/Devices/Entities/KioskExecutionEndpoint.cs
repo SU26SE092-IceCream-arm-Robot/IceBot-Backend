@@ -71,7 +71,7 @@ public class KioskExecutionEndpoint : BusinessEntity
         };
     }
 
-    public void AttachCredentialBinding(ExecutionEndpointCredentialBinding credentialBinding)
+    private void AttachCredentialBinding(ExecutionEndpointCredentialBinding credentialBinding)
     {
         if (Status is KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Retired ||
             credentialBinding is null ||
@@ -87,7 +87,7 @@ public class KioskExecutionEndpoint : BusinessEntity
         CredentialBindingId = credentialBinding.Id;
     }
 
-    public void ActivateCredentialBinding(DateTimeOffset activatedAt)
+    private void ActivateCredentialBinding(DateTimeOffset activatedAt)
     {
         if (Status is KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Retired ||
             CredentialBinding is null ||
@@ -99,7 +99,7 @@ public class KioskExecutionEndpoint : BusinessEntity
         CredentialBinding.Activate(activatedAt);
     }
 
-    public void RevokeCredential(DateTimeOffset revokedAt)
+    private void RevokeCredential(DateTimeOffset revokedAt)
     {
         if (CredentialBinding is null || CredentialBinding.Status == ExecutionEndpointCredentialBindingStatus.Revoked)
         {
@@ -116,7 +116,7 @@ public class KioskExecutionEndpoint : BusinessEntity
         }
     }
 
-    public void AddSupportedRobotTarget(
+    private void AddSupportedRobotTarget(
         string runtimeTargetCode,
         string machineModelCode,
         Device? device = null)
@@ -154,7 +154,7 @@ public class KioskExecutionEndpoint : BusinessEntity
             device));
     }
 
-    public void ClearSupportedRobotTargets()
+    private void ClearSupportedRobotTargets()
     {
         if (Status is KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Retired)
         {
@@ -162,6 +162,80 @@ public class KioskExecutionEndpoint : BusinessEntity
         }
 
         _supportedRobotTargets.Clear();
+    }
+
+    public IReadOnlyCollection<ExecutionEndpointSupportedRobotTarget> ReplaceSupportedRobotTargets(
+        IEnumerable<(string RuntimeTargetCode, string MachineModelCode, Device? Device)> replacements)
+    {
+        if (replacements is null)
+        {
+            throw new DomainRuleException("Supported robot targets are required.");
+        }
+
+        var removed = _supportedRobotTargets.ToArray();
+        ClearSupportedRobotTargets();
+        foreach (var replacement in replacements)
+        {
+            AddSupportedRobotTarget(
+                replacement.RuntimeTargetCode,
+                replacement.MachineModelCode,
+                replacement.Device);
+        }
+
+        return removed;
+    }
+
+    public ExecutionEndpointCredentialBinding ProvisionCredential(
+        string credentialReference,
+        DateTimeOffset provisionedAt,
+        string? publicKeyPem = null)
+    {
+        if (Status != KioskExecutionEndpointStatus.Provisioning || CredentialBinding is not null)
+        {
+            throw new DomainRuleException("Only an unbound provisioning endpoint can provision credentials.");
+        }
+
+        var credential = ExecutionEndpointCredentialBinding.CreateProvisioned(
+            Id,
+            AuthenticationMode,
+            credentialReference,
+            provisionedAt,
+            publicKeyPem);
+        AttachCredentialBinding(credential);
+        ActivateCredentialBinding(provisionedAt);
+        return credential;
+    }
+
+    public ExecutionEndpointCredentialBinding RotateCredential(
+        string credentialReference,
+        DateTimeOffset rotatedAt,
+        string? publicKeyPem = null)
+    {
+        if (Status is not (KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Disabled))
+        {
+            throw new DomainRuleException("Only active or disabled execution endpoints can rotate credentials.");
+        }
+
+        var wasActive = Status == KioskExecutionEndpointStatus.Active;
+        if (CredentialBinding is not null)
+        {
+            RevokeCredential(rotatedAt);
+        }
+
+        var credential = ExecutionEndpointCredentialBinding.CreateProvisioned(
+            Id,
+            AuthenticationMode,
+            credentialReference,
+            rotatedAt,
+            publicKeyPem);
+        AttachCredentialBinding(credential);
+        ActivateCredentialBinding(rotatedAt);
+        if (wasActive)
+        {
+            ReactivateWithCurrentCredential(rotatedAt);
+        }
+
+        return credential;
     }
 
     public bool SupportsRobotTarget(string runtimeTargetCode, string machineModelCode, Guid? deviceId = null)

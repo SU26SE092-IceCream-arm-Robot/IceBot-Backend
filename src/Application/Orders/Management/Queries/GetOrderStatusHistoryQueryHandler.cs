@@ -28,7 +28,7 @@ public sealed class GetOrderStatusHistoryQueryHandler
             return PagedResult<OrderStatusHistoryResult>.Fail("Order not found.", 404, pageNumber, pageSize);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersView,
             query.UserContext,
             order.OrganizationId,
             order.StoreId,
