@@ -81,6 +81,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler
                 KioskId = target.KioskId,
                 ConfigurationReleaseId = target.ConfigurationReleaseId,
                 KioskExecutionEndpointId = target.KioskExecutionEndpointId,
+                IdempotencyKey = command.IdempotencyKey,
                 CommandExpiryAt = command.CommandExpiryAt,
                 RollbackTargetDeploymentId = target.Id
             },
@@ -138,8 +139,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler
                 KioskId = target.KioskId,
                 ConfigurationReleaseId = target.ConfigurationReleaseId,
                 KioskExecutionEndpointId = target.KioskExecutionEndpointId,
-                MaxArtifactCount = source.MaxArtifactCount,
-                MaxArtifactStorageBytes = source.MaxArtifactStorageBytes,
+                IdempotencyKey = command.IdempotencyKey,
                 Selections = source.Items.Select(item => new DeployLowCostArtifactSelection(
                     item.ExecutionRouteId,
                     item.RobotProgramId,

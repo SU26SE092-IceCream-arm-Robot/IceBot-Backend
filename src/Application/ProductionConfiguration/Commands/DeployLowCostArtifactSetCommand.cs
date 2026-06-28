@@ -8,8 +8,7 @@ public sealed class DeployLowCostArtifactSetCommand
     public required Guid KioskId { get; init; }
     public required Guid ConfigurationReleaseId { get; init; }
     public required Guid KioskExecutionEndpointId { get; init; }
-    public required int MaxArtifactCount { get; init; }
-    public required long MaxArtifactStorageBytes { get; init; }
+    public required string IdempotencyKey { get; init; }
     public required IReadOnlyCollection<DeployLowCostArtifactSelection> Selections { get; init; }
     public DateTimeOffset? CommandExpiryAt { get; init; }
     public Guid? RollbackTargetDeploymentId { get; init; }

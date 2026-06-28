@@ -697,6 +697,8 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("KioskConfigurationDeployments");
             entity.HasIndex(x => new { x.KioskId, x.ConfigurationReleaseId, x.AttemptNo }).IsUnique();
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.IdempotencyKey }).IsUnique();
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
             entity.HasIndex(x => new { x.KioskId, x.Status, x.RequestedAt });
             entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status });
             entity.HasIndex(x => x.KioskId).IsUnique().HasFilter("\"Status\" IN (1, 2)");
@@ -716,6 +718,8 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("ControllerArtifactSetDeployments");
             entity.HasIndex(x => new { x.ControllerId, x.ActiveSetVersion }).IsUnique();
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.IdempotencyKey }).IsUnique();
+            entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
             entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status, x.RequestedAt });
             entity.HasIndex(x => new { x.ControllerId, x.LastControllerReportId }).IsUnique().HasFilter("\"LastControllerReportId\" IS NOT NULL");
             entity.HasOne(x => x.SourceConfigurationRelease).WithMany().HasForeignKey(x => x.SourceConfigurationReleaseId).OnDelete(DeleteBehavior.Restrict);

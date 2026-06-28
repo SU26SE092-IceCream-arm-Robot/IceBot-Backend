@@ -106,6 +106,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
     [Authorize(Policy = "release.rollback")]
     public async Task<IActionResult> RollbackConfigurationDeployment(
         Guid deploymentId,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
         [FromBody] RollbackConfigurationDeploymentRequest request,
         CancellationToken cancellationToken)
     {
@@ -113,6 +114,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         {
             UserContext = User.GetUserContext(),
             TargetDeploymentId = deploymentId,
+            IdempotencyKey = idempotencyKey,
             CommandExpiryAt = request.CommandExpiryAt
         };
         var result = await _rollbackConfigurationDeploymentHandler.HandleAsync(command, cancellationToken);
@@ -234,6 +236,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
     [Authorize(Policy = "release.deploy")]
     public async Task<IActionResult> DeployFullEdgeConfiguration(
         Guid kioskId,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
         [FromBody] DeployFullEdgeConfigurationRequest request,
         CancellationToken cancellationToken)
     {
@@ -243,6 +246,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
             KioskId = kioskId,
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
+            IdempotencyKey = idempotencyKey,
             CommandExpiryAt = request.CommandExpiryAt
         };
 
@@ -279,6 +283,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
     [Authorize(Policy = "release.deploy")]
     public async Task<IActionResult> DeployLowCostArtifactSet(
         Guid kioskId,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
         [FromBody] DeployLowCostArtifactSetRequest request,
         CancellationToken cancellationToken)
     {
@@ -288,8 +293,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
             KioskId = kioskId,
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
-            MaxArtifactCount = request.MaxArtifactCount,
-            MaxArtifactStorageBytes = request.MaxArtifactStorageBytes,
+            IdempotencyKey = idempotencyKey,
             Selections = request.Selections.Select(selection => new DeployLowCostArtifactSelection(
                 selection.ExecutionRouteId,
                 selection.RobotProgramId,
@@ -366,12 +370,6 @@ public sealed class DeployLowCostArtifactSetRequest
 
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
-
-    [Range(1, int.MaxValue)]
-    public int MaxArtifactCount { get; init; }
-
-    [Range(1, long.MaxValue)]
-    public long MaxArtifactStorageBytes { get; init; }
 
     [Required]
     [MinLength(1)]

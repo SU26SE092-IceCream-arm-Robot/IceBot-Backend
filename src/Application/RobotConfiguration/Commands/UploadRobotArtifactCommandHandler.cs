@@ -13,6 +13,7 @@ namespace Application.RobotConfiguration.Commands;
 public sealed class UploadRobotArtifactCommandHandler
 {
     private const int BufferSize = 81920;
+    public const long MaximumFileSizeBytes = 10 * 1024 * 1024;
     private readonly IRobotConfigurationStore _robotConfigurationStore;
     private readonly IArtifactObjectStorage _artifactObjectStorage;
     private readonly ILogger<UploadRobotArtifactCommandHandler> _logger;
@@ -46,9 +47,10 @@ public sealed class UploadRobotArtifactCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("Robot artifact file must use the .lua extension.", 400);
         }
 
-        if (command.ContentLengthBytes <= 0)
+        if (command.ContentLengthBytes <= 0 || command.ContentLengthBytes > MaximumFileSizeBytes)
         {
-            return ApiResult<RobotArtifactResult>.Fail("Robot artifact file must not be empty.", 400);
+            return ApiResult<RobotArtifactResult>.Fail(
+                $"Robot artifact file must be between 1 byte and {MaximumFileSizeBytes} bytes.", 400);
         }
 
         if (!string.IsNullOrWhiteSpace(command.MetadataJson) && !IsValidJson(command.MetadataJson))
@@ -56,7 +58,7 @@ public sealed class UploadRobotArtifactCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("MetadataJson must be a valid JSON string.", 400);
         }
 
-        var bufferedContent = new MemoryStream();
+        await using var bufferedContent = new MemoryStream((int)command.ContentLengthBytes);
         var checksum = await CopyAndHashAsync(command.Content, bufferedContent, cancellationToken);
         var normalizedArtifactCode = NormalizeCode(command.ArtifactCode);
         var normalizedRuntimeTargetCode = NormalizeCode(command.RuntimeTargetCode);

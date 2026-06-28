@@ -17,6 +17,8 @@ public interface IEdgeCommandStore
 
     Task<EdgeCommand?> GetByIdAsync(Guid commandId, CancellationToken cancellationToken = default);
 
+    Task<EdgeCommand?> GetByDeploymentIdAsync(Guid deploymentId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<EdgeCommand>> ListExpiredDeploymentCommandsAsync(
         DateTimeOffset observedAt,
         int maxCommands,

@@ -22,6 +22,20 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
         _dbContext = dbContext;
     }
 
+    public async Task<T> ExecuteDeploymentCreationAsync<T>(
+        Guid executionScopeId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"deployment:{executionScopeId:D}"}, 0));",
+            cancellationToken);
+        var result = await action(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
     public Task<ConfigurationRelease?> GetReleaseForPublishAsync(Guid releaseId, CancellationToken cancellationToken = default)
     {
         return ReleaseGraph()
@@ -60,6 +74,31 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
     {
         return _dbContext.ControllerArtifactSetDeployments
             .FirstOrDefaultAsync(deployment => deployment.Id == deploymentId, cancellationToken);
+    }
+
+    public Task<KioskConfigurationDeployment?> GetFullEdgeDeploymentByIdempotencyKeyAsync(
+        Guid endpointId,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KioskConfigurationDeployments.AsNoTracking()
+            .FirstOrDefaultAsync(deployment =>
+                deployment.KioskExecutionEndpointId == endpointId &&
+                deployment.IdempotencyKey == idempotencyKey,
+                cancellationToken);
+    }
+
+    public Task<ControllerArtifactSetDeployment?> GetControllerDeploymentByIdempotencyKeyAsync(
+        Guid endpointId,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ControllerArtifactSetDeployments.AsNoTracking()
+            .Include(deployment => deployment.Items)
+            .FirstOrDefaultAsync(deployment =>
+                deployment.KioskExecutionEndpointId == endpointId &&
+                deployment.IdempotencyKey == idempotencyKey,
+                cancellationToken);
     }
 
     public Task<bool> OrganizationExistsAsync(Guid organizationId, CancellationToken cancellationToken = default)
@@ -204,6 +243,7 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
             .Where(recipe => recipe.DeletedAt == null &&
                 recipe.ProductVariant.DeletedAt == null &&
                 recipe.ProductVariant.Product.DeletedAt == null &&
+                recipe.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced &&
                 (recipe.Status == Domain.Catalog.Enums.RecipeStatus.Published ||
                     recipe.Status == Domain.Catalog.Enums.RecipeStatus.Active) &&
                 (!recipe.OrganizationId.HasValue || recipe.OrganizationId == organizationId) &&
@@ -621,6 +661,7 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 ConfigurationReleaseId = deployment.ConfigurationReleaseId,
                 ReleaseNumber = deployment.ConfigurationRelease.ReleaseNumber,
                 ReleaseChecksum = deployment.ReleaseChecksum,
+                IdempotencyKey = deployment.IdempotencyKey,
                 Status = (ConfigurationDeploymentReadStatus)deployment.Status,
                 RequestedAt = deployment.RequestedAt,
                 RequestedByAccountId = deployment.RequestedByAccountId,
@@ -656,6 +697,7 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
                 ReleaseNumber = deployment.SourceConfigurationRelease.ReleaseNumber,
                 ReleaseChecksum = deployment.ReleaseChecksum,
+                IdempotencyKey = deployment.IdempotencyKey,
                 Status = (ConfigurationDeploymentReadStatus)deployment.Status,
                 RequestedAt = deployment.RequestedAt,
                 RequestedByAccountId = deployment.RequestedByAccountId,

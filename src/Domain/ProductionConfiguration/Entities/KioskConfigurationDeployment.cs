@@ -14,6 +14,7 @@ public class KioskConfigurationDeployment : BusinessEntity
     public Guid ConfigurationReleaseId { get; private set; }
 
     public string ReleaseChecksum { get; private set; } = null!;
+    public string IdempotencyKey { get; private set; } = null!;
 
     public int AttemptNo { get; private set; }
 
@@ -45,6 +46,7 @@ public class KioskConfigurationDeployment : BusinessEntity
         Domain.Devices.Entities.KioskExecutionEndpoint kioskExecutionEndpoint,
         ConfigurationRelease configurationRelease,
         int attemptNo,
+        string idempotencyKey,
         DateTimeOffset requestedAt,
         Guid? requestedByAccountId = null,
         bool isRollback = false)
@@ -56,7 +58,7 @@ public class KioskConfigurationDeployment : BusinessEntity
             throw new DomainRuleException("An active Full Edge endpoint and a published configuration release checksum are required.");
         }
 
-        if (attemptNo <= 0)
+        if (attemptNo <= 0 || string.IsNullOrWhiteSpace(idempotencyKey))
         {
             throw new DomainRuleException("Configuration deployment attempt number must be greater than zero.");
         }
@@ -73,6 +75,7 @@ public class KioskConfigurationDeployment : BusinessEntity
             EdgeRuntimeId = kioskExecutionEndpoint.FullEdgeRuntimeId.Value,
             ConfigurationReleaseId = configurationRelease.Id,
             ReleaseChecksum = configurationRelease.ReleaseChecksum,
+            IdempotencyKey = idempotencyKey.Trim(),
             AttemptNo = attemptNo,
             RequestedAt = requestedAt,
             RequestedByAccountId = requestedByAccountId

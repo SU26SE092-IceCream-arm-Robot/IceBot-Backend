@@ -164,7 +164,7 @@ Example `manifestJson`:
 
 Request-level rules are validated before any item is written:
 
-- 1 to 50 files.
+- 1 to 50 files, each no larger than 10 MiB.
 - File count equals manifest item count.
 - Every uploaded basename has exactly one manifest item.
 - File names are unique within the request.
@@ -275,6 +275,9 @@ Both profiles use the same immutable `RobotArtifact` bytes and checksum identity
 - Re-uploading identical normalized artifact code plus checksum in one organization returns the existing artifact as idempotent success.
 - Concurrent uploads of that same identity are resolved by the database unique constraint. The losing request returns the winner's metadata and removes its own redundant object rather than surfacing a conflict.
 - Artifact, program, and release retire commands are idempotent. Retirement preserves immutable bytes, manifests, deployment history, and rollback provenance.
+- Full Edge and Low-cost deployment creation is serialized per execution scope. Backend configuration, not the management request, owns the Low-cost artifact-count and storage-byte ceilings.
+- Deployment and rollback requests require `Idempotency-Key`. Retry with the same endpoint, key, and payload returns the previously created deployment; the key cannot be reused for a different deployment payload.
+- Execution-report ingestion is serialized by `SourceEventId`; concurrent delivery of the same report returns the existing duplicate result instead of racing the inbox unique constraint.
 - Published parent history may retain retired children. Retirement is blocked only by mutable Draft parent references, or by Pending/Installed deployments for a release.
 - Artifact name, runtime target, machine model, and description do not redefine an existing identity on retry; backend returns the stored metadata. Use a different artifact code when the same bytes intentionally represent a distinct artifact identity.
 - Object bytes are written before metadata is committed. A domain failure before DB write triggers immediate best-effort deletion.

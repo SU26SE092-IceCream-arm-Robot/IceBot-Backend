@@ -48,20 +48,17 @@ public sealed class PullEdgeCommandsCommandHandler
             now,
             cancellationToken);
 
-        foreach (var edgeCommand in commands)
-        {
-            var nextAttemptNo = edgeCommand.DeliveryAttempts.Count + 1;
-            edgeCommand.RecordDeliveryAttempt(nextAttemptNo, now, EdgeCommandDeliveryOutcome.Sent);
-        }
-
-        await _edgeCommandStore.SaveChangesAsync(cancellationToken);
-
         var commandResults = new List<(Domain.Sync.Entities.EdgeCommand Command, string PayloadJson)>(commands.Count);
         foreach (var edgeCommand in commands)
         {
             var payloadJson = await _artifactPayloadEnricher.EnrichAsync(edgeCommand, cancellationToken);
             commandResults.Add((edgeCommand, payloadJson));
+
+            var nextAttemptNo = edgeCommand.DeliveryAttempts.Count + 1;
+            edgeCommand.RecordDeliveryAttempt(nextAttemptNo, now, EdgeCommandDeliveryOutcome.Sent);
         }
+
+        await _edgeCommandStore.SaveChangesAsync(cancellationToken);
 
         return ApiResult<EdgeCommandPullResult>.Success(
             EdgeCommandPullResult.FromCommands(now, commandResults),
