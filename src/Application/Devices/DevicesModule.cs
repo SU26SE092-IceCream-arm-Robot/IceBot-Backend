@@ -18,6 +18,15 @@ public static class DevicesModule
         services.AddScoped<UpdateDeviceCommandHandler>();
         services.AddScoped<SetDeviceStatusCommandHandler>();
         services.AddScoped<RetireDeviceCommandHandler>();
+        services.AddScoped<ListExecutionEndpointsQueryHandler>();
+        services.AddScoped<GetExecutionEndpointQueryHandler>();
+        services.AddScoped<CreateExecutionEndpointCommandHandler>();
+        services.AddScoped<ReplaceExecutionEndpointRobotTargetsCommandHandler>();
+        services.AddScoped<ProvisionExecutionEndpointCommandHandler>();
+        services.AddScoped<DisableExecutionEndpointCommandHandler>();
+        services.AddScoped<ReactivateExecutionEndpointCommandHandler>();
+        services.AddScoped<RetireExecutionEndpointCommandHandler>();
+        services.AddScoped<RotateExecutionEndpointCredentialCommandHandler>();
 
         return services;
     }

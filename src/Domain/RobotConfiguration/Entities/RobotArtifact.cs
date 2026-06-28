@@ -95,6 +95,11 @@ public class RobotArtifact : RobotConfigurationEntity
 
     public void Retire()
     {
+        if (Status == RobotArtifactStatus.Retired)
+        {
+            return;
+        }
+
         if (Status == RobotArtifactStatus.Draft)
         {
             throw new DomainRuleException("Draft robot artifacts should be deleted or disabled, not retired.");

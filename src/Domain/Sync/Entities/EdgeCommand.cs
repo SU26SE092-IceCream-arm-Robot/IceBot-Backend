@@ -12,6 +12,8 @@ public class EdgeCommand : AuditedEntity
     public Guid? OrderId { get; private set; }
     public Guid KioskId { get; private set; }
     public Guid TargetExecutionEndpointId { get; private set; }
+    public Guid? DeploymentId { get; private set; }
+    public DeploymentCommandTargetKind? DeploymentKind { get; private set; }
     public string PayloadJson { get; private set; } = null!;
     public DateTimeOffset? CommandExpiryAt { get; private set; }
     public EdgeCommandStatus Status { get; private set; } = EdgeCommandStatus.PendingDelivery;
@@ -35,7 +37,9 @@ public class EdgeCommand : AuditedEntity
         DateTimeOffset createdAt,
         Guid? orderId = null,
         int? dispatchAttemptNo = null,
-        DateTimeOffset? commandExpiryAt = null)
+        DateTimeOffset? commandExpiryAt = null,
+        Guid? deploymentId = null,
+        DeploymentCommandTargetKind? deploymentKind = null)
     {
         if (kioskId == Guid.Empty || targetEndpointId == Guid.Empty || string.IsNullOrWhiteSpace(payloadJson))
         {
@@ -48,6 +52,17 @@ public class EdgeCommand : AuditedEntity
             throw new DomainRuleException("Execute-order commands require order, dispatch attempt, and expiry.");
         }
 
+        if (type == EdgeCommandType.DeployConfiguration &&
+            (!deploymentId.HasValue || deploymentId.Value == Guid.Empty || !deploymentKind.HasValue))
+        {
+            throw new DomainRuleException("Deploy-configuration commands require a typed deployment target.");
+        }
+
+        if (type != EdgeCommandType.DeployConfiguration && (deploymentId.HasValue || deploymentKind.HasValue))
+        {
+            throw new DomainRuleException("Only deploy-configuration commands can reference a deployment target.");
+        }
+
         if (commandExpiryAt.HasValue && commandExpiryAt.Value <= createdAt)
         {
             throw new DomainRuleException("Edge command expiry must be later than command creation.");
@@ -58,6 +73,8 @@ public class EdgeCommand : AuditedEntity
             CommandType = type,
             KioskId = kioskId,
             TargetExecutionEndpointId = targetEndpointId,
+            DeploymentId = deploymentId,
+            DeploymentKind = deploymentKind,
             PayloadJson = payloadJson,
             OrderId = orderId,
             DispatchAttemptNo = dispatchAttemptNo,

@@ -19,6 +19,7 @@ using Infrastructure.Operations.Persistence;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
 using Infrastructure.ProductionConfiguration.Persistence;
+using Infrastructure.RobotConfiguration.ObjectStorage;
 using Infrastructure.RobotConfiguration.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
@@ -50,6 +51,7 @@ namespace Infrastructure
             });
 
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
+            services.AddScoped<Concurrency.PostgresAdvisoryLockManager>();
             services.Configure<EmailOptions>(config.GetSection(EmailOptions.SectionName));
             services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();
@@ -62,11 +64,20 @@ namespace Infrastructure
             services.AddHostedService<Persistence.Jobs.DataRetentionJob>();
             services.AddScoped<IKioskTelemetryStore, KioskTelemetryStore>();
             services.AddScoped<IDeviceManagementStore, DeviceManagementStore>();
+            services.AddScoped<IExecutionEndpointStore, ExecutionEndpointStore>();
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
+            services.Configure<RobotArtifactObjectStorageOptions>(config.GetSection(RobotArtifactObjectStorageOptions.SectionName));
+            services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
+            services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
             services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
+            services.Configure<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions>(
+                config.GetSection(ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions.SectionName));
+            services.AddHostedService<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationJob>();
             services.AddScoped<IEdgeCommandStore, EdgeCommandStore>();
+            services.AddScoped<IExecutionEndpointTransportAuthStore, ExecutionEndpointTransportAuthStore>();
+            services.AddScoped<IExecutionReportStore, ExecutionReportStore>();
 
             return services;
         }

@@ -67,6 +67,14 @@ public sealed class DataRetentionJob : BackgroundService
             .Where(x => x.OccurredAt < deviceEventThreshold)
             .ExecuteDeleteAsync(cancellationToken);
 
-        _logger.LogInformation("Purge completed. Deleted {DeletedHeartbeats} heartbeats and {DeletedDeviceEvents} device events.", deletedHeartbeats, deletedDeviceEvents);
+        var deletedExecutionRequestNonces = await dbContext.ExecutionEndpointRequestNonces
+            .Where(x => x.ExpiresAt < now)
+            .ExecuteDeleteAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Purge completed. Deleted {DeletedHeartbeats} heartbeats, {DeletedDeviceEvents} device events, and {DeletedExecutionRequestNonces} expired execution request nonces.",
+            deletedHeartbeats,
+            deletedDeviceEvents,
+            deletedExecutionRequestNonces);
     }
 }

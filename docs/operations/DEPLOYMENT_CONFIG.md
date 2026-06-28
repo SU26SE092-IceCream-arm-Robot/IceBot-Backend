@@ -4,7 +4,7 @@ This document lists the minimum backend configuration that must be provided outs
 
 ## Search Keywords
 
-`deployment`, `backend config`, `environment variables`, `appsettings`, `JWT`, `database connection`, `Firebase`, `SMTP`, `PayOS`, `PORT`, `health`, `info`
+`deployment`, `backend config`, `environment variables`, `appsettings`, `JWT`, `database connection`, `Firebase`, `SMTP`, `PayOS`, `MinIO`, `S3`, `robot artifact storage`, `PORT`, `health`, `info`
 
 ## Configuration Source
 
@@ -49,6 +49,25 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | PayOS base URL | `PayOS__BaseUrl` |
 | PayOS return URL | `PayOS__ReturnUrl` |
 | PayOS cancel URL | `PayOS__CancelUrl` |
+| Robot artifact object storage endpoint | `RobotArtifacts__ObjectStorage__Endpoint` |
+| Robot artifact Edge-reachable download endpoint | `RobotArtifacts__ObjectStorage__DownloadEndpoint` |
+| Robot artifact object storage access key | `RobotArtifacts__ObjectStorage__AccessKey` |
+| Robot artifact object storage secret key | `RobotArtifacts__ObjectStorage__SecretKey` |
+| Robot artifact object storage bucket | `RobotArtifacts__ObjectStorage__BucketName` |
+| Robot artifact object storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` |
+| Robot artifact download endpoint TLS toggle | `RobotArtifacts__ObjectStorage__DownloadUseSsl` |
+| Robot artifact presigned download lifetime in seconds | `RobotArtifacts__ObjectStorage__DownloadUrlExpirySeconds` |
+| Enable robot artifact orphan cleanup | `RobotArtifacts__ObjectStorage__OrphanCleanupEnabled` |
+| Minimum orphan age before deletion in hours | `RobotArtifacts__ObjectStorage__OrphanGracePeriodHours` |
+| Robot artifact orphan cleanup interval in hours | `RobotArtifacts__ObjectStorage__OrphanCleanupIntervalHours` |
+| Maximum orphan deletes per cleanup run | `RobotArtifacts__ObjectStorage__OrphanCleanupMaxDeletesPerRun` |
+| Enable deployment-command timeout reconciliation | `DeploymentTimeoutReconciliation__Enabled` |
+| Deployment timeout reconciliation interval in seconds | `DeploymentTimeoutReconciliation__IntervalSeconds` |
+| Maximum expired deployment commands per reconciliation run | `DeploymentTimeoutReconciliation__MaxCommandsPerRun` |
+| Minutes allowed after command acceptance before the first deployment report | `DeploymentTimeoutReconciliation__AcceptedReportTimeoutMinutes` |
+| Low-cost signed-request maximum clock skew in seconds | `ExecutionEndpointSecurity__SignedRequestMaxClockSkewSeconds` |
+| Used signed-request nonce retention in seconds | `ExecutionEndpointSecurity__NonceRetentionSeconds` |
+| Maximum IoT request body bytes hashed before transport authentication (default 1 MiB) | `ExecutionEndpointSecurity__MaxRequestBodyBytes` |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` |
 | Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |
@@ -102,7 +121,10 @@ When enabled, diagnostics performs provider reachability checks without sending 
 - Firebase can be disabled with `Firebase__Enabled=false`, but Google/Firebase login paths will then return service-unavailable behavior.
 - SMTP failures must not make account onboarding unrecoverable; admins can resend invitations.
 - PayOS webhook/payment behavior depends on correct public return/cancel URLs and checksum key.
+- Robot artifact uploads store Lua files in S3-compatible object storage. Use MinIO for local/dev and S3-compatible cloud object storage in production. PostgreSQL stores metadata only.
 - Set `ErrorHandling__ExposeStackTrace=false` and `Observability__DebugBodyLogging__Enabled=false` in deployed environments.
 - For production observability, set `Observability__OpenTelemetry__OtlpExporterEnabled=true` for traces/metrics and `Observability__Serilog__OtlpSinkEnabled=true` for structured logs, then configure the OTLP endpoint to point to your collector.
 - Set `Diagnostics__ApiKey` outside Development before using `/management/diagnostics/health`.
 - Keep `Diagnostics__EnableExternalPing=false` unless the deployment check intentionally needs live SMTP/Firebase/PayOS reachability.
+- IoT runtime endpoints require HTTPS. Full Edge client certificates are accepted at the TLS handshake and authenticated by the provisioned SHA-256 fingerprint in WebAPI; do not terminate mTLS at an untrusted proxy.
+- After applying the execution transport-security migration, rotate any pre-existing low-cost credential binding that has no ECDSA public key and any Full Edge binding whose reference is not the normalized certificate SHA-256 fingerprint.

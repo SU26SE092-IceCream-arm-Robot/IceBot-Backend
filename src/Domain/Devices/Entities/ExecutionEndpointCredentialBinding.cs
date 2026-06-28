@@ -11,6 +11,8 @@ public class ExecutionEndpointCredentialBinding : AuditedEntity
 
     public string CredentialReference { get; private set; } = null!;
 
+    public string? PublicKeyPem { get; private set; }
+
     public ExecutionEndpointCredentialBindingStatus Status { get; private set; } = ExecutionEndpointCredentialBindingStatus.Provisioned;
 
     public DateTimeOffset ProvisionedAt { get; private set; }
@@ -29,11 +31,18 @@ public class ExecutionEndpointCredentialBinding : AuditedEntity
         Guid kioskExecutionEndpointId,
         ExecutionEndpointAuthenticationMode authenticationMode,
         string credentialReference,
-        DateTimeOffset provisionedAt)
+        DateTimeOffset provisionedAt,
+        string? publicKeyPem = null)
     {
         if (kioskExecutionEndpointId == Guid.Empty || string.IsNullOrWhiteSpace(credentialReference))
         {
             throw new DomainRuleException("Execution endpoint and credential reference are required.");
+        }
+
+        if ((authenticationMode == ExecutionEndpointAuthenticationMode.MutualTls && !string.IsNullOrWhiteSpace(publicKeyPem)) ||
+            (authenticationMode == ExecutionEndpointAuthenticationMode.SignedCommandTls && string.IsNullOrWhiteSpace(publicKeyPem)))
+        {
+            throw new DomainRuleException("Mutual TLS uses a certificate fingerprint; signed-command TLS requires a public key.");
         }
 
         return new ExecutionEndpointCredentialBinding
@@ -41,6 +50,7 @@ public class ExecutionEndpointCredentialBinding : AuditedEntity
             KioskExecutionEndpointId = kioskExecutionEndpointId,
             AuthenticationMode = authenticationMode,
             CredentialReference = credentialReference.Trim(),
+            PublicKeyPem = string.IsNullOrWhiteSpace(publicKeyPem) ? null : publicKeyPem.Trim(),
             ProvisionedAt = provisionedAt
         };
     }

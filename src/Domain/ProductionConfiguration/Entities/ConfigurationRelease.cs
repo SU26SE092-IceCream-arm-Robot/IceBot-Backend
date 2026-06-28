@@ -85,6 +85,12 @@ public class ConfigurationRelease : BusinessEntity
         return route;
     }
 
+    public void ClearRoutes()
+    {
+        EnsureDraft();
+        _executionRoutes.Clear();
+    }
+
     public void Publish(DateTimeOffset publishedAt, Guid publishedByAccountId)
     {
         EnsureDraft();
@@ -119,6 +125,11 @@ public class ConfigurationRelease : BusinessEntity
 
     public void Retire(DateTimeOffset retiredAt)
     {
+        if (Status == ConfigurationReleaseStatus.Retired)
+        {
+            return;
+        }
+
         if (Status != ConfigurationReleaseStatus.Published)
         {
             throw new DomainRuleException("Only published configuration releases can be retired.");
@@ -138,9 +149,11 @@ public class ConfigurationRelease : BusinessEntity
 
     public void ValidateFullEdgeDeploymentTarget(
         Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
-        Guid edgeRuntimeId)
+        Guid edgeRuntimeId,
+        bool allowRetiredRelease = false)
     {
-        if (Status != ConfigurationReleaseStatus.Published ||
+        if ((Status != ConfigurationReleaseStatus.Published &&
+                !(allowRetiredRelease && Status == ConfigurationReleaseStatus.Retired)) ||
             endpoint.ExecutionProfile != Domain.Devices.Enums.KioskExecutionProfile.FullEdge ||
             endpoint.Status != Domain.Devices.Enums.KioskExecutionEndpointStatus.Active ||
             endpoint.FullEdgeRuntimeId != edgeRuntimeId)

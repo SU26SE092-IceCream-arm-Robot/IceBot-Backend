@@ -442,14 +442,15 @@ Rules:
 
 ```http
 POST /api/v1/iot/kiosks/{kioskId}/commands/pull
+X-Execution-Endpoint-Id: <endpoint-id>
 ```
+
+Full Edge sends its provisioned client certificate during the TLS handshake. Low-cost controllers add the signed-request headers defined under **Execution Endpoint Transport Authentication** below.
 
 Request:
 
 ```json
 {
-  "originNodeId": "kiosk-edge-node-id",
-  "lastCommandSequence": 123,
   "maxCommands": 10,
   "edgeTime": "2026-05-21T10:00:02Z"
 }
@@ -463,32 +464,14 @@ Response:
   "commands": [
     {
       "commandId": "uuid",
-      "commandSequence": 124,
-      "commandType": "StartRobotJob",
+      "commandType": "DeployConfiguration",
       "kioskId": "uuid",
-      "orderId": "uuid",
-      "paymentTransactionId": "uuid",
-      "idempotencyKey": "order:{orderId}:execute",
+      "targetExecutionEndpointId": "uuid",
+      "orderId": null,
+      "dispatchAttemptNo": null,
       "issuedAt": "2026-05-21T10:00:00Z",
       "expiresAt": "2026-05-21T10:10:00Z",
-      "payloadSchemaVersion": 1,
-      "payload": {
-        "orderNumber": "ORD-20260521-0001",
-        "items": [
-          {
-            "orderItemId": "uuid",
-            "menuItemId": "uuid",
-            "productId": "uuid",
-            "productVariantId": "uuid",
-            "productCode": "VANILLA_CUP",
-            "productVariantCode": "M",
-            "recipeId": "uuid",
-            "recipeVersion": 3,
-            "quantity": 1,
-            "recipeSnapshotJson": {}
-          }
-        ]
-      }
+      "payloadJson": "{... canonical command payload ...}"
     }
   ]
 }
@@ -496,35 +479,98 @@ Response:
 
 Rules:
 
-- Edge must deduplicate by `commandId` and `idempotencyKey`.
-- A retried command must not create duplicate `RobotJob`.
-- Edge should persist the command and local job before starting execution.
+- Edge must deduplicate by `commandId`.
+- Deployment commands include typed Cloud correlation fields for deployment ownership. `PayloadJson` is execution data, not the authoritative link used by timeout reconciliation.
+- Pull marks returned commands as `Delivered` and records a delivery attempt.
+- Retrying command pull can return delivered but unacknowledged commands.
+- Runtime execution state is reported through the event/report ingest boundary, not command ack.
+- If a deployment command expires before acceptance, Cloud marks the command `Rejected` with `CommandExpired` and marks the linked Pending deployment `Failed`.
+- Once accepted, command expiry no longer applies. If no `Installed`, `Active`, or `Failed` report moves the deployment out of Pending within the configured accepted-report timeout, Cloud marks that attempt `Failed/ExecutionReportTimeout` without changing the endpoint's previously active release/artifact set.
+- Late reports do not revive a timed-out attempt. Reconciliation requires a new deployment/rollback attempt so Cloud and endpoint history remain explicit.
+- A `DeployConfiguration` payload contains immutable artifact descriptors. During an authenticated pull, each descriptor with a `StorageKey` is enriched with a short-lived `DownloadUrl` and `DownloadUrlExpiresAt`.
+- Rollback uses the same `DeployConfiguration` command contract and includes `RollbackTargetDeploymentId` as provenance. Edge installs it as a new deployment attempt; it does not locally mutate the historical deployment.
+- Presigned download URLs are transport data only. They are not persisted in `EdgeCommand.PayloadJson`, release manifests, or artifact metadata.
+- The object-storage bucket remains private. Edge must download before URL expiry and must not treat the URL as an artifact identity.
+- `DownloadUrl` must use an endpoint reachable from the execution endpoint. A Docker-internal MinIO hostname is not a valid external Edge download endpoint unless both runtimes share that network.
+- After download, Edge must verify both `ContentLengthBytes` and the SHA-256 `ArtifactChecksum` before installing or activating the artifact.
+- A failed download, expired URL, size mismatch, or checksum mismatch must fail the deployment attempt. Edge may pull the unacknowledged command again to obtain fresh download URLs; it must not activate partial or unverified files.
+- Fairino-Studio currently exports multiple `.lua` files: normally one file per editor step, while a paired loop is exported as one file. Each exported file is stored as one `RobotArtifact`; `RobotProgramArtifact.RunOrder` defines their runtime sequence.
+- Filename prefixes such as `01_` are human-facing export hints, not execution authority. Edge executes the ordered program manifest delivered by Cloud.
 
-### Command Ack And Fast Runtime Check
+### Execution Endpoint Provisioning Boundary
+
+Before command pull, Cloud management must create and activate a `KioskExecutionEndpoint`:
+
+1. Create the endpoint in `Provisioning` for one kiosk and one execution profile.
+2. Replace its supported robot targets using runtime-target code, machine-model code, and optional same-kiosk device binding.
+3. Provision profile-specific authentication material and a profile identity.
+4. Activate the endpoint; only an Active endpoint with an Active credential may authenticate command pull or report execution state.
+
+Full Edge uses `FullEdgeRuntimeId` and requires `MutualTls`; provisioning accepts the client certificate SHA-256 fingerprint. Low-cost uses `ControllerId` and requires `SignedCommandTls`; provisioning accepts an ECDSA NIST P-256 public key PEM. The backend stores only the canonical public key and its SHA-256 fingerprint, never the controller private key. Disabling or retiring an endpoint blocks runtime authentication without deleting deployment or execution history.
+
+Full Edge provisioning body:
+
+```json
+{
+  "profileIdentity": "<full-edge-runtime-id>",
+  "clientCertificateSha256Fingerprint": "<64 lowercase hex characters>"
+}
+```
+
+Low-cost provisioning body:
+
+```json
+{
+  "profileIdentity": "<controller-id>",
+  "ecdsaPublicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+}
+```
+
+### Execution Endpoint Transport Authentication
+
+All IoT routes require HTTPS and `X-Execution-Endpoint-Id`.
+
+**Full Edge:** Kestrel requests a client certificate and the application compares its SHA-256 fingerprint with the active credential binding using constant-time comparison. Certificate-chain trust is not used as endpoint identity; the provisioned fingerprint is the pinning boundary.
+
+**Low-cost controller:** every request includes:
+
+```text
+X-Execution-Timestamp: <Unix seconds>
+X-Execution-Nonce: <new UUID per request>
+X-Execution-Signature: <Base64 ECDSA P-256 signature>
+```
+
+The signature uses SHA-256 and IEEE P1363 fixed-field format (64-byte `r || s`). It signs this UTF-8 canonical string, with one LF between fields and no trailing LF:
+
+```text
+UPPERCASE_HTTP_METHOD
+REQUEST_PATH
+RAW_QUERY_STRING_OR_EMPTY
+endpoint-id-in-D-format
+unix-timestamp
+nonce-in-D-format
+lowercase-sha256-of-raw-request-body
+```
+
+The request path includes the API version and route exactly as sent. The query string includes its leading `?` when present. The body hash is computed from raw bytes before JSON model binding.
+
+Cloud rejects signatures outside `ExecutionEndpointSecurity:SignedRequestMaxClockSkewSeconds`. After successful signature verification, it atomically stores `(EndpointId, Nonce)`; reuse is rejected even across backend instances. Expired nonce rows are removed by data retention. Clients retry with a new timestamp, nonce, and signature.
+
+### Command Ack
 
 ```http
 POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack
+X-Execution-Endpoint-Id: <endpoint-id>
 ```
 
 Request:
 
 ```json
 {
-  "originNodeId": "kiosk-edge-node-id",
-  "orderId": "uuid",
   "ackStatus": "Accepted",
-  "checkedAt": "2026-05-21T10:00:05Z",
-  "robotJobId": "uuid",
-  "rejectionReason": null,
-  "readinessSnapshot": {
-    "isReady": true,
-    "checkDurationMs": 320,
-    "robotAvailable": true,
-    "deviceHealthy": true,
-    "inventorySufficient": true,
-    "queueCapacityAvailable": true,
-    "runtimeStateTimestamp": "2026-05-21T10:00:04Z"
-  }
+  "acknowledgedAt": "2026-05-21T10:00:05Z",
+  "rejectionCode": null,
+  "rejectionMessage": null
 }
 ```
 
@@ -533,54 +579,36 @@ Allowed `ackStatus` values:
 - `Received`
 - `Accepted`
 - `Rejected`
-- `Started`
-- `Completed`
-- `Failed`
+- `DeliveryFailed`
 
-Fast runtime check timeout: 5-10 seconds.
+Command ack is dispatch-only. `Started`, `Completed`, `Failed`, and
+`RequiresManualIntervention` belong to the execution event/report ingest
+boundary, not this endpoint.
 
-Check:
-
-- Edge process is healthy.
-- Robot executor is available.
-- Required robot program/config version and local point/frame references exist.
-- Required devices are online and not in error.
-- Required ingredients are not below allowed level.
-- Queue capacity is available.
-
-If rejected after payment, Cloud should mark the order as failed/refund-required using the current compensation workflow.
-
-### Sync Events Batch
+### Execution Reports
 
 ```http
-POST /api/v1/iot/kiosks/{kioskId}/events
+POST /api/v1/iot/kiosks/{kioskId}/execution-reports
+X-Execution-Endpoint-Id: <endpoint-id>
 ```
 
 Request:
 
 ```json
 {
-  "batchId": "uuid",
-  "originNodeId": "kiosk-edge-node-id",
-  "sentAt": "2026-05-21T10:02:00Z",
-  "events": [
-    {
-      "eventId": "uuid",
-      "eventType": "RobotJobCompleted",
-      "sequence": 12001,
-      "occurredAt": "2026-05-21T10:01:58Z",
-      "correlationId": "order-id",
-      "causationId": "command-id",
-      "orderId": "uuid",
-      "robotJobId": "uuid",
-      "robotJobStepId": null,
-      "payloadSchemaVersion": 1,
-      "payload": {
-        "status": "Completed",
-        "durationMs": 95000
-      }
-    }
-  ]
+  "commandId": "uuid",
+  "sourceEventId": "uuid",
+  "sequenceNumber": 12001,
+  "edgeCreatedAt": "2026-05-21T10:01:58Z",
+  "executorReportedAt": "2026-05-21T10:01:59Z",
+  "reportType": "Deployment",
+  "status": "Active",
+  "deploymentId": "uuid",
+  "sourceProductionJobId": null,
+  "physicalOutputMayHaveOccurred": null,
+  "errorCode": null,
+  "errorMessage": null,
+  "payloadJson": null
 }
 ```
 
@@ -588,30 +616,56 @@ Response:
 
 ```json
 {
-  "serverTime": "2026-05-21T10:02:01Z",
-  "accepted": ["event-id-1"],
-  "duplicates": ["event-id-2"],
-  "rejected": [
-    {
-      "eventId": "event-id-3",
-      "reason": "InvalidRobotJobState"
-    }
-  ]
+  "succeeded": true,
+  "statusCode": 200,
+  "message": "Execution report applied successfully.",
+  "data": {
+    "commandId": "uuid",
+    "sourceEventId": "uuid",
+    "reportType": "Deployment",
+    "status": "Active",
+    "applied": true,
+    "duplicate": false
+  }
 }
 ```
 
-Event types should map to existing domain tables:
+Allowed `reportType` values in V1:
 
-| Event type | Domain target |
+| Report type | Meaning | Target |
 | --- | --- |
-| `RobotJobQueued` / `RobotJobStarted` / `RobotJobCompleted` / `RobotJobFailed` | `RobotJobEvent`, `RobotJob` |
-| `RobotJobStepStarted` / `RobotJobStepCompleted` / `RobotJobStepFailed` | `RobotJobEvent`, `RobotJobStep` |
-| `DeviceStatusChanged` / `DeviceErrorRaised` | `DeviceEvent` |
-| `IngredientLevelChanged` | `IngredientDispenserState` |
-| `StockConsumed` / `StockRefilled` / `StockAdjusted` | `StockMovement` |
-| `KioskHeartbeatReported` | `KioskHeartbeat` |
+| `Deployment` | Full Edge configuration deployment or low-cost active artifact-set deployment result | `KioskConfigurationDeployment`, `ControllerArtifactSetDeployment`, `KioskExecutionEndpoint` active snapshot |
+| `ProductionExecution` | Execute-order production progress/result | `ProductionExecutionRecord`, `OrderExecutionRecord` when order provenance is present |
 
-Cloud ingestion should use `SyncEventInbox` for deduplication and `SyncDeadLetter` for failed processing.
+Deployment `status` values:
+
+- `Installed`
+- `Active`
+- `Failed`
+
+Production execution `status` values:
+
+- `Accepted`
+- `Running`
+- `Completed`
+- `Failed`
+- `RequiresManualIntervention`
+
+Rules:
+
+- Command ack is dispatch-only. Execution reports are the current V1 boundary for deployment and production status after a command has been accepted.
+- The endpoint deduplicates by `sourceEventId` using `SyncEventInbox`.
+- `sequenceNumber` is executor-local ordering evidence for projection updates.
+- `physicalOutputMayHaveOccurred` must be set when reporting failed production execution. It drives customer/support projection: failure before output can be handled differently from failure after possible physical output.
+- Deployment report `Active` updates the observed active configuration/artifact-set snapshot on `KioskExecutionEndpoint`.
+
+### Future Sync Events Batch
+
+```http
+POST /api/v1/iot/kiosks/{kioskId}/events
+```
+
+`/events` is reserved for a broader batch sync surface. It should be added when Edge needs to replay multiple local events such as telemetry, stock movements, heartbeat evidence, or detailed local runtime logs. It is not the current V1 command execution status endpoint.
 
 ### Heartbeat
 

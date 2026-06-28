@@ -30,6 +30,7 @@ Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. Fo
 | System flow index | [System Flows](flows/SYSTEM_FLOWS.md) |
 | Version direction / future roadmap | [System Overview Flow](flows/SYSTEM_OVERVIEW_FLOW.md) |
 | Checkout/payment/edge execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) |
+| Fairino Lua artifact/program deployment | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md) |
 | Tablet/edge/cloud contract | [IoT Contract](iot/IOT_CONTRACT.md) |
 | Naming conventions | [Naming Rules](process/NAMING_RULES.md) |
 | Deployment/runtime configuration | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |

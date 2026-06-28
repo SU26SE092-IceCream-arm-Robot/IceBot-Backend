@@ -56,9 +56,10 @@ public class KioskExecutionEndpoint : BusinessEntity
             throw new DomainRuleException("Kiosk and endpoint code are required.");
         }
 
-        if (profile == KioskExecutionProfile.FullEdge && authenticationMode != ExecutionEndpointAuthenticationMode.MutualTls)
+        if ((profile == KioskExecutionProfile.FullEdge && authenticationMode != ExecutionEndpointAuthenticationMode.MutualTls) ||
+            (profile == KioskExecutionProfile.LowCostController && authenticationMode != ExecutionEndpointAuthenticationMode.SignedCommandTls))
         {
-            throw new DomainRuleException("Full Edge endpoints require mutual TLS.");
+            throw new DomainRuleException("Full Edge requires mutual TLS; low-cost controller requires signed-command TLS.");
         }
 
         return new KioskExecutionEndpoint
@@ -153,6 +154,16 @@ public class KioskExecutionEndpoint : BusinessEntity
             device));
     }
 
+    public void ClearSupportedRobotTargets()
+    {
+        if (Status is KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Retired)
+        {
+            throw new DomainRuleException("Only non-active endpoints can change supported robot targets.");
+        }
+
+        _supportedRobotTargets.Clear();
+    }
+
     public bool SupportsRobotTarget(string runtimeTargetCode, string machineModelCode, Guid? deviceId = null)
     {
         return _supportedRobotTargets.Any(target =>
@@ -183,6 +194,21 @@ public class KioskExecutionEndpoint : BusinessEntity
         }
 
         ProvisionedAt = provisionedAt;
+        Status = KioskExecutionEndpointStatus.Active;
+    }
+
+    public void ReactivateWithCurrentCredential(DateTimeOffset reactivatedAt)
+    {
+        if (Status != KioskExecutionEndpointStatus.Disabled ||
+            CredentialBindingId is null ||
+            CredentialBinding?.Status != ExecutionEndpointCredentialBindingStatus.Active ||
+            (ExecutionProfile == KioskExecutionProfile.FullEdge && FullEdgeRuntimeId is null) ||
+            (ExecutionProfile == KioskExecutionProfile.LowCostController && ControllerId is null))
+        {
+            throw new DomainRuleException("Only a disabled endpoint with an active credential and existing profile identity can be reactivated.");
+        }
+
+        ProvisionedAt = reactivatedAt;
         Status = KioskExecutionEndpointStatus.Active;
     }
 
