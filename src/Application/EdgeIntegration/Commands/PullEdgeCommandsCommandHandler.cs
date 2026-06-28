@@ -29,18 +29,12 @@ public sealed class PullEdgeCommandsCommandHandler
             return ApiResult<EdgeCommandPullResult>.Fail("Kiosk and execution endpoint are required.", 400);
         }
 
-        if (string.IsNullOrWhiteSpace(command.Credential))
-        {
-            return ApiResult<EdgeCommandPullResult>.Fail("Execution credential is required.", 401);
-        }
-
         var endpoint = await _edgeCommandStore.GetEndpointForCommandAuthAsync(command.EndpointId, cancellationToken);
         if (endpoint is null ||
             endpoint.KioskId != command.KioskId ||
             endpoint.Status != KioskExecutionEndpointStatus.Active ||
             endpoint.CredentialBinding is null ||
-            endpoint.CredentialBinding.Status != ExecutionEndpointCredentialBindingStatus.Active ||
-            !string.Equals(endpoint.CredentialBinding.CredentialReference, command.Credential.Trim(), StringComparison.Ordinal))
+            endpoint.CredentialBinding.Status != ExecutionEndpointCredentialBindingStatus.Active)
         {
             return ApiResult<EdgeCommandPullResult>.Fail("Execution endpoint authentication failed.", 401);
         }

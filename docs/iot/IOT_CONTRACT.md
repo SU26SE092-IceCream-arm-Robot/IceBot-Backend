@@ -443,8 +443,9 @@ Rules:
 ```http
 POST /api/v1/iot/kiosks/{kioskId}/commands/pull
 X-Execution-Endpoint-Id: <endpoint-id>
-X-Execution-Credential: <active endpoint credential>
 ```
+
+Full Edge sends its provisioned client certificate during the TLS handshake. Low-cost controllers add the signed-request headers defined under **Execution Endpoint Transport Authentication** below.
 
 Request:
 
@@ -483,7 +484,9 @@ Rules:
 - Pull marks returned commands as `Delivered` and records a delivery attempt.
 - Retrying command pull can return delivered but unacknowledged commands.
 - Runtime execution state is reported through the event/report ingest boundary, not command ack.
-- If a deployment command expires before acceptance, Cloud marks the command `Rejected` with `CommandExpired` and marks the linked Pending deployment `Failed`. Expiry after command acceptance is not inferred; missing execution reports require a separate report-timeout policy.
+- If a deployment command expires before acceptance, Cloud marks the command `Rejected` with `CommandExpired` and marks the linked Pending deployment `Failed`.
+- Once accepted, command expiry no longer applies. If no `Installed`, `Active`, or `Failed` report moves the deployment out of Pending within the configured accepted-report timeout, Cloud marks that attempt `Failed/ExecutionReportTimeout` without changing the endpoint's previously active release/artifact set.
+- Late reports do not revive a timed-out attempt. Reconciliation requires a new deployment/rollback attempt so Cloud and endpoint history remain explicit.
 - A `DeployConfiguration` payload contains immutable artifact descriptors. During an authenticated pull, each descriptor with a `StorageKey` is enriched with a short-lived `DownloadUrl` and `DownloadUrlExpiresAt`.
 - Rollback uses the same `DeployConfiguration` command contract and includes `RollbackTargetDeploymentId` as provenance. Edge installs it as a new deployment attempt; it does not locally mutate the historical deployment.
 - Presigned download URLs are transport data only. They are not persisted in `EdgeCommand.PayloadJson`, release manifests, or artifact metadata.
@@ -500,17 +503,64 @@ Before command pull, Cloud management must create and activate a `KioskExecution
 
 1. Create the endpoint in `Provisioning` for one kiosk and one execution profile.
 2. Replace its supported robot targets using runtime-target code, machine-model code, and optional same-kiosk device binding.
-3. Provision a write-only credential reference and profile identity.
+3. Provision profile-specific authentication material and a profile identity.
 4. Activate the endpoint; only an Active endpoint with an Active credential may authenticate command pull or report execution state.
 
-Full Edge uses `FullEdgeRuntimeId` and requires `MutualTls`. Low-cost uses `ControllerId` and may use the supported signed-command-over-TLS mode. Cloud stores credential references, not raw credential material in read responses. Disabling or retiring an endpoint blocks runtime authentication without deleting deployment or execution history.
+Full Edge uses `FullEdgeRuntimeId` and requires `MutualTls`; provisioning accepts the client certificate SHA-256 fingerprint. Low-cost uses `ControllerId` and requires `SignedCommandTls`; provisioning accepts an ECDSA NIST P-256 public key PEM. The backend stores only the canonical public key and its SHA-256 fingerprint, never the controller private key. Disabling or retiring an endpoint blocks runtime authentication without deleting deployment or execution history.
+
+Full Edge provisioning body:
+
+```json
+{
+  "profileIdentity": "<full-edge-runtime-id>",
+  "clientCertificateSha256Fingerprint": "<64 lowercase hex characters>"
+}
+```
+
+Low-cost provisioning body:
+
+```json
+{
+  "profileIdentity": "<controller-id>",
+  "ecdsaPublicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+}
+```
+
+### Execution Endpoint Transport Authentication
+
+All IoT routes require HTTPS and `X-Execution-Endpoint-Id`.
+
+**Full Edge:** Kestrel requests a client certificate and the application compares its SHA-256 fingerprint with the active credential binding using constant-time comparison. Certificate-chain trust is not used as endpoint identity; the provisioned fingerprint is the pinning boundary.
+
+**Low-cost controller:** every request includes:
+
+```text
+X-Execution-Timestamp: <Unix seconds>
+X-Execution-Nonce: <new UUID per request>
+X-Execution-Signature: <Base64 ECDSA P-256 signature>
+```
+
+The signature uses SHA-256 and IEEE P1363 fixed-field format (64-byte `r || s`). It signs this UTF-8 canonical string, with one LF between fields and no trailing LF:
+
+```text
+UPPERCASE_HTTP_METHOD
+REQUEST_PATH
+RAW_QUERY_STRING_OR_EMPTY
+endpoint-id-in-D-format
+unix-timestamp
+nonce-in-D-format
+lowercase-sha256-of-raw-request-body
+```
+
+The request path includes the API version and route exactly as sent. The query string includes its leading `?` when present. The body hash is computed from raw bytes before JSON model binding.
+
+Cloud rejects signatures outside `ExecutionEndpointSecurity:SignedRequestMaxClockSkewSeconds`. After successful signature verification, it atomically stores `(EndpointId, Nonce)`; reuse is rejected even across backend instances. Expired nonce rows are removed by data retention. Clients retry with a new timestamp, nonce, and signature.
 
 ### Command Ack
 
 ```http
 POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack
 X-Execution-Endpoint-Id: <endpoint-id>
-X-Execution-Credential: <active endpoint credential>
 ```
 
 Request:
@@ -540,7 +590,6 @@ boundary, not this endpoint.
 ```http
 POST /api/v1/iot/kiosks/{kioskId}/execution-reports
 X-Execution-Endpoint-Id: <endpoint-id>
-X-Execution-Credential: <active endpoint credential>
 ```
 
 Request:

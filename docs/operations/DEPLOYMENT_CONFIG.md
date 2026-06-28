@@ -64,6 +64,10 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | Enable deployment-command timeout reconciliation | `DeploymentTimeoutReconciliation__Enabled` |
 | Deployment timeout reconciliation interval in seconds | `DeploymentTimeoutReconciliation__IntervalSeconds` |
 | Maximum expired deployment commands per reconciliation run | `DeploymentTimeoutReconciliation__MaxCommandsPerRun` |
+| Minutes allowed after command acceptance before the first deployment report | `DeploymentTimeoutReconciliation__AcceptedReportTimeoutMinutes` |
+| Low-cost signed-request maximum clock skew in seconds | `ExecutionEndpointSecurity__SignedRequestMaxClockSkewSeconds` |
+| Used signed-request nonce retention in seconds | `ExecutionEndpointSecurity__NonceRetentionSeconds` |
+| Maximum IoT request body bytes hashed before transport authentication (default 1 MiB) | `ExecutionEndpointSecurity__MaxRequestBodyBytes` |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` |
 | Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |
@@ -122,3 +126,5 @@ When enabled, diagnostics performs provider reachability checks without sending 
 - For production observability, set `Observability__OpenTelemetry__OtlpExporterEnabled=true` for traces/metrics and `Observability__Serilog__OtlpSinkEnabled=true` for structured logs, then configure the OTLP endpoint to point to your collector.
 - Set `Diagnostics__ApiKey` outside Development before using `/management/diagnostics/health`.
 - Keep `Diagnostics__EnableExternalPing=false` unless the deployment check intentionally needs live SMTP/Firebase/PayOS reachability.
+- IoT runtime endpoints require HTTPS. Full Edge client certificates are accepted at the TLS handshake and authenticated by the provisioned SHA-256 fingerprint in WebAPI; do not terminate mTLS at an untrusted proxy.
+- After applying the execution transport-security migration, rotate any pre-existing low-cost credential binding that has no ECDSA public key and any Full Edge binding whose reference is not the normalized certificate SHA-256 fingerprint.

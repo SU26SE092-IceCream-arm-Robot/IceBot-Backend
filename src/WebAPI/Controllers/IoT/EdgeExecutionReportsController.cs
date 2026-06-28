@@ -2,6 +2,8 @@ using Application.EdgeIntegration.Commands;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using WebAPI.Configuration.Security;
+using Application.Shared.Wrappers;
 
 namespace WebAPI.Controllers.IoT;
 
@@ -11,25 +13,30 @@ namespace WebAPI.Controllers.IoT;
 public sealed class EdgeExecutionReportsController : ControllerBase
 {
     private readonly IngestExecutionReportCommandHandler _ingestExecutionReportHandler;
+    private readonly ExecutionEndpointRequestAuthenticator _authenticator;
 
-    public EdgeExecutionReportsController(IngestExecutionReportCommandHandler ingestExecutionReportHandler)
+    public EdgeExecutionReportsController(
+        IngestExecutionReportCommandHandler ingestExecutionReportHandler,
+        ExecutionEndpointRequestAuthenticator authenticator)
     {
         _ingestExecutionReportHandler = ingestExecutionReportHandler;
+        _authenticator = authenticator;
     }
 
     [HttpPost]
     public async Task<IActionResult> IngestExecutionReport(
         Guid kioskId,
         [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
-        [FromHeader(Name = "X-Execution-Credential")] string credential,
         [FromBody] IngestExecutionReportRequest request,
         CancellationToken cancellationToken)
     {
+        var authentication = await _authenticator.AuthenticateAsync(HttpContext, kioskId, endpointId, cancellationToken);
+        if (!authentication.Succeeded) return Unauthorized(ApiResult<object>.Fail(authentication.Message, 401));
+
         var command = new IngestExecutionReportCommand
         {
             KioskId = kioskId,
             EndpointId = endpointId,
-            Credential = credential,
             CommandId = request.CommandId,
             SourceEventId = request.SourceEventId,
             SequenceNumber = request.SequenceNumber,

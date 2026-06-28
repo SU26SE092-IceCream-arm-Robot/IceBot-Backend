@@ -56,9 +56,10 @@ public class KioskExecutionEndpoint : BusinessEntity
             throw new DomainRuleException("Kiosk and endpoint code are required.");
         }
 
-        if (profile == KioskExecutionProfile.FullEdge && authenticationMode != ExecutionEndpointAuthenticationMode.MutualTls)
+        if ((profile == KioskExecutionProfile.FullEdge && authenticationMode != ExecutionEndpointAuthenticationMode.MutualTls) ||
+            (profile == KioskExecutionProfile.LowCostController && authenticationMode != ExecutionEndpointAuthenticationMode.SignedCommandTls))
         {
-            throw new DomainRuleException("Full Edge endpoints require mutual TLS.");
+            throw new DomainRuleException("Full Edge requires mutual TLS; low-cost controller requires signed-command TLS.");
         }
 
         return new KioskExecutionEndpoint

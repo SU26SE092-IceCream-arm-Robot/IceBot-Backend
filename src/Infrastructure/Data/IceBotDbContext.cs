@@ -85,6 +85,7 @@ public class IceBotDbContext : DbContext
     public DbSet<KioskHeartbeat> KioskHeartbeats => Set<KioskHeartbeat>();
     public DbSet<KioskExecutionEndpoint> KioskExecutionEndpoints => Set<KioskExecutionEndpoint>();
     public DbSet<ExecutionEndpointCredentialBinding> ExecutionEndpointCredentialBindings => Set<ExecutionEndpointCredentialBinding>();
+    public DbSet<ExecutionEndpointRequestNonce> ExecutionEndpointRequestNonces => Set<ExecutionEndpointRequestNonce>();
     public DbSet<ExecutionEndpointSupportedRobotTarget> ExecutionEndpointSupportedRobotTargets => Set<ExecutionEndpointSupportedRobotTarget>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
@@ -368,6 +369,17 @@ public class IceBotDbContext : DbContext
             entity.ToTable("ExecutionEndpointCredentialBindings");
             entity.HasIndex(x => x.CredentialReference).IsUnique();
             entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status });
+            entity.HasOne(x => x.KioskExecutionEndpoint)
+                .WithMany()
+                .HasForeignKey(x => x.KioskExecutionEndpointId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ExecutionEndpointRequestNonce>(entity =>
+        {
+            entity.ToTable("ExecutionEndpointRequestNonces");
+            entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Nonce }).IsUnique();
+            entity.HasIndex(x => x.ExpiresAt);
             entity.HasOne(x => x.KioskExecutionEndpoint)
                 .WithMany()
                 .HasForeignKey(x => x.KioskExecutionEndpointId)

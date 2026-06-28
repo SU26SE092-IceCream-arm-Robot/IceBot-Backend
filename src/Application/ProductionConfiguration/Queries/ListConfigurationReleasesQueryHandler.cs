@@ -1,5 +1,5 @@
 using Application.ProductionConfiguration.Abstractions;
-using Application.ProductionConfiguration.Results;
+using Application.ProductionConfiguration.ReadModels;
 using Application.Shared.Wrappers;
 
 namespace Application.ProductionConfiguration.Queries;
@@ -10,7 +10,7 @@ public sealed class ListConfigurationReleasesQueryHandler
 
     public ListConfigurationReleasesQueryHandler(IProductionConfigurationStore store) => _store = store;
 
-    public async Task<PagedResult<ConfigurationReleaseResult>> HandleAsync(
+    public async Task<PagedResult<ConfigurationReleaseSummaryReadModel>> HandleAsync(
         ListConfigurationReleasesQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -22,7 +22,7 @@ public sealed class ListConfigurationReleasesQueryHandler
         var releases = await _store.ListReleasesAsync(
             query.OrganizationId, query.Status, user.IsSystemAdmin, user.AllowedOrganizationIds,
             pageNumber, pageSize, cancellationToken);
-        return PagedResult<ConfigurationReleaseResult>.Success(
-            releases.Select(ConfigurationReleaseResult.FromEntity), count, pageNumber, pageSize);
+        return PagedResult<ConfigurationReleaseSummaryReadModel>.Success(
+            releases, count, pageNumber, pageSize);
     }
 }

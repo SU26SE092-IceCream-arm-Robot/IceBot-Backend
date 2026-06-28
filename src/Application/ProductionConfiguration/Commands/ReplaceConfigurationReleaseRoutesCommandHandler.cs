@@ -56,6 +56,12 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
         {
             var variant = variantsById[route.ProductVariantId];
             var recipe = recipesById[route.RecipeId];
+            if (variant.FulfillmentType != FulfillmentType.MachineProduced)
+            {
+                return ApiResult<ConfigurationReleaseResult>.Fail(
+                    "Execution routes require machine-produced product variants.", 400);
+            }
+
             if (recipe.ProductVariantId != variant.Id)
             {
                 return ApiResult<ConfigurationReleaseResult>.Fail("Every execution route recipe must belong to its product variant.", 400);

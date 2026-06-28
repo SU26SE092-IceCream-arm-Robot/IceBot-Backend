@@ -5,6 +5,7 @@ using Application.Shared.Wrappers;
 using Domain.Common;
 using Domain.Devices.Entities;
 using Domain.Devices.Enums;
+using Application.Devices.Security;
 
 namespace Application.Devices.Commands;
 
@@ -27,15 +28,28 @@ public sealed class ProvisionExecutionEndpointCommandHandler
         if (await _store.ProfileIdentityExistsAsync(command.Request.ProfileIdentity, cancellationToken))
             return ApiResult<ExecutionEndpointResult>.Fail("Profile identity already belongs to another execution endpoint.", 409);
 
-        var credentialReference = command.Request.CredentialReference.Trim();
-        if (await _store.CredentialReferenceExistsAsync(credentialReference, cancellationToken))
+        ExecutionEndpointCredentialMaterial material;
+        try
+        {
+            material = endpoint.AuthenticationMode == ExecutionEndpointAuthenticationMode.MutualTls
+                ? ExecutionEndpointCredentialMaterialFactory.FromCertificateFingerprint(
+                    command.Request.ClientCertificateSha256Fingerprint ?? string.Empty)
+                : ExecutionEndpointCredentialMaterialFactory.FromEcdsaPublicKey(
+                    command.Request.EcdsaPublicKeyPem ?? string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiResult<ExecutionEndpointResult>.Fail(ex.Message, 400);
+        }
+
+        if (await _store.CredentialReferenceExistsAsync(material.Fingerprint, cancellationToken))
             return ApiResult<ExecutionEndpointResult>.Fail("Credential reference already exists.", 409);
 
         try
         {
             var now = DateTimeOffset.UtcNow;
             var credential = ExecutionEndpointCredentialBinding.CreateProvisioned(
-                endpoint.Id, endpoint.AuthenticationMode, credentialReference, now);
+                endpoint.Id, endpoint.AuthenticationMode, material.Fingerprint, now, material.PublicKeyPem);
             credential.CreatedByAccountId = command.UserContext.AccountId;
             await _store.AddCredentialBindingAsync(credential, cancellationToken);
             endpoint.AttachCredentialBinding(credential);

@@ -21,23 +21,29 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     private readonly BulkPublishRobotArtifactsCommandHandler _bulkPublishRobotArtifactsHandler;
     private readonly PublishRobotArtifactCommandHandler _publishRobotArtifactHandler;
     private readonly RetireRobotArtifactCommandHandler _retireRobotArtifactHandler;
+    private readonly DiscardDraftRobotArtifactCommandHandler _discardDraftRobotArtifactHandler;
     private readonly ListRobotArtifactsQueryHandler _listRobotArtifactsHandler;
     private readonly GetRobotArtifactQueryHandler _getRobotArtifactHandler;
+    private readonly CreateRobotArtifactReviewUrlQueryHandler _createReviewUrlHandler;
 
     public ManagementRobotArtifactsController(
         BulkUploadRobotArtifactsCommandHandler bulkUploadRobotArtifactsHandler,
         BulkPublishRobotArtifactsCommandHandler bulkPublishRobotArtifactsHandler,
         PublishRobotArtifactCommandHandler publishRobotArtifactHandler,
         RetireRobotArtifactCommandHandler retireRobotArtifactHandler,
+        DiscardDraftRobotArtifactCommandHandler discardDraftRobotArtifactHandler,
         ListRobotArtifactsQueryHandler listRobotArtifactsHandler,
-        GetRobotArtifactQueryHandler getRobotArtifactHandler)
+        GetRobotArtifactQueryHandler getRobotArtifactHandler,
+        CreateRobotArtifactReviewUrlQueryHandler createReviewUrlHandler)
     {
         _bulkUploadRobotArtifactsHandler = bulkUploadRobotArtifactsHandler;
         _bulkPublishRobotArtifactsHandler = bulkPublishRobotArtifactsHandler;
         _publishRobotArtifactHandler = publishRobotArtifactHandler;
         _retireRobotArtifactHandler = retireRobotArtifactHandler;
+        _discardDraftRobotArtifactHandler = discardDraftRobotArtifactHandler;
         _listRobotArtifactsHandler = listRobotArtifactsHandler;
         _getRobotArtifactHandler = getRobotArtifactHandler;
+        _createReviewUrlHandler = createReviewUrlHandler;
     }
 
     [HttpGet("organizations/{organizationId:guid}/robot-artifacts")]
@@ -156,15 +162,17 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         }
     }
 
-    [HttpPatch("robot-artifacts/{artifactId:guid}/publish")]
+    [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/publish")]
     [Authorize(Policy = "artifact.upload")]
     public async Task<IActionResult> PublishRobotArtifact(
+        Guid organizationId,
         Guid artifactId,
         CancellationToken cancellationToken)
     {
         var command = new PublishRobotArtifactCommand
         {
             UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
             ArtifactId = artifactId
         };
 
@@ -189,13 +197,46 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("robot-artifacts/{artifactId:guid}/retire")]
+    [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/retire")]
     [Authorize(Policy = "artifact.upload")]
-    public async Task<IActionResult> RetireRobotArtifact(Guid artifactId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RetireRobotArtifact(Guid organizationId, Guid artifactId, CancellationToken cancellationToken)
     {
         var result = await _retireRobotArtifactHandler.HandleAsync(new RetireRobotArtifactCommand
         {
             UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            ArtifactId = artifactId
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/review-url")]
+    [Authorize(Policy = "artifact.upload")]
+    public async Task<IActionResult> CreateRobotArtifactReviewUrl(
+        Guid organizationId,
+        Guid artifactId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _createReviewUrlHandler.HandleAsync(new CreateRobotArtifactReviewUrlQuery
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            ArtifactId = artifactId
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}")]
+    [Authorize(Policy = "artifact.upload")]
+    public async Task<IActionResult> DiscardDraftRobotArtifact(
+        Guid organizationId,
+        Guid artifactId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _discardDraftRobotArtifactHandler.HandleAsync(new DiscardDraftRobotArtifactCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
             ArtifactId = artifactId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);

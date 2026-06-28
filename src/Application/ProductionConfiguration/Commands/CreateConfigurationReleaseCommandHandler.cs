@@ -29,15 +29,18 @@ public sealed class CreateConfigurationReleaseCommandHandler
 
         try
         {
-            var releaseNumber = await _store.GetNextReleaseNumberAsync(command.OrganizationId, cancellationToken);
-            var release = ConfigurationRelease.CreateDraft(
+            var release = await _store.CreateNextReleaseAsync(
                 command.OrganizationId,
-                releaseNumber,
-                command.ReleaseManifestSchemaVersion);
-            release.CreatedByAccountId = command.UserContext.AccountId;
-
-            await _store.AddReleaseAsync(release, cancellationToken);
-            await _store.SaveChangesAsync(cancellationToken);
+                releaseNumber =>
+                {
+                    var draft = ConfigurationRelease.CreateDraft(
+                        command.OrganizationId,
+                        releaseNumber,
+                        command.ReleaseManifestSchemaVersion);
+                    draft.CreatedByAccountId = command.UserContext.AccountId;
+                    return draft;
+                },
+                cancellationToken);
             return ApiResult<ConfigurationReleaseResult>.Success(
                 ConfigurationReleaseResult.FromEntity(release),
                 "Configuration release draft created successfully.",

@@ -127,13 +127,19 @@ public sealed class UploadRobotArtifactCommandHandler
         artifact.Id = artifactId;
         artifact.CreatedByAccountId = command.UserContext.AccountId;
 
-        // Do not delete on an ambiguous database exception: the commit may have succeeded.
-        // The grace-period cleanup job reconciles object storage against committed metadata.
-        await _robotConfigurationStore.AddArtifactAsync(artifact, cancellationToken);
-        await _robotConfigurationStore.SaveChangesAsync(cancellationToken);
+        // A concurrent request may win the unique artifact identity after the initial lookup.
+        // Resolve that conflict to the committed winner and remove only this request's known-loser object.
+        var insertResult = await _robotConfigurationStore.InsertArtifactOrGetExistingAsync(artifact, cancellationToken);
+        if (!insertResult.Created)
+        {
+            await TryDeleteUncommittedObjectAsync(writeResult.StorageKey);
+            return ApiResult<RobotArtifactResult>.Success(
+                RobotArtifactResult.FromEntity(insertResult.Artifact),
+                "Matching robot artifact already exists; concurrent upload resolved to existing metadata.");
+        }
 
         return ApiResult<RobotArtifactResult>.Success(
-            RobotArtifactResult.FromEntity(artifact),
+            RobotArtifactResult.FromEntity(insertResult.Artifact),
             "Robot artifact uploaded successfully.",
             201);
     }

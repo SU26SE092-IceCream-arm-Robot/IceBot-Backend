@@ -4,6 +4,8 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.Devices.Entities;
+using Domain.Devices.Enums;
+using Application.Devices.Security;
 
 namespace Application.Devices.Commands;
 
@@ -25,11 +27,6 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Execution endpoint is required.", 400);
         }
 
-        if (string.IsNullOrWhiteSpace(command.CredentialReference))
-        {
-            return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Credential reference is required.", 400);
-        }
-
         var endpoint = await _executionEndpointStore.GetByIdForCredentialRotationAsync(command.EndpointId, cancellationToken);
         if (endpoint is null)
         {
@@ -41,8 +38,21 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Access denied.", 403);
         }
 
-        var credentialReference = command.CredentialReference.Trim();
-        if (await _executionEndpointStore.CredentialReferenceExistsAsync(credentialReference, cancellationToken))
+        ExecutionEndpointCredentialMaterial material;
+        try
+        {
+            material = endpoint.AuthenticationMode == ExecutionEndpointAuthenticationMode.MutualTls
+                ? ExecutionEndpointCredentialMaterialFactory.FromCertificateFingerprint(
+                    command.ClientCertificateSha256Fingerprint ?? string.Empty)
+                : ExecutionEndpointCredentialMaterialFactory.FromEcdsaPublicKey(
+                    command.EcdsaPublicKeyPem ?? string.Empty);
+        }
+        catch (ArgumentException ex)
+        {
+            return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail(ex.Message, 400);
+        }
+
+        if (await _executionEndpointStore.CredentialReferenceExistsAsync(material.Fingerprint, cancellationToken))
         {
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Credential reference already exists.", 409);
         }
@@ -55,6 +65,13 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
         try
         {
             var now = DateTimeOffset.UtcNow;
+            if (endpoint.Status is KioskExecutionEndpointStatus.Provisioning or KioskExecutionEndpointStatus.Retired)
+            {
+                return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail(
+                    "Only active or disabled execution endpoints can rotate credentials.", 400);
+            }
+
+            var wasActive = endpoint.Status == KioskExecutionEndpointStatus.Active;
             if (endpoint.CredentialBinding is not null)
             {
                 endpoint.RevokeCredential(now);
@@ -63,15 +80,19 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
             var newCredential = ExecutionEndpointCredentialBinding.CreateProvisioned(
                 endpoint.Id,
                 endpoint.AuthenticationMode,
-                credentialReference,
-                now);
+                material.Fingerprint,
+                now,
+                material.PublicKeyPem);
             newCredential.CreatedByAccountId = command.UserContext.AccountId;
 
             await _executionEndpointStore.AddCredentialBindingAsync(newCredential, cancellationToken);
 
             endpoint.AttachCredentialBinding(newCredential);
             endpoint.ActivateCredentialBinding(now);
-            endpoint.ReactivateWithCurrentCredential(now);
+            if (wasActive)
+            {
+                endpoint.ReactivateWithCurrentCredential(now);
+            }
             endpoint.UpdatedByAccountId = command.UserContext.AccountId;
 
             await _executionEndpointStore.SaveChangesAsync(cancellationToken);

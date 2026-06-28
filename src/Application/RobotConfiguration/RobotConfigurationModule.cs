@@ -13,13 +13,16 @@ public static class RobotConfigurationModule
         services.AddScoped<BulkPublishRobotArtifactsCommandHandler>();
         services.AddScoped<PublishRobotArtifactCommandHandler>();
         services.AddScoped<RetireRobotArtifactCommandHandler>();
+        services.AddScoped<DiscardDraftRobotArtifactCommandHandler>();
         services.AddScoped<PublishRobotProgramCommandHandler>();
         services.AddScoped<RetireRobotProgramCommandHandler>();
+        services.AddScoped<DiscardDraftRobotProgramCommandHandler>();
         services.AddScoped<CreateRobotProgramCommandHandler>();
         services.AddScoped<ReplaceRobotProgramArtifactsCommandHandler>();
         services.AddScoped<UpdateRobotProgramCommandHandler>();
         services.AddScoped<ListRobotArtifactsQueryHandler>();
         services.AddScoped<GetRobotArtifactQueryHandler>();
+        services.AddScoped<CreateRobotArtifactReviewUrlQueryHandler>();
         services.AddScoped<ListRobotProgramsQueryHandler>();
         services.AddScoped<GetRobotProgramQueryHandler>();
 

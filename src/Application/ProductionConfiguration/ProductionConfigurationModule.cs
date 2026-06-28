@@ -10,16 +10,19 @@ public static class ProductionConfigurationModule
     {
         services.AddScoped<PublishConfigurationReleaseCommandHandler>();
         services.AddScoped<RetireConfigurationReleaseCommandHandler>();
+        services.AddScoped<DiscardDraftConfigurationReleaseCommandHandler>();
         services.AddScoped<DeployFullEdgeConfigurationCommandHandler>();
         services.AddScoped<DeployLowCostArtifactSetCommandHandler>();
         services.AddScoped<CreateConfigurationReleaseCommandHandler>();
         services.AddScoped<ReplaceConfigurationReleaseRoutesCommandHandler>();
         services.AddScoped<ListConfigurationReleasesQueryHandler>();
         services.AddScoped<GetConfigurationReleaseQueryHandler>();
+        services.AddScoped<GetConfigurationReleaseAuthoringOptionsQueryHandler>();
         services.AddScoped<ListConfigurationDeploymentsQueryHandler>();
         services.AddScoped<GetConfigurationDeploymentQueryHandler>();
         services.AddScoped<RollbackConfigurationDeploymentCommandHandler>();
         services.AddScoped<ReconcileExpiredDeploymentCommandsCommandHandler>();
+        services.AddScoped<ReconcileAcceptedDeploymentReportTimeoutsCommandHandler>();
 
         return services;
     }

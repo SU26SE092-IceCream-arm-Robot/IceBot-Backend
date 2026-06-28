@@ -10,6 +10,7 @@ namespace Infrastructure.RobotConfiguration.Jobs;
 public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
 {
     private const string ArtifactPrefix = "robot-artifacts/";
+    private const long CleanupLockKey = 0x494345424F544F52L;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RobotArtifactObjectStorageOptions _options;
     private readonly ILogger<RobotArtifactOrphanCleanupJob> _logger;
@@ -62,6 +63,14 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
     private async Task CleanupAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
+        var lockManager = scope.ServiceProvider.GetRequiredService<Infrastructure.Concurrency.PostgresAdvisoryLockManager>();
+        await using var cleanupLock = await lockManager.TryAcquireAsync(CleanupLockKey, cancellationToken);
+        if (cleanupLock is null)
+        {
+            _logger.LogInformation("Robot artifact orphan cleanup skipped because another backend instance holds the distributed lock.");
+            return;
+        }
+
         var storage = scope.ServiceProvider.GetRequiredService<IArtifactObjectStorage>();
         var store = scope.ServiceProvider.GetRequiredService<IRobotConfigurationStore>();
         var referencedKeys = (await store.ListArtifactStorageKeysAsync(cancellationToken))

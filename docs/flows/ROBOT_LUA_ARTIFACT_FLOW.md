@@ -56,29 +56,34 @@ Fairino-Studio project
 | 3. Find existing artifacts | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-artifacts` | Returns a tenant-scoped, paged artifact list with optional `search` and `status`. |
 | 4. Upload files | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-artifacts/bulk` | Uploads up to 50 files with metadata. Each successful item creates one unassigned Draft `RobotArtifact`; no program sequence changes. Policy: `artifact.upload`. |
 | 5. Inspect artifact | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}` | Returns artifact metadata only when both artifact and organization match the caller's scope. It does not return a download URL. |
-| 6. Publish reviewed artifacts | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish-bulk` | Atomically publishes 1–100 selected Draft artifacts after staging review. Already Published selections are idempotent success. Policy: `artifact.upload`. |
-| 6A. Publish one artifact | Management UI | `PATCH /api/v1/management/robot-artifacts/{artifactId}/publish` | Single-artifact alternative. |
-| 6B. Retire artifact | Management UI | `PATCH /api/v1/management/robot-artifacts/{artifactId}/retire` | Stops new authoring use without deleting Lua bytes or breaking published manifests/rollback. Draft program references must be removed first. |
+| 5A. Review Lua bytes | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/review-url` | Returns an authorized short-lived presigned URL plus checksum/size metadata. The URL is ephemeral and must not be persisted as artifact identity. |
+| 5B. Discard staging artifact | Management UI | `DELETE /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}` | Hard-deletes only an unreferenced Draft artifact. Metadata commits first; object deletion is best-effort and orphan cleanup handles any remaining object. |
+| 6. Publish reviewed artifacts | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish-bulk` | Atomically publishes 1-100 unique selected Draft artifacts after staging review. Already Published selections are idempotent success; other states reject the request. Policy: `artifact.upload`. |
+| 6A. Publish one artifact | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/publish` | Single-artifact alternative with explicit organization ownership. |
+| 6B. Retire artifact | Management UI | `PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/retire` | Stops new authoring use without deleting Lua bytes or breaking published manifests/rollback. Draft program references must be removed first. |
 | 7. Create program | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-programs` | Creates an organization-owned Draft `RobotProgram`, optionally narrowed to Store, Kiosk, or Device scope. Policy: `release.publish`. |
 | 8. Set execution order | Management UI | `PUT /api/v1/management/robot-programs/{programId}/artifacts` | Atomically replaces the complete `RobotProgramArtifact` membership and explicit `RunOrder` values while the program is Draft. |
 | 9. Edit program metadata | Management UI | `PUT /api/v1/management/robot-programs/{programId}` | Updates Draft code, name, and description. Scope remains immutable. |
 | 10. Review programs | Management UI | `GET /api/v1/management/robot-programs` and `GET /api/v1/management/robot-programs/{programId}` | Returns tenant-scoped program data and ordered artifact metadata for review/reordering. |
 | 11. Publish program | Management UI | `PATCH /api/v1/management/robot-programs/{programId}/publish` | Validates published artifacts and creates immutable `ProgramManifestJson` plus `ProgramManifestChecksum`. |
 | 11A. Retire program | Management UI | `PATCH /api/v1/management/robot-programs/{programId}/retire` | Stops new release authoring while preserving published release and rollback history. Draft release references must be removed first. |
+| 11D. Discard program draft | Management UI | `DELETE /api/v1/management/robot-programs/{programId}` | Hard-deletes only a Draft program and its ordered membership. Published or release-referenced programs are preserved. |
+| 11B. Load release options | Management UI | `GET /api/v1/management/organizations/{organizationId}/configuration-release-authoring-options` | Returns eligible machine-produced ProductVariant, Published/Active Recipe, and Published RobotProgram options for release authoring. Optional `productVariantId`, `search`, and per-group `limit` reduce selector payloads. |
 | 12. Create release draft | Management UI | `POST /api/v1/management/organizations/{organizationId}/configuration-releases` | Creates a Draft release and allocates the next organization release number. Policy: `release.publish`. |
 | 12A. Author routes | Management UI | `PUT /api/v1/management/configuration-releases/{releaseId}/routes` | Atomically replaces Draft execution routes and ordered robot-program bindings after validating product, recipe, organization, and published-program references. |
 | 12B. Review releases | Management UI | `GET /api/v1/management/configuration-releases` and `GET /api/v1/management/configuration-releases/{releaseId}` | Returns tenant-scoped release summaries/details with route and binding metadata. |
 | 13. Publish release | Management UI | `PATCH /api/v1/management/configuration-releases/{releaseId}/publish` | Validates execution routes/program bindings and creates immutable release manifest/checksum. Policy: `release.publish`. |
 | 13R. Retire release | Management UI | `PATCH /api/v1/management/configuration-releases/{releaseId}/retire` | Stops normal new deployments. Active history and validated rollback remain available; Pending/Installed deployments must finish first. |
+| 13X. Discard release draft | Management UI | `DELETE /api/v1/management/configuration-releases/{releaseId}` | Hard-deletes only a Draft release and its route/binding children when no deployment references exist. |
 | 13A. Create endpoint | Management UI | `POST /api/v1/management/kiosks/{kioskId}/execution-endpoints` | Creates a Full Edge or Low-cost endpoint in `Provisioning`; Full Edge requires mutual TLS authentication mode. Policy: `devices.manage`. |
 | 13B. Set robot compatibility | Management UI | `PUT /api/v1/management/execution-endpoints/{endpointId}/supported-robot-targets` | Replaces the complete runtime-target/machine-model/device compatibility set while the endpoint is not Active or Retired. |
-| 13C. Provision endpoint | Management UI / provisioning operator | `POST /api/v1/management/execution-endpoints/{endpointId}/provision` | Creates and activates the initial credential binding, assigns the profile identity (`FullEdgeRuntimeId` or `ControllerId`), and activates the endpoint. Credential references are write-only. |
+| 13C. Provision endpoint | Management UI / provisioning operator | `POST /api/v1/management/execution-endpoints/{endpointId}/provision` | Full Edge pins a client-certificate SHA-256 fingerprint; low-cost stores an ECDSA P-256 public key/fingerprint. The private key never enters Cloud. The operation also assigns profile identity and activates the endpoint. |
 | 13D. Operate endpoint | Management UI | `PATCH .../disable`, `PATCH .../reactivate`, `PATCH .../credential`, `PATCH .../retire` | Controls endpoint lifecycle and credential rotation without changing release or artifact history. |
 | 14A. Deploy Full Edge | Management UI | `POST /api/v1/management/kiosks/{kioskId}/configuration-deployments` | Creates `KioskConfigurationDeployment` and durable `DeployConfiguration` command. Policy: `release.deploy`. |
 | 14B. Deploy low-cost set | Management UI | `POST /api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments` | Creates a capacity-limited artifact-set deployment and durable command for a low-cost controller. Policy: `release.deploy`. |
 | 14C. Monitor deployments | Management UI | `GET /api/v1/management/configuration-deployments` and `GET /api/v1/management/configuration-deployments/{deploymentId}` | Reads one unified, tenant-scoped history across Full Edge and Low-cost profiles with `Pending`, `Installed`, `Active`, or `Failed` state and failure provenance. |
 | 14D. Roll back | Management UI | `POST /api/v1/management/configuration-deployments/{deploymentId}/rollback` | Selects a previously Active deployment as the immutable rollback target and creates a new deployment plus command. Policy: `release.rollback`. |
-| 15. Pull command | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/commands/pull` | Authenticates endpoint credential, returns deployment manifest, and enriches artifact descriptors with short-lived `DownloadUrl` values. |
+| 15. Pull command | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/commands/pull` | Authenticates Full Edge by mTLS fingerprint or low-cost by signed request + nonce, returns deployment manifest, and enriches artifact descriptors with short-lived `DownloadUrl` values. |
 | 16. Download files | Execution endpoint | Direct HTTPS GET to presigned object-storage URL | Downloads private `.lua` bytes without exposing a public backend download route. |
 | 17. Verify files | Execution endpoint | Local operation | Verifies `ContentLengthBytes` and SHA-256 `ArtifactChecksum` before install or activation. |
 | 18. Acknowledge command | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack` | Reports dispatch acceptance/rejection only. It does not report installation completion. |
@@ -182,6 +187,8 @@ If the HTTP request is interrupted after some items commit, the client may safel
 - Upload does not add an artifact to any `RobotProgram`.
 - Upload does not append an artifact to the end of an existing sequence.
 - Upload does not publish an artifact or program.
+- Draft discard is unavailable after publication and is blocked while any robot program references the artifact.
+- Review URLs are short-lived transport data. A discard may invalidate an already-issued review URL before its nominal expiry.
 - Management UI should show newly uploaded files as unassigned relative to the selected program.
 - The user explicitly drags/inserts an artifact into the ordered list, or chooses an explicit append action.
 - Only the subsequent `PUT /management/robot-programs/{programId}/artifacts` assigns membership and `RunOrder`.
@@ -266,18 +273,23 @@ Both profiles use the same immutable `RobotArtifact` bytes and checksum identity
 ## Failure And Retry Rules
 
 - Re-uploading identical normalized artifact code plus checksum in one organization returns the existing artifact as idempotent success.
+- Concurrent uploads of that same identity are resolved by the database unique constraint. The losing request returns the winner's metadata and removes its own redundant object rather than surfacing a conflict.
 - Artifact, program, and release retire commands are idempotent. Retirement preserves immutable bytes, manifests, deployment history, and rollback provenance.
 - Published parent history may retain retired children. Retirement is blocked only by mutable Draft parent references, or by Pending/Installed deployments for a release.
 - Artifact name, runtime target, machine model, and description do not redefine an existing identity on retry; backend returns the stored metadata. Use a different artifact code when the same bytes intentionally represent a distinct artifact identity.
 - Object bytes are written before metadata is committed. A domain failure before DB write triggers immediate best-effort deletion.
 - Database exceptions are treated as commit-ambiguous: upload does not immediately delete the object because metadata may already have committed.
 - `RobotArtifactOrphanCleanupJob` periodically compares private object-storage keys with committed `RobotArtifact.StorageKey` values. It deletes only unreferenced objects older than the configured grace period and stops at a configured per-run delete limit.
+- Orphan cleanup holds a PostgreSQL advisory lock for the scan/delete window, so multiple backend instances do not clean the same bucket concurrently.
 - Objects without a reliable last-modified timestamp are skipped rather than deleted.
+- Release-number allocation is serialized per organization with a transaction-scoped PostgreSQL advisory lock; other organizations remain independent.
 - Command pull may return a delivered but unacknowledged deployment again.
 - Command acknowledgement is transport state only; deployment completion belongs to execution reports.
 - Each deployment command has a typed `DeploymentId` and `DeploymentKind`; reconciliation never parses `PayloadJson` to discover ownership.
 - `DeploymentTimeoutReconciliationJob` rejects expired `PendingDelivery`/`Delivered` deployment commands with `CommandExpired` and changes the linked Pending deployment to Failed. It also completes reconciliation when pull/ack already rejected the command as expired.
-- Command expiry applies only before executor acceptance. An Accepted command waiting too long for an install/activation report is a separate report-timeout policy and is not failed by command-expiry reconciliation.
+- Command expiry applies only before executor acceptance. After acceptance, a separate configurable report timeout starts from `EdgeCommand.RespondedAt`.
+- If the linked deployment is still Pending after `AcceptedReportTimeoutMinutes`, conditional reconciliation marks it `Failed/ExecutionReportTimeout`. An already Installed deployment is outside this rule; activation timeout is a separate lifecycle concern.
+- A report arriving after `ExecutionReportTimeout` cannot revive that failed deployment attempt. Operators must inspect endpoint state and request a new deployment or rollback, preserving attempt history.
 - A failed deployment keeps the previously active configuration/artifact set. It must not delete a known-good active set merely because a new deployment failed.
 - Rollback never mutates the selected deployment, release, artifact set, program manifest, or artifact bytes. It creates a new Pending deployment and a new `DeployConfiguration` command.
 - A Retired release may be redeployed only through rollback to a deployment that was previously Active; normal deployment still requires Published status.

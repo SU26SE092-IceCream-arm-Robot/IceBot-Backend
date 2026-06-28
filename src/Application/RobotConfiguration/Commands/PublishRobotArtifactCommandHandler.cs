@@ -20,12 +20,12 @@ public sealed class PublishRobotArtifactCommandHandler
         CancellationToken cancellationToken = default)
     {
         var artifact = await _robotConfigurationStore.GetArtifactForPublishAsync(command.ArtifactId, cancellationToken);
-        if (artifact is null)
+        if (artifact is null || artifact.OrganizationId != command.OrganizationId)
         {
             return ApiResult<RobotArtifactResult>.Fail("Robot artifact not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, artifact.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, null, null))
         {
             return ApiResult<RobotArtifactResult>.Fail("Access denied.", 403);
         }

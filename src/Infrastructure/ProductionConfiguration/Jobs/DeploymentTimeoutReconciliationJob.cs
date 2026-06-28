@@ -39,7 +39,14 @@ public sealed class DeploymentTimeoutReconciliationJob : BackgroundService
             {
                 using var scope = _scopeFactory.CreateScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ReconcileExpiredDeploymentCommandsCommandHandler>();
-                var result = await handler.HandleAsync(DateTimeOffset.UtcNow, batchSize, stoppingToken);
+                var reportTimeoutHandler = scope.ServiceProvider.GetRequiredService<ReconcileAcceptedDeploymentReportTimeoutsCommandHandler>();
+                var now = DateTimeOffset.UtcNow;
+                var result = await handler.HandleAsync(now, batchSize, stoppingToken);
+                var reportTimeoutResult = await reportTimeoutHandler.HandleAsync(
+                    now,
+                    TimeSpan.FromMinutes(Math.Max(_options.AcceptedReportTimeoutMinutes, 1)),
+                    batchSize,
+                    stoppingToken);
 
                 if (result.ExpiredCommandCount > 0)
                 {
@@ -48,6 +55,14 @@ public sealed class DeploymentTimeoutReconciliationJob : BackgroundService
                         result.ExpiredCommandCount,
                         result.ReconciledDeploymentCount,
                         result.MissingDeploymentCount);
+                }
+
+                if (reportTimeoutResult.TotalCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Deployment report timeout reconciliation failed {FullEdgeCount} Full Edge and {ControllerCount} low-cost deployments whose accepted commands received no installation report.",
+                        reportTimeoutResult.FullEdgeDeploymentCount,
+                        reportTimeoutResult.ControllerDeploymentCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

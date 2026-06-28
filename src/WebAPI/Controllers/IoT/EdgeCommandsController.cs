@@ -2,6 +2,8 @@ using Application.EdgeIntegration.Commands;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
+using WebAPI.Configuration.Security;
+using Application.Shared.Wrappers;
 
 namespace WebAPI.Controllers.IoT;
 
@@ -12,28 +14,32 @@ public sealed class EdgeCommandsController : ControllerBase
 {
     private readonly PullEdgeCommandsCommandHandler _pullCommandsHandler;
     private readonly AcknowledgeEdgeCommandCommandHandler _acknowledgeCommandHandler;
+    private readonly ExecutionEndpointRequestAuthenticator _authenticator;
 
     public EdgeCommandsController(
         PullEdgeCommandsCommandHandler pullCommandsHandler,
-        AcknowledgeEdgeCommandCommandHandler acknowledgeCommandHandler)
+        AcknowledgeEdgeCommandCommandHandler acknowledgeCommandHandler,
+        ExecutionEndpointRequestAuthenticator authenticator)
     {
         _pullCommandsHandler = pullCommandsHandler;
         _acknowledgeCommandHandler = acknowledgeCommandHandler;
+        _authenticator = authenticator;
     }
 
     [HttpPost("pull")]
     public async Task<IActionResult> PullCommands(
         Guid kioskId,
         [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
-        [FromHeader(Name = "X-Execution-Credential")] string credential,
         [FromBody] PullEdgeCommandsRequest request,
         CancellationToken cancellationToken)
     {
+        var authentication = await _authenticator.AuthenticateAsync(HttpContext, kioskId, endpointId, cancellationToken);
+        if (!authentication.Succeeded) return Unauthorized(ApiResult<object>.Fail(authentication.Message, 401));
+
         var command = new PullEdgeCommandsCommand
         {
             KioskId = kioskId,
             EndpointId = endpointId,
-            Credential = credential,
             MaxCommands = request.MaxCommands,
             EdgeTime = request.EdgeTime
         };
@@ -47,16 +53,17 @@ public sealed class EdgeCommandsController : ControllerBase
         Guid kioskId,
         Guid commandId,
         [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
-        [FromHeader(Name = "X-Execution-Credential")] string credential,
         [FromBody] AcknowledgeEdgeCommandRequest request,
         CancellationToken cancellationToken)
     {
+        var authentication = await _authenticator.AuthenticateAsync(HttpContext, kioskId, endpointId, cancellationToken);
+        if (!authentication.Succeeded) return Unauthorized(ApiResult<object>.Fail(authentication.Message, 401));
+
         var command = new AcknowledgeEdgeCommandCommand
         {
             KioskId = kioskId,
             EndpointId = endpointId,
             CommandId = commandId,
-            Credential = credential,
             AckStatus = request.AckStatus,
             AcknowledgedAt = request.AcknowledgedAt,
             RejectionCode = request.RejectionCode,

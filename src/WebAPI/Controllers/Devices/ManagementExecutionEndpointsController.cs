@@ -161,7 +161,8 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         {
             UserContext = User.GetUserContext(),
             EndpointId = endpointId,
-            CredentialReference = request.CredentialReference,
+            ClientCertificateSha256Fingerprint = request.ClientCertificateSha256Fingerprint,
+            EcdsaPublicKeyPem = request.EcdsaPublicKeyPem,
             AuthenticationMode = request.AuthenticationMode
         };
 
@@ -172,9 +173,10 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
 
 public sealed class RotateExecutionEndpointCredentialRequest
 {
-    [Required]
-    [StringLength(300)]
-    public string CredentialReference { get; init; } = string.Empty;
+    [StringLength(128)]
+    public string? ClientCertificateSha256Fingerprint { get; init; }
+
+    public string? EcdsaPublicKeyPem { get; init; }
 
     public ExecutionEndpointAuthenticationMode? AuthenticationMode { get; init; }
 }

@@ -286,6 +286,15 @@ Notes:
 - For artifact-first configuration, use immutable artifact checksum, `RobotProgramId + RunOrder`, release number and release route code constraints.
 - They may need optimistic concurrency (`Version`) if edited from both cloud and edge.
 
+## Artifact And Release Concurrency
+
+- Robot artifact upload identity is `OrganizationId + normalized ArtifactCode + SHA-256 Checksum`, enforced by a unique database index.
+- The pre-insert lookup is only an optimization. If concurrent uploads pass it together, the unique-index loser reloads and returns the committed winner as idempotent success, then deletes only its own known-uncommitted object-storage key.
+- Ambiguous database failures are not treated as uniqueness conflicts and must not trigger immediate object deletion; orphan cleanup handles them after the grace period.
+- Configuration release numbers are allocated inside a database transaction protected by a PostgreSQL transaction-scoped advisory lock derived from `OrganizationId`. This preserves `MAX + 1` numbering per organization without serializing unrelated organizations.
+- The unique `OrganizationId + ReleaseNumber` index remains the final integrity boundary.
+- `RobotArtifactOrphanCleanupJob` uses a PostgreSQL session advisory lock. At most one backend instance scans/deletes orphans per run; another instance skips when the lock is held. A crashed instance releases the lock when its database connection closes.
+
 ## Do Not Soft Delete Event Tables
 
 Event, callback, retry, and append-only evidence tables should not use soft delete as a normal lifecycle.

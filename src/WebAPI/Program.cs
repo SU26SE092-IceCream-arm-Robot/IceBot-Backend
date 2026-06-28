@@ -24,6 +24,8 @@ try
 
     var builder = WebApplication.CreateBuilder(args);
 
+    builder.WebHost.UseIceBotExecutionEndpointMutualTls();
+
     builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                                     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
                                     .AddEnvironmentVariables();
@@ -67,6 +69,8 @@ try
     app.UseMiddleware<CorrelationIdMiddleware>();
 
     app.UseMiddleware<GlobalExceptionMiddleware>();
+
+    app.UseMiddleware<ExecutionRequestBodyHashMiddleware>();
 
     if (app.Configuration.GetValue<bool>("Observability:DebugBodyLogging:Enabled"))
     {

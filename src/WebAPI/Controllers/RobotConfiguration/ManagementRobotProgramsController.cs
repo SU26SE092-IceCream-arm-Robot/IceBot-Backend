@@ -23,6 +23,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
     private readonly ReplaceRobotProgramArtifactsCommandHandler _replaceArtifactsHandler;
     private readonly PublishRobotProgramCommandHandler _publishHandler;
     private readonly RetireRobotProgramCommandHandler _retireHandler;
+    private readonly DiscardDraftRobotProgramCommandHandler _discardHandler;
 
     public ManagementRobotProgramsController(
         ListRobotProgramsQueryHandler listHandler,
@@ -31,7 +32,8 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         UpdateRobotProgramCommandHandler updateHandler,
         ReplaceRobotProgramArtifactsCommandHandler replaceArtifactsHandler,
         PublishRobotProgramCommandHandler publishHandler,
-        RetireRobotProgramCommandHandler retireHandler)
+        RetireRobotProgramCommandHandler retireHandler,
+        DiscardDraftRobotProgramCommandHandler discardHandler)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
@@ -40,6 +42,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         _replaceArtifactsHandler = replaceArtifactsHandler;
         _publishHandler = publishHandler;
         _retireHandler = retireHandler;
+        _discardHandler = discardHandler;
     }
 
     [HttpGet("robot-programs")]
@@ -145,6 +148,17 @@ public sealed class ManagementRobotProgramsController : ControllerBase
     public async Task<IActionResult> RetireRobotProgram(Guid programId, CancellationToken cancellationToken)
     {
         var result = await _retireHandler.HandleAsync(new RetireRobotProgramCommand
+        {
+            UserContext = User.GetUserContext(),
+            ProgramId = programId
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("robot-programs/{programId:guid}")]
+    public async Task<IActionResult> DiscardDraftRobotProgram(Guid programId, CancellationToken cancellationToken)
+    {
+        var result = await _discardHandler.HandleAsync(new DiscardDraftRobotProgramCommand
         {
             UserContext = User.GetUserContext(),
             ProgramId = programId

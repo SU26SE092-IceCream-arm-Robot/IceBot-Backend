@@ -30,8 +30,7 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             endpoint.KioskId != command.KioskId ||
             endpoint.Status != KioskExecutionEndpointStatus.Active ||
             endpoint.CredentialBinding is null ||
-            endpoint.CredentialBinding.Status != ExecutionEndpointCredentialBindingStatus.Active ||
-            !string.Equals(endpoint.CredentialBinding.CredentialReference, command.Credential.Trim(), StringComparison.Ordinal))
+            endpoint.CredentialBinding.Status != ExecutionEndpointCredentialBindingStatus.Active)
         {
             return ApiResult<EdgeCommandAckResult>.Fail("Execution endpoint authentication failed.", 401);
         }

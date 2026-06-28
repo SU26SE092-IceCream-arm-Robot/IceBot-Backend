@@ -1,5 +1,5 @@
 using Application.RobotConfiguration.Abstractions;
-using Application.RobotConfiguration.Results;
+using Application.RobotConfiguration.ReadModels;
 using Application.Shared.Wrappers;
 
 namespace Application.RobotConfiguration.Queries;
@@ -10,7 +10,7 @@ public sealed class ListRobotProgramsQueryHandler
 
     public ListRobotProgramsQueryHandler(IRobotConfigurationStore store) => _store = store;
 
-    public async Task<PagedResult<RobotProgramResult>> HandleAsync(
+    public async Task<PagedResult<RobotProgramSummaryReadModel>> HandleAsync(
         ListRobotProgramsQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -25,7 +25,7 @@ public sealed class ListRobotProgramsQueryHandler
             user.AllowedOrganizationIds, user.AllowedStoreIds, user.AllowedKioskIds,
             pageNumber, pageSize, cancellationToken);
 
-        return PagedResult<RobotProgramResult>.Success(
-            programs.Select(RobotProgramResult.FromEntity), count, pageNumber, pageSize);
+        return PagedResult<RobotProgramSummaryReadModel>.Success(
+            programs, count, pageNumber, pageSize);
     }
 }

@@ -33,6 +33,8 @@ public sealed class ProvisionExecutionEndpointRequest
 {
     public Guid ProfileIdentity { get; init; }
 
-    [Required, StringLength(300, MinimumLength = 1)]
-    public string CredentialReference { get; init; } = null!;
+    [StringLength(128)]
+    public string? ClientCertificateSha256Fingerprint { get; init; }
+
+    public string? EcdsaPublicKeyPem { get; init; }
 }

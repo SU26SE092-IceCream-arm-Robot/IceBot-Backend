@@ -51,6 +51,7 @@ namespace Infrastructure
             });
 
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
+            services.AddScoped<Concurrency.PostgresAdvisoryLockManager>();
             services.Configure<EmailOptions>(config.GetSection(EmailOptions.SectionName));
             services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();
@@ -75,6 +76,7 @@ namespace Infrastructure
                 config.GetSection(ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions.SectionName));
             services.AddHostedService<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationJob>();
             services.AddScoped<IEdgeCommandStore, EdgeCommandStore>();
+            services.AddScoped<IExecutionEndpointTransportAuthStore, ExecutionEndpointTransportAuthStore>();
             services.AddScoped<IExecutionReportStore, ExecutionReportStore>();
 
             return services;

@@ -4,7 +4,6 @@ public sealed class IngestExecutionReportCommand
 {
     public required Guid KioskId { get; init; }
     public required Guid EndpointId { get; init; }
-    public required string Credential { get; init; }
     public required Guid CommandId { get; init; }
     public required Guid SourceEventId { get; init; }
     public required long SequenceNumber { get; init; }

@@ -32,7 +32,7 @@ public sealed class IngestExecutionReportCommandHandler
         }
 
         var endpoint = await _executionReportStore.GetEndpointForReportAuthAsync(command.EndpointId, cancellationToken);
-        if (!IsAuthenticatedEndpoint(endpoint, command))
+        if (!IsUsableEndpoint(endpoint, command))
         {
             return ApiResult<ExecutionReportIngestResult>.Fail("Execution endpoint authentication failed.", 401);
         }
@@ -95,12 +95,11 @@ public sealed class IngestExecutionReportCommandHandler
             command.EndpointId == Guid.Empty ||
             command.CommandId == Guid.Empty ||
             command.SourceEventId == Guid.Empty ||
-            string.IsNullOrWhiteSpace(command.Credential) ||
             string.IsNullOrWhiteSpace(command.ReportType) ||
             string.IsNullOrWhiteSpace(command.Status) ||
             command.SequenceNumber <= 0)
         {
-            return "Kiosk, endpoint, command, source event, sequence, report type, status, and credential are required.";
+            return "Kiosk, endpoint, command, source event, sequence, report type, and status are required.";
         }
 
         if (command.EdgeCreatedAt == default)
@@ -111,14 +110,13 @@ public sealed class IngestExecutionReportCommandHandler
         return null;
     }
 
-    private static bool IsAuthenticatedEndpoint(KioskExecutionEndpoint? endpoint, IngestExecutionReportCommand command)
+    private static bool IsUsableEndpoint(KioskExecutionEndpoint? endpoint, IngestExecutionReportCommand command)
     {
         return endpoint is not null &&
             endpoint.KioskId == command.KioskId &&
             endpoint.Status == KioskExecutionEndpointStatus.Active &&
             endpoint.CredentialBinding is not null &&
-            endpoint.CredentialBinding.Status == ExecutionEndpointCredentialBindingStatus.Active &&
-            string.Equals(endpoint.CredentialBinding.CredentialReference, command.Credential.Trim(), StringComparison.Ordinal);
+            endpoint.CredentialBinding.Status == ExecutionEndpointCredentialBindingStatus.Active;
     }
 
     private static Guid? GetSourceExecutorId(KioskExecutionEndpoint endpoint)

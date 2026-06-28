@@ -4,6 +4,9 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Tenants.Enums;
 using Domain.RobotConfiguration.Enums;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Npgsql;
+using Application.RobotConfiguration.ReadModels;
 
 namespace Infrastructure.RobotConfiguration.Persistence;
 
@@ -96,7 +99,7 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
             .CountAsync(cancellationToken);
     }
 
-    public async Task<IReadOnlyList<RobotProgram>> ListProgramsAsync(
+    public async Task<IReadOnlyList<RobotProgramSummaryReadModel>> ListProgramsAsync(
         Guid? organizationId,
         string? search,
         RobotProgramStatus? status,
@@ -109,12 +112,27 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
         CancellationToken cancellationToken = default)
     {
         return await BuildProgramQuery(organizationId, search, status, isSystemAdmin, allowedOrganizationIds, allowedStoreIds, allowedKioskIds)
-            .Include(program => program.RobotProgramArtifacts)
-                .ThenInclude(programArtifact => programArtifact.RobotArtifact)
             .OrderBy(program => program.Code)
             .ThenByDescending(program => program.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
+            .Select(program => new RobotProgramSummaryReadModel
+            {
+                Id = program.Id,
+                OrganizationId = program.OrganizationId,
+                StoreId = program.StoreId,
+                KioskId = program.KioskId,
+                DeviceId = program.DeviceId,
+                Code = program.Code,
+                Name = program.Name,
+                ScopeType = program.ScopeType.ToString(),
+                Status = program.Status.ToString(),
+                Description = program.Description,
+                ProgramManifestSchemaVersion = program.ProgramManifestSchemaVersion,
+                ProgramManifestChecksum = program.ProgramManifestChecksum,
+                PublishedAt = program.PublishedAt,
+                ArtifactCount = program.RobotProgramArtifacts.Count
+            })
             .ToListAsync(cancellationToken);
     }
 
@@ -216,6 +234,58 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
             cancellationToken);
     }
 
+    public async Task<RobotArtifactDiscardOutcome> DiscardDraftArtifactAsync(
+        RobotArtifact artifact,
+        CancellationToken cancellationToken = default)
+    {
+        if (await _dbContext.RobotProgramArtifacts.AnyAsync(
+                item => item.RobotArtifactId == artifact.Id,
+                cancellationToken))
+        {
+            return RobotArtifactDiscardOutcome.Referenced;
+        }
+
+        EntityEntry<RobotArtifact> entry = _dbContext.RobotArtifacts.Remove(artifact);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return RobotArtifactDiscardOutcome.Deleted;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            entry.State = EntityState.Unchanged;
+            return RobotArtifactDiscardOutcome.Referenced;
+        }
+    }
+
+    public async Task<RobotProgramDiscardOutcome> DiscardDraftProgramAsync(
+        RobotProgram program,
+        CancellationToken cancellationToken = default)
+    {
+        if (await _dbContext.ExecutionRouteRobotBindings.AnyAsync(
+                binding => binding.RobotProgramId == program.Id,
+                cancellationToken))
+        {
+            return RobotProgramDiscardOutcome.Referenced;
+        }
+
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        _dbContext.RobotProgramArtifacts.RemoveRange(program.RobotProgramArtifacts);
+        var entry = _dbContext.RobotPrograms.Remove(program);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return RobotProgramDiscardOutcome.Deleted;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            entry.State = EntityState.Unchanged;
+            return RobotProgramDiscardOutcome.Referenced;
+        }
+    }
+
     public async Task<IReadOnlyCollection<string>> ListArtifactStorageKeysAsync(
         CancellationToken cancellationToken = default)
     {
@@ -224,9 +294,31 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
             .ToArrayAsync(cancellationToken);
     }
 
-    public Task AddArtifactAsync(RobotArtifact artifact, CancellationToken cancellationToken = default)
+    public async Task<RobotArtifactInsertResult> InsertArtifactOrGetExistingAsync(
+        RobotArtifact artifact,
+        CancellationToken cancellationToken = default)
     {
-        return _dbContext.RobotArtifacts.AddAsync(artifact, cancellationToken).AsTask();
+        EntityEntry<RobotArtifact> entry = await _dbContext.RobotArtifacts.AddAsync(artifact, cancellationToken);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return new RobotArtifactInsertResult(true, artifact);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            entry.State = EntityState.Detached;
+            var existing = await _dbContext.RobotArtifacts.AsNoTracking().FirstOrDefaultAsync(
+                candidate => candidate.OrganizationId == artifact.OrganizationId &&
+                    candidate.ArtifactCode == artifact.ArtifactCode &&
+                    candidate.Checksum == artifact.Checksum &&
+                    candidate.DeletedAt == null,
+                cancellationToken);
+
+            if (existing is null)
+                throw;
+
+            return new RobotArtifactInsertResult(false, existing);
+        }
     }
 
     public Task AddProgramAsync(RobotProgram program, CancellationToken cancellationToken = default)

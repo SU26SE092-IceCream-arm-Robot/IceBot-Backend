@@ -1,6 +1,7 @@
 using Domain.RobotConfiguration.Entities;
 using Domain.Tenants.Enums;
 using Domain.RobotConfiguration.Enums;
+using Application.RobotConfiguration.ReadModels;
 
 namespace Application.RobotConfiguration.Abstractions;
 
@@ -39,7 +40,7 @@ public interface IRobotConfigurationStore
         IEnumerable<Guid> allowedKioskIds,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<RobotProgram>> ListProgramsAsync(
+    Task<IReadOnlyList<RobotProgramSummaryReadModel>> ListProgramsAsync(
         Guid? organizationId,
         string? search,
         RobotProgramStatus? status,
@@ -84,17 +85,41 @@ public interface IRobotConfigurationStore
         Guid programId,
         CancellationToken cancellationToken = default);
 
+    Task<RobotArtifactDiscardOutcome> DiscardDraftArtifactAsync(
+        RobotArtifact artifact,
+        CancellationToken cancellationToken = default);
+
+    Task<RobotProgramDiscardOutcome> DiscardDraftProgramAsync(
+        RobotProgram program,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<RobotArtifact>> ListArtifactsByIdsAsync(
         IReadOnlyCollection<Guid> artifactIds,
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyCollection<string>> ListArtifactStorageKeysAsync(CancellationToken cancellationToken = default);
 
-    Task AddArtifactAsync(RobotArtifact artifact, CancellationToken cancellationToken = default);
+    Task<RobotArtifactInsertResult> InsertArtifactOrGetExistingAsync(
+        RobotArtifact artifact,
+        CancellationToken cancellationToken = default);
 
     Task AddProgramAsync(RobotProgram program, CancellationToken cancellationToken = default);
 
     void DeleteProgramArtifacts(IEnumerable<RobotProgramArtifact> programArtifacts);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
+}
+
+public sealed record RobotArtifactInsertResult(bool Created, RobotArtifact Artifact);
+
+public enum RobotArtifactDiscardOutcome
+{
+    Deleted = 1,
+    Referenced = 2
+}
+
+public enum RobotProgramDiscardOutcome
+{
+    Deleted = 1,
+    Referenced = 2
 }

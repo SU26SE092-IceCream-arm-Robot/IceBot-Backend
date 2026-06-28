@@ -17,8 +17,10 @@ public sealed class BulkPublishRobotArtifactsCommandHandler
         BulkPublishRobotArtifactsCommand command,
         CancellationToken cancellationToken = default)
     {
-        var ids = command.RobotArtifactIds.Distinct().ToArray();
-        if (ids.Length == 0 || ids.Length > MaximumItemCount || ids.Any(id => id == Guid.Empty))
+        var requestedIds = command.RobotArtifactIds.ToArray();
+        var ids = requestedIds.Distinct().ToArray();
+        if (requestedIds.Length == 0 || requestedIds.Length > MaximumItemCount ||
+            requestedIds.Any(id => id == Guid.Empty) || ids.Length != requestedIds.Length)
         {
             return ApiResult<BulkRobotArtifactPublishResult>.Fail(
                 $"Bulk publish requires 1 to {MaximumItemCount} unique, non-empty robot artifact ids.", 400);
@@ -41,10 +43,10 @@ public sealed class BulkPublishRobotArtifactsCommandHandler
                 "All robot artifacts must belong to the selected organization.", 400);
         }
 
-        if (artifacts.Any(artifact => artifact.Status == RobotArtifactStatus.Retired))
+        if (artifacts.Any(artifact => artifact.Status is not RobotArtifactStatus.Draft and not RobotArtifactStatus.Published))
         {
             return ApiResult<BulkRobotArtifactPublishResult>.Fail(
-                "Retired robot artifacts cannot be published again.", 400);
+                "Only Draft or Published robot artifacts can be included in bulk publish.", 400);
         }
 
         var alreadyPublishedIds = artifacts

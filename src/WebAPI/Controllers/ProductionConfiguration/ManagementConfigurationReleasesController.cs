@@ -23,9 +23,11 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
     private readonly ReplaceConfigurationReleaseRoutesCommandHandler _replaceConfigurationReleaseRoutesHandler;
     private readonly ListConfigurationReleasesQueryHandler _listConfigurationReleasesHandler;
     private readonly GetConfigurationReleaseQueryHandler _getConfigurationReleaseHandler;
+    private readonly GetConfigurationReleaseAuthoringOptionsQueryHandler _getAuthoringOptionsHandler;
     private readonly ListConfigurationDeploymentsQueryHandler _listConfigurationDeploymentsHandler;
     private readonly GetConfigurationDeploymentQueryHandler _getConfigurationDeploymentHandler;
     private readonly RollbackConfigurationDeploymentCommandHandler _rollbackConfigurationDeploymentHandler;
+    private readonly DiscardDraftConfigurationReleaseCommandHandler _discardDraftConfigurationReleaseHandler;
 
     public ManagementConfigurationReleasesController(
         PublishConfigurationReleaseCommandHandler publishConfigurationReleaseHandler,
@@ -36,9 +38,11 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         ReplaceConfigurationReleaseRoutesCommandHandler replaceConfigurationReleaseRoutesHandler,
         ListConfigurationReleasesQueryHandler listConfigurationReleasesHandler,
         GetConfigurationReleaseQueryHandler getConfigurationReleaseHandler,
+        GetConfigurationReleaseAuthoringOptionsQueryHandler getAuthoringOptionsHandler,
         ListConfigurationDeploymentsQueryHandler listConfigurationDeploymentsHandler,
         GetConfigurationDeploymentQueryHandler getConfigurationDeploymentHandler,
-        RollbackConfigurationDeploymentCommandHandler rollbackConfigurationDeploymentHandler)
+        RollbackConfigurationDeploymentCommandHandler rollbackConfigurationDeploymentHandler,
+        DiscardDraftConfigurationReleaseCommandHandler discardDraftConfigurationReleaseHandler)
     {
         _publishConfigurationReleaseHandler = publishConfigurationReleaseHandler;
         _retireConfigurationReleaseHandler = retireConfigurationReleaseHandler;
@@ -48,9 +52,11 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         _replaceConfigurationReleaseRoutesHandler = replaceConfigurationReleaseRoutesHandler;
         _listConfigurationReleasesHandler = listConfigurationReleasesHandler;
         _getConfigurationReleaseHandler = getConfigurationReleaseHandler;
+        _getAuthoringOptionsHandler = getAuthoringOptionsHandler;
         _listConfigurationDeploymentsHandler = listConfigurationDeploymentsHandler;
         _getConfigurationDeploymentHandler = getConfigurationDeploymentHandler;
         _rollbackConfigurationDeploymentHandler = rollbackConfigurationDeploymentHandler;
+        _discardDraftConfigurationReleaseHandler = discardDraftConfigurationReleaseHandler;
     }
 
     [HttpGet("configuration-deployments")]
@@ -143,6 +149,28 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpGet("organizations/{organizationId:guid}/configuration-release-authoring-options")]
+    [Authorize(Policy = "release.publish")]
+    public async Task<IActionResult> GetConfigurationReleaseAuthoringOptions(
+        Guid organizationId,
+        [FromQuery] Guid? productVariantId,
+        [FromQuery] string? search,
+        [FromQuery] int limit = 50,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _getAuthoringOptionsHandler.HandleAsync(
+            new GetConfigurationReleaseAuthoringOptionsQuery
+            {
+                UserContext = User.GetUserContext(),
+                OrganizationId = organizationId,
+                ProductVariantId = productVariantId,
+                Search = search,
+                Limit = limit
+            },
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("organizations/{organizationId:guid}/configuration-releases")]
     [Authorize(Policy = "release.publish")]
     public async Task<IActionResult> CreateConfigurationRelease(
@@ -231,6 +259,19 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
             UserContext = User.GetUserContext(),
             ReleaseId = releaseId
         }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("configuration-releases/{releaseId:guid}")]
+    [Authorize(Policy = "release.publish")]
+    public async Task<IActionResult> DiscardDraftConfigurationRelease(Guid releaseId, CancellationToken cancellationToken)
+    {
+        var result = await _discardDraftConfigurationReleaseHandler.HandleAsync(
+            new DiscardDraftConfigurationReleaseCommand
+            {
+                UserContext = User.GetUserContext(),
+                ReleaseId = releaseId
+            }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

@@ -16,8 +16,9 @@ public sealed class RetireRobotArtifactCommandHandler
         CancellationToken cancellationToken = default)
     {
         var artifact = await _store.GetArtifactForPublishAsync(command.ArtifactId, cancellationToken);
-        if (artifact is null) return ApiResult<RobotArtifactResult>.Fail("Robot artifact not found.", 404);
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, artifact.OrganizationId, null, null))
+        if (artifact is null || artifact.OrganizationId != command.OrganizationId)
+            return ApiResult<RobotArtifactResult>.Fail("Robot artifact not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, null, null))
             return ApiResult<RobotArtifactResult>.Fail("Access denied.", 403);
         if (await _store.ArtifactIsReferencedByDraftProgramAsync(artifact.Id, cancellationToken))
             return ApiResult<RobotArtifactResult>.Fail("Remove the robot artifact from draft programs before retiring it.", 409);

@@ -990,6 +990,10 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("ProvisionedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("PublicKeyPem")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTimeOffset?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1010,6 +1014,45 @@ namespace Infrastructure.Migrations
                     b.HasIndex("KioskExecutionEndpointId", "Status");
 
                     b.ToTable("ExecutionEndpointCredentialBindings", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Devices.Entities.ExecutionEndpointRequestNonce", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("KioskExecutionEndpointId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("Nonce")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestTimestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("KioskExecutionEndpointId", "Nonce")
+                        .IsUnique();
+
+                    b.ToTable("ExecutionEndpointRequestNonces", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Devices.Entities.ExecutionEndpointSupportedRobotTarget", b =>
@@ -4913,6 +4956,17 @@ namespace Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Domain.Devices.Entities.ExecutionEndpointCredentialBinding", b =>
+                {
+                    b.HasOne("Domain.Devices.Entities.KioskExecutionEndpoint", "KioskExecutionEndpoint")
+                        .WithMany()
+                        .HasForeignKey("KioskExecutionEndpointId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("KioskExecutionEndpoint");
+                });
+
+            modelBuilder.Entity("Domain.Devices.Entities.ExecutionEndpointRequestNonce", b =>
                 {
                     b.HasOne("Domain.Devices.Entities.KioskExecutionEndpoint", "KioskExecutionEndpoint")
                         .WithMany()

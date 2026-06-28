@@ -7,4 +7,5 @@ public sealed class DeploymentTimeoutReconciliationOptions
     public bool Enabled { get; set; } = true;
     public int IntervalSeconds { get; set; } = 60;
     public int MaxCommandsPerRun { get; set; } = 100;
+    public int AcceptedReportTimeoutMinutes { get; set; } = 30;
 }
