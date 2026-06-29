@@ -13,6 +13,11 @@ public interface IArtifactObjectStorage
         string storageKey,
         CancellationToken cancellationToken = default);
 
+    Task<ArtifactObjectWriteResult> CopyImmutableAsync(
+        string sourceStorageKey,
+        ArtifactObjectWriteRequest destination,
+        CancellationToken cancellationToken = default);
+
     IAsyncEnumerable<ArtifactObjectInfo> ListAsync(
         string prefix,
         CancellationToken cancellationToken = default);

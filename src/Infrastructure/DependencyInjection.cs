@@ -71,6 +71,7 @@ namespace Infrastructure
             services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
             services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
+            services.AddScoped<IRobotArtifactTemplateStore, RobotArtifactTemplateStore>();
             services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
             services.AddOptions<Application.ProductionConfiguration.LowCostControllerCapacityOptions>()
                 .Bind(config.GetSection(Application.ProductionConfiguration.LowCostControllerCapacityOptions.SectionName))

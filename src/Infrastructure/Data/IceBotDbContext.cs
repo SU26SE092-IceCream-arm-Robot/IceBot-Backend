@@ -113,6 +113,7 @@ public class IceBotDbContext : DbContext
 
     public DbSet<RobotProgram> RobotPrograms => Set<RobotProgram>();
     public DbSet<RobotArtifact> RobotArtifacts => Set<RobotArtifact>();
+    public DbSet<RobotArtifactTemplate> RobotArtifactTemplates => Set<RobotArtifactTemplate>();
     public DbSet<RobotProgramArtifact> RobotProgramArtifacts => Set<RobotProgramArtifact>();
     public DbSet<ConfigurationRelease> ConfigurationReleases => Set<ConfigurationRelease>();
     public DbSet<ExecutionRoute> ExecutionRoutes => Set<ExecutionRoute>();
@@ -632,6 +633,15 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => x.StorageKey).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasIndex(x => new { x.RuntimeTargetCode, x.MachineModelCode, x.Status });
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(x => x.SourceRobotArtifactTemplate).WithMany().HasForeignKey(x => x.SourceRobotArtifactTemplateId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<RobotArtifactTemplate>(entity =>
+        {
+            entity.ToTable("RobotArtifactTemplates");
+            entity.HasIndex(x => new { x.TemplateCode, x.Checksum }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => x.StorageKey).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.RuntimeTargetCode, x.MachineModelCode, x.Status });
         });
 
         modelBuilder.Entity<RobotProgramArtifact>(entity =>

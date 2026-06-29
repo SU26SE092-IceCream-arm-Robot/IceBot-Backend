@@ -140,11 +140,10 @@ public sealed class RollbackConfigurationDeploymentCommandHandler
                 ConfigurationReleaseId = target.ConfigurationReleaseId,
                 KioskExecutionEndpointId = target.KioskExecutionEndpointId,
                 IdempotencyKey = command.IdempotencyKey,
-                Selections = source.Items.Select(item => new DeployLowCostArtifactSelection(
-                    item.ExecutionRouteId,
-                    item.RobotProgramId,
-                    item.RobotArtifactId,
-                    item.RunOrder)).ToArray(),
+                Selections = source.Items
+                    .Select(item => new DeployLowCostArtifactSelection(item.ExecutionRouteId, item.RobotProgramId))
+                    .Distinct()
+                    .ToArray(),
                 CommandExpiryAt = command.CommandExpiryAt,
                 RollbackTargetDeploymentId = target.Id
             },

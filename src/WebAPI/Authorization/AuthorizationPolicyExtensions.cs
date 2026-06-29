@@ -47,6 +47,8 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("artifact.read", "SystemAdmin", "OrgAdmin");
         options.AddScopedRolePolicy("artifact.upload", "SystemAdmin", "OrgAdmin");
+        options.AddScopedRolePolicy("artifact-template.read", "SystemAdmin", "OrgAdmin");
+        options.AddScopedRolePolicy("artifact-template.manage", "SystemAdmin");
         options.AddScopedRolePolicy("program.read", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("program.manage", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("release.read", "SystemAdmin", "OrgAdmin", "Manager");

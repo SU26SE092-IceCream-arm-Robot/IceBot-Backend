@@ -1,5 +1,6 @@
 using Application.RobotConfiguration.Commands;
 using Application.RobotConfiguration.Queries;
+using Application.RobotConfiguration.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.RobotConfiguration;
@@ -8,6 +9,7 @@ public static class RobotConfigurationModule
 {
     public static IServiceCollection AddRobotConfigurationModule(this IServiceCollection services)
     {
+        services.AddScoped<ArtifactUploadContentService>();
         services.AddScoped<UploadRobotArtifactCommandHandler>();
         services.AddScoped<BulkUploadRobotArtifactsCommandHandler>();
         services.AddScoped<BulkPublishRobotArtifactsCommandHandler>();
@@ -25,6 +27,14 @@ public static class RobotConfigurationModule
         services.AddScoped<CreateRobotArtifactReviewUrlQueryHandler>();
         services.AddScoped<ListRobotProgramsQueryHandler>();
         services.AddScoped<GetRobotProgramQueryHandler>();
+        services.AddScoped<UploadRobotArtifactTemplateCommandHandler>();
+        services.AddScoped<BulkUploadRobotArtifactTemplatesCommandHandler>();
+        services.AddScoped<ListRobotArtifactTemplatesQueryHandler>();
+        services.AddScoped<GetRobotArtifactTemplateQueryHandler>();
+        services.AddScoped<CreateRobotArtifactTemplateReviewUrlQueryHandler>();
+        services.AddScoped<PublishRobotArtifactTemplateCommandHandler>();
+        services.AddScoped<RetireRobotArtifactTemplateCommandHandler>();
+        services.AddScoped<CloneRobotArtifactTemplateCommandHandler>();
 
         return services;
     }

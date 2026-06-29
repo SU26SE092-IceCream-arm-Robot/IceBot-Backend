@@ -65,6 +65,7 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | Deployment timeout reconciliation interval in seconds | `DeploymentTimeoutReconciliation__IntervalSeconds` |
 | Maximum expired deployment commands per reconciliation run | `DeploymentTimeoutReconciliation__MaxCommandsPerRun` |
 | Minutes allowed after command acceptance before the first deployment report | `DeploymentTimeoutReconciliation__AcceptedReportTimeoutMinutes` |
+| Minutes allowed between Installed and Active deployment reports | `DeploymentTimeoutReconciliation__InstalledActivationTimeoutMinutes` |
 | Low-cost signed-request maximum clock skew in seconds | `ExecutionEndpointSecurity__SignedRequestMaxClockSkewSeconds` |
 | Used signed-request nonce retention in seconds | `ExecutionEndpointSecurity__NonceRetentionSeconds` |
 | Maximum IoT request body bytes hashed before transport authentication (default 1 MiB) | `ExecutionEndpointSecurity__MaxRequestBodyBytes` |

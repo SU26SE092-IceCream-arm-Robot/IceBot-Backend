@@ -147,6 +147,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, retire devices/hardware; create, configure, provision, disable/reactivate, rotate credentials, or retire execution endpoints within assigned scope |
 | `artifact.read` | `SystemAdmin`, `OrgAdmin` | List, inspect, and request short-lived review URLs for organization-owned robot Lua artifacts |
 | `artifact.upload` | `SystemAdmin`, `OrgAdmin` | Upload, discard Draft, publish, and retire organization-owned robot Lua artifacts |
+| `artifact-template.read` | `SystemAdmin`, `OrgAdmin` | List and review global robot Lua templates; templates cannot execute directly |
+| `artifact-template.manage` | `SystemAdmin` | Upload, publish, and retire global robot Lua templates |
 | `program.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read robot programs within the actor's matching organization/store/kiosk scope |
 | `program.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Author, publish, and retire robot programs within the actor's matching organization/store/kiosk scope |
 | `release.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read production configuration releases and authoring options within the actor's matching organization scope |

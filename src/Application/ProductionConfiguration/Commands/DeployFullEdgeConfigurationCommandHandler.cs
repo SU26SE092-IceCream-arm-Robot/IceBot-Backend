@@ -80,7 +80,8 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                     var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, ct);
                     if (existing.ConfigurationReleaseId != command.ConfigurationReleaseId ||
                         existingCommand is null ||
-                        ReadRollbackTarget(existingCommand.PayloadJson) != command.RollbackTargetDeploymentId)
+                        ReadRollbackTarget(existingCommand.PayloadJson) != command.RollbackTargetDeploymentId ||
+                        ReadRequestedCommandExpiryAt(existingCommand.PayloadJson) != command.CommandExpiryAt)
                         return ApiResult<KioskConfigurationDeploymentResult>.Fail("Idempotency key was already used for a different deployment request.", 409);
                     return ApiResult<KioskConfigurationDeploymentResult>.Success(
                         KioskConfigurationDeploymentResult.FromEntity(existing, existingCommand?.Id),
@@ -110,7 +111,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                 EdgeCommandType.DeployConfiguration,
                 deployment.KioskId,
                 deployment.KioskExecutionEndpointId,
-                BuildDeployPayload(deployment, release, command.RollbackTargetDeploymentId),
+                BuildDeployPayload(deployment, release, command.RollbackTargetDeploymentId, command.CommandExpiryAt),
                 now,
                 commandExpiryAt: commandExpiryAt,
                 deploymentId: deployment.Id,
@@ -138,7 +139,8 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     private static string BuildDeployPayload(
         KioskConfigurationDeployment deployment,
         ConfigurationRelease release,
-        Guid? rollbackTargetDeploymentId)
+        Guid? rollbackTargetDeploymentId,
+        DateTimeOffset? requestedCommandExpiryAt)
     {
         var artifacts = release.ExecutionRoutes
             .SelectMany(route => route.RobotBindings)
@@ -166,6 +168,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             deployment.ConfigurationReleaseId,
             deployment.ReleaseChecksum,
             RollbackTargetDeploymentId = rollbackTargetDeploymentId,
+            RequestedCommandExpiryAt = requestedCommandExpiryAt,
             release.ReleaseManifestSchemaVersion,
             release.ManifestJson,
             Artifacts = artifacts
@@ -180,5 +183,13 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         if (!document.RootElement.TryGetProperty("RollbackTargetDeploymentId", out var value) || value.ValueKind == JsonValueKind.Null)
             return null;
         return value.GetGuid();
+    }
+
+    private static DateTimeOffset? ReadRequestedCommandExpiryAt(string payloadJson)
+    {
+        using var document = JsonDocument.Parse(payloadJson);
+        if (!document.RootElement.TryGetProperty("RequestedCommandExpiryAt", out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        return value.GetDateTimeOffset();
     }
 }

@@ -103,7 +103,7 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
             Selections = request.Selections.Select(item => new DeployLowCostArtifactSelection(
-                item.ExecutionRouteId, item.RobotProgramId, item.RobotArtifactId, item.RunOrder)).ToArray(),
+                item.ExecutionRouteId, item.RobotProgramId)).ToArray(),
             CommandExpiryAt = request.CommandExpiryAt
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -148,9 +148,4 @@ public sealed class DeployLowCostArtifactSetSelectionRequest
     [Required]
     public Guid RobotProgramId { get; init; }
 
-    [Required]
-    public Guid RobotArtifactId { get; init; }
-
-    [Range(1, int.MaxValue)]
-    public int RunOrder { get; init; }
 }

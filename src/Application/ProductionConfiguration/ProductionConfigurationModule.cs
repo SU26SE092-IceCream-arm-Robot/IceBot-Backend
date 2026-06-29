@@ -23,6 +23,7 @@ public static class ProductionConfigurationModule
         services.AddScoped<RollbackConfigurationDeploymentCommandHandler>();
         services.AddScoped<ReconcileExpiredDeploymentCommandsCommandHandler>();
         services.AddScoped<ReconcileAcceptedDeploymentReportTimeoutsCommandHandler>();
+        services.AddScoped<ReconcileInstalledDeploymentActivationTimeoutsCommandHandler>();
 
         return services;
     }

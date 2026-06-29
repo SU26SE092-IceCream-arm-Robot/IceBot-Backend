@@ -8,4 +8,5 @@ public sealed class DeploymentTimeoutReconciliationOptions
     public int IntervalSeconds { get; set; } = 60;
     public int MaxCommandsPerRun { get; set; } = 100;
     public int AcceptedReportTimeoutMinutes { get; set; } = 30;
+    public int InstalledActivationTimeoutMinutes { get; set; } = 30;
 }

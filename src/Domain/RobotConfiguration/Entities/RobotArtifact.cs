@@ -8,6 +8,8 @@ public class RobotArtifact : RobotConfigurationEntity
 {
     public Guid OrganizationId { get; private set; }
 
+    public Guid? SourceRobotArtifactTemplateId { get; private set; }
+
     public string ArtifactCode { get; private set; } = null!;
 
     public string ArtifactName { get; private set; } = null!;
@@ -34,6 +36,8 @@ public class RobotArtifact : RobotConfigurationEntity
 
     public virtual Organization Organization { get; private set; } = null!;
 
+    public virtual RobotArtifactTemplate? SourceRobotArtifactTemplate { get; private set; }
+
     private RobotArtifact()
     {
     }
@@ -50,7 +54,8 @@ public class RobotArtifact : RobotConfigurationEntity
         long contentLengthBytes,
         DateTimeOffset exportedAt,
         string? description = null,
-        string? metadataJson = null)
+        string? metadataJson = null,
+        Guid? sourceRobotArtifactTemplateId = null)
     {
         if (organizationId == Guid.Empty)
         {
@@ -65,6 +70,7 @@ public class RobotArtifact : RobotConfigurationEntity
         return new RobotArtifact
         {
             OrganizationId = organizationId,
+            SourceRobotArtifactTemplateId = sourceRobotArtifactTemplateId,
             ArtifactCode = RequireText(artifactCode, "Robot artifact code"),
             ArtifactName = RequireText(artifactName, "Robot artifact name"),
             StorageKey = RequireText(storageKey, "Robot artifact storage key"),

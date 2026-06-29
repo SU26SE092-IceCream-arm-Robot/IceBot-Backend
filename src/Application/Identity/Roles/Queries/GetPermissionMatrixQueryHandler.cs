@@ -218,6 +218,20 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "artifact-template.read",
+            Description = "Read and review global robot Lua templates.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "artifact-template.manage",
+            Description = "Upload, publish, and retire global robot Lua templates.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "artifact.upload",
             Description = "Upload immutable robot Lua artifacts within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin" },

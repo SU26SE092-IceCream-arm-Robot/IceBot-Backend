@@ -23,7 +23,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public string Name { get; private set; } = null!;
 
-    public TenantScopeType ScopeType { get; private set; } = TenantScopeType.Global;
+    public TenantScopeType ScopeType { get; private set; } = TenantScopeType.Organization;
 
     public RobotProgramStatus Status { get; private set; } = RobotProgramStatus.Draft;
 
@@ -222,7 +222,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
     {
         var valid = scopeType switch
         {
-            TenantScopeType.Global => organizationId is null && storeId is null && kioskId is null && deviceId is null,
+            TenantScopeType.Global => false,
             TenantScopeType.Organization => organizationId.HasValue && storeId is null && kioskId is null && deviceId is null,
             TenantScopeType.Store => organizationId.HasValue && storeId.HasValue && kioskId is null && deviceId is null,
             TenantScopeType.Kiosk => organizationId.HasValue && storeId.HasValue && kioskId.HasValue && deviceId is null,
