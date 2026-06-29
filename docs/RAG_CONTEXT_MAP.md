@@ -46,12 +46,13 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | SignalR realtime UI updates, hub routes, event names, smoke test | [SignalR Realtime Contract](api/SIGNALR_REALTIME_CONTRACT.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [SignalR Smoke Test](operations/SIGNALR_SMOKE_TEST.md) |
 | Catalog to runtime menu, menu sellability, Cloud menu vs Edge projection | [Catalog Runtime Menu Flow](flows/CATALOG_RUNTIME_MENU_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Fairino `.lua` export, global RobotArtifactTemplate, organization clone, RobotArtifact upload, RobotProgram RunOrder, release deployment, presigned download | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
+| Robot artifact migration, MinIO setup, operational smoke, Edge/controller integration test | [Robot Artifact Operational Smoke Test](operations/ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md), [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md) |
 | Tablet/cloud/edge/payment/MQTT/execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) | [IoT Contract](iot/IOT_CONTRACT.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Operations support, telemetry, heartbeat, device events, refund support | [Operations Support Flow](flows/OPERATIONS_SUPPORT_FLOW.md) | [API Surface Rules](api/API_SURFACE_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md) |
 | Maintenance ticket lifecycle, staff support ticket, technician assignment | [Maintenance Ticket Flow](flows/MAINTENANCE_TICKET_FLOW.md) | [Operations Support Flow](flows/OPERATIONS_SUPPORT_FLOW.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Failure flows, edge offline, duplicate notifications, retry behavior | [Failure Flows](flows/FAILURE_FLOWS.md) | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md), [IoT Contract](iot/IOT_CONTRACT.md) |
 | Exact tablet-edge-cloud API/message contract | [IoT Contract](iot/IOT_CONTRACT.md) | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
-| Local edge runtime database design | [Local Edge Runtime ERD](iot/LOCAL_EDGE_RUNTIME_ERD.md) | [IoT Contract](iot/IOT_CONTRACT.md), [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
+| Current Edge runtime contract and artifact deployment | [IoT Contract](iot/IOT_CONTRACT.md) | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md), [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 
 ## Common Query Hints
 
@@ -83,7 +84,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `configuration release authoring`, `ProductVariant Recipe RobotProgram lookup`, `authoring options` | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md), then [API Surface Rules](api/API_SURFACE_RULES.md) |
 | `execution endpoint provisioning`, `FullEdgeRuntimeId`, `ControllerId`, `supported robot target`, `credential rotation` | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md), then [API Surface Rules](api/API_SURFACE_RULES.md) and [IoT Contract](iot/IOT_CONTRACT.md) |
 | `Fairino Studio`, `.lua`, `RunOrder`, `presigned artifact download`, `artifact deployment` | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md) |
-| `local edge db`, `ProductionJob`, `artifact cache`, `workcell scheduler` | [Local Edge Runtime ERD](iot/LOCAL_EDGE_RUNTIME_ERD.md) |
+| `local edge db`, `ProductionJob`, `artifact cache`, `workcell scheduler` | [IoT Contract](iot/IOT_CONTRACT.md); use [Historical Step-First Local Edge Runtime ERD](iot/HISTORICAL_STEP_FIRST_LOCAL_EDGE_RUNTIME_ERD.md) only when explicitly comparing the removed step-first proposal |
 
 ## Related Docs
 

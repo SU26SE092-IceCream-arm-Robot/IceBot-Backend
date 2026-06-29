@@ -27,6 +27,16 @@ The `.fairobot` project file remains a design-time Fairino-Studio file. It is no
 
 `RobotArtifactTemplate` is also design-time input. It is globally managed and cannot be added to a program, release, or deployment. An organization must clone a Published template into its own Draft `RobotArtifact`, review it, and publish it before production use. The clone records `SourceRobotArtifactTemplateId`, but owns separate metadata and object-storage bytes so later template retirement cannot break organization runtime history.
 
+### Documentation Ownership
+
+- This file owns the end-to-end Lua authoring, publication, deployment, download, and activation workflow.
+- [API Surface Rules](../api/API_SURFACE_RULES.md) owns route placement, request/response boundaries, paging, and transport-facing behavior.
+- [IoT Contract](../iot/IOT_CONTRACT.md) owns Edge/controller authentication, command pull/ack, report envelopes, and retry semantics.
+- [Deployment Configuration](../operations/DEPLOYMENT_CONFIG.md) owns environment variables, secrets, storage endpoints, and timeout settings.
+- [Robot Artifact Operational Smoke Test](../operations/ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md) owns runnable migration, MinIO, and integration verification commands.
+
+Other documents should summarize only the rules they own and link here instead of maintaining a second copy of this flow.
+
 ## End-To-End Flow
 
 ```text
@@ -309,13 +319,9 @@ Both profiles use the same immutable `RobotArtifact` bytes and checksum identity
 - A Retired release may be redeployed only through rollback to a deployment that was previously Active; normal deployment still requires Published status.
 - Rollback is rejected when the target is not Active, is already the endpoint's observed active deployment, no longer matches the endpoint profile, or another Pending/Installed deployment blocks the endpoint.
 
-## Current Missing Surface
+## Runtime Verification
 
-The following piece remains after release authoring, deployment reads, rollback, and deployment timeout reconciliation:
-
-1. Runtime integration test using real MinIO plus an Edge/controller client.
-
-These are missing API/integration surfaces, not responsibilities of Fairino-Studio.
+The PostgreSQL plus MinIO integration suite covers the Edge/controller command contract and the complete authoring-to-activation smoke path. See [Robot Artifact Operational Smoke Test](../operations/ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md) for the runnable workflow and operational prerequisites.
 
 ## Related Docs
 

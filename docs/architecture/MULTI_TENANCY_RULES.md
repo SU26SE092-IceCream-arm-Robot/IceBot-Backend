@@ -369,7 +369,7 @@ Cloud/platform owns:
 
 - global product templates
 - global recipes
-- global robot program templates
+- global robot artifact templates
 - payment methods
 - device types
 - roles

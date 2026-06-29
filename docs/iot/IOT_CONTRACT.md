@@ -693,37 +693,23 @@ Maps to `KioskHeartbeat`.
 
 ### Configuration Sync
 
-```http
-GET /api/v1/iot/kiosks/{kioskId}/configuration?currentVersion={version}
+There is no current `GET /api/v1/iot/kiosks/{kioskId}/configuration` endpoint.
+
+Current production configuration distribution uses the durable command flow:
+
+```text
+Published ConfigurationRelease
+-> DeployConfiguration EdgeCommand
+-> authenticated command pull
+-> short-lived artifact download URLs
+-> local size/checksum verification
+-> Installed report
+-> Active report
 ```
 
-Purpose: edge fetches menu, product variant, product, recipe, recipe execution profile, robot program, and device configuration snapshots.
+Cloud ships immutable release/program manifests and ordered `RobotArtifact` descriptors. `RobotProgramArtifact.RunOrder` defines artifact execution order; Cloud does not ship `RobotProgramStep`, motion commands, Blockly trees, teaching points, or realtime robot steps.
 
-Response:
-
-```json
-{
-  "configurationVersion": 42,
-  "generatedAt": "2026-05-21T10:00:00Z",
-  "checksum": "sha256",
-  "menus": [],
-  "menuItems": [],
-  "products": [],
-  "productVariants": [],
-  "recipes": [],
-  "recipeExecutionProfiles": [],
-  "robotPrograms": [],
-  "devices": []
-}
-```
-
-Rules:
-
-- Recipe execution profiles are Cloud-side config bindings that Edge can resolve into local runtime recipe-program bindings.
-- Robot programs and steps are shipped as complete versioned packages.
-- `RobotProgramStep` represents a workflow action/instruction. For motion steps, it references local Fairino point/frame names instead of Cloud-owned coordinates.
-- Do not send realtime robot step commands from Cloud.
-- Edge executes robot steps locally through the robot SDK/controller using local Fairino execution data.
+A future catalog/menu snapshot endpoint is a separate contract. It must not reintroduce the removed step-first robot configuration model or duplicate the deployment command path.
 
 ## Idempotency And Retry Rules
 
@@ -792,7 +778,7 @@ Future hardening:
 - [System Flows](../flows/SYSTEM_FLOWS.md)
 - [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md)
 - [Failure Flows](../flows/FAILURE_FLOWS.md)
-- [Local Edge Runtime ERD](LOCAL_EDGE_RUNTIME_ERD.md)
+- [Historical Step-First Local Edge Runtime ERD](HISTORICAL_STEP_FIRST_LOCAL_EDGE_RUNTIME_ERD.md) (comparison only)
 - [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](../data/JSON_FIELD_RULES.md)
 - [Multi-Tenancy Rules](../architecture/MULTI_TENANCY_RULES.md)

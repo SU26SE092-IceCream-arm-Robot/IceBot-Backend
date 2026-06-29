@@ -31,7 +31,7 @@ Rules:
 - Do not put query-critical fields only inside JSON. Promote them to typed columns.
 - Validate JSON against the matching schema version before publish, activation, or deployment to edge.
 - Edge sync conflict resolution must use the owning aggregate version, not JSON diffing.
-- Robot programs and steps should be shipped to edge as a complete versioned package, not as ad hoc realtime step edits.
+- Published robot program manifests and ordered artifact descriptors should be shipped to Edge as immutable versioned configuration, not as ad hoc realtime motion/step edits.
 
 ### Immutable snapshot
 

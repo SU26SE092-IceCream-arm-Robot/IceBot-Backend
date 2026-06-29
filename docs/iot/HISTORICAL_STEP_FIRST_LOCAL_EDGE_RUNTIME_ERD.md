@@ -1,9 +1,6 @@
-Exit code: 0
-Wall time: 0.1 seconds
-Output:
-# Local Edge Runtime ERD
+# Historical Step-First Local Edge Runtime ERD
 
-This document preserves the earlier proposed Local Edge PostgreSQL relationship model for reference. It is not the current artifact-first Edge contract and must not be implemented directly.
+This document preserves the earlier proposed Local Edge PostgreSQL relationship model for comparison only. It is not the current artifact-first Edge contract and must not be implemented directly.
 
 The current backend owns Cloud configuration, dispatch and projections only. A future Edge schema must use artifact-first configuration and Edge-local `ProductionJob`/`ProductionJobEvent`, not the `RobotJob`/step-first model documented below.
 
