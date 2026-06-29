@@ -7,6 +7,9 @@ COPY . .
 RUN dotnet tool install --global dotnet-ef
 ENV PATH="$PATH:/root/.dotnet/tools"
 
+# 1.1 Restore
+RUN dotnet restore "src/WebAPI/WebAPI.csproj"
+
 # 2. Tạo Migration Bundle thành một file thực thi tên là 'efbundle'
 RUN dotnet ef migrations bundle \
     --project src/Infrastructure/Infrastructure.csproj \
@@ -14,8 +17,8 @@ RUN dotnet ef migrations bundle \
     --force \
     -o /app/publish/efbundle
 
-# 3. Restore và Publish code như cũ
-RUN dotnet restore "src/WebAPI/WebAPI.csproj"
+# 3. Publish code như cũ
+
 RUN dotnet publish "src/WebAPI/WebAPI.csproj" \
     -c Release \
     -o /app/publish \
