@@ -130,6 +130,12 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Active commands per endpoint | `OrderExecutionDispatch__MaxActiveCommandsPerEndpoint` | **P1** | Set from real Edge capacity; default is `20`. |
 | Dispatch reconciliation interval | `OrderExecutionDispatch__ReconciliationIntervalSeconds` | **P2** | Use appsettings default `10` unless database load requires tuning. |
 | Dispatch reconciliation batch size | `OrderExecutionDispatch__ReconciliationBatchSize` | **P2** | Use appsettings default `50` unless recovery volume requires tuning. |
+| Execution-timeout reconciliation interval | `OrderExecutionDispatch__TimeoutReconciliationIntervalSeconds` | **P2** | Use appsettings default `30`. |
+| Execution-timeout batch size | `OrderExecutionDispatch__TimeoutReconciliationBatchSize` | **P2** | Use appsettings default `100`. |
+| Accepted report timeout | `OrderExecutionDispatch__AcceptedReportTimeoutMinutes` | **P1** | Maximum time after ACK before missing order-summary evidence becomes stale; default is `5`. |
+| Running report timeout | `OrderExecutionDispatch__RunningReportTimeoutMinutes` | **P1** | Maximum silence while running before observation becomes stale; default is `30`. |
+| Heartbeat unreachable threshold | `OrderExecutionDispatch__HeartbeatUnreachableMinutes` | **P1** | Missing, Offline, or older heartbeat changes stale observation to unreachable; default is `2`. |
+| Maximum order dispatch attempts | `OrderExecutionDispatch__MaxDispatchAttempts` | **P1** | Hard ceiling across initial dispatch and operator redispatch; default is `3`. |
 
 ## Observability And Diagnostics
 

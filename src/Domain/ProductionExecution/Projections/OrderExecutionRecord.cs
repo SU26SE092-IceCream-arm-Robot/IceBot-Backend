@@ -33,6 +33,46 @@ public class OrderExecutionRecord : AuditedEntity
     {
     }
 
+    public static OrderExecutionRecord CreateProvisionalAccepted(
+        Guid orderId,
+        Guid sourceCommandId,
+        int dispatchAttemptNo,
+        Guid kioskExecutionEndpointId,
+        KioskExecutionProfile executionProfile,
+        Guid sourceExecutorId,
+        Guid sourceConfigurationReleaseId,
+        string releaseChecksum,
+        DateTimeOffset acknowledgedAt)
+    {
+        if (orderId == Guid.Empty || sourceCommandId == Guid.Empty || dispatchAttemptNo <= 0 ||
+            kioskExecutionEndpointId == Guid.Empty || sourceExecutorId == Guid.Empty ||
+            sourceConfigurationReleaseId == Guid.Empty || string.IsNullOrWhiteSpace(releaseChecksum))
+        {
+            throw new DomainRuleException("Provisional execution provenance and release are required.");
+        }
+
+        return new OrderExecutionRecord
+        {
+            OrderId = orderId,
+            SourceCommandId = sourceCommandId,
+            DispatchAttemptNo = dispatchAttemptNo,
+            KioskExecutionEndpointId = kioskExecutionEndpointId,
+            ExecutionProfile = executionProfile,
+            SourceExecutorId = sourceExecutorId,
+            SourceConfigurationReleaseId = sourceConfigurationReleaseId,
+            ReleaseChecksum = releaseChecksum.Trim(),
+            Status = ProductionExecutionStatus.Accepted,
+            ObservationStatus = ExecutionObservationStatus.Fresh,
+            CustomerExecutionStatus = CustomerExecutionStatus.Processing,
+            // Sequence zero marks this as a Cloud provisional observation; command id keeps the projection unique.
+            LastAppliedSourceEventId = sourceCommandId,
+            LastAppliedSequenceNumber = 0,
+            LastEdgeCreatedAt = acknowledgedAt,
+            LastExecutorReportedAt = acknowledgedAt,
+            CloudReceivedAt = acknowledgedAt
+        };
+    }
+
     public static OrderExecutionRecord Create(
         Guid orderId,
         Guid sourceCommandId,
@@ -103,6 +143,32 @@ public class OrderExecutionRecord : AuditedEntity
         LastEdgeCreatedAt = edgeCreatedAt;
         LastExecutorReportedAt = executorReportedAt;
         CloudReceivedAt = cloudReceivedAt;
+        return true;
+    }
+
+    public bool MarkCloudObservation(
+        ExecutionObservationStatus observationStatus,
+        CustomerExecutionStatus customerExecutionStatus,
+        DateTimeOffset observedAt)
+    {
+        if (Status is ProductionExecutionStatus.Completed or ProductionExecutionStatus.Failed or ProductionExecutionStatus.RequiresManualIntervention)
+        {
+            return false;
+        }
+
+        if (observationStatus == ExecutionObservationStatus.Fresh)
+        {
+            throw new DomainRuleException("Fresh execution observation requires an executor report.");
+        }
+
+        if (ObservationStatus == observationStatus && CustomerExecutionStatus == customerExecutionStatus)
+        {
+            return false;
+        }
+
+        ObservationStatus = observationStatus;
+        CustomerExecutionStatus = customerExecutionStatus;
+        CloudReceivedAt = observedAt;
         return true;
     }
 

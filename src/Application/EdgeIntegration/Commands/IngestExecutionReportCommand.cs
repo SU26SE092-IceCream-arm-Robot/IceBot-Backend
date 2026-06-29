@@ -24,4 +24,13 @@ public sealed class IngestExecutionReportCommand
     public string? ErrorCode { get; init; }
     public string? ErrorMessage { get; init; }
     public string? PayloadJson { get; init; }
+    public IReadOnlyCollection<StockMovementEvidenceInput> StockMovements { get; init; } = [];
 }
+
+public sealed record StockMovementEvidenceInput(
+    Guid SourceEventId,
+    Guid IngredientDispenserStateId,
+    decimal QuantityConsumed,
+    decimal? BalanceAfter,
+    DateTimeOffset? OccurredAt,
+    bool IsEstimated);

@@ -1,0 +1,57 @@
+namespace Application.Orders.Management.Results;
+
+public sealed class ExecutionAttemptResult
+{
+    public Guid SourceCommandId { get; init; }
+    public Guid OrderId { get; init; }
+    public int DispatchAttemptNo { get; init; }
+    public Guid KioskExecutionEndpointId { get; init; }
+    public string CommandStatus { get; init; } = null!;
+    public DateTimeOffset CreatedAt { get; init; }
+    public Guid? RequestedByAccountId { get; init; }
+    public DateTimeOffset? CommandExpiryAt { get; init; }
+    public DateTimeOffset? DeliveredAt { get; init; }
+    public DateTimeOffset? RespondedAt { get; init; }
+    public string? RejectionCode { get; init; }
+    public string? RejectionMessage { get; init; }
+    public string? ExecutionProfile { get; init; }
+    public Guid? SourceConfigurationReleaseId { get; init; }
+    public string? ReleaseChecksum { get; init; }
+    public string? ExecutionStatus { get; init; }
+    public string? ObservationStatus { get; init; }
+    public string? CustomerExecutionStatus { get; init; }
+    public Guid? SourceExecutorId { get; init; }
+    public Guid? LastAppliedSourceEventId { get; init; }
+    public long? LastAppliedSequenceNumber { get; init; }
+    public DateTimeOffset? LastEdgeCreatedAt { get; init; }
+    public DateTimeOffset? LastExecutorReportedAt { get; init; }
+    public DateTimeOffset? CloudReceivedAt { get; init; }
+}
+
+public sealed class ExecutionAttemptDetailResult
+{
+    public required ExecutionAttemptResult Attempt { get; init; }
+    public IReadOnlyCollection<ProductionExecutionResult> ProductionExecutions { get; init; } = [];
+}
+
+public sealed class ProductionExecutionResult
+{
+    public Guid Id { get; init; }
+    public bool IsOrderSummary { get; init; }
+    public Guid? SourceProductionJobId { get; init; }
+    public Guid? WorkcellId { get; init; }
+    public Guid? ControllerId { get; init; }
+    public string? ExecutionPlanChecksum { get; init; }
+    public long? ActiveSetVersion { get; init; }
+    public string? ActiveSetChecksum { get; init; }
+    public string Status { get; init; } = null!;
+    public string PhysicalOutputState { get; init; } = null!;
+    public string? ErrorCode { get; init; }
+    public string? ErrorMessage { get; init; }
+    public Guid SourceExecutorId { get; init; }
+    public Guid LastAppliedSourceEventId { get; init; }
+    public long LastAppliedSequenceNumber { get; init; }
+    public DateTimeOffset LastEdgeCreatedAt { get; init; }
+    public DateTimeOffset LastExecutorReportedAt { get; init; }
+    public DateTimeOffset CloudReceivedAt { get; init; }
+}

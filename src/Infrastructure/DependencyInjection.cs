@@ -83,6 +83,7 @@ namespace Infrastructure
             services.AddHostedService<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationJob>();
             services.AddScoped<IEdgeCommandStore, EdgeCommandStore>();
             services.AddScoped<IOrderExecutionDispatchStore, OrderExecutionDispatchStore>();
+            services.AddScoped<IOrderExecutionTimeoutStore, OrderExecutionTimeoutStore>();
             services.AddScoped<IExecutionEndpointTransportAuthStore, ExecutionEndpointTransportAuthStore>();
             services.AddScoped<IExecutionReportStore, ExecutionReportStore>();
             services.AddOptions<Application.EdgeIntegration.OrderExecutionDispatchOptions>()
@@ -91,10 +92,17 @@ namespace Infrastructure
                         options.CommandExpiryMinutes > 0 &&
                         options.MaxActiveCommandsPerEndpoint > 0 &&
                         options.ReconciliationIntervalSeconds > 0 &&
-                        options.ReconciliationBatchSize > 0,
+                        options.ReconciliationBatchSize > 0 &&
+                        options.TimeoutReconciliationIntervalSeconds > 0 &&
+                        options.TimeoutReconciliationBatchSize > 0 &&
+                        options.AcceptedReportTimeoutMinutes > 0 &&
+                        options.RunningReportTimeoutMinutes > 0 &&
+                        options.HeartbeatUnreachableMinutes > 0 &&
+                        options.MaxDispatchAttempts > 0,
                     "Order execution dispatch settings must be positive.")
                 .ValidateOnStart();
             services.AddHostedService<EdgeIntegration.Jobs.OrderExecutionDispatchReconciliationJob>();
+            services.AddHostedService<EdgeIntegration.Jobs.OrderExecutionTimeoutReconciliationJob>();
 
             return services;
         }

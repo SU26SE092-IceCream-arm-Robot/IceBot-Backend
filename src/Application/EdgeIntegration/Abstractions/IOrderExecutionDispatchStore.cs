@@ -33,6 +33,14 @@ public interface IOrderExecutionDispatchStore
         int dispatchAttemptNo,
         CancellationToken cancellationToken = default);
 
+    Task<EdgeCommand?> GetLatestCommandAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
+
+    Task AddOrderStatusHistoryAsync(
+        OrderStatusHistory history,
+        CancellationToken cancellationToken = default);
+
     Task<int> CountActiveCommandsAsync(
         Guid endpointId,
         CancellationToken cancellationToken = default);

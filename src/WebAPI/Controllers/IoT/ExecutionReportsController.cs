@@ -56,7 +56,14 @@ public sealed class ExecutionReportsController : ControllerBase
             PhysicalOutputMayHaveOccurred = request.PhysicalOutputMayHaveOccurred,
             ErrorCode = request.ErrorCode,
             ErrorMessage = request.ErrorMessage,
-            PayloadJson = request.PayloadJson
+            PayloadJson = request.PayloadJson,
+            StockMovements = request.StockMovements.Select(item => new StockMovementEvidenceInput(
+                item.SourceEventId,
+                item.IngredientDispenserStateId,
+                item.QuantityConsumed,
+                item.BalanceAfter,
+                item.OccurredAt,
+                item.IsEstimated)).ToArray()
         };
 
         var result = await _ingestExecutionReportHandler.HandleAsync(command, cancellationToken);
@@ -118,4 +125,25 @@ public sealed class IngestExecutionReportRequest
     public string? ErrorMessage { get; init; }
 
     public string? PayloadJson { get; init; }
+
+    public IReadOnlyCollection<StockMovementEvidenceRequest> StockMovements { get; init; } = [];
+}
+
+public sealed class StockMovementEvidenceRequest
+{
+    [Required]
+    public Guid SourceEventId { get; init; }
+
+    [Required]
+    public Guid IngredientDispenserStateId { get; init; }
+
+    [Range(typeof(decimal), "0.00000001", "79228162514264337593543950335")]
+    public decimal QuantityConsumed { get; init; }
+
+    [Range(typeof(decimal), "0", "79228162514264337593543950335")]
+    public decimal? BalanceAfter { get; init; }
+
+    public DateTimeOffset? OccurredAt { get; init; }
+
+    public bool IsEstimated { get; init; }
 }

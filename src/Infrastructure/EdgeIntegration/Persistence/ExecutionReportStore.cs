@@ -1,5 +1,7 @@
 using Application.EdgeIntegration.Abstractions;
 using Domain.Devices.Entities;
+using Domain.Inventory.Entities;
+using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
@@ -46,6 +48,18 @@ public sealed class ExecutionReportStore : IExecutionReportStore
     {
         return _dbContext.SyncEventInbox
             .FirstOrDefaultAsync(syncEvent => syncEvent.EventId == eventId, cancellationToken);
+    }
+
+    public async Task AcquireStockMovementLocksAsync(
+        IEnumerable<Guid> sourceEventIds,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var sourceEventId in sourceEventIds.Distinct().OrderBy(id => id))
+        {
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({$"stock-movement:{sourceEventId:D}"}, 0));",
+                cancellationToken);
+        }
     }
 
     public Task AddSyncEventAsync(
@@ -113,6 +127,44 @@ public sealed class ExecutionReportStore : IExecutionReportStore
         CancellationToken cancellationToken = default)
     {
         return _dbContext.OrderExecutionRecords.AddAsync(record, cancellationToken).AsTask();
+    }
+
+    public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Orders.FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+    }
+
+    public Task AddOrderStatusHistoryAsync(
+        OrderStatusHistory history,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrderStatusHistories.AddAsync(history, cancellationToken).AsTask();
+    }
+
+    public Task<IngredientDispenserState?> GetDispenserStateAsync(
+        Guid dispenserStateId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.IngredientDispenserStates
+            .Include(state => state.Kiosk)
+            .Include(state => state.Ingredient)
+            .FirstOrDefaultAsync(state => state.Id == dispenserStateId, cancellationToken);
+    }
+
+    public Task<bool> StockMovementExistsAsync(
+        Guid sourceEventId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.StockMovements.AnyAsync(
+            movement => movement.SourceEventId == sourceEventId,
+            cancellationToken);
+    }
+
+    public Task AddStockMovementAsync(
+        StockMovement movement,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.StockMovements.AddAsync(movement, cancellationToken).AsTask();
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -588,7 +588,7 @@ Allowed `ackStatus` values:
 - `ExecutorBusy`
 - `DeliveryFailed`
 
-Command ack owns delivery and executor-admission state. For `ExecuteOrder`, that admission decision also projects to the order lifecycle as defined below. `Started`, `Completed`, `Failed`, and
+Command ack owns delivery and executor-admission state. For `ExecuteOrder`, that admission decision also projects to the order lifecycle as defined below. `Running`, `Completed`, `Failed`, and
 `RequiresManualIntervention` belong to the execution event/report ingest
 boundary, not this endpoint.
 
@@ -599,6 +599,17 @@ For `ExecuteOrder` commands:
 - `Rejected` with `physicalOutputMayHaveOccurred` absent or `false` moves the order to `ExecutionRejected`.
 - `Rejected` with `physicalOutputMayHaveOccurred=true` moves the paid order to `RefundRequired` because staff support or compensation may be required.
 - Order status changes and their `OrderStatusHistory` row commit together with the command acknowledgement.
+- Accepting an `ExecuteOrder` command creates a provisional `OrderExecutionRecord` with sequence `0`. This is Cloud correlation state, not a fabricated Edge event; the first order-summary report starts at sequence `1` and replaces it with executor evidence.
+
+Execution timeout reconciliation:
+
+- Before ACK, an expired `ExecuteOrder` command becomes `Rejected/CommandExpired`; a still-`ReadyForExecution` order becomes `ExecutionRejected` with status history.
+- An Accepted command with no order-summary report beyond the configured deadline becomes `Stale/Delayed` when the executor heartbeat is still current.
+- An Accepted or Running execution with no current heartbeat becomes `Unreachable/PendingRecovery`.
+- Reconciliation changes `OrderExecutionRecord.ObservationStatus` and `CustomerExecutionStatus`; it does not claim that the physical job failed and does not change an Accepted/Preparing Order to `Failed`.
+- A later valid executor report restores observation to `Fresh` through normal sequence validation.
+
+Redispatch is an explicit management operation, not an Edge-side automatic retry. Backend permits a new attempt only after transport `DeliveryFailed` or a rejection proven to be before physical output. It allocates the next attempt number under the order lock, enforces the configured maximum, and records operator/reason audit. `ExecutorBusy` redelivers the same command; possible physical output, `RefundRequired`, production failure, and manual intervention remain support/compensation flows.
 
 ### Execution Reports
 
@@ -616,14 +627,26 @@ Request:
   "sequenceNumber": 12001,
   "edgeCreatedAt": "2026-05-21T10:01:58Z",
   "executorReportedAt": "2026-05-21T10:01:59Z",
-  "reportType": "Deployment",
-  "status": "Active",
-  "deploymentId": "uuid",
-  "sourceProductionJobId": null,
-  "physicalOutputMayHaveOccurred": null,
+  "reportType": "ProductionExecution",
+  "status": "Running",
+  "deploymentId": null,
+  "sourceProductionJobId": "uuid",
+  "sourceConfigurationReleaseId": "uuid",
+  "releaseChecksum": "sha256-hex",
+  "physicalOutputMayHaveOccurred": true,
   "errorCode": null,
   "errorMessage": null,
-  "payloadJson": null
+  "payloadJson": null,
+  "stockMovements": [
+    {
+      "sourceEventId": "uuid",
+      "ingredientDispenserStateId": "uuid",
+      "quantityConsumed": 12.5,
+      "balanceAfter": 87.5,
+      "occurredAt": "2026-05-21T10:01:57Z",
+      "isEstimated": false
+    }
+  ]
 }
 ```
 
@@ -673,6 +696,13 @@ Rules:
 - `sequenceNumber` is executor-local ordering evidence for projection updates.
 - `physicalOutputMayHaveOccurred` must be set when reporting failed production execution. It drives customer/support projection: failure before output can be handled differently from failure after possible physical output.
 - Deployment report `Active` updates the observed active configuration/artifact-set snapshot on `KioskExecutionEndpoint`.
+- Production reports update the business order in the same transaction: `Accepted -> Accepted`, `Running -> Preparing`, `Completed -> Completed`, `Failed -> Failed`, and `RequiresManualIntervention -> RefundRequired`. Each change appends `OrderStatusHistory`.
+- A report with `sourceProductionJobId` set is job/unit-level evidence: it updates `ProductionExecutionRecord` and optional stock evidence only. It must not complete or fail the whole order.
+- A report with `sourceProductionJobId=null` is the Edge-computed order summary: it updates the aggregate `ProductionExecutionRecord`, `OrderExecutionRecord`, and business Order. Edge emits this summary only after applying its local multi-job aggregation policy.
+- Successful order transitions publish `OrderStatusChanged` through SignalR after commit.
+- `stockMovements` is typed append-only consumption evidence. Each item has its own globally unique `sourceEventId`; duplicates are ignored. The dispenser must belong to the reporting kiosk.
+- A supplied `balanceAfter` updates the observed dispenser estimate. Without it, Cloud records evidence without guessing a new balance. Inventory evidence does not gate runtime-menu sellability or order creation in V1.
+- Applied stock evidence publishes `InventoryChanged` after commit. Do not encode authoritative stock adjustments only inside `payloadJson`.
 
 ### Future Sync Events Batch
 
@@ -680,7 +710,7 @@ Rules:
 POST /api/v1/iot/kiosks/{kioskId}/events
 ```
 
-`/events` is reserved for a broader batch sync surface. It should be added when Edge needs to replay multiple local events such as telemetry, stock movements, heartbeat evidence, or detailed local runtime logs. It is not the current V1 command execution status endpoint.
+`/events` is reserved for a broader batch sync surface. It should be added when Edge needs to replay telemetry, independent stock events, heartbeat evidence, or detailed local runtime logs. Stock consumption tied directly to one production report already uses typed `stockMovements` on the current endpoint.
 
 ### Heartbeat
 

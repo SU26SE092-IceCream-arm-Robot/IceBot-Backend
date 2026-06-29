@@ -1,4 +1,5 @@
 using Domain.Sync.Entities;
+using Domain.ProductionExecution.Projections;
 
 namespace Application.EdgeIntegration.Abstractions;
 
@@ -23,6 +24,14 @@ public interface IEdgeCommandStore
 
     Task AddOrderStatusHistoryAsync(
         Domain.Orders.Entities.OrderStatusHistory history,
+        CancellationToken cancellationToken = default);
+
+    Task<OrderExecutionRecord?> GetOrderExecutionRecordAsync(
+        Guid sourceCommandId,
+        CancellationToken cancellationToken = default);
+
+    Task AddOrderExecutionRecordAsync(
+        OrderExecutionRecord record,
         CancellationToken cancellationToken = default);
 
     Task<EdgeCommand?> GetByDeploymentIdAsync(Guid deploymentId, CancellationToken cancellationToken = default);

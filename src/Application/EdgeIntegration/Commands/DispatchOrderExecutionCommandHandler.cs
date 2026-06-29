@@ -50,9 +50,87 @@ public sealed class DispatchOrderExecutionCommandHandler
             cancellationToken);
     }
 
+    public Task<ApiResult<OrderExecutionDispatchResult>> HandleRedispatchAsync(
+        Guid orderId,
+        Guid requestedByAccountId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_options.Enabled)
+        {
+            return Task.FromResult(ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Order execution dispatch is disabled.", 503));
+        }
+
+        if (orderId == Guid.Empty || requestedByAccountId == Guid.Empty || string.IsNullOrWhiteSpace(reason))
+        {
+            return Task.FromResult(ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Order, requesting operator, and redispatch reason are required.", 400));
+        }
+
+        return _store.ExecuteSerializedAsync(
+            orderId,
+            ct => RedispatchLockedAsync(orderId, requestedByAccountId, reason.Trim(), ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<OrderExecutionDispatchResult>> RedispatchLockedAsync(
+        Guid orderId,
+        Guid requestedByAccountId,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var latest = await _store.GetLatestCommandAsync(orderId, cancellationToken);
+        if (latest is null || !latest.DispatchAttemptNo.HasValue)
+        {
+            return ApiResult<OrderExecutionDispatchResult>.Fail("No prior execution attempt was found.", 409);
+        }
+
+        if (latest.Status is EdgeCommandStatus.PendingDelivery or EdgeCommandStatus.Delivered or EdgeCommandStatus.Accepted)
+        {
+            if (latest.CreatedByAccountId == requestedByAccountId)
+            {
+                return ApiResult<OrderExecutionDispatchResult>.Success(
+                    ToResult(latest, ReadConfigurationReleaseId(latest.PayloadJson), existing: true),
+                    "Existing operator redispatch attempt returned.");
+            }
+
+            return ApiResult<OrderExecutionDispatchResult>.Fail("The latest execution attempt is still active.", 409);
+        }
+
+        if (latest.DispatchAttemptNo.Value >= _options.MaxDispatchAttempts)
+        {
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Maximum execution dispatch attempts reached.", 409);
+        }
+
+        var order = await _store.GetOrderAsync(orderId, cancellationToken);
+        if (order is null)
+        {
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
+        }
+
+        var eligible = latest.Status == EdgeCommandStatus.DeliveryFailed ||
+            (latest.Status == EdgeCommandStatus.Rejected && order.Status == OrderStatus.ExecutionRejected);
+        if (!eligible)
+        {
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Redispatch is allowed only after delivery failure or rejection before physical output.", 409);
+        }
+
+        return await DispatchLockedAsync(
+            new DispatchOrderExecutionCommand
+            {
+                OrderId = orderId,
+                DispatchAttemptNo = latest.DispatchAttemptNo.Value + 1
+            },
+            cancellationToken,
+            new RedispatchContext(requestedByAccountId, reason));
+    }
+
     private async Task<ApiResult<OrderExecutionDispatchResult>> DispatchLockedAsync(
         DispatchOrderExecutionCommand command,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RedispatchContext? redispatch = null)
     {
         var existing = await _store.GetCommandAsync(command.OrderId, command.DispatchAttemptNo, cancellationToken);
         if (existing is not null)
@@ -68,7 +146,9 @@ public sealed class DispatchOrderExecutionCommandHandler
             return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
         }
 
-        if (order.PaymentStatus != PaymentStatus.Paid || order.Status != OrderStatus.ReadyForExecution)
+        var canPrepareRejectedOrder = redispatch is not null && order.Status == OrderStatus.ExecutionRejected;
+        if (order.PaymentStatus != PaymentStatus.Paid ||
+            (order.Status != OrderStatus.ReadyForExecution && !canPrepareRejectedOrder))
         {
             return ApiResult<OrderExecutionDispatchResult>.Fail(
                 "Only paid orders ready for execution can be dispatched.", 409);
@@ -141,6 +221,26 @@ public sealed class DispatchOrderExecutionCommandHandler
             command.DispatchAttemptNo,
             expiry);
         edgeCommand.Id = commandId;
+        edgeCommand.CreatedByAccountId = redispatch?.RequestedByAccountId;
+
+        if (redispatch is not null)
+        {
+            var previousStatus = order.Status;
+            if (order.Status == OrderStatus.ExecutionRejected)
+            {
+                order.PrepareRedispatch();
+            }
+
+            await _store.AddOrderStatusHistoryAsync(new OrderStatusHistory
+            {
+                OrderId = order.Id,
+                ChangedByAccountId = redispatch.RequestedByAccountId,
+                FromStatus = previousStatus,
+                ToStatus = order.Status,
+                ChangedAt = now,
+                Reason = $"Redispatch attempt {command.DispatchAttemptNo}: {redispatch.Reason}"
+            }, cancellationToken);
+        }
 
         await _store.AddCommandAsync(edgeCommand, cancellationToken);
         await _store.SaveChangesAsync(cancellationToken);
@@ -325,6 +425,8 @@ public sealed class DispatchOrderExecutionCommandHandler
         Guid OrderItemId,
         ExecutionRoute Route,
         IReadOnlyCollection<ExecutionRouteRobotBinding> Bindings);
+
+    private sealed record RedispatchContext(Guid RequestedByAccountId, string Reason);
 }
 
 internal static class KioskExecutionEndpointDispatchExtensions

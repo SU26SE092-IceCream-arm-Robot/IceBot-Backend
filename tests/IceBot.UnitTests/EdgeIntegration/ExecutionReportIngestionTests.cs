@@ -6,6 +6,7 @@ using Domain.Devices.Entities;
 using Domain.Devices.Enums;
 using Domain.Sync.Entities;
 using NSubstitute;
+using Application.Abstractions.Realtime;
 
 namespace IceBot.UnitTests.EdgeIntegration;
 
@@ -26,7 +27,9 @@ public sealed class ExecutionReportIngestionTests
             .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<ExecutionReportIngestResult>>>>()(CancellationToken.None));
         store.GetSyncEventByEventIdAsync(sourceEventId, Arg.Any<CancellationToken>())
             .Returns(new SyncEventInbox { EventId = sourceEventId });
-        var handler = new IngestExecutionReportCommandHandler(store);
+        var handler = new IngestExecutionReportCommandHandler(
+            store,
+            Substitute.For<IRealtimeNotificationPublisher>());
 
         var result = await handler.HandleAsync(new IngestExecutionReportCommand
         {

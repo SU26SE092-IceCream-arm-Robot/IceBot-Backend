@@ -2,7 +2,10 @@ using Application.Orders.Abstractions;
 using Application.Orders.Management.Results;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Enums;
+using Domain.ProductionExecution.Projections;
 using Domain.SalesCatalog.Entities;
+using Domain.Sync.Entities;
+using Domain.Sync.Enums;
 using Domain.Tenants.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -240,6 +243,63 @@ public sealed class OrderStore : IOrderStore
             .ThenByDescending(history => history.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountExecutionAttemptsAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.EdgeCommands.AsNoTracking().CountAsync(command =>
+            command.CommandType == EdgeCommandType.ExecuteOrder &&
+            command.OrderId == orderId,
+            cancellationToken);
+    }
+
+    public Task<List<EdgeCommand>> ListExecutionAttemptsAsync(
+        Guid orderId,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.EdgeCommands.AsNoTracking()
+            .Where(command =>
+                command.CommandType == EdgeCommandType.ExecuteOrder &&
+                command.OrderId == orderId)
+            .OrderByDescending(command => command.DispatchAttemptNo)
+            .ThenByDescending(command => command.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<EdgeCommand?> GetExecutionAttemptAsync(
+        Guid sourceCommandId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.EdgeCommands.AsNoTracking().FirstOrDefaultAsync(command =>
+            command.Id == sourceCommandId &&
+            command.CommandType == EdgeCommandType.ExecuteOrder,
+            cancellationToken);
+    }
+
+    public Task<List<OrderExecutionRecord>> ListOrderExecutionRecordsAsync(
+        IReadOnlyCollection<Guid> sourceCommandIds,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrderExecutionRecords.AsNoTracking()
+            .Where(record => sourceCommandIds.Contains(record.SourceCommandId))
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsAsync(
+        Guid sourceCommandId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ProductionExecutionRecords.AsNoTracking()
+            .Where(record => record.SourceCommandId == sourceCommandId)
+            .OrderBy(record => record.SourceProductionJobId == null ? 0 : 1)
+            .ThenBy(record => record.SourceProductionJobId)
             .ToListAsync(cancellationToken);
     }
 

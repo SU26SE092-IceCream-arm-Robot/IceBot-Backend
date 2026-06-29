@@ -1,10 +1,16 @@
 using System.Text.Json;
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Results;
+using Application.Shared.Utils;
 using Application.Shared.Wrappers;
 using Domain.Common;
 using Domain.Devices.Entities;
 using Domain.Devices.Enums;
+using Domain.Inventory.Entities;
+using Domain.Orders.Entities;
+using Domain.Orders.Enums;
 using Domain.ProductionExecution.Enums;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
@@ -15,10 +21,14 @@ namespace Application.EdgeIntegration.Commands;
 public sealed class IngestExecutionReportCommandHandler
 {
     private readonly IExecutionReportStore _executionReportStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public IngestExecutionReportCommandHandler(IExecutionReportStore executionReportStore)
+    public IngestExecutionReportCommandHandler(
+        IExecutionReportStore executionReportStore,
+        IRealtimeNotificationPublisher publisher)
     {
         _executionReportStore = executionReportStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<ExecutionReportIngestResult>> HandleAsync(
@@ -43,16 +53,25 @@ public sealed class IngestExecutionReportCommandHandler
             return ApiResult<ExecutionReportIngestResult>.Fail("Execution endpoint profile identity is missing.", 400);
         }
 
-        return await _executionReportStore.ExecuteReportIngestionAsync(
+        var notifications = new ReportNotifications();
+        var result = await _executionReportStore.ExecuteReportIngestionAsync(
             command.SourceEventId,
-            ct => IngestLockedAsync(command, endpoint!, sourceExecutorId.Value, ct),
+            ct => IngestLockedAsync(command, endpoint!, sourceExecutorId.Value, notifications, ct),
             cancellationToken);
+
+        if (result.Succeeded && !result.Data!.Duplicate)
+        {
+            await PublishNotificationsAsync(notifications, cancellationToken);
+        }
+
+        return result;
     }
 
     private async Task<ApiResult<ExecutionReportIngestResult>> IngestLockedAsync(
         IngestExecutionReportCommand command,
         KioskExecutionEndpoint endpoint,
         Guid sourceExecutorId,
+        ReportNotifications notifications,
         CancellationToken cancellationToken)
     {
 
@@ -62,6 +81,13 @@ public sealed class IngestExecutionReportCommandHandler
             return ApiResult<ExecutionReportIngestResult>.Success(
                 BuildResult(command, applied: false, duplicate: true),
                 "Execution report already ingested.");
+        }
+
+        if (command.StockMovements.Count > 0)
+        {
+            await _executionReportStore.AcquireStockMovementLocksAsync(
+                command.StockMovements.Select(item => item.SourceEventId),
+                cancellationToken);
         }
 
         var edgeCommand = await _executionReportStore.GetCommandAsync(command.CommandId, cancellationToken);
@@ -86,6 +112,7 @@ public sealed class IngestExecutionReportCommandHandler
                 edgeCommand,
                 executorReportedAt,
                 cloudReceivedAt,
+                notifications,
                 cancellationToken);
 
             inboxEvent.MarkProcessed(cloudReceivedAt);
@@ -120,6 +147,27 @@ public sealed class IngestExecutionReportCommandHandler
             return "Edge-created timestamp is required.";
         }
 
+        if (command.StockMovements.Count > 0 &&
+            !string.Equals(command.ReportType, "ProductionExecution", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Stock movement evidence is supported only for production execution reports.";
+        }
+
+        if (command.StockMovements.Count > 100)
+        {
+            return "A production execution report supports at most 100 stock movement evidence items.";
+        }
+
+        if (command.StockMovements.Any(item =>
+                item.SourceEventId == Guid.Empty ||
+                item.IngredientDispenserStateId == Guid.Empty ||
+                item.QuantityConsumed <= 0 ||
+                item.BalanceAfter < 0) ||
+            command.StockMovements.Select(item => item.SourceEventId).Distinct().Count() != command.StockMovements.Count)
+        {
+            return "Stock movement evidence requires unique event ids, dispenser states, positive consumed quantities, and non-negative balances.";
+        }
+
         return null;
     }
 
@@ -146,6 +194,7 @@ public sealed class IngestExecutionReportCommandHandler
         EdgeCommand edgeCommand,
         DateTimeOffset executorReportedAt,
         DateTimeOffset cloudReceivedAt,
+        ReportNotifications notifications,
         CancellationToken cancellationToken)
     {
         if (string.Equals(command.ReportType, "Deployment", StringComparison.OrdinalIgnoreCase))
@@ -162,6 +211,7 @@ public sealed class IngestExecutionReportCommandHandler
                 edgeCommand,
                 executorReportedAt,
                 cloudReceivedAt,
+                notifications,
                 cancellationToken);
         }
 
@@ -268,6 +318,7 @@ public sealed class IngestExecutionReportCommandHandler
         EdgeCommand edgeCommand,
         DateTimeOffset executorReportedAt,
         DateTimeOffset cloudReceivedAt,
+        ReportNotifications notifications,
         CancellationToken cancellationToken)
     {
         if (edgeCommand.CommandType != EdgeCommandType.ExecuteOrder)
@@ -322,15 +373,41 @@ public sealed class IngestExecutionReportCommandHandler
                 command.ErrorMessage);
         }
 
-        var orderApplied = await ApplyOrderExecutionRecordAsync(
-            command,
-            endpoint,
-            sourceExecutorId,
-            edgeCommand,
-            executorReportedAt,
-            cloudReceivedAt,
-            status,
-            cancellationToken);
+        var orderApplied = false;
+        if (!command.SourceProductionJobId.HasValue)
+        {
+            orderApplied = await ApplyOrderExecutionRecordAsync(
+                command,
+                endpoint,
+                sourceExecutorId,
+                edgeCommand,
+                executorReportedAt,
+                cloudReceivedAt,
+                status,
+                cancellationToken);
+        }
+
+        if (orderApplied)
+        {
+            await ApplyOrderLifecycleAsync(
+                command,
+                edgeCommand,
+                status,
+                executorReportedAt,
+                notifications,
+                cancellationToken);
+        }
+
+        if (productionApplied && command.StockMovements.Count > 0)
+        {
+            await ApplyStockEvidenceAsync(
+                command,
+                endpoint,
+                sourceExecutorId,
+                edgeCommand,
+                notifications,
+                cancellationToken);
+        }
 
         return productionApplied || orderApplied;
     }
@@ -383,6 +460,12 @@ public sealed class IngestExecutionReportCommandHandler
             return true;
         }
 
+        if (orderRecord.SourceConfigurationReleaseId != command.SourceConfigurationReleaseId.Value ||
+            !string.Equals(orderRecord.ReleaseChecksum, command.ReleaseChecksum, StringComparison.Ordinal))
+        {
+            throw new DomainRuleException("Order execution report release does not match the dispatched command.");
+        }
+
         return orderRecord.ApplyObservation(
             command.SourceEventId,
             command.SequenceNumber,
@@ -392,6 +475,173 @@ public sealed class IngestExecutionReportCommandHandler
             status,
             ExecutionObservationStatus.Fresh,
             customerStatus);
+    }
+
+    private async Task ApplyOrderLifecycleAsync(
+        IngestExecutionReportCommand command,
+        EdgeCommand edgeCommand,
+        ProductionExecutionStatus status,
+        DateTimeOffset executorReportedAt,
+        ReportNotifications notifications,
+        CancellationToken cancellationToken)
+    {
+        if (!edgeCommand.OrderId.HasValue)
+        {
+            return;
+        }
+
+        var order = await _executionReportStore.GetOrderAsync(edgeCommand.OrderId.Value, cancellationToken)
+            ?? throw new DomainRuleException("Order for production execution report was not found.");
+        var previousStatus = order.Status;
+
+        switch (status)
+        {
+            case ProductionExecutionStatus.Accepted when order.Status == OrderStatus.ReadyForExecution:
+                order.MarkAccepted();
+                break;
+            case ProductionExecutionStatus.Running when order.Status is OrderStatus.ReadyForExecution or OrderStatus.Accepted:
+                order.MarkPreparing();
+                break;
+            case ProductionExecutionStatus.Completed when order.Status != OrderStatus.Completed:
+                order.Complete(executorReportedAt);
+                break;
+            case ProductionExecutionStatus.Failed when order.Status != OrderStatus.Failed:
+                order.MarkFailed(command.ErrorMessage);
+                break;
+            case ProductionExecutionStatus.RequiresManualIntervention when order.Status != OrderStatus.RefundRequired:
+                order.MarkRefundRequired(command.ErrorMessage);
+                break;
+        }
+
+        if (order.Status == previousStatus)
+        {
+            return;
+        }
+
+        await _executionReportStore.AddOrderStatusHistoryAsync(new OrderStatusHistory
+        {
+            OrderId = order.Id,
+            FromStatus = previousStatus,
+            ToStatus = order.Status,
+            ChangedAt = executorReportedAt,
+            Reason = BuildOrderHistoryReason(command)
+        }, cancellationToken);
+
+        var projection = OrderStatusProjector.ProjectFromOrder(order);
+        notifications.OrderStatusChanged = new OrderStatusChangedEvent
+        {
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            KioskId = order.KioskId,
+            OrganizationId = order.OrganizationId,
+            StoreId = order.StoreId,
+            OldStatus = previousStatus.ToString(),
+            NewStatus = order.Status.ToString(),
+            PaymentStatus = order.PaymentStatus.ToString(),
+            CustomerStatus = projection.CustomerStatus,
+            CustomerStatusMessage = projection.CustomerStatusMessage,
+            CanRetryPayment = projection.CanRetryPayment,
+            RequiresStaffSupport = projection.RequiresStaffSupport,
+            UpdatedAt = executorReportedAt,
+            Version = 1
+        };
+    }
+
+    private async Task ApplyStockEvidenceAsync(
+        IngestExecutionReportCommand command,
+        KioskExecutionEndpoint endpoint,
+        Guid sourceExecutorId,
+        EdgeCommand edgeCommand,
+        ReportNotifications notifications,
+        CancellationToken cancellationToken)
+    {
+        foreach (var evidence in command.StockMovements)
+        {
+            if (await _executionReportStore.StockMovementExistsAsync(evidence.SourceEventId, cancellationToken))
+            {
+                continue;
+            }
+
+            var state = await _executionReportStore.GetDispenserStateAsync(
+                evidence.IngredientDispenserStateId,
+                cancellationToken)
+                ?? throw new DomainRuleException("Stock movement dispenser state was not found.");
+            if (state.KioskId != endpoint.KioskId || state.Kiosk is null)
+            {
+                throw new DomainRuleException("Stock movement dispenser state does not belong to the reporting kiosk.");
+            }
+
+            var occurredAt = evidence.OccurredAt ?? command.EdgeCreatedAt;
+            if (evidence.BalanceAfter.HasValue)
+            {
+                state.RecordSensorLevel(
+                    state.CurrentLevelStatus,
+                    occurredAt,
+                    estimatedQuantity: evidence.BalanceAfter.Value);
+            }
+
+            var movement = StockMovement.Create(
+                state.Id,
+                state.Kiosk.OrganizationId,
+                state.Kiosk.StoreId,
+                state.KioskId,
+                state.DeviceId,
+                state.IngredientId,
+                "CONSUME",
+                -evidence.QuantityConsumed,
+                evidence.BalanceAfter,
+                state.Unit,
+                occurredAt,
+                "PRODUCTION_EXECUTION",
+                "Order",
+                edgeCommand.OrderId,
+                evidence.SourceEventId,
+                evidence.IsEstimated);
+            movement.OriginNodeId = sourceExecutorId;
+            movement.Version = command.SequenceNumber;
+            movement.CorrelationId = edgeCommand.OrderId;
+            movement.CausationId = command.SourceEventId;
+
+            await _executionReportStore.AddStockMovementAsync(movement, cancellationToken);
+            notifications.InventoryChanged.Add(new InventoryChangedEvent
+            {
+                DispenserStateId = state.Id,
+                KioskId = state.KioskId!.Value,
+                OrganizationId = state.Kiosk.OrganizationId,
+                StoreId = state.Kiosk.StoreId,
+                IngredientName = state.Ingredient.Name,
+                EstimatedQuantity = state.EstimatedQuantity ?? evidence.BalanceAfter ?? 0,
+                Unit = state.Unit,
+                Status = state.CurrentLevelStatus.ToString(),
+                UpdatedAt = occurredAt,
+                Version = 1
+            });
+        }
+    }
+
+    private async Task PublishNotificationsAsync(
+        ReportNotifications notifications,
+        CancellationToken cancellationToken)
+    {
+        if (notifications.OrderStatusChanged is not null)
+        {
+            await _publisher.PublishOrderStatusChangedAsync(
+                notifications.OrderStatusChanged,
+                cancellationToken);
+        }
+
+        foreach (var inventoryEvent in notifications.InventoryChanged)
+        {
+            await _publisher.PublishInventoryChangedAsync(inventoryEvent, cancellationToken);
+        }
+    }
+
+    private static string BuildOrderHistoryReason(IngestExecutionReportCommand command)
+    {
+        var error = string.IsNullOrWhiteSpace(command.ErrorCode)
+            ? null
+            : $" Error: {command.ErrorCode.Trim()}.";
+        return $"Production execution report: {command.Status.Trim()}.{error}".Trim();
     }
 
     private static SyncEventInbox BuildInboxEvent(
@@ -428,7 +678,8 @@ public sealed class IngestExecutionReportCommandHandler
                 command.PhysicalOutputMayHaveOccurred,
                 command.ErrorCode,
                 command.ErrorMessage,
-                command.PayloadJson
+                command.PayloadJson,
+                command.StockMovements
             }),
             OccurredAt = command.EdgeCreatedAt,
             ReceivedAt = cloudReceivedAt
@@ -491,5 +742,11 @@ public sealed class IngestExecutionReportCommandHandler
             ProductionExecutionStatus.RequiresManualIntervention => CustomerExecutionStatus.SupportRequired,
             _ => CustomerExecutionStatus.ExecutionUnconfirmed
         };
+    }
+
+    private sealed class ReportNotifications
+    {
+        public OrderStatusChangedEvent? OrderStatusChanged { get; set; }
+        public List<InventoryChangedEvent> InventoryChanged { get; } = [];
     }
 }

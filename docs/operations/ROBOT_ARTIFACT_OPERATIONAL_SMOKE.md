@@ -65,6 +65,10 @@ bulk upload .lua
 -> resolve endpoint/release/route/program
 -> create ExecuteOrder dispatch attempt 1
 -> repeat attempt 1 and receive the same command
+-> acknowledge Accepted and project Order Accepted
+-> report Running with typed stock evidence and project Order Preparing
+-> report Completed and project Order Completed
+-> verify Rejected, ExecutorBusy, and Failed order outcomes
 ```
 
 Success requires the deployment and endpoint projection to reference the active release, and the paid order to produce exactly one idempotent `ExecuteOrder` command for the selected endpoint.

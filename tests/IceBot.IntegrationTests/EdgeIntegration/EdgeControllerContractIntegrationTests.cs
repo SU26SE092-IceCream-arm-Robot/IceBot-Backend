@@ -164,7 +164,9 @@ public sealed class EdgeControllerContractIntegrationTests
         string? errorMessage = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
-        var handler = new IngestExecutionReportCommandHandler(new ExecutionReportStore(dbContext));
+        var handler = new IngestExecutionReportCommandHandler(
+            new ExecutionReportStore(dbContext),
+            new NoOpRealtimeNotificationPublisher());
         return await handler.HandleAsync(new IngestExecutionReportCommand
         {
             KioskId = graph.KioskId,

@@ -154,6 +154,37 @@ Order tracking read model boundary limitations and data exclusions are detailed 
 9. Cloud updates order/execution state.
 ```
 
+## Execution Timeout Reconciliation
+
+```text
+Pending/Delivered command expires before ACK
+  -> CommandExpired
+  -> Order ExecutionRejected
+
+Accepted without order-summary report past deadline
+  -> heartbeat current: Stale / Delayed
+  -> heartbeat missing, old, or Offline: Unreachable / PendingRecovery
+
+Running without report past deadline
+  -> same observation rules
+  -> Order remains Preparing; Cloud does not infer physical failure
+```
+
+Observation timeout is uncertainty about Edge, not proof that production failed. A later sequence-valid order-summary report restores `Fresh` and continues the normal lifecycle.
+
+## Manual Redispatch
+
+```text
+Latest attempt DeliveryFailed
+  or Rejected before physical output
+    -> authorized operator supplies reason
+    -> backend allocates attempt + 1
+    -> audit actor/reason
+    -> create a new immutable ExecuteOrder command
+```
+
+`ExecutorBusy` stays on the same attempt and is redelivered. `RefundRequired`, possible physical output, production `Failed`, and `RequiresManualIntervention` are support/refund paths, not automatic retry paths. The configured maximum attempt count is enforced inside the same order-level transaction.
+
 MQTT payloads should stay small. Edge must pull command details from Cloud.
 
 ## Runtime Readiness Check
@@ -178,9 +209,16 @@ Check:
 3. Edge batches events for Cloud sync.
 4. Cloud ingests events through SyncEventInbox.
 5. Cloud deduplicates by eventId/source node.
-6. Cloud applies accepted events to domain state.
-7. Cloud stores failed processing in SyncDeadLetter.
-8. Cloud returns accepted/duplicate/rejected item-level result.
+6. Job/unit reports carrying `sourceProductionJobId` update production and stock evidence without prematurely changing the whole Order.
+7. The Edge order-summary report (`sourceProductionJobId = null`) updates the order projection and business Order in one transaction:
+   - Accepted -> Accepted
+   - Running -> Preparing
+   - Completed -> Completed
+   - Failed -> Failed
+   - RequiresManualIntervention -> RefundRequired
+8. Cloud appends OrderStatusHistory and typed stock-consumption evidence supplied by Edge.
+9. After commit, Cloud publishes OrderStatusChanged and InventoryChanged SignalR events.
+10. Cloud returns accepted/duplicate/rejected result.
 ```
 
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
