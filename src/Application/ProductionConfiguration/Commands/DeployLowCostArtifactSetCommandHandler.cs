@@ -6,6 +6,7 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
+using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.ValueObjects;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
@@ -59,6 +60,14 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         if (release is null)
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Published configuration release not found.", 404);
+        }
+
+        if (release.Status != ConfigurationReleaseStatus.Published &&
+            !(command.IsRollback && release.Status == ConfigurationReleaseStatus.Retired))
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
+                "Only a published configuration release can be deployed; retired releases are available only through rollback.",
+                400);
         }
 
         var endpoint = await _productionConfigurationStore.GetEndpointForDeploymentAsync(

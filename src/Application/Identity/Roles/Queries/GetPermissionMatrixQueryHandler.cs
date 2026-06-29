@@ -213,7 +213,7 @@ internal static class PermissionMatrixRules
         new()
         {
             Policy = "artifact.read",
-            Description = "Read and review robot artifacts within assigned scope.",
+            Description = "Read robot artifact metadata within assigned scope.",
             Roles = ["SystemAdmin", "OrgAdmin"]
         },
         new()
@@ -226,14 +226,14 @@ internal static class PermissionMatrixRules
         new()
         {
             Policy = "artifact-template.manage",
-            Description = "Upload, publish, and retire global robot Lua templates.",
+            Description = "Upload, discard Draft, publish, and retire global robot Lua templates.",
             Roles = new[] { "SystemAdmin" },
             ScopeRequired = false
         },
         new()
         {
             Policy = "artifact.upload",
-            Description = "Upload immutable robot Lua artifacts within assigned scope.",
+            Description = "Upload, review Lua bytes, and manage robot artifact lifecycle within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },

@@ -22,7 +22,7 @@ public sealed class CreateRobotArtifactReviewUrlQueryHandler
         CreateRobotArtifactReviewUrlQuery query,
         CancellationToken cancellationToken = default)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactRead, query.UserContext, query.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactUpload, query.UserContext, query.OrganizationId, null, null))
             return ApiResult<RobotArtifactReviewUrlResult>.Fail("Robot artifact not found.", 404);
 
         var artifact = await _store.GetArtifactByIdAsync(query.OrganizationId, query.ArtifactId, cancellationToken);

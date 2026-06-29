@@ -7,7 +7,6 @@ using Domain.RobotConfiguration.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Authorization;
-using FilePath = System.IO.Path;
 
 namespace WebAPI.Controllers.RobotConfiguration;
 
@@ -22,6 +21,7 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
     private readonly CreateRobotArtifactTemplateReviewUrlQueryHandler _review;
     private readonly PublishRobotArtifactTemplateCommandHandler _publish;
     private readonly RetireRobotArtifactTemplateCommandHandler _retire;
+    private readonly DiscardDraftRobotArtifactTemplateCommandHandler _discard;
     private readonly CloneRobotArtifactTemplateCommandHandler _clone;
 
     public ManagementRobotArtifactTemplatesController(
@@ -31,10 +31,11 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
         CreateRobotArtifactTemplateReviewUrlQueryHandler review,
         PublishRobotArtifactTemplateCommandHandler publish,
         RetireRobotArtifactTemplateCommandHandler retire,
+        DiscardDraftRobotArtifactTemplateCommandHandler discard,
         CloneRobotArtifactTemplateCommandHandler clone)
     {
         _bulkUpload = bulkUpload; _list = list; _get = get; _review = review;
-        _publish = publish; _retire = retire; _clone = clone;
+        _publish = publish; _retire = retire; _discard = discard; _clone = clone;
     }
 
     [HttpGet("robot-artifact-templates")]
@@ -77,11 +78,11 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
         {
             var items = parsedManifest.Items.Select(item =>
             {
-                var file = parsedManifest.FilesByName[FilePath.GetFileName(item.FileName)];
+                var file = parsedManifest.FilesByName[RobotArtifactMultipartManifestParser.NormalizeFileName(item.FileName)!];
                 var stream = file.OpenReadStream(); streams.Add(stream);
                 return new UploadRobotArtifactTemplateCommand
                 {
-                    UserContext = User.GetUserContext(), FileName = FilePath.GetFileName(file.FileName), ContentType = file.ContentType,
+                    UserContext = User.GetUserContext(), FileName = RobotArtifactMultipartManifestParser.NormalizeFileName(file.FileName)!, ContentType = file.ContentType,
                     ContentLengthBytes = file.Length, Content = stream, TemplateCode = item.TemplateCode, TemplateName = item.TemplateName,
                     RuntimeTargetCode = item.RuntimeTargetCode, MachineModelCode = item.MachineModelCode, ExportedAt = item.ExportedAt,
                     Description = item.Description, MetadataJson = item.MetadataJson
@@ -114,6 +115,19 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
     public async Task<IActionResult> Retire(Guid templateId, CancellationToken cancellationToken)
     {
         var result = await _retire.HandleAsync(new RetireRobotArtifactTemplateCommand(templateId) { UserContext = User.GetUserContext() }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("robot-artifact-templates/{templateId:guid}")]
+    [Authorize(Policy = "artifact-template.manage")]
+    public async Task<IActionResult> Discard(Guid templateId, CancellationToken cancellationToken)
+    {
+        var result = await _discard.HandleAsync(
+            new DiscardDraftRobotArtifactTemplateCommand(templateId)
+            {
+                UserContext = User.GetUserContext()
+            },
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

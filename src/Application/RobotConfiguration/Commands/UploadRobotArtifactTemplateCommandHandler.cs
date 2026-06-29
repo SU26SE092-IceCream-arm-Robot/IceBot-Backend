@@ -47,16 +47,20 @@ public sealed class UploadRobotArtifactTemplateCommandHandler
             return ApiResult<RobotArtifactTemplateResult>.Fail("MetadataJson must be valid JSON.", 400);
         }
 
-        await using var content = await _contentService.BufferAndHashAsync(
-            command.Content,
-            command.ContentLengthBytes,
-            cancellationToken);
-        if (content.Stream.Length != command.ContentLengthBytes)
+        BufferedArtifactContent content;
+        try
         {
-            return ApiResult<RobotArtifactTemplateResult>.Fail(
-                "Uploaded content length does not match the request length.",
-                400);
+            content = await _contentService.BufferAndHashAsync(
+                command.Content,
+                command.ContentLengthBytes,
+                cancellationToken);
         }
+        catch (ArtifactUploadContentException ex)
+        {
+            return ApiResult<RobotArtifactTemplateResult>.Fail(ex.Message, 400);
+        }
+
+        await using var _ = content;
 
         var code = NormalizeCode(command.TemplateCode);
         var existing = await _store.GetByCodeAndChecksumAsync(code, content.Checksum, cancellationToken);

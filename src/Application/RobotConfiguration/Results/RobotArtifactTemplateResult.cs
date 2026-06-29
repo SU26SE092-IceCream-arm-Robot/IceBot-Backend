@@ -51,3 +51,10 @@ public sealed class BulkRobotArtifactTemplateUploadItemResult
     public string Message { get; init; } = string.Empty;
     public RobotArtifactTemplateResult? Template { get; init; }
 }
+
+public sealed class RobotArtifactTemplateDiscardResult
+{
+    public Guid RobotArtifactTemplateId { get; init; }
+    public string FileName { get; init; } = string.Empty;
+    public bool ObjectDeleted { get; init; }
+}

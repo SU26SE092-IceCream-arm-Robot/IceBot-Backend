@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using Application.RobotConfiguration.Services;
 using Microsoft.AspNetCore.Http;
-using FilePath = System.IO.Path;
 
 namespace WebAPI.Controllers.RobotConfiguration;
 
@@ -52,7 +51,7 @@ internal static class RobotArtifactMultipartManifestParser
                     "Every manifest item must satisfy its required metadata contract.");
             }
 
-            var itemFileName = FilePath.GetFileName(fileNameSelector(item));
+            var itemFileName = NormalizeFileName(fileNameSelector(item));
             if (string.IsNullOrWhiteSpace(itemFileName) ||
                 !itemFileName.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             {
@@ -64,7 +63,7 @@ internal static class RobotArtifactMultipartManifestParser
         var filesByName = new Dictionary<string, IFormFile>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in files)
         {
-            var fileName = FilePath.GetFileName(file.FileName);
+            var fileName = NormalizeFileName(file.FileName);
             if (string.IsNullOrWhiteSpace(fileName) ||
                 !fileName.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) ||
                 !filesByName.TryAdd(fileName, file))
@@ -75,7 +74,7 @@ internal static class RobotArtifactMultipartManifestParser
         }
 
         var manifestFileNames = manifest
-            .Select(item => FilePath.GetFileName(fileNameSelector(item))!)
+            .Select(item => NormalizeFileName(fileNameSelector(item))!)
             .ToArray();
         if (manifestFileNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != manifest.Length ||
             !filesByName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(manifestFileNames))
@@ -85,6 +84,18 @@ internal static class RobotArtifactMultipartManifestParser
         }
 
         return RobotArtifactMultipartManifestParseResult<TItem>.Success(manifest, filesByName);
+    }
+
+    internal static string? NormalizeFileName(string? fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            return null;
+        }
+
+        var normalizedPath = fileName.Replace('\\', '/');
+        var separatorIndex = normalizedPath.LastIndexOf('/');
+        return (separatorIndex >= 0 ? normalizedPath[(separatorIndex + 1)..] : normalizedPath).Trim();
     }
 }
 

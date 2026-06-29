@@ -7,7 +7,6 @@ using System.ComponentModel.DataAnnotations;
 using WebAPI.Authorization;
 using Domain.RobotConfiguration.Enums;
 using Application.Shared.Wrappers;
-using FilePath = System.IO.Path;
 
 namespace WebAPI.Controllers.RobotConfiguration;
 
@@ -107,12 +106,12 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         {
             var items = parsedManifest.Items.Select(item =>
             {
-                var file = parsedManifest.FilesByName[FilePath.GetFileName(item.FileName)];
+                var file = parsedManifest.FilesByName[RobotArtifactMultipartManifestParser.NormalizeFileName(item.FileName)!];
                 var stream = file.OpenReadStream();
                 streams.Add(stream);
                 return new BulkUploadRobotArtifactItem
                 {
-                    FileName = FilePath.GetFileName(file.FileName),
+                    FileName = RobotArtifactMultipartManifestParser.NormalizeFileName(file.FileName)!,
                     ContentType = file.ContentType,
                     ContentLengthBytes = file.Length,
                     Content = stream,
@@ -193,7 +192,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     }
 
     [HttpPost("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/review-url")]
-    [Authorize(Policy = "artifact.read")]
+    [Authorize(Policy = "artifact.upload")]
     public async Task<IActionResult> CreateRobotArtifactReviewUrl(
         Guid organizationId,
         Guid artifactId,

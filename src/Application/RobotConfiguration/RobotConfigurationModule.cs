@@ -34,6 +34,7 @@ public static class RobotConfigurationModule
         services.AddScoped<CreateRobotArtifactTemplateReviewUrlQueryHandler>();
         services.AddScoped<PublishRobotArtifactTemplateCommandHandler>();
         services.AddScoped<RetireRobotArtifactTemplateCommandHandler>();
+        services.AddScoped<DiscardDraftRobotArtifactTemplateCommandHandler>();
         services.AddScoped<CloneRobotArtifactTemplateCommandHandler>();
 
         return services;

@@ -4,6 +4,7 @@ namespace Application.RobotConfiguration.Commands;
 
 public sealed record PublishRobotArtifactTemplateCommand(Guid TemplateId) { public required CurrentUserContext UserContext { get; init; } }
 public sealed record RetireRobotArtifactTemplateCommand(Guid TemplateId) { public required CurrentUserContext UserContext { get; init; } }
+public sealed record DiscardDraftRobotArtifactTemplateCommand(Guid TemplateId) { public required CurrentUserContext UserContext { get; init; } }
 
 public sealed class CloneRobotArtifactTemplateCommand
 {

@@ -33,7 +33,17 @@ public interface IRobotArtifactTemplateStore
 
     Task<IReadOnlyCollection<string>> ListStorageKeysAsync(CancellationToken cancellationToken = default);
 
+    Task<RobotArtifactTemplateDiscardOutcome> DiscardDraftAsync(
+        RobotArtifactTemplate template,
+        CancellationToken cancellationToken = default);
+
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }
 
 public sealed record RobotArtifactTemplateInsertResult(bool Created, RobotArtifactTemplate Template);
+
+public enum RobotArtifactTemplateDiscardOutcome
+{
+    Deleted = 1,
+    Referenced = 2
+}

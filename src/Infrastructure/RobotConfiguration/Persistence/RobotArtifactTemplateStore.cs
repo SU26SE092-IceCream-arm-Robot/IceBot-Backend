@@ -84,6 +84,23 @@ public sealed class RobotArtifactTemplateStore : IRobotArtifactTemplateStore
             .Select(template => template.StorageKey)
             .ToArrayAsync(cancellationToken);
 
+    public async Task<RobotArtifactTemplateDiscardOutcome> DiscardDraftAsync(
+        RobotArtifactTemplate template,
+        CancellationToken cancellationToken = default)
+    {
+        var entry = _dbContext.RobotArtifactTemplates.Remove(template);
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return RobotArtifactTemplateDiscardOutcome.Deleted;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
+        {
+            entry.State = EntityState.Unchanged;
+            return RobotArtifactTemplateDiscardOutcome.Referenced;
+        }
+    }
+
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _dbContext.SaveChangesAsync(cancellationToken);
 
