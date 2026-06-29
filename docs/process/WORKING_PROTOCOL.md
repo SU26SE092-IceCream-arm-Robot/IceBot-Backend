@@ -175,8 +175,23 @@ python .\rag\commands\ingest_code.py
 For code changes, run:
 
 ```powershell
-dotnet build src\IceBot.slnx
+dotnet build IceBot.slnx
 ```
+
+Unit tests run without external infrastructure:
+
+```powershell
+dotnet test tests\IceBot.UnitTests\IceBot.UnitTests.csproj
+```
+
+PostgreSQL and MinIO integration tests are opt-in and require Docker:
+
+```powershell
+$env:ICEBOT_RUN_INTEGRATION_TESTS='true'
+dotnet test tests\IceBot.IntegrationTests\IceBot.IntegrationTests.csproj
+```
+
+Without `ICEBOT_RUN_INTEGRATION_TESTS=true`, integration tests are discovered and skipped without starting containers.
 
 For documentation-only changes, no build is needed.
 

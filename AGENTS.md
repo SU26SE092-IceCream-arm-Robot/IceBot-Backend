@@ -109,7 +109,7 @@ python .\backend-preflight\commands\check_backend.py
 Fallback/direct compile check:
 
 ```powershell
-dotnet build src\IceBot.slnx
+dotnet build IceBot.slnx
 ```
 
 Use focused lookup or docs tools during investigation. Do not run backend preflight at the start of a task or for design-only discussion.

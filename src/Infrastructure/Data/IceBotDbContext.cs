@@ -347,7 +347,6 @@ public class IceBotDbContext : DbContext
                     "((\"ExecutionProfile\" = 1 AND \"ControllerId\" IS NULL) OR (\"ExecutionProfile\" = 2 AND \"FullEdgeRuntimeId\" IS NULL)) AND (\"Status\" <> 2 OR ((\"ExecutionProfile\" = 1 AND \"FullEdgeRuntimeId\" IS NOT NULL) OR (\"ExecutionProfile\" = 2 AND \"ControllerId\" IS NOT NULL)))"));
             entity.HasIndex(x => new { x.KioskId, x.EndpointCode }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasIndex(x => new { x.Id, x.KioskId }).IsUnique();
-            entity.HasIndex(x => new { x.Id, x.KioskId, x.FullEdgeRuntimeId }).IsUnique().HasFilter("\"FullEdgeRuntimeId\" IS NOT NULL");
             entity.HasIndex(x => x.FullEdgeRuntimeId).IsUnique().HasFilter("\"FullEdgeRuntimeId\" IS NOT NULL");
             entity.HasIndex(x => x.ControllerId).IsUnique().HasFilter("\"ControllerId\" IS NOT NULL");
             entity.HasIndex(x => x.CredentialBindingId).IsUnique().HasFilter("\"CredentialBindingId\" IS NOT NULL");
@@ -716,8 +715,7 @@ public class IceBotDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.KioskExecutionEndpoint)
                 .WithMany()
-                .HasForeignKey(x => new { x.KioskExecutionEndpointId, x.KioskId, x.EdgeRuntimeId })
-                .HasPrincipalKey(endpoint => new { endpoint.Id, endpoint.KioskId, endpoint.FullEdgeRuntimeId })
+                .HasForeignKey(x => x.KioskExecutionEndpointId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Account>().WithMany().HasForeignKey(x => x.RequestedByAccountId).OnDelete(DeleteBehavior.Restrict);
         });
