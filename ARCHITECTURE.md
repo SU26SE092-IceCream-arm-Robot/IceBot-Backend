@@ -252,4 +252,4 @@ Avoid:
 - [Idempotency and Retry Rules](docs/data/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](docs/data/JSON_FIELD_RULES.md)
 - [IoT Contract](docs/iot/IOT_CONTRACT.md)
-- [Local Edge Runtime ERD](docs/iot/LOCAL_EDGE_RUNTIME_ERD.md)
+- [Historical Step-First Local Edge Runtime ERD](docs/iot/HISTORICAL_STEP_FIRST_LOCAL_EDGE_RUNTIME_ERD.md) (comparison only; not current implementation guidance)

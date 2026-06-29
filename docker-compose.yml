@@ -17,6 +17,25 @@ services:
       timeout: 5s
       retries: 10
 
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: icebot-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - icebot_minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   icebot-backend-api:
     build:
       context: .
@@ -26,12 +45,22 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      minio:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
       ConnectionStrings__IceBot_DB: "Host=postgres;Port=5432;Database=IceBotDB;Username=postgres;Password=p@ssw0rd12345"
+      RobotArtifacts__ObjectStorage__Endpoint: "minio:9000"
+      RobotArtifacts__ObjectStorage__DownloadEndpoint: "${MINIO_DOWNLOAD_ENDPOINT:-localhost:9000}"
+      RobotArtifacts__ObjectStorage__AccessKey: "${MINIO_ROOT_USER:-minioadmin}"
+      RobotArtifacts__ObjectStorage__SecretKey: "${MINIO_ROOT_PASSWORD:-minioadmin}"
+      RobotArtifacts__ObjectStorage__BucketName: "${MINIO_BUCKET_NAME:-icebot-robot-artifacts}"
+      RobotArtifacts__ObjectStorage__UseSsl: "false"
+      RobotArtifacts__ObjectStorage__DownloadUseSsl: "false"
 
 volumes:
   icebot_postgres_data:
+  icebot_minio_data:

@@ -1,6 +1,6 @@
 # Deployment Configuration
 
-This document lists the minimum backend configuration that must be provided outside source control before running a deployed environment.
+This document classifies backend deployment configuration by priority and source. Not every setting must be repeated as an environment variable: safe, environment-independent defaults may remain in `appsettings.json`.
 
 ## Search Keywords
 
@@ -16,7 +16,7 @@ appsettings.{Environment}.json
 environment variables
 ```
 
-Use environment variables or deployment secrets for real credentials. Do not rely on sample values in `appsettings.json` outside local development.
+Use environment variables or a deployment secret store for credentials and environment-specific addresses. Values marked **Use appsettings default** below do not need to be repeated unless the deployment intentionally changes them.
 
 ## Docker Compose Boundary
 
@@ -24,63 +24,119 @@ Backend docker compose, when added, should contain only backend app runtime depe
 
 Tooling infrastructure such as Qdrant, RAG services, local model caches, and agent automation belongs in the `IceBot-Tools` compose lifecycle. If backend and tools need to communicate locally, use environment variables such as `RAG_API_URL` or an explicitly shared Docker network.
 
-## Required Runtime Settings
+## Configuration Priority
 
-| Area | Configuration key |
+| Priority | Meaning |
 | --- | --- |
-| Database | `ConnectionStrings__IceBot_DB` |
-| JWT secret | `Authentication__Jwt__Secret` |
-| JWT issuer | `Authentication__Jwt__Issuer` |
-| JWT audience | `Authentication__Jwt__Audience` |
-| Email host | `Email__Host` |
-| Email port | `Email__Port` |
-| Email sender | `Email__From` |
-| Email display name | `Email__DisplayName` |
-| Email username | `Email__UserName` |
-| Email password | `Email__Password` |
-| Email TLS toggle | `Email__EnableSsl` |
-| Password reset frontend URL | `Email__PasswordResetBaseUrl` |
-| Invitation frontend URL | `Email__InvitationBaseUrl` |
-| Firebase enabled flag | `Firebase__Enabled` |
-| Firebase credentials path | `Firebase__CredentialsPath` |
-| PayOS client id | `PayOS__ClientId` |
-| PayOS API key | `PayOS__ApiKey` |
-| PayOS checksum key | `PayOS__ChecksumKey` |
-| PayOS base URL | `PayOS__BaseUrl` |
-| PayOS return URL | `PayOS__ReturnUrl` |
-| PayOS cancel URL | `PayOS__CancelUrl` |
-| Robot artifact object storage endpoint | `RobotArtifacts__ObjectStorage__Endpoint` |
-| Robot artifact Edge-reachable download endpoint | `RobotArtifacts__ObjectStorage__DownloadEndpoint` |
-| Robot artifact object storage access key | `RobotArtifacts__ObjectStorage__AccessKey` |
-| Robot artifact object storage secret key | `RobotArtifacts__ObjectStorage__SecretKey` |
-| Robot artifact object storage bucket | `RobotArtifacts__ObjectStorage__BucketName` |
-| Robot artifact object storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` |
-| Robot artifact download endpoint TLS toggle | `RobotArtifacts__ObjectStorage__DownloadUseSsl` |
-| Robot artifact presigned download lifetime in seconds | `RobotArtifacts__ObjectStorage__DownloadUrlExpirySeconds` |
-| Enable robot artifact orphan cleanup | `RobotArtifacts__ObjectStorage__OrphanCleanupEnabled` |
-| Minimum orphan age before deletion in hours | `RobotArtifacts__ObjectStorage__OrphanGracePeriodHours` |
-| Robot artifact orphan cleanup interval in hours | `RobotArtifacts__ObjectStorage__OrphanCleanupIntervalHours` |
-| Maximum orphan deletes per cleanup run | `RobotArtifacts__ObjectStorage__OrphanCleanupMaxDeletesPerRun` |
-| Enable deployment-command timeout reconciliation | `DeploymentTimeoutReconciliation__Enabled` |
-| Deployment timeout reconciliation interval in seconds | `DeploymentTimeoutReconciliation__IntervalSeconds` |
-| Maximum expired deployment commands per reconciliation run | `DeploymentTimeoutReconciliation__MaxCommandsPerRun` |
-| Minutes allowed after command acceptance before the first deployment report | `DeploymentTimeoutReconciliation__AcceptedReportTimeoutMinutes` |
-| Minutes allowed between Installed and Active deployment reports | `DeploymentTimeoutReconciliation__InstalledActivationTimeoutMinutes` |
-| Low-cost signed-request maximum clock skew in seconds | `ExecutionEndpointSecurity__SignedRequestMaxClockSkewSeconds` |
-| Used signed-request nonce retention in seconds | `ExecutionEndpointSecurity__NonceRetentionSeconds` |
-| Maximum IoT request body bytes hashed before transport authentication (default 1 MiB) | `ExecutionEndpointSecurity__MaxRequestBodyBytes` |
-| Low-cost controller maximum active artifact count | `LowCostControllerCapacity__MaxArtifactCount` |
-| Low-cost controller maximum active artifact bytes | `LowCostControllerCapacity__MaxArtifactStorageBytes` |
-| Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... |
-| Expose stack traces | `ErrorHandling__ExposeStackTrace` |
-| Enable Serilog OTLP log sink | `Observability__Serilog__OtlpSinkEnabled` |
-| Enable OpenTelemetry OTLP export | `Observability__OpenTelemetry__OtlpExporterEnabled` |
-| OpenTelemetry OTLP endpoint | `Observability__OpenTelemetry__OtlpEndpoint` |
-| Enable debug body logging | `Observability__DebugBodyLogging__Enabled` |
-| Diagnostics API key | `Diagnostics__ApiKey` |
-| Diagnostics realtime external ping toggle | `Diagnostics__EnableExternalPing` |
-| Diagnostics realtime external ping timeout seconds | `Diagnostics__ExternalPingTimeoutSeconds` |
-| Public port, if hosting platform injects it | `PORT` |
+| **P0 Core** | Required for every deployed backend. Deployment must provide or explicitly verify it. |
+| **P0 Feature** | Required when the named feature is enabled or used in that environment. |
+| **P1** | Production-sensitive. A default exists, but the operator must review it for the target environment. |
+| **P2** | Operational tuning or optional integration. Use the `appsettings` default until there is a reason to override it. |
+
+`Secret/env required` means the checked-in value is a placeholder, local credential, or environment-specific address and must not be used as a deployed value. `Use appsettings default` means omission from environment variables is intentional and supported.
+
+## Core And Feature Credentials
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| Database connection | `ConnectionStrings__IceBot_DB` | **P0 Core** | **Secret/env required.** Never deploy the checked-in local connection string. |
+| JWT signing secret | `Authentication__Jwt__Secret` | **P0 Core** | **Secret/env required.** Use a strong environment-specific secret. |
+| JWT issuer | `Authentication__Jwt__Issuer` | **P1** | Use appsettings default only if `IceBotApp` is the intended issuer. |
+| JWT audience | `Authentication__Jwt__Audience` | **P1** | Use appsettings default only if `IceBotUsers` is the intended audience. |
+| Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... | **P0 Core** | **Env required for browser deployments.** Production does not use the Development allow-any fallback. |
+| Public hosting port | `PORT` | **P0 Feature** | Provide only when the hosting platform injects a public port; otherwise use normal ASP.NET hosting configuration. |
+| Diagnostics API key | `Diagnostics__ApiKey` | **P0 Feature** | **Secret/env required** before exposing management diagnostics outside Development. |
+
+## Initial SystemAdmin Bootstrap
+
+These values are required only while an environment has no active `SystemAdmin` role assignment. They are not normal long-lived application settings.
+
+| Area | Configuration key | Direct environment alias | Priority | Deploy action |
+| --- | --- | --- | --- | --- |
+| Admin username | `BootstrapAdmin__UserName` | `BOOTSTRAP_ADMIN_USERNAME` | **P0 Core, first deployment** | Environment-specific value required for initial bootstrap. |
+| Admin email | `BootstrapAdmin__Email` | `BOOTSTRAP_ADMIN_EMAIL` | **P0 Core, first deployment** | Environment-specific value required for initial bootstrap. |
+| Admin password | `BootstrapAdmin__Password` | `BOOTSTRAP_ADMIN_PASSWORD` | **P0 Core, first deployment** | **Secret store/env required. Never put this value in appsettings or source control.** |
+| Admin display name | `BootstrapAdmin__FullName` | `BOOTSTRAP_ADMIN_FULLNAME` | **P2** | Optional; defaults to `Bootstrap System Admin`. |
+
+Bootstrap lifecycle:
+
+1. Supply username, email, and a strong generated password through the deployment secret store.
+2. Start the backend and confirm that the account has the active `SystemAdmin` role.
+3. Log in and rotate the password through the normal account flow.
+4. Remove all bootstrap admin values from deployment configuration.
+
+The hosted bootstrap exits without reading these values when an active `SystemAdmin` already exists. Keeping them after bootstrap is still discouraged: if all active SystemAdmin assignments are later removed, a restart could match/create the configured account, reset its password, and grant `SystemAdmin` again.
+
+## Email And Identity Providers
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| Email host | `Email__Host` | **P0 Feature** | Required when invitation/password-reset email delivery is enabled. |
+| Email username | `Email__UserName` | **P0 Feature** | **Secret/env required** when SMTP authentication is used. |
+| Email password | `Email__Password` | **P0 Feature** | **Secret/env required** when SMTP authentication is used. |
+| Email sender | `Email__From` | **P0 Feature** | Required for email delivery; do not use the sample address. |
+| Password reset frontend URL | `Email__PasswordResetBaseUrl` | **P0 Feature** | Required before password-reset links are issued. |
+| Invitation frontend URL | `Email__InvitationBaseUrl` | **P0 Feature** | Required before invitation links are issued. |
+| Email port | `Email__Port` | **P1** | Review for the SMTP provider; appsettings defaults to `587`. |
+| Email TLS mode | `Email__EnableSsl` | **P1** | Review with the selected SMTP port/provider. |
+| Email display name | `Email__DisplayName` | **P2** | Use appsettings default or override branding. |
+| Firebase enabled flag | `Firebase__Enabled` | **P1** | Explicitly set `false` when Google/Firebase login is not deployed. |
+| Firebase credentials path | `Firebase__CredentialsPath` | **P0 Feature** | **Secret-mounted path required** when Firebase is enabled outside an environment that supplies application-default credentials. |
+
+## Payment Provider
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| PayOS client id | `PayOS__ClientId` | **P0 Feature** | **Secret/env required** when PayOS payment is enabled. |
+| PayOS API key | `PayOS__ApiKey` | **P0 Feature** | **Secret/env required** when PayOS payment is enabled. |
+| PayOS checksum key | `PayOS__ChecksumKey` | **P0 Feature** | **Secret/env required** for request/webhook integrity. |
+| PayOS return URL | `PayOS__ReturnUrl` | **P0 Feature** | Environment-specific public URL required for checkout. |
+| PayOS cancel URL | `PayOS__CancelUrl` | **P0 Feature** | Environment-specific public URL required for checkout cancellation. |
+| PayOS base URL | `PayOS__BaseUrl` | **P2** | Use the appsettings provider URL unless PayOS changes the endpoint or a test stub is used. |
+
+## Robot Artifact Storage
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| Object-storage endpoint | `RobotArtifacts__ObjectStorage__Endpoint` | **P0 Feature** | Environment-specific internal S3/MinIO endpoint required for artifact upload. |
+| Edge-reachable download endpoint | `RobotArtifacts__ObjectStorage__DownloadEndpoint` | **P0 Feature** | Environment-specific endpoint required; it must be reachable by Edge/controllers. |
+| Object-storage access key | `RobotArtifacts__ObjectStorage__AccessKey` | **P0 Feature** | **Secret/env required.** Do not deploy `minioadmin`. |
+| Object-storage secret key | `RobotArtifacts__ObjectStorage__SecretKey` | **P0 Feature** | **Secret/env required.** Do not deploy `minioadmin`. |
+| Object-storage bucket | `RobotArtifacts__ObjectStorage__BucketName` | **P1** | Appsettings default is acceptable only when the deployment uses the same private bucket name. |
+| Storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` | **P1** | Review for the internal storage endpoint; production usually requires TLS. |
+| Download TLS toggle | `RobotArtifacts__ObjectStorage__DownloadUseSsl` | **P1** | Review for the Edge-facing endpoint; production should use TLS. |
+| Presigned URL lifetime | `RobotArtifacts__ObjectStorage__DownloadUrlExpirySeconds` | **P2** | Use appsettings default `900` seconds unless deployment latency requires tuning. |
+| Enable orphan cleanup | `RobotArtifacts__ObjectStorage__OrphanCleanupEnabled` | **P1** | Keep the appsettings default `true` unless cleanup is owned externally. |
+| Orphan grace period | `RobotArtifacts__ObjectStorage__OrphanGracePeriodHours` | **P2** | Use appsettings default `24`. |
+| Orphan cleanup interval | `RobotArtifacts__ObjectStorage__OrphanCleanupIntervalHours` | **P2** | Use appsettings default `24`. |
+| Cleanup delete limit | `RobotArtifacts__ObjectStorage__OrphanCleanupMaxDeletesPerRun` | **P2** | Use appsettings default `100`. |
+
+## Runtime Safety And Capacity
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| Enable deployment reconciliation | `DeploymentTimeoutReconciliation__Enabled` | **P1** | Keep the appsettings default `true` for active Edge/controller deployments. |
+| Reconciliation interval | `DeploymentTimeoutReconciliation__IntervalSeconds` | **P2** | Use appsettings default `60`. |
+| Commands per reconciliation run | `DeploymentTimeoutReconciliation__MaxCommandsPerRun` | **P2** | Use appsettings default `100`. |
+| Accepted-report timeout | `DeploymentTimeoutReconciliation__AcceptedReportTimeoutMinutes` | **P1** | Review against expected download/install duration; default is `30`. |
+| Installed-activation timeout | `DeploymentTimeoutReconciliation__InstalledActivationTimeoutMinutes` | **P1** | Review against expected activation duration; default is `30`. |
+| Signed-request clock skew | `ExecutionEndpointSecurity__SignedRequestMaxClockSkewSeconds` | **P1** | Review device clock quality; default is `300`. |
+| Signed-request nonce retention | `ExecutionEndpointSecurity__NonceRetentionSeconds` | **P1** | Must remain longer than the accepted replay window; default is `900`. |
+| IoT request body limit | `ExecutionEndpointSecurity__MaxRequestBodyBytes` | **P1** | Review against command/report payload size; default is 1 MiB. |
+| Low-cost artifact count | `LowCostControllerCapacity__MaxArtifactCount` | **P1** | Configure from the supported controller profile; default is `50`. |
+| Low-cost artifact bytes | `LowCostControllerCapacity__MaxArtifactStorageBytes` | **P1** | Configure from controller storage capacity; default is 50 MiB. |
+
+## Observability And Diagnostics
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| Expose stack traces | `ErrorHandling__ExposeStackTrace` | **P1** | Use the safe appsettings default `false`. |
+| Serilog OTLP sink | `Observability__Serilog__OtlpSinkEnabled` | **P2** | Default `false`; enable when an OTLP log collector is deployed. |
+| OpenTelemetry OTLP export | `Observability__OpenTelemetry__OtlpExporterEnabled` | **P2** | Default `false`; enable when an OTLP collector is deployed. |
+| OpenTelemetry endpoint | `Observability__OpenTelemetry__OtlpEndpoint` | **P0 Feature** | Required when either OTLP exporter is enabled; environment-specific. |
+| Debug body logging | `Observability__DebugBodyLogging__Enabled` | **P1** | Keep the safe appsettings default `false`; enable only for controlled debugging. |
+| Diagnostics external ping | `Diagnostics__EnableExternalPing` | **P2** | Default `false`; enable only for controlled provider diagnostics. |
+| External ping timeout | `Diagnostics__ExternalPingTimeoutSeconds` | **P2** | Use appsettings default `5` unless provider latency requires tuning. |
 
 ## Operational Endpoints
 
@@ -92,6 +148,8 @@ GET /health/ready
 GET /management/diagnostics/health
 GET /info
 ```
+
+For the PostgreSQL migration, MinIO, endpoint seed, and artifact-to-active-deployment verification workflow, use [Robot Artifact Operational Smoke Test](ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md).
 
 `/info` may include build metadata if these values are provided:
 
