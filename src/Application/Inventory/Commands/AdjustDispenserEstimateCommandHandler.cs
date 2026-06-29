@@ -43,7 +43,7 @@ public sealed class AdjustDispenserEstimateCommandHandler
             var storeId = state.Kiosk?.StoreId;
             var kioskId = state.KioskId;
 
-            if (!ScopeAccessRules.CanAccessScopedRow(
+            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryManage,
                 command.UserContext,
                 orgId,
                 storeId,

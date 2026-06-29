@@ -17,7 +17,7 @@ public sealed class ListRobotArtifactsQueryHandler
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
-        if (!ScopeAccessRules.CanAccessScopedRow(query.UserContext, query.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactRead, query.UserContext, query.OrganizationId, null, null))
         {
             return PagedResult<RobotArtifactResult>.Forbidden("Access denied.", pageNumber, pageSize);
         }

@@ -33,7 +33,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler
             return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Rollback target deployment not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseRollback,
                 command.UserContext, target.OrganizationId, target.StoreId, target.KioskId))
         {
             return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Access denied.", 403);
@@ -140,11 +140,10 @@ public sealed class RollbackConfigurationDeploymentCommandHandler
                 ConfigurationReleaseId = target.ConfigurationReleaseId,
                 KioskExecutionEndpointId = target.KioskExecutionEndpointId,
                 IdempotencyKey = command.IdempotencyKey,
-                Selections = source.Items.Select(item => new DeployLowCostArtifactSelection(
-                    item.ExecutionRouteId,
-                    item.RobotProgramId,
-                    item.RobotArtifactId,
-                    item.RunOrder)).ToArray(),
+                Selections = source.Items
+                    .Select(item => new DeployLowCostArtifactSelection(item.ExecutionRouteId, item.RobotProgramId))
+                    .Distinct()
+                    .ToArray(),
                 CommandExpiryAt = command.CommandExpiryAt,
                 RollbackTargetDeploymentId = target.Id
             },

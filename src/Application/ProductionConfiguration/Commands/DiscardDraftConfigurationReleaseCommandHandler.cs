@@ -16,9 +16,9 @@ public sealed class DiscardDraftConfigurationReleaseCommandHandler
         CancellationToken cancellationToken = default)
     {
         var release = await _store.GetReleaseForEditAsync(command.ReleaseId, cancellationToken);
-        if (release is null)
+        if (release is null || release.OrganizationId != command.OrganizationId)
             return ApiResult<object>.Fail("Configuration release not found.", 404);
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, release.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleasePublish, command.UserContext, release.OrganizationId, null, null))
             return ApiResult<object>.Fail("Access denied.", 403);
         if (release.Status != ConfigurationReleaseStatus.Draft)
             return ApiResult<object>.Fail("Only draft configuration releases can be discarded.", 400);

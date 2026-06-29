@@ -7,8 +7,6 @@ using System.ComponentModel.DataAnnotations;
 using WebAPI.Authorization;
 using Domain.RobotConfiguration.Enums;
 using Application.Shared.Wrappers;
-using System.Text.Json;
-using FilePath = System.IO.Path;
 
 namespace WebAPI.Controllers.RobotConfiguration;
 
@@ -47,7 +45,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     }
 
     [HttpGet("organizations/{organizationId:guid}/robot-artifacts")]
-    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "artifact.read")]
     public async Task<IActionResult> ListRobotArtifacts(
         Guid organizationId,
         [FromQuery] string? search,
@@ -70,7 +68,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     }
 
     [HttpGet("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}")]
-    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "artifact.read")]
     public async Task<IActionResult> GetRobotArtifact(
         Guid organizationId,
         Guid artifactId,
@@ -93,44 +91,27 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         [FromForm] BulkUploadRobotArtifactsRequest request,
         CancellationToken cancellationToken)
     {
-        BulkUploadRobotArtifactManifestItemRequest[]? manifest;
-        try
+        var parsedManifest = RobotArtifactMultipartManifestParser.Parse(
+            request.Files,
+            request.ManifestJson,
+            (BulkUploadRobotArtifactManifestItemRequest item) => item.FileName);
+        if (!parsedManifest.Succeeded)
         {
-            manifest = JsonSerializer.Deserialize<BulkUploadRobotArtifactManifestItemRequest[]>(
-                request.ManifestJson,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        }
-        catch (JsonException)
-        {
-            return BadRequest(ApiResult<object>.Fail("ManifestJson must be a valid JSON array.", 400));
+            return BadRequest(ApiResult<object>.Fail(parsedManifest.Error!, 400));
         }
 
-        if (manifest is null || manifest.Length == 0)
-        {
-            return BadRequest(ApiResult<object>.Fail("ManifestJson must contain at least one artifact item.", 400));
-        }
-
-        var manifestValidationError = ValidateBulkManifest(request.Files, manifest);
-        if (manifestValidationError is not null)
-        {
-            return BadRequest(ApiResult<object>.Fail(manifestValidationError, 400));
-        }
-
-        var filesByName = request.Files.ToDictionary(
-            file => FilePath.GetFileName(file.FileName),
-            StringComparer.OrdinalIgnoreCase);
-        var streams = new List<Stream>(manifest.Length);
+        var streams = new List<Stream>(parsedManifest.Items.Count);
 
         try
         {
-            var items = manifest.Select(item =>
+            var items = parsedManifest.Items.Select(item =>
             {
-                var file = filesByName[item.FileName];
+                var file = parsedManifest.FilesByName[RobotArtifactMultipartManifestParser.NormalizeFileName(item.FileName)!];
                 var stream = file.OpenReadStream();
                 streams.Add(stream);
                 return new BulkUploadRobotArtifactItem
                 {
-                    FileName = FilePath.GetFileName(file.FileName),
+                    FileName = RobotArtifactMultipartManifestParser.NormalizeFileName(file.FileName)!,
                     ContentType = file.ContentType,
                     ContentLengthBytes = file.Length,
                     Content = stream,
@@ -240,54 +221,6 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
             ArtifactId = artifactId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
-    }
-
-    private static string? ValidateBulkManifest(
-        IReadOnlyCollection<IFormFile> files,
-        IReadOnlyCollection<BulkUploadRobotArtifactManifestItemRequest> manifest)
-    {
-        if (files.Count == 0 || files.Count != manifest.Count)
-        {
-            return "Files and manifest items must have the same non-zero count.";
-        }
-
-        if (files.Any(file => file.Length <= 0 || file.Length > UploadRobotArtifactCommandHandler.MaximumFileSizeBytes))
-        {
-            return $"Each robot artifact file must be between 1 byte and {UploadRobotArtifactCommandHandler.MaximumFileSizeBytes} bytes.";
-        }
-
-        if (files.Count > 50)
-        {
-            return "A maximum of 50 robot artifact files is allowed per request.";
-        }
-
-        var fileNames = files.Select(file => FilePath.GetFileName(file.FileName)).ToArray();
-        if (fileNames.Any(string.IsNullOrWhiteSpace) ||
-            fileNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != fileNames.Length)
-        {
-            return "Uploaded file names must be present and unique.";
-        }
-
-        if (manifest.Any(item => !TryValidateManifestItem(item)))
-        {
-            return "Every manifest item requires a .lua file name, artifact metadata, and a positive run order.";
-        }
-
-        var manifestFileNames = manifest.Select(item => FilePath.GetFileName(item.FileName)).ToArray();
-        if (manifestFileNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != manifestFileNames.Length ||
-            !fileNames.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(manifestFileNames))
-        {
-            return "Manifest file names must uniquely match all uploaded file names.";
-        }
-
-        return null;
-    }
-
-    private static bool TryValidateManifestItem(BulkUploadRobotArtifactManifestItemRequest item)
-    {
-        var context = new ValidationContext(item);
-        return Validator.TryValidateObject(item, context, [], validateAllProperties: true) &&
-            item.FileName.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
     }
 
 }

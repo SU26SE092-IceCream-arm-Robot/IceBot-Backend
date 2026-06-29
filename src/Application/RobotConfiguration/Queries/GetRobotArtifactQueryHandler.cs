@@ -15,7 +15,7 @@ public sealed class GetRobotArtifactQueryHandler
         GetRobotArtifactQuery query,
         CancellationToken cancellationToken = default)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(query.UserContext, query.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactRead, query.UserContext, query.OrganizationId, null, null))
         {
             return ApiResult<RobotArtifactResult>.Fail("Robot artifact not found.", 404);
         }

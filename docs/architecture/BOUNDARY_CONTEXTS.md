@@ -132,15 +132,13 @@ Namespace: `Domain.RobotConfiguration`
 
 Owns immutable exported robot Lua artifacts and reusable declared robot manifests.
 
-Entities:
+Aggregate roots: `RobotProgram`, `RobotArtifact`.
 
-- `RobotProgram`
-- `RobotProgramArtifact`
-- `RobotArtifact`
+Aggregate child: `RobotProgramArtifact`, owned only by `RobotProgram`.
 
 This context is configuration-time. It should not own runtime execution state.
 
-`RobotProgramArtifact` owns ordered artifact membership. This context does not persist Blockly trees, teaching points, calibration, motion coordinates or live runtime work.
+`RobotProgramArtifact` represents ordered artifact membership. `RobotArtifact` does not own an inverse membership collection. This context does not persist Blockly trees, teaching points, calibration, motion coordinates or live runtime work.
 
 ### Production Configuration
 
@@ -148,14 +146,13 @@ Namespace: `Domain.ProductionConfiguration`
 
 Owns organization-scoped configuration releases, release-owned route snapshots, ordered robot bindings and Cloud rollout acknowledgement records.
 
-Entities:
+Aggregate roots: `ConfigurationRelease`, `KioskConfigurationDeployment`, `ControllerArtifactSetDeployment`.
 
-- `ConfigurationRelease`
-- `ExecutionRoute`
-- `ExecutionRouteRobotBinding`
-- `KioskConfigurationDeployment`
+Release-owned children: `ExecutionRoute`, `ExecutionRouteRobotBinding`.
 
-Published releases are immutable. A route links catalog variant/recipe requirements to robot programs through bindings, rather than Catalog holding a direct program id.
+Low-cost deployment child: `ControllerArtifactSetItem`.
+
+Published releases are immutable. A route links catalog variant/recipe requirements to robot programs through bindings, rather than Catalog holding a direct program id. Release publication consumes immutable published-program/artifact snapshots; the release manifest builder does not traverse a live Robot Configuration aggregate. Deployment aggregates keep release ids/checksums and materialized item snapshots rather than owning a release graph.
 
 ### Production Execution
 

@@ -40,11 +40,17 @@ public sealed class DeploymentTimeoutReconciliationJob : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var handler = scope.ServiceProvider.GetRequiredService<ReconcileExpiredDeploymentCommandsCommandHandler>();
                 var reportTimeoutHandler = scope.ServiceProvider.GetRequiredService<ReconcileAcceptedDeploymentReportTimeoutsCommandHandler>();
+                var activationTimeoutHandler = scope.ServiceProvider.GetRequiredService<ReconcileInstalledDeploymentActivationTimeoutsCommandHandler>();
                 var now = DateTimeOffset.UtcNow;
                 var result = await handler.HandleAsync(now, batchSize, stoppingToken);
                 var reportTimeoutResult = await reportTimeoutHandler.HandleAsync(
                     now,
                     TimeSpan.FromMinutes(Math.Max(_options.AcceptedReportTimeoutMinutes, 1)),
+                    batchSize,
+                    stoppingToken);
+                var activationTimeoutResult = await activationTimeoutHandler.HandleAsync(
+                    now,
+                    TimeSpan.FromMinutes(Math.Max(_options.InstalledActivationTimeoutMinutes, 1)),
                     batchSize,
                     stoppingToken);
 
@@ -63,6 +69,14 @@ public sealed class DeploymentTimeoutReconciliationJob : BackgroundService
                         "Deployment report timeout reconciliation failed {FullEdgeCount} Full Edge and {ControllerCount} low-cost deployments whose accepted commands received no installation report.",
                         reportTimeoutResult.FullEdgeDeploymentCount,
                         reportTimeoutResult.ControllerDeploymentCount);
+                }
+
+                if (activationTimeoutResult.TotalCount > 0)
+                {
+                    _logger.LogWarning(
+                        "Deployment activation timeout reconciliation failed {FullEdgeCount} Full Edge and {ControllerCount} low-cost deployments that remained installed without activation.",
+                        activationTimeoutResult.FullEdgeDeploymentCount,
+                        activationTimeoutResult.ControllerDeploymentCount);
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

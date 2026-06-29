@@ -48,12 +48,12 @@ public sealed class ProvisionExecutionEndpointCommandHandler
         try
         {
             var now = DateTimeOffset.UtcNow;
-            var credential = ExecutionEndpointCredentialBinding.CreateProvisioned(
-                endpoint.Id, endpoint.AuthenticationMode, material.Fingerprint, now, material.PublicKeyPem);
+            var credential = endpoint.ProvisionCredential(
+                material.Fingerprint,
+                now,
+                material.PublicKeyPem);
             credential.CreatedByAccountId = command.UserContext.AccountId;
             await _store.AddCredentialBindingAsync(credential, cancellationToken);
-            endpoint.AttachCredentialBinding(credential);
-            endpoint.ActivateCredentialBinding(now);
             endpoint.Activate(command.Request.ProfileIdentity, now);
             endpoint.UpdatedByAccountId = command.UserContext.AccountId;
             await _store.SaveChangesAsync(cancellationToken);

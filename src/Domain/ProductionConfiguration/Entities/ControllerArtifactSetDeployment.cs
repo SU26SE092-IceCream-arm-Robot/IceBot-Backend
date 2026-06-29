@@ -43,22 +43,17 @@ public class ControllerArtifactSetDeployment : AuditedEntity
     }
 
     public static ControllerArtifactSetDeployment CreatePending(
-        KioskExecutionEndpoint endpoint,
-        ConfigurationRelease release,
+        Guid kioskId, Guid endpointId, Guid controllerId, Guid releaseId, string releaseChecksum,
         long activeSetVersion,
         string idempotencyKey,
         int maxArtifactCount,
         long maxArtifactStorageBytes,
         Guid? requestedByAccountId,
         DateTimeOffset requestedAt,
-        IEnumerable<ControllerArtifactSetItemSelection> selections,
-        bool isRollback = false)
+        IEnumerable<ControllerArtifactSetItemSnapshot> items)
     {
-        if (endpoint is null || release is null || endpoint.ExecutionProfile != KioskExecutionProfile.LowCostController ||
-            endpoint.Status != KioskExecutionEndpointStatus.Active || endpoint.ControllerId is null ||
-            (release.Status != ConfigurationReleaseStatus.Published &&
-                !(isRollback && release.Status == ConfigurationReleaseStatus.Retired)) ||
-            string.IsNullOrWhiteSpace(release.ReleaseChecksum) ||
+        if (kioskId == Guid.Empty || endpointId == Guid.Empty || controllerId == Guid.Empty || releaseId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(releaseChecksum) ||
             activeSetVersion <= 0 || string.IsNullOrWhiteSpace(idempotencyKey) || maxArtifactCount <= 0 || maxArtifactStorageBytes <= 0)
         {
             throw new DomainRuleException("A published release, active low-cost endpoint, positive active-set version, and capacity limits are required.");
@@ -66,11 +61,8 @@ public class ControllerArtifactSetDeployment : AuditedEntity
 
         var deployment = new ControllerArtifactSetDeployment
         {
-            KioskId = endpoint.KioskId,
-            KioskExecutionEndpointId = endpoint.Id,
-            ControllerId = endpoint.ControllerId.Value,
-            SourceConfigurationReleaseId = release.Id,
-            ReleaseChecksum = release.ReleaseChecksum,
+            KioskId = kioskId, KioskExecutionEndpointId = endpointId, ControllerId = controllerId,
+            SourceConfigurationReleaseId = releaseId, ReleaseChecksum = releaseChecksum,
             ActiveSetVersion = activeSetVersion,
             IdempotencyKey = idempotencyKey.Trim(),
             MaxArtifactCount = maxArtifactCount,
@@ -79,16 +71,13 @@ public class ControllerArtifactSetDeployment : AuditedEntity
             RequestedAt = requestedAt
         };
 
-        var selected = selections?.ToArray() ?? [];
+        var selected = items?.ToArray() ?? [];
         if (selected.Length == 0)
         {
             throw new DomainRuleException("A low-cost active artifact set requires at least one selected artifact.");
         }
 
-        foreach (var selection in selected)
-        {
-            deployment._items.Add(ResolveItem(deployment.Id, endpoint, release, selection));
-        }
+        foreach (var item in selected) deployment._items.Add(ControllerArtifactSetItem.Create(deployment.Id, item));
 
         if (deployment._items.Select(item => item.RobotArtifactId).Distinct().Count() > maxArtifactCount ||
             deployment._items.GroupBy(item => item.RobotArtifactId).Sum(group => group.First().ContentLengthBytes) > maxArtifactStorageBytes)
@@ -146,24 +135,6 @@ public class ControllerArtifactSetDeployment : AuditedEntity
         FailureCode = "CommandExpired";
         FailureReason = "The deployment command expired before the execution endpoint accepted it.";
         Status = ControllerArtifactSetDeploymentStatus.Failed;
-    }
-
-    private static ControllerArtifactSetItem ResolveItem(Guid deploymentId, KioskExecutionEndpoint endpoint, ConfigurationRelease release, ControllerArtifactSetItemSelection selection)
-    {
-        var route = release.ExecutionRoutes.SingleOrDefault(candidate => candidate.Id == selection.ExecutionRouteId)
-            ?? throw new DomainRuleException("Selected active-set route does not belong to the source release.");
-        var binding = route.RobotBindings.SingleOrDefault(candidate => candidate.RobotProgramId == selection.RobotProgramId)
-            ?? throw new DomainRuleException("Selected active-set program does not belong to the source route.");
-        var program = binding.RobotProgram ?? throw new DomainRuleException("Robot program must be loaded before active-set materialization.");
-        var programArtifact = program.RobotProgramArtifacts.SingleOrDefault(candidate => candidate.RobotArtifactId == selection.RobotArtifactId && candidate.RunOrder == selection.RunOrder)
-            ?? throw new DomainRuleException("Selected active-set artifact does not belong to the selected robot program.");
-
-        if (programArtifact.RobotArtifact is null || !endpoint.SupportsRobotTarget(programArtifact.RobotArtifact.RuntimeTargetCode, programArtifact.RobotArtifact.MachineModelCode, program.DeviceId))
-        {
-            throw new DomainRuleException("Selected active-set artifact is not compatible with the controller endpoint.");
-        }
-
-        return ControllerArtifactSetItem.Create(deploymentId, route.Id, program, programArtifact);
     }
 
     private bool IsDuplicateReport(Guid reportId) => reportId != Guid.Empty && LastControllerReportId == reportId;

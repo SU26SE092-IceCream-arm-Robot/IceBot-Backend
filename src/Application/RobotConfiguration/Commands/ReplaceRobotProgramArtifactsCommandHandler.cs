@@ -41,12 +41,12 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
         }
 
         var program = await _robotConfigurationStore.GetProgramForEditAsync(command.ProgramId, cancellationToken);
-        if (program is null)
+        if (program is null || program.OrganizationId != command.OrganizationId)
         {
             return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProgramManage, command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
         {
             return ApiResult<RobotProgramResult>.Fail("Access denied.", 403);
         }
@@ -70,21 +70,14 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
 
         try
         {
-            var existingArtifacts = program.RobotProgramArtifacts.ToArray();
-            _robotConfigurationStore.DeleteProgramArtifacts(existingArtifacts);
-            program.ClearArtifacts();
-
-            foreach (var item in command.Artifacts.OrderBy(item => item.RunOrder))
-            {
-                program.AddArtifact(
-                    item.RobotArtifactId,
-                    item.RunOrder,
+            var removedArtifacts = program.ReplaceArtifacts(command.Artifacts
+                .OrderBy(item => item.RunOrder)
+                .Select(item => (item.RobotArtifactId, item.RunOrder,
                     string.IsNullOrWhiteSpace(item.ParametersJson) ? null : item.ParametersJson.Trim(),
-                    item.ParametersSchemaVersion);
-            }
+                    item.ParametersSchemaVersion)));
 
             program.UpdatedByAccountId = command.UserContext.AccountId;
-            await _robotConfigurationStore.SaveChangesAsync(cancellationToken);
+            await _robotConfigurationStore.SaveProgramReplacementAsync(removedArtifacts, cancellationToken);
 
             var updatedProgram = await _robotConfigurationStore.GetProgramByIdAsync(program.Id, cancellationToken)
                 ?? throw new InvalidOperationException("Robot program disappeared after artifact replacement.");

@@ -326,9 +326,12 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
         return _dbContext.RobotPrograms.AddAsync(program, cancellationToken).AsTask();
     }
 
-    public void DeleteProgramArtifacts(IEnumerable<RobotProgramArtifact> programArtifacts)
+    public async Task SaveProgramReplacementAsync(
+        IReadOnlyCollection<RobotProgramArtifact> removedArtifacts,
+        CancellationToken cancellationToken = default)
     {
-        _dbContext.RobotProgramArtifacts.RemoveRange(programArtifacts);
+        _dbContext.RobotProgramArtifacts.RemoveRange(removedArtifacts);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -29,7 +29,7 @@ public sealed class ManagementDashboardHub : Hub
                     : throw new HubException("Access denied: you do not have SystemAdmin access.");
                 break;
             case "organization":
-                groupKey = organizationId.HasValue && ScopeAccessRules.CanAccessScopedRow(user, organizationId.Value, null, null)
+                groupKey = organizationId.HasValue && ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, organizationId.Value, null, null)
                     ? $"dashboard:organization:{organizationId.Value}"
                     : throw new HubException("Access denied: you do not have access to this organization dashboard.");
                 break;
@@ -40,7 +40,7 @@ public sealed class ManagementDashboardHub : Hub
                 }
 
                 var store = await _storeStore.GetByIdAsync(storeId.Value, Context.ConnectionAborted);
-                groupKey = store is not null && ScopeAccessRules.CanAccessScopedRow(user, store.OrganizationId, store.Id, null)
+                groupKey = store is not null && ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, store.OrganizationId, store.Id, null)
                     ? $"dashboard:store:{store.Id}"
                     : throw new HubException("Access denied: you do not have access to this store dashboard.");
                 break;

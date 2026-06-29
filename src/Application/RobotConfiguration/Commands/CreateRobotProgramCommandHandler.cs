@@ -21,7 +21,7 @@ public sealed class CreateRobotProgramCommandHandler
         CreateRobotProgramCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, command.StoreId, command.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProgramManage, command.UserContext, command.OrganizationId, command.StoreId, command.KioskId))
         {
             return ApiResult<RobotProgramResult>.Fail("Access denied.", 403);
         }

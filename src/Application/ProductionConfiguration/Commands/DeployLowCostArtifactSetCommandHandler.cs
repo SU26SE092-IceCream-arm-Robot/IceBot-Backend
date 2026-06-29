@@ -6,6 +6,7 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
+using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.ValueObjects;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
@@ -46,12 +47,27 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("At least one artifact selection is required.", 400);
         }
 
+        if (command.Selections.Any(selection => selection.ExecutionRouteId == Guid.Empty || selection.RobotProgramId == Guid.Empty) ||
+            command.Selections.GroupBy(selection => (selection.ExecutionRouteId, selection.RobotProgramId)).Any(group => group.Count() > 1))
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
+                "Low-cost selections require unique route and robot-program pairs.", 400);
+        }
+
         var release = await _productionConfigurationStore.GetPublishedReleaseForDeploymentAsync(
             command.ConfigurationReleaseId,
             cancellationToken);
         if (release is null)
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Published configuration release not found.", 404);
+        }
+
+        if (release.Status != ConfigurationReleaseStatus.Published &&
+            !(command.IsRollback && release.Status == ConfigurationReleaseStatus.Retired))
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
+                "Only a published configuration release can be deployed; retired releases are available only through rollback.",
+                400);
         }
 
         var endpoint = await _productionConfigurationStore.GetEndpointForDeploymentAsync(
@@ -77,7 +93,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Low-cost endpoint controller identity is missing.", 400);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseDeploy, command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Access denied.", 403);
         }
@@ -101,7 +117,8 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                     if (existing.SourceConfigurationReleaseId != command.ConfigurationReleaseId ||
                         !SelectionsMatch(existing, command.Selections) ||
                         existingCommand is null ||
-                        ReadRollbackTarget(existingCommand.PayloadJson) != command.RollbackTargetDeploymentId)
+                        ReadRollbackTarget(existingCommand.PayloadJson) != command.RollbackTargetDeploymentId ||
+                        ReadRequestedCommandExpiryAt(existingCommand.PayloadJson) != command.CommandExpiryAt)
                         return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Idempotency key was already used for a different deployment request.", 409);
                     return ApiResult<ControllerArtifactSetDeploymentResult>.Success(
                         ControllerArtifactSetDeploymentResult.FromEntity(existing, existingCommand?.Id),
@@ -114,29 +131,27 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 var activeSetVersion = await _productionConfigurationStore.GetNextControllerActiveSetVersionAsync(endpoint.ControllerId.Value, ct);
                 try
                 {
-            var selections = command.Selections.Select(selection => new ControllerArtifactSetItemSelection(
-                selection.ExecutionRouteId,
-                selection.RobotProgramId,
-                selection.RobotArtifactId,
-                selection.RunOrder));
+            var items = MaterializeItems(endpoint, release, command.Selections);
 
             var deployment = ControllerArtifactSetDeployment.CreatePending(
-                endpoint,
-                release,
+                endpoint.KioskId,
+                endpoint.Id,
+                endpoint.ControllerId!.Value,
+                release.Id,
+                release.ReleaseChecksum!,
                 activeSetVersion,
                 command.IdempotencyKey.Trim(),
                 _capacity.MaxArtifactCount,
                 _capacity.MaxArtifactStorageBytes,
                 command.UserContext.AccountId,
                 now,
-                selections,
-                command.IsRollback);
+                items);
 
             var edgeCommand = EdgeCommand.Create(
                 EdgeCommandType.DeployConfiguration,
                 deployment.KioskId,
                 deployment.KioskExecutionEndpointId,
-                BuildDeployPayload(deployment, command.RollbackTargetDeploymentId),
+                BuildDeployPayload(deployment, command.RollbackTargetDeploymentId, command.CommandExpiryAt),
                 now,
                 commandExpiryAt: commandExpiryAt,
                 deploymentId: deployment.Id,
@@ -163,7 +178,8 @@ public sealed class DeployLowCostArtifactSetCommandHandler
 
     private static string BuildDeployPayload(
         ControllerArtifactSetDeployment deployment,
-        Guid? rollbackTargetDeploymentId)
+        Guid? rollbackTargetDeploymentId,
+        DateTimeOffset? requestedCommandExpiryAt)
     {
         var payload = new
         {
@@ -174,6 +190,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
             deployment.ReleaseChecksum,
             RollbackTargetDeploymentId = rollbackTargetDeploymentId,
+            RequestedCommandExpiryAt = requestedCommandExpiryAt,
             deployment.ActiveSetVersion,
             deployment.ActiveSetChecksum,
             deployment.MaxArtifactCount,
@@ -212,16 +229,65 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         IReadOnlyCollection<DeployLowCostArtifactSelection> requested)
     {
         var existingKeys = existing.Items
-            .Select(item => (item.ExecutionRouteId, item.RobotProgramId, item.RobotArtifactId, item.RunOrder))
+            .Select(item => (item.ExecutionRouteId, item.RobotProgramId))
+            .Distinct()
             .OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId)
-            .ThenBy(item => item.RunOrder).ThenBy(item => item.RobotArtifactId)
             .ToArray();
         var requestedKeys = requested
-            .Select(item => (item.ExecutionRouteId, item.RobotProgramId, item.RobotArtifactId, item.RunOrder))
+            .Select(item => (item.ExecutionRouteId, item.RobotProgramId))
+            .Distinct()
             .OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId)
-            .ThenBy(item => item.RunOrder).ThenBy(item => item.RobotArtifactId)
             .ToArray();
         return existingKeys.SequenceEqual(requestedKeys);
+    }
+
+    private static IReadOnlyCollection<ControllerArtifactSetItemSnapshot> MaterializeItems(
+        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        ConfigurationRelease release,
+        IReadOnlyCollection<DeployLowCostArtifactSelection> selections)
+    {
+        var items = new List<ControllerArtifactSetItemSnapshot>(selections.Count);
+        foreach (var selection in selections)
+        {
+            var route = release.ExecutionRoutes.SingleOrDefault(item => item.Id == selection.ExecutionRouteId)
+                ?? throw new DomainRuleException("Selected active-set route does not belong to the source release.");
+            var binding = route.RobotBindings.SingleOrDefault(item => item.RobotProgramId == selection.RobotProgramId)
+                ?? throw new DomainRuleException("Selected active-set program does not belong to the source route.");
+            var program = binding.RobotProgram;
+            if (!AppliesToKiosk(route.ProductVariant.Product.OrganizationId, route.ProductVariant.Product.StoreId,
+                    route.ProductVariant.Product.KioskId, endpoint.Kiosk) ||
+                !AppliesToKiosk(route.Recipe.OrganizationId, route.Recipe.StoreId, route.Recipe.KioskId, endpoint.Kiosk) ||
+                !AppliesToKiosk(program.OrganizationId, program.StoreId, program.KioskId, endpoint.Kiosk))
+                throw new DomainRuleException("Selected route, recipe, and robot program must apply to the target kiosk scope.");
+
+            if (program.RobotProgramArtifacts.Count == 0)
+                throw new DomainRuleException("Selected robot program has no published artifact sequence.");
+
+            foreach (var programArtifact in program.RobotProgramArtifacts.OrderBy(item => item.RunOrder))
+            {
+                var artifact = programArtifact.RobotArtifact;
+                if (!endpoint.SupportsRobotTarget(artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId))
+                    throw new DomainRuleException("Selected robot program contains an artifact that is not compatible with the controller endpoint.");
+
+                items.Add(new ControllerArtifactSetItemSnapshot(
+                    route.Id, program.Id, program.ProgramManifestChecksum!, artifact.Id, artifact.Checksum,
+                    artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId,
+                    artifact.ContentLengthBytes, programArtifact.RunOrder, programArtifact.ParametersSchemaVersion,
+                    programArtifact.ParametersJson));
+            }
+        }
+        return items;
+    }
+
+    private static bool AppliesToKiosk(
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        Domain.Tenants.Entities.Kiosk kiosk)
+    {
+        return (!organizationId.HasValue || organizationId == kiosk.OrganizationId) &&
+            (!storeId.HasValue || storeId == kiosk.StoreId) &&
+            (!kioskId.HasValue || kioskId == kiosk.Id);
     }
 
     private static Guid? ReadRollbackTarget(string payloadJson)
@@ -230,5 +296,13 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         if (!document.RootElement.TryGetProperty("RollbackTargetDeploymentId", out var value) || value.ValueKind == JsonValueKind.Null)
             return null;
         return value.GetGuid();
+    }
+
+    private static DateTimeOffset? ReadRequestedCommandExpiryAt(string payloadJson)
+    {
+        using var document = JsonDocument.Parse(payloadJson);
+        if (!document.RootElement.TryGetProperty("RequestedCommandExpiryAt", out var value) || value.ValueKind == JsonValueKind.Null)
+            return null;
+        return value.GetDateTimeOffset();
     }
 }

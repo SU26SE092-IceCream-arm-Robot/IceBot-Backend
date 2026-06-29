@@ -40,7 +40,8 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Execution endpoint management | `/api/v1/management/execution-endpoints/*`, `/api/v1/management/kiosks/{kioskId}/execution-endpoints` | create, provision, inspect, configure compatibility, disable/reactivate, rotate credentials, and retire Full Edge or low-cost execution endpoints |
 | Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
-| Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/robot-artifacts/*`, `/api/v1/management/robot-programs/*`, `/api/v1/management/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments`, `/api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments` | upload immutable robot Lua artifacts, publish robot programs, publish immutable configuration releases, and request Full Edge or low-cost controller deployment |
+| Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/organizations/{organizationId}/robot-programs/*`, `/api/v1/management/organizations/{organizationId}/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments/{profile}` | upload immutable robot Lua artifacts, publish robot programs, publish immutable configuration releases, and request Full Edge or low-cost controller deployment |
+| Global robot artifact templates | `/api/v1/management/robot-artifact-templates/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts/from-template` | manage reusable global Lua templates and clone a Published template into an organization-owned Draft artifact |
 | Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/refunds` | internal order search, unpaid cancellation, refund-required marking, manual refund tracking |
 | Inventory management | `/api/v1/management/inventory/*` | dispenser states, stock movement history, refill, estimate adjustment |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/events` | kiosk connectivity history and device warnings/errors |
@@ -124,30 +125,31 @@ GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/publish
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/retire
-PATCH /api/v1/management/robot-programs/{programId}/retire
-PATCH /api/v1/management/configuration-releases/{releaseId}/retire
-PATCH /api/v1/management/robot-programs/{programId}/publish
-DELETE /api/v1/management/robot-programs/{programId}
-PATCH /api/v1/management/configuration-releases/{releaseId}/publish
-DELETE /api/v1/management/configuration-releases/{releaseId}
-POST /api/v1/management/kiosks/{kioskId}/configuration-deployments
-POST /api/v1/management/kiosks/{kioskId}/controller-artifact-set-deployments
+DELETE /api/v1/management/robot-artifact-templates/{templateId}
+PATCH /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/retire
+PATCH /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}/retire
+PATCH /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/publish
+DELETE /api/v1/management/organizations/{organizationId}/robot-programs/{programId}
+PATCH /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}/publish
+DELETE /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}
+POST /api/v1/management/kiosks/{kioskId}/configuration-deployments/full-edge
+POST /api/v1/management/kiosks/{kioskId}/configuration-deployments/low-cost
 POST /api/v1/management/organizations/{organizationId}/robot-programs
-PUT /api/v1/management/robot-programs/{programId}/artifacts
+PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/artifacts
 POST /api/v1/management/organizations/{organizationId}/robot-artifacts/bulk
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish-bulk
 GET /api/v1/management/organizations/{organizationId}/robot-artifacts
 GET /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}
 POST /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/review-url
 DELETE /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}
-GET /api/v1/management/robot-programs
-GET /api/v1/management/robot-programs/{programId}
-PUT /api/v1/management/robot-programs/{programId}
-GET /api/v1/management/configuration-releases
+GET /api/v1/management/organizations/{organizationId}/robot-programs
+GET /api/v1/management/organizations/{organizationId}/robot-programs/{programId}
+PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}
+GET /api/v1/management/organizations/{organizationId}/configuration-releases
 GET /api/v1/management/organizations/{organizationId}/configuration-release-authoring-options
-GET /api/v1/management/configuration-releases/{releaseId}
+GET /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}
 POST /api/v1/management/organizations/{organizationId}/configuration-releases
-PUT /api/v1/management/configuration-releases/{releaseId}/routes
+PUT /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}/routes
 GET /api/v1/management/configuration-deployments
 GET /api/v1/management/configuration-deployments/{deploymentId}
 POST /api/v1/management/configuration-deployments/{deploymentId}/rollback
@@ -189,6 +191,7 @@ Rules:
 
 - Use `/management/...`, not `/admin/...`.
 - Access is controlled by authorization policies, not the route prefix.
+- Tenant authorization must match role and resource scope on the same `UserRoleScope`; combining a privileged role from one scope with an unrelated scope from another assignment is forbidden.
 - It is valid for multiple roles to share the same management endpoint when policy allows it.
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
 - Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
@@ -211,12 +214,13 @@ Rules:
 - Draft discard hard-deletes metadata only when no `RobotProgramArtifact` references exist. Metadata deletion commits before best-effort object deletion; the orphan cleanup job removes residual objects after its grace period.
 - Bulk artifact publish atomically transitions 1-100 unique selected Draft artifacts from one organization. Published items are idempotent no-ops; duplicate ids, missing, cross-organization, Disabled, or Retired selections reject the complete publish request.
 - Robot artifact publish makes an uploaded artifact available for `RobotProgram` manifests. Robot program publish calculates `ProgramManifestJson` and `ProgramManifestChecksum` from ordered `RobotProgramArtifact` membership. Configuration release publish calculates immutable release manifest/checksum from execution routes and published robot program bindings.
+- `RobotArtifactTemplate` is a global authoring source, not a runtime artifact. Only a Published template may be cloned; cloning creates a separate organization-owned Draft `RobotArtifact`, copies immutable bytes to an organization object key, and records `SourceRobotArtifactTemplateId` for lineage. Programs, releases, deployments, and execution endpoints never reference templates directly. An unreferenced Draft template may be hard-discarded; Published and Retired templates remain history.
 - Retire lifecycle commands are idempotent and do not hard-delete artifact bytes, manifests, or deployment history. Artifact retirement is blocked by Draft programs, program retirement by Draft releases, and release retirement by Pending/Installed deployments. Published history can retain retired references for audit and rollback.
 - Robot programs are created as organization-owned drafts. Store, kiosk, and device scope may narrow that ownership, but all scope ids must belong to the same tenant hierarchy. Global robot-program creation is not exposed because `RobotArtifact` is organization-owned.
-- `PUT /management/robot-programs/{programId}/artifacts` replaces the complete ordered membership while the program is Draft. `RunOrder` is explicit API data; backend must not derive execution order from an exported filename prefix.
+- `PUT /management/organizations/{organizationId}/robot-programs/{programId}/artifacts` replaces the complete ordered membership while the program is Draft. `RunOrder` is explicit API data; backend must not derive execution order from an exported filename prefix.
 - Every assigned artifact must belong to the program organization. Artifact parameters must be valid JSON. Publishing still requires all assigned artifacts to be Published.
 - Artifact and program list endpoints are paged and tenant-scoped. Program lists return summaries without manifest JSON or artifact collections. Program detail includes ordered artifact metadata so management clients can edit/reorder a draft without issuing one request per artifact.
-- `PUT /management/robot-programs/{programId}` edits draft code, name, and description only. Program scope is immutable after creation; changing ownership scope requires a new draft program.
+- `PUT /management/organizations/{organizationId}/robot-programs/{programId}` edits draft code, name, and description only. Program scope is immutable after creation; changing ownership scope requires a new draft program.
 - `RobotProgramArtifact` is aggregate membership, not an independent management resource. Clients replace the ordered collection through the program endpoint instead of creating or deleting membership rows individually.
 - Configuration releases are created as organization-owned drafts with backend-assigned release numbers. Route authoring replaces the complete Draft route/binding collection; `ExecutionRoute` and `ExecutionRouteRobotBinding` are aggregate children, not independent CRUD resources.
 - Draft robot programs and Draft configuration releases can be hard-discarded through their `DELETE` endpoints. Published or referenced records are preserved; retirement remains the lifecycle operation for published history.
@@ -228,9 +232,12 @@ Rules:
 - The complete Fairino export-to-deployment sequence is owned by [Robot Lua Artifact Flow](../flows/ROBOT_LUA_ARTIFACT_FLOW.md); keep this document focused on route and client boundaries.
 - Publish commands do not deploy to an execution endpoint.
 - Full Edge deployment requests create a `KioskConfigurationDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database save. The command payload references the immutable release manifest/checksum and artifact descriptors; the edge runtime still validates checksum and reports install/activation later.
-- Low-cost controller active-set deployment requests create a `ControllerArtifactSetDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database transaction. The request selects route/program/artifact/run-order items; backend-owned `LowCostControllerCapacity` configuration supplies the V1 capacity ceiling, so clients cannot claim larger hardware capacity.
+- Low-cost controller active-set deployment requests create a `ControllerArtifactSetDeployment` and a durable `DeployConfiguration` `EdgeCommand` in one database transaction. The request selects unique route/program pairs; backend materializes every ordered artifact in each selected published program, preventing partial program deployment. Backend-owned `LowCostControllerCapacity` configuration supplies the V1 capacity ceiling, so clients cannot claim larger hardware capacity.
+- Normal Full Edge and low-cost deployments require a Published configuration release. A Retired release may be deployed only through the validated rollback endpoint; callers cannot use the normal deployment routes to bypass retirement.
 - Deployment creation is serialized per kiosk/controller with a PostgreSQL transaction-scoped advisory lock. The pending-state check, attempt/version allocation, deployment insert, and durable command insert execute inside that boundary.
 - Full Edge deploy, Low-cost deploy, and rollback requests require `Idempotency-Key`. The key is durable and unique per execution endpoint. An exact retry returns the existing deployment and command; reusing a key for a different release or Low-cost selection returns `409`.
+- Deployment create/rollback responses may return their `IdempotencyKey` for immediate retry correlation. Deployment list/detail read models must not expose stored idempotency keys.
+- Robot program, configuration release, and deployment read routes use `program.read`, `release.read`, and `deployment.read`. Authoring/publishing/deployment commands retain their narrower mutation policies.
 - Deploy commands carry typed deployment correlation (`DeploymentId` and `DeploymentKind`). When a command expires before acceptance, background reconciliation marks both the command and its still-Pending deployment terminal with `CommandExpired`; management reads must not show that deployment as Pending indefinitely.
 - Accepted deployment commands use a separate report deadline. A still-Pending deployment beyond that deadline becomes `Failed/ExecutionReportTimeout` through a conditional database update, preventing concurrent report ingestion or multiple backend jobs from blindly overwriting a newer state.
 - Artifact bytes are not exposed through a public REST download endpoint. After execution-endpoint authentication, command pull enriches deployment artifact descriptors with short-lived object-storage read URLs. These URLs are not durable API identifiers and must not be stored as release state.

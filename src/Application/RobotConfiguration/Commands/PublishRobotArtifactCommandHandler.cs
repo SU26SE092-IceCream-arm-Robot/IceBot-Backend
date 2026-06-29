@@ -25,7 +25,7 @@ public sealed class PublishRobotArtifactCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("Robot artifact not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactUpload, command.UserContext, command.OrganizationId, null, null))
         {
             return ApiResult<RobotArtifactResult>.Fail("Access denied.", 403);
         }

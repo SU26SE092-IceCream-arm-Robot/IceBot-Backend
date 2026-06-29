@@ -6,6 +6,7 @@ public sealed class RobotArtifactResult
 {
     public Guid Id { get; init; }
     public Guid OrganizationId { get; init; }
+    public Guid? SourceRobotArtifactTemplateId { get; init; }
     public string ArtifactCode { get; init; } = null!;
     public string ArtifactName { get; init; } = null!;
     public string StorageKey { get; init; } = null!;
@@ -25,6 +26,7 @@ public sealed class RobotArtifactResult
         {
             Id = artifact.Id,
             OrganizationId = artifact.OrganizationId,
+            SourceRobotArtifactTemplateId = artifact.SourceRobotArtifactTemplateId,
             ArtifactCode = artifact.ArtifactCode,
             ArtifactName = artifact.ArtifactName,
             StorageKey = artifact.StorageKey,

@@ -27,7 +27,7 @@ public sealed class DiscardDraftRobotArtifactCommandHandler
         DiscardDraftRobotArtifactCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactUpload, command.UserContext, command.OrganizationId, null, null))
             return ApiResult<RobotArtifactDiscardResult>.Fail("Robot artifact not found.", 404);
 
         var artifact = await _store.GetArtifactForPublishAsync(command.ArtifactId, cancellationToken);

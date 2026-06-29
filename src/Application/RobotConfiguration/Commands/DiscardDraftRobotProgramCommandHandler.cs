@@ -16,10 +16,9 @@ public sealed class DiscardDraftRobotProgramCommandHandler
         CancellationToken cancellationToken = default)
     {
         var program = await _store.GetProgramForEditAsync(command.ProgramId, cancellationToken);
-        if (program is null)
+        if (program is null || program.OrganizationId != command.OrganizationId)
             return ApiResult<object>.Fail("Robot program not found.", 404);
-        if (!program.OrganizationId.HasValue ||
-            !ScopeAccessRules.CanAccessScopedRow(command.UserContext, program.OrganizationId.Value, program.StoreId, program.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProgramManage, command.UserContext, program.OrganizationId, program.StoreId, program.KioskId))
             return ApiResult<object>.Fail("Access denied.", 403);
         if (program.Status != RobotProgramStatus.Draft)
             return ApiResult<object>.Fail("Only draft robot programs can be discarded.", 400);

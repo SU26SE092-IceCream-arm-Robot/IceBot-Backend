@@ -21,7 +21,7 @@ public class ExecutionRouteRobotBinding : BusinessEntity
     {
     }
 
-    public static ExecutionRouteRobotBinding Create(
+    internal static ExecutionRouteRobotBinding Create(
         Guid robotProgramId,
         int bindingOrder,
         string requiredWorkcellCapabilityCode)

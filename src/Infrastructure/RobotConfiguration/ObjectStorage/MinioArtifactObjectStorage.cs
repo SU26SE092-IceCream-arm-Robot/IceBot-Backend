@@ -92,6 +92,32 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         return new ArtifactObjectReadUrlResult(url, expiresAt);
     }
 
+    public async Task<ArtifactObjectWriteResult> CopyImmutableAsync(
+        string sourceStorageKey,
+        ArtifactObjectWriteRequest destination,
+        CancellationToken cancellationToken = default)
+    {
+        await EnsureBucketAsync(cancellationToken);
+        if (!await ExistsAsync(sourceStorageKey, cancellationToken))
+            throw new InvalidOperationException("Source artifact object does not exist.");
+        if (await ExistsAsync(destination.StorageKey, cancellationToken))
+            throw new ArtifactObjectAlreadyExistsException(destination.StorageKey);
+
+        await _client.CopyObjectAsync(
+            new CopyObjectArgs()
+                .WithBucket(_options.BucketName)
+                .WithObject(destination.StorageKey)
+                .WithCopyObjectSource(new CopySourceObjectArgs()
+                    .WithBucket(_options.BucketName)
+                    .WithObject(sourceStorageKey)),
+            cancellationToken);
+
+        return new ArtifactObjectWriteResult(
+            destination.StorageKey,
+            destination.Checksum,
+            destination.ContentLengthBytes);
+    }
+
     public async IAsyncEnumerable<ArtifactObjectInfo> ListAsync(
         string prefix,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)

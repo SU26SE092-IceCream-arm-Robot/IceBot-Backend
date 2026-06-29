@@ -22,7 +22,7 @@ public class RobotProgramArtifact : RobotConfigurationEntity
     {
     }
 
-    public static RobotProgramArtifact Create(
+    internal static RobotProgramArtifact Create(
         Guid robotArtifactId,
         int runOrder,
         string? parametersJson = null,

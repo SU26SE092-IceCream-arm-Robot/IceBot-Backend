@@ -25,7 +25,7 @@ public sealed class GetMenuQueryHandler
             return ApiResult<MenuResult>.Fail("Menu not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.MenusManage,
             query.UserContext,
             menu.OrganizationId,
             menu.StoreId,

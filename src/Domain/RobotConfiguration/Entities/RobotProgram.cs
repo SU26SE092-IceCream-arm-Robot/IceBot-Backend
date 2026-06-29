@@ -23,7 +23,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
 
     public string Name { get; private set; } = null!;
 
-    public TenantScopeType ScopeType { get; private set; } = TenantScopeType.Global;
+    public TenantScopeType ScopeType { get; private set; } = TenantScopeType.Organization;
 
     public RobotProgramStatus Status { get; private set; } = RobotProgramStatus.Draft;
 
@@ -125,6 +125,20 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         _robotProgramArtifacts.Clear();
     }
 
+    public IReadOnlyCollection<RobotProgramArtifact> ReplaceArtifacts(
+        IEnumerable<(Guid ArtifactId, int RunOrder, string? ParametersJson, int ParametersSchemaVersion)> replacements)
+    {
+        EnsureDraft();
+        var removed = _robotProgramArtifacts.ToArray();
+        _robotProgramArtifacts.Clear();
+        foreach (var replacement in replacements)
+        {
+            AddArtifact(replacement.ArtifactId, replacement.RunOrder, replacement.ParametersJson, replacement.ParametersSchemaVersion);
+        }
+
+        return removed;
+    }
+
     public void UpdateDraftDetails(string code, string name, string? description)
     {
         EnsureDraft();
@@ -208,7 +222,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
     {
         var valid = scopeType switch
         {
-            TenantScopeType.Global => organizationId is null && storeId is null && kioskId is null && deviceId is null,
+            TenantScopeType.Global => false,
             TenantScopeType.Organization => organizationId.HasValue && storeId is null && kioskId is null && deviceId is null,
             TenantScopeType.Store => organizationId.HasValue && storeId.HasValue && kioskId is null && deviceId is null,
             TenantScopeType.Kiosk => organizationId.HasValue && storeId.HasValue && kioskId.HasValue && deviceId is null,

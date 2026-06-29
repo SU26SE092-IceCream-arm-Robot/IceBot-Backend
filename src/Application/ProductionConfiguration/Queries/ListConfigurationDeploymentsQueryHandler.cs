@@ -1,6 +1,7 @@
 using Application.ProductionConfiguration.Abstractions;
 using Application.ProductionConfiguration.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.ProductionConfiguration.Queries;
 
@@ -17,15 +18,16 @@ public sealed class ListConfigurationDeploymentsQueryHandler
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
         var user = query.UserContext;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.DeploymentRead, user);
         var count = await _store.CountConfigurationDeploymentsAsync(
             query.OrganizationId, query.StoreId, query.KioskId, query.ConfigurationReleaseId,
             query.Profile, query.Status, user.IsSystemAdmin,
-            user.AllowedOrganizationIds, user.AllowedStoreIds, user.AllowedKioskIds,
+            scope.OrganizationIds, scope.StoreIds, scope.KioskIds,
             cancellationToken);
         var deployments = await _store.ListConfigurationDeploymentsAsync(
             query.OrganizationId, query.StoreId, query.KioskId, query.ConfigurationReleaseId,
             query.Profile, query.Status, user.IsSystemAdmin,
-            user.AllowedOrganizationIds, user.AllowedStoreIds, user.AllowedKioskIds,
+            scope.OrganizationIds, scope.StoreIds, scope.KioskIds,
             pageNumber, pageSize, cancellationToken);
         return PagedResult<ConfigurationDeploymentResult>.Success(
             deployments.Select(ConfigurationDeploymentResult.FromReadModel), count, pageNumber, pageSize);

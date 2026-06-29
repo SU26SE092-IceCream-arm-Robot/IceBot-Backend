@@ -43,7 +43,7 @@ public sealed class MarkOrderRefundRequiredCommandHandler
 
             fromStatus = order.Status;
 
-            if (!ScopeAccessRules.CanAccessScopedRow(
+            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersManage,
                 command.UserContext,
                 order.OrganizationId,
                 order.StoreId,

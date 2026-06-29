@@ -9,7 +9,7 @@ namespace Infrastructure.RobotConfiguration.Jobs;
 
 public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
 {
-    private const string ArtifactPrefix = "robot-artifacts/";
+    private const string ArtifactPrefix = "robot-artifact";
     private const long CleanupLockKey = 0x494345424F544F52L;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RobotArtifactObjectStorageOptions _options;
@@ -73,7 +73,9 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
 
         var storage = scope.ServiceProvider.GetRequiredService<IArtifactObjectStorage>();
         var store = scope.ServiceProvider.GetRequiredService<IRobotConfigurationStore>();
+        var templateStore = scope.ServiceProvider.GetRequiredService<IRobotArtifactTemplateStore>();
         var referencedKeys = (await store.ListArtifactStorageKeysAsync(cancellationToken))
+            .Concat(await templateStore.ListStorageKeysAsync(cancellationToken))
             .ToHashSet(StringComparer.Ordinal);
         var threshold = DateTimeOffset.UtcNow.AddHours(-_options.OrphanGracePeriodHours);
         var deletedCount = 0;

@@ -17,7 +17,7 @@ public sealed class CreateConfigurationReleaseCommandHandler
         CreateConfigurationReleaseCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleasePublish, command.UserContext, command.OrganizationId, null, null))
         {
             return ApiResult<ConfigurationReleaseResult>.Fail("Access denied.", 403);
         }

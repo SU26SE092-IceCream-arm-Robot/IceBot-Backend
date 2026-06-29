@@ -17,6 +17,4 @@ public sealed class DeployLowCostArtifactSetCommand
 
 public sealed record DeployLowCostArtifactSelection(
     Guid ExecutionRouteId,
-    Guid RobotProgramId,
-    Guid RobotArtifactId,
-    int RunOrder);
+    Guid RobotProgramId);

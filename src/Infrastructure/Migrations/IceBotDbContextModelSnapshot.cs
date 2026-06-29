@@ -3765,6 +3765,9 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid?>("SourceRobotArtifactTemplateId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -3787,6 +3790,8 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SourceRobotArtifactTemplateId");
+
                     b.HasIndex("StorageKey")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
@@ -3800,6 +3805,96 @@ namespace Infrastructure.Migrations
                     b.HasIndex("RuntimeTargetCode", "MachineModelCode", "Status");
 
                     b.ToTable("RobotArtifacts", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotArtifactTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("ContentLengthBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("ExportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("MachineModelCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("MetadataJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("RuntimeTargetCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TemplateCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("TemplateCode", "Checksum")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("RuntimeTargetCode", "MachineModelCode", "Status");
+
+                    b.ToTable("RobotArtifactTemplates", (string)null);
                 });
 
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
@@ -5565,7 +5660,7 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.ProductionConfiguration.Entities.KioskConfigurationDeployment", b =>
                 {
                     b.HasOne("Domain.ProductionConfiguration.Entities.ConfigurationRelease", "ConfigurationRelease")
-                        .WithMany("KioskConfigurationDeployments")
+                        .WithMany()
                         .HasForeignKey("ConfigurationReleaseId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -5641,7 +5736,14 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Domain.RobotConfiguration.Entities.RobotArtifactTemplate", "SourceRobotArtifactTemplate")
+                        .WithMany()
+                        .HasForeignKey("SourceRobotArtifactTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Organization");
+
+                    b.Navigation("SourceRobotArtifactTemplate");
                 });
 
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
@@ -5678,7 +5780,7 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgramArtifact", b =>
                 {
                     b.HasOne("Domain.RobotConfiguration.Entities.RobotArtifact", "RobotArtifact")
-                        .WithMany("RobotProgramArtifacts")
+                        .WithMany()
                         .HasForeignKey("RobotArtifactId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -5933,8 +6035,6 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ConfigurationRelease", b =>
                 {
                     b.Navigation("ExecutionRoutes");
-
-                    b.Navigation("KioskConfigurationDeployments");
                 });
 
             modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ControllerArtifactSetDeployment", b =>
@@ -5945,11 +6045,6 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ExecutionRoute", b =>
                 {
                     b.Navigation("RobotBindings");
-                });
-
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotArtifact", b =>
-                {
-                    b.Navigation("RobotProgramArtifacts");
                 });
 
             modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>

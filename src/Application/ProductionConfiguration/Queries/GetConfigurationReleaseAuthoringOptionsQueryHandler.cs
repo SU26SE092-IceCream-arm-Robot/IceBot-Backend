@@ -16,7 +16,7 @@ public sealed class GetConfigurationReleaseAuthoringOptionsQueryHandler
     {
         if (query.OrganizationId == Guid.Empty)
             return ApiResult<ConfigurationReleaseAuthoringOptionsReadModel>.Fail("Organization is required.", 400);
-        if (!ScopeAccessRules.CanAccessScopedRow(query.UserContext, query.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseRead, query.UserContext, query.OrganizationId, null, null))
             return ApiResult<ConfigurationReleaseAuthoringOptionsReadModel>.Fail("Access denied.", 403);
         if (!await _store.OrganizationExistsAsync(query.OrganizationId, cancellationToken))
             return ApiResult<ConfigurationReleaseAuthoringOptionsReadModel>.Fail("Organization not found.", 404);

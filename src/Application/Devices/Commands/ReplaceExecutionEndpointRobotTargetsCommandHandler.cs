@@ -40,11 +40,9 @@ public sealed class ReplaceExecutionEndpointRobotTargetsCommandHandler
 
         try
         {
-            var previousTargets = endpoint.SupportedRobotTargets.ToArray();
-            endpoint.ClearSupportedRobotTargets();
+            var previousTargets = endpoint.ReplaceSupportedRobotTargets(
+                resolved.Select(target => (target.RuntimeTargetCode, target.MachineModelCode, target.Device)));
             _store.RemoveSupportedRobotTargets(previousTargets);
-            foreach (var target in resolved)
-                endpoint.AddSupportedRobotTarget(target.RuntimeTargetCode, target.MachineModelCode, target.Device);
             endpoint.UpdatedByAccountId = command.UserContext.AccountId;
             await _store.SaveChangesAsync(cancellationToken);
             return ApiResult<ExecutionEndpointResult>.Success(

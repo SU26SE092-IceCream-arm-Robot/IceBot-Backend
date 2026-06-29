@@ -497,6 +497,48 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 cancellationToken);
     }
 
+    public Task<int> FailFullEdgeDeploymentsMissingActivationReportAsync(
+        DateTimeOffset installedBefore,
+        DateTimeOffset observedAt,
+        int maxDeployments,
+        CancellationToken cancellationToken = default)
+    {
+        var timedOutIds = _dbContext.KioskConfigurationDeployments
+            .Where(deployment => deployment.Status == KioskConfigurationDeploymentStatus.Installed &&
+                deployment.CloudReceivedAt != null && deployment.CloudReceivedAt < installedBefore)
+            .OrderBy(deployment => deployment.CloudReceivedAt)
+            .Take(maxDeployments)
+            .Select(deployment => deployment.Id);
+        return _dbContext.KioskConfigurationDeployments
+            .Where(deployment => timedOutIds.Contains(deployment.Id) && deployment.Status == KioskConfigurationDeploymentStatus.Installed)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(deployment => deployment.Status, KioskConfigurationDeploymentStatus.Failed)
+                .SetProperty(deployment => deployment.FailureCode, "ActivationReportTimeout")
+                .SetProperty(deployment => deployment.FailureReason, "The execution endpoint installed the deployment but did not report activation before the timeout.")
+                .SetProperty(deployment => deployment.UpdatedAt, observedAt), cancellationToken);
+    }
+
+    public Task<int> FailControllerDeploymentsMissingActivationReportAsync(
+        DateTimeOffset installedBefore,
+        DateTimeOffset observedAt,
+        int maxDeployments,
+        CancellationToken cancellationToken = default)
+    {
+        var timedOutIds = _dbContext.ControllerArtifactSetDeployments
+            .Where(deployment => deployment.Status == ControllerArtifactSetDeploymentStatus.Installed &&
+                deployment.CloudReceivedAt != null && deployment.CloudReceivedAt < installedBefore)
+            .OrderBy(deployment => deployment.CloudReceivedAt)
+            .Take(maxDeployments)
+            .Select(deployment => deployment.Id);
+        return _dbContext.ControllerArtifactSetDeployments
+            .Where(deployment => timedOutIds.Contains(deployment.Id) && deployment.Status == ControllerArtifactSetDeploymentStatus.Installed)
+            .ExecuteUpdateAsync(setters => setters
+                .SetProperty(deployment => deployment.Status, ControllerArtifactSetDeploymentStatus.Failed)
+                .SetProperty(deployment => deployment.FailureCode, "ActivationReportTimeout")
+                .SetProperty(deployment => deployment.FailureReason, "The controller installed the artifact set but did not report activation before the timeout.")
+                .SetProperty(deployment => deployment.UpdatedAt, observedAt), cancellationToken);
+    }
+
     public async Task<long> GetNextControllerActiveSetVersionAsync(Guid controllerId, CancellationToken cancellationToken = default)
     {
         var maxVersion = await _dbContext.ControllerArtifactSetDeployments
@@ -517,11 +559,14 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
         return _dbContext.ControllerArtifactSetDeployments.AddAsync(deployment, cancellationToken).AsTask();
     }
 
-    public void DeleteReleaseRoutes(IEnumerable<ExecutionRoute> routes)
+    public async Task SaveReleaseReplacementAsync(
+        IReadOnlyCollection<ExecutionRoute> routes,
+        CancellationToken cancellationToken = default)
     {
         var routeArray = routes.ToArray();
         _dbContext.ExecutionRouteRobotBindings.RemoveRange(routeArray.SelectMany(route => route.RobotBindings));
         _dbContext.ExecutionRoutes.RemoveRange(routeArray);
+        await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<ConfigurationReleaseDiscardOutcome> DiscardDraftReleaseAsync(
@@ -540,7 +585,9 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
         }
 
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        DeleteReleaseRoutes(release.ExecutionRoutes);
+        var routeArray = release.ExecutionRoutes.ToArray();
+        _dbContext.ExecutionRouteRobotBindings.RemoveRange(routeArray.SelectMany(route => route.RobotBindings));
+        _dbContext.ExecutionRoutes.RemoveRange(routeArray);
         var entry = _dbContext.ConfigurationReleases.Remove(release);
         try
         {
@@ -661,7 +708,6 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 ConfigurationReleaseId = deployment.ConfigurationReleaseId,
                 ReleaseNumber = deployment.ConfigurationRelease.ReleaseNumber,
                 ReleaseChecksum = deployment.ReleaseChecksum,
-                IdempotencyKey = deployment.IdempotencyKey,
                 Status = (ConfigurationDeploymentReadStatus)deployment.Status,
                 RequestedAt = deployment.RequestedAt,
                 RequestedByAccountId = deployment.RequestedByAccountId,
@@ -697,7 +743,6 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
                 ReleaseNumber = deployment.SourceConfigurationRelease.ReleaseNumber,
                 ReleaseChecksum = deployment.ReleaseChecksum,
-                IdempotencyKey = deployment.IdempotencyKey,
                 Status = (ConfigurationDeploymentReadStatus)deployment.Status,
                 RequestedAt = deployment.RequestedAt,
                 RequestedByAccountId = deployment.RequestedByAccountId,

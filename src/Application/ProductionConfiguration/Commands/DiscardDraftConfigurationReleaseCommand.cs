@@ -5,5 +5,6 @@ namespace Application.ProductionConfiguration.Commands;
 public sealed class DiscardDraftConfigurationReleaseCommand
 {
     public required CurrentUserContext UserContext { get; init; }
+    public Guid OrganizationId { get; init; }
     public Guid ReleaseId { get; init; }
 }

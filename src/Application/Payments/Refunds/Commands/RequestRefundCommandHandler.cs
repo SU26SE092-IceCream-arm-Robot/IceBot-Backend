@@ -44,7 +44,7 @@ public sealed class RequestRefundCommandHandler
                 if (existing is not null)
                 {
                     var existingOrder = existing.PaymentTransaction.Order;
-                    if (!ScopeAccessRules.CanAccessScopedRow(
+                    if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
                         command.UserContext,
                         existingOrder.OrganizationId,
                         existingOrder.StoreId,
@@ -65,7 +65,7 @@ public sealed class RequestRefundCommandHandler
                 return ApiResult<RefundResult>.Fail("Order not found.", 404);
             }
 
-            if (!ScopeAccessRules.CanAccessScopedRow(
+            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
                 command.UserContext,
                 order.OrganizationId,
                 order.StoreId,

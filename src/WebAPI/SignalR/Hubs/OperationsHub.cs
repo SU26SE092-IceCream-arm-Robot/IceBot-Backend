@@ -21,7 +21,7 @@ public sealed class OperationsHub : Hub
         var user = Context.User!.GetUserContext();
         var kiosk = await _kioskStore.GetByIdAsync(kioskId, Context.ConnectionAborted);
         if (kiosk is null ||
-            !ScopeAccessRules.CanAccessScopedRow(user, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id))
+            !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OperationsView, user, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id))
         {
             throw new HubException("Access denied: you do not have access to this kiosk.");
         }

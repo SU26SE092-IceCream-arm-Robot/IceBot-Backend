@@ -145,13 +145,27 @@ public interface IProductionConfigurationStore
         int maxDeployments,
         CancellationToken cancellationToken = default);
 
+    Task<int> FailFullEdgeDeploymentsMissingActivationReportAsync(
+        DateTimeOffset installedBefore,
+        DateTimeOffset observedAt,
+        int maxDeployments,
+        CancellationToken cancellationToken = default);
+
+    Task<int> FailControllerDeploymentsMissingActivationReportAsync(
+        DateTimeOffset installedBefore,
+        DateTimeOffset observedAt,
+        int maxDeployments,
+        CancellationToken cancellationToken = default);
+
     Task<long> GetNextControllerActiveSetVersionAsync(Guid controllerId, CancellationToken cancellationToken = default);
 
     Task AddFullEdgeDeploymentAsync(KioskConfigurationDeployment deployment, CancellationToken cancellationToken = default);
 
     Task AddControllerArtifactSetDeploymentAsync(ControllerArtifactSetDeployment deployment, CancellationToken cancellationToken = default);
 
-    void DeleteReleaseRoutes(IEnumerable<ExecutionRoute> routes);
+    Task SaveReleaseReplacementAsync(
+        IReadOnlyCollection<ExecutionRoute> removedRoutes,
+        CancellationToken cancellationToken = default);
 
     Task<ConfigurationReleaseDiscardOutcome> DiscardDraftReleaseAsync(
         ConfigurationRelease release,

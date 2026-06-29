@@ -25,7 +25,7 @@ public sealed class GetManagementOrderQueryHandler
             return ApiResult<OrderResult>.Fail("Order not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersView,
             query.UserContext,
             order.OrganizationId,
             order.StoreId,

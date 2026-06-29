@@ -26,7 +26,7 @@ public sealed class BulkPublishRobotArtifactsCommandHandler
                 $"Bulk publish requires 1 to {MaximumItemCount} unique, non-empty robot artifact ids.", 400);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, command.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ArtifactUpload, command.UserContext, command.OrganizationId, null, null))
         {
             return ApiResult<BulkRobotArtifactPublishResult>.Fail("Access denied.", 403);
         }

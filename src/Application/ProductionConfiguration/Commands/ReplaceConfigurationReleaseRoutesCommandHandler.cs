@@ -26,12 +26,12 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
         }
 
         var release = await _store.GetReleaseForEditAsync(command.ReleaseId, cancellationToken);
-        if (release is null)
+        if (release is null || release.OrganizationId != command.OrganizationId)
         {
             return ApiResult<ConfigurationReleaseResult>.Fail("Configuration release not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(command.UserContext, release.OrganizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleasePublish, command.UserContext, release.OrganizationId, null, null))
         {
             return ApiResult<ConfigurationReleaseResult>.Fail("Access denied.", 403);
         }
@@ -91,32 +91,22 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
 
         try
         {
-            var existingRoutes = release.ExecutionRoutes.ToArray();
-            _store.DeleteReleaseRoutes(existingRoutes);
-            release.ClearRoutes();
-
-            foreach (var routeInput in command.Routes.OrderBy(route => route.Priority).ThenBy(route => route.RouteCode))
-            {
-                var route = release.AddRoute(
-                    routeInput.ProductVariantId,
-                    routeInput.RecipeId,
-                    routeInput.RouteCode.Trim().ToUpperInvariant(),
-                    routeInput.Priority,
-                    string.IsNullOrWhiteSpace(routeInput.RequiredCapabilitiesJson)
-                        ? null
-                        : routeInput.RequiredCapabilitiesJson.Trim());
-
-                foreach (var binding in routeInput.RobotBindings.OrderBy(binding => binding.BindingOrder))
-                {
-                    route.AddRobotBinding(
-                        binding.RobotProgramId,
-                        binding.BindingOrder,
-                        binding.RequiredWorkcellCapabilityCode.Trim().ToUpperInvariant());
-                }
-            }
+            var removedRoutes = release.ReplaceRoutes(command.Routes
+                .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
+                .Select(route => (
+                    route.ProductVariantId,
+                    route.RecipeId,
+                    route.RouteCode.Trim().ToUpperInvariant(),
+                    route.Priority,
+                    string.IsNullOrWhiteSpace(route.RequiredCapabilitiesJson) ? null : route.RequiredCapabilitiesJson.Trim(),
+                    (IReadOnlyCollection<(Guid, int, string)>)route.RobotBindings
+                        .OrderBy(binding => binding.BindingOrder)
+                        .Select(binding => (binding.RobotProgramId, binding.BindingOrder,
+                            binding.RequiredWorkcellCapabilityCode.Trim().ToUpperInvariant()))
+                        .ToArray())));
 
             release.UpdatedByAccountId = command.UserContext.AccountId;
-            await _store.SaveChangesAsync(cancellationToken);
+            await _store.SaveReleaseReplacementAsync(removedRoutes, cancellationToken);
 
             var updatedRelease = await _store.GetReleaseByIdAsync(release.Id, cancellationToken)
                 ?? throw new InvalidOperationException("Configuration release disappeared after route replacement.");
