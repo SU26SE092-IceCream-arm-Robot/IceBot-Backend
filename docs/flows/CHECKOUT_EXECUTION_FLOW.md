@@ -47,12 +47,11 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 16. Cloud verifies provider callback and signature.
 17. Cloud updates PaymentTransaction = Paid and Order = ReadyForExecution in one DB transaction.
 18. Cloud commits payment/order state.
-19. Cloud emits post-commit events:
-   - PaymentSucceeded
-   - OrderReadyForExecution
+19. After the payment transaction commits, Cloud dispatches execution attempt `1`.
+   A reconciliation worker repairs any paid `ReadyForExecution` order whose initial command was not created.
 20. Tablet status flow updates payment/order screen.
-21. Edge dispatch flow creates executable command and publishes MQTT notification.
-22. Edge receives MQTT notification or finds command by polling.
+21. Edge dispatch resolves one active execution endpoint and the active configuration release, then maps every machine-produced order line to an execution route and ordered robot programs.
+22. Edge finds the durable `ExecuteOrder` command by polling. MQTT wake-up notification remains an optional later transport optimization.
 23. Edge pulls executable command from Cloud.
 24. Edge performs fast runtime check with 5-10 second timeout.
 25. If ready, Edge accepts command and creates its own local execution state.
@@ -76,16 +75,19 @@ Payment success and robot execution are separate concerns. Tablet can show payme
 After payment is verified and committed, Cloud should fan out independently:
 
 ```text
-PaymentSucceeded / OrderReadyForExecution
+Paid order committed
   -> Tablet status notification
-  -> Edge executable command dispatch
+  -> ExecuteOrder dispatch attempt 1
+  -> reconciliation scan when the initial dispatch was missed
 ```
 
 Rules:
 
 - Do not wait for Edge acceptance inside the payment webhook transaction.
 - Do not make Tablet status depend on Edge dispatch success.
-- Retry failed fan-out handlers independently.
+- Dispatch is idempotent by `(OrderId, DispatchAttemptNo)`.
+- Reconciliation creates only missing attempt `1`; a new attempt number requires an explicit retry decision.
+- Admission counts active `ExecuteOrder` commands per endpoint and rejects dispatch when the configured queue limit is reached.
 - Payment remains paid after provider-confirmed commit.
 
 ## Tablet Status Flow
@@ -135,19 +137,21 @@ Order tracking read model boundary limitations and data exclusions are detailed 
 ```text
 1. Cloud has a paid order ready for execution.
 2. Cloud creates an executable command.
-3. Cloud publishes MQTT wake-up notification.
-4. Edge receives MQTT or polls on schedule.
-5. Edge pulls pending commands from Cloud.
-6. Edge deduplicates by commandId/idempotencyKey.
-7. Edge performs runtime readiness check.
-8. If ready:
+3. Edge polls on schedule. A future MQTT wake-up may reduce latency but does not own the durable command.
+4. Edge pulls pending commands from Cloud through its authenticated execution endpoint.
+5. Edge deduplicates by commandId/idempotencyKey.
+6. Edge performs runtime readiness check.
+7. If ready:
    - persist local command/job
    - ack Accepted
+   - Cloud moves Order to Accepted
    - create local execution work
-9. If not ready:
-   - ack Rejected
+8. If not ready:
+   - ack ExecutorBusy when capacity is temporarily unavailable; Cloud keeps the order ReadyForExecution and redelivers later
+   - otherwise ack Rejected
    - include rejection reason and readiness snapshot
-10. Cloud updates order/execution state.
+   - Cloud moves the order to ExecutionRejected, or RefundRequired when physical output may already have occurred
+9. Cloud updates order/execution state.
 ```
 
 MQTT payloads should stay small. Edge must pull command details from Cloud.

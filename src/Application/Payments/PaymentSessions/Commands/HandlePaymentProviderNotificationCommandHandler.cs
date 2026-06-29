@@ -9,6 +9,8 @@ using Application.Shared.Wrappers;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
+using Application.EdgeIntegration.Commands;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Payments.PaymentSessions.Commands;
 
@@ -17,15 +19,21 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
     private readonly IPaymentStore _paymentStore;
     private readonly IPaymentGateway _paymentGateway;
     private readonly IRealtimeNotificationPublisher _publisher;
+    private readonly DispatchOrderExecutionCommandHandler _dispatchOrderExecutionHandler;
+    private readonly ILogger<HandlePaymentProviderNotificationCommandHandler> _logger;
 
     public HandlePaymentProviderNotificationCommandHandler(
         IPaymentStore paymentStore,
         IPaymentGateway paymentGateway,
-        IRealtimeNotificationPublisher publisher)
+        IRealtimeNotificationPublisher publisher,
+        DispatchOrderExecutionCommandHandler dispatchOrderExecutionHandler,
+        ILogger<HandlePaymentProviderNotificationCommandHandler> logger)
     {
         _paymentStore = paymentStore;
         _paymentGateway = paymentGateway;
         _publisher = publisher;
+        _dispatchOrderExecutionHandler = dispatchOrderExecutionHandler;
+        _logger = logger;
     }
 
     public async Task<ApiResult<PaymentNotificationResult>> HandleAsync(
@@ -217,6 +225,25 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                     UpdatedAt = DateTimeOffset.UtcNow,
                     Version = 1
                 }, cancellationToken);
+            }
+
+            if (result.Data.Status == PaymentTransactionStatus.Paid)
+            {
+                var dispatchResult = await _dispatchOrderExecutionHandler.HandleAsync(
+                    new DispatchOrderExecutionCommand
+                    {
+                        OrderId = result.Data.OrderId,
+                        DispatchAttemptNo = 1
+                    },
+                    cancellationToken);
+
+                if (!dispatchResult.Succeeded)
+                {
+                    _logger.LogWarning(
+                        "Paid order {OrderId} remains ready for execution because command dispatch was deferred: {Message}",
+                        result.Data.OrderId,
+                        dispatchResult.Message);
+                }
             }
         }
 

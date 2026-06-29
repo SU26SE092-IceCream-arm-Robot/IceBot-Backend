@@ -1,0 +1,47 @@
+using Domain.Devices.Entities;
+using Domain.Orders.Entities;
+using Domain.ProductionConfiguration.Entities;
+using Domain.Sync.Entities;
+
+namespace Application.EdgeIntegration.Abstractions;
+
+public interface IOrderExecutionDispatchStore
+{
+    Task<T> ExecuteSerializedAsync<T>(
+        Guid orderId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
+    Task AcquireEndpointAdmissionLockAsync(
+        Guid endpointId,
+        CancellationToken cancellationToken = default);
+
+    Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<KioskExecutionEndpoint>> ListActiveEndpointsAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
+
+    Task<ConfigurationRelease?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default);
+
+    Task<ControllerArtifactSetDeployment?> GetControllerActiveSetAsync(
+        Guid deploymentId,
+        CancellationToken cancellationToken = default);
+
+    Task<EdgeCommand?> GetCommandAsync(
+        Guid orderId,
+        int dispatchAttemptNo,
+        CancellationToken cancellationToken = default);
+
+    Task<int> CountActiveCommandsAsync(
+        Guid endpointId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Guid>> ListReadyOrderIdsWithoutInitialCommandAsync(
+        int maxOrders,
+        CancellationToken cancellationToken = default);
+
+    Task AddCommandAsync(EdgeCommand command, CancellationToken cancellationToken = default);
+
+    Task SaveChangesAsync(CancellationToken cancellationToken = default);
+}

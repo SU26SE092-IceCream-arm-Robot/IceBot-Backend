@@ -67,7 +67,8 @@ public sealed class ExecutionCommandsController : ControllerBase
             AckStatus = request.AckStatus,
             AcknowledgedAt = request.AcknowledgedAt,
             RejectionCode = request.RejectionCode,
-            RejectionMessage = request.RejectionMessage
+            RejectionMessage = request.RejectionMessage,
+            PhysicalOutputMayHaveOccurred = request.PhysicalOutputMayHaveOccurred
         };
 
         var result = await _acknowledgeCommandHandler.HandleAsync(command, cancellationToken);
@@ -95,4 +96,6 @@ public sealed class AcknowledgeEdgeCommandRequest
 
     [StringLength(500)]
     public string? RejectionMessage { get; init; }
+
+    public bool? PhysicalOutputMayHaveOccurred { get; init; }
 }

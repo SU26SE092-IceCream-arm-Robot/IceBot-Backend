@@ -1,4 +1,5 @@
 using System.Text;
+using Application.EdgeIntegration;
 using Application.EdgeIntegration.Commands;
 using Application.EdgeIntegration.Services;
 using Application.Identity.Tokens.Claims;
@@ -11,7 +12,12 @@ using Domain.Common.Enums;
 using Domain.Devices.Entities;
 using Domain.Devices.Enums;
 using Domain.Identity.Entities;
+using Domain.Orders.Entities;
+using Domain.Orders.Enums;
 using Domain.ProductionConfiguration.Enums;
+using Domain.SalesCatalog.Entities;
+using Domain.SalesCatalog.Enums;
+using Domain.Sync.Enums;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using IceBot.IntegrationTests.Infrastructure;
@@ -20,6 +26,7 @@ using Infrastructure.ProductionConfiguration.Persistence;
 using Infrastructure.RobotConfiguration.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace IceBot.IntegrationTests.EdgeIntegration;
 
@@ -185,6 +192,167 @@ public sealed class RobotArtifactOperationalSmokeTests
         Assert.Equal(KioskConfigurationDeploymentStatus.Active, deployment.Status);
         Assert.Equal(deploymentId, endpoint.ActiveConfigurationDeploymentId);
         Assert.Equal(releaseId, endpoint.ActiveConfigurationReleaseId);
+
+        var orderId = await CreatePaidOrderAsync(graph);
+        await using var dispatchContext = _fixture.CreateDbContext();
+        var dispatchHandler = new DispatchOrderExecutionCommandHandler(
+            new OrderExecutionDispatchStore(dispatchContext),
+            Options.Create(new OrderExecutionDispatchOptions()));
+        var firstDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
+        {
+            OrderId = orderId,
+            DispatchAttemptNo = 1
+        });
+        Assert.True(firstDispatch.Succeeded, firstDispatch.Message);
+        Assert.False(firstDispatch.Data!.Existing);
+
+        var retryDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
+        {
+            OrderId = orderId,
+            DispatchAttemptNo = 1
+        });
+        Assert.True(retryDispatch.Succeeded, retryDispatch.Message);
+        Assert.True(retryDispatch.Data!.Existing);
+        Assert.Equal(firstDispatch.Data.EdgeCommandId, retryDispatch.Data.EdgeCommandId);
+
+        var command = await dispatchContext.EdgeCommands.SingleAsync(x => x.OrderId == orderId);
+        Assert.Equal(EdgeCommandType.ExecuteOrder, command.CommandType);
+        Assert.Equal(graph.EndpointId, command.TargetExecutionEndpointId);
+        Assert.Equal(1, command.DispatchAttemptNo);
+
+        await PullAndAcknowledgeAsync(graph, command.Id, "Accepted");
+        await using (var acceptedContext = _fixture.CreateDbContext())
+        {
+            var acceptedOrder = await acceptedContext.Orders.SingleAsync(x => x.Id == orderId);
+            Assert.Equal(OrderStatus.Accepted, acceptedOrder.Status);
+            Assert.Single(await acceptedContext.OrderStatusHistories
+                .Where(x => x.OrderId == orderId && x.ToStatus == OrderStatus.Accepted)
+                .ToListAsync());
+        }
+
+        var rejectedOrderId = await CreatePaidOrderAsync(graph);
+        var rejectedDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
+        {
+            OrderId = rejectedOrderId,
+            DispatchAttemptNo = 1
+        });
+        Assert.True(rejectedDispatch.Succeeded, rejectedDispatch.Message);
+        await PullAndAcknowledgeAsync(graph, rejectedDispatch.Data!.EdgeCommandId, "Rejected", false);
+
+        var supportOrderId = await CreatePaidOrderAsync(graph);
+        var supportDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
+        {
+            OrderId = supportOrderId,
+            DispatchAttemptNo = 1
+        });
+        Assert.True(supportDispatch.Succeeded, supportDispatch.Message);
+        await PullAndAcknowledgeAsync(graph, supportDispatch.Data!.EdgeCommandId, "Rejected", true);
+
+        var busyOrderId = await CreatePaidOrderAsync(graph);
+        var busyDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
+        {
+            OrderId = busyOrderId,
+            DispatchAttemptNo = 1
+        });
+        Assert.True(busyDispatch.Succeeded, busyDispatch.Message);
+        await PullAndAcknowledgeAsync(graph, busyDispatch.Data!.EdgeCommandId, "ExecutorBusy");
+        await AcknowledgeAsync(graph, busyDispatch.Data.EdgeCommandId, "ExecutorBusy");
+
+        await using var ackAssertionContext = _fixture.CreateDbContext();
+        Assert.Equal(
+            OrderStatus.ExecutionRejected,
+            (await ackAssertionContext.Orders.SingleAsync(x => x.Id == rejectedOrderId)).Status);
+        Assert.Equal(
+            OrderStatus.RefundRequired,
+            (await ackAssertionContext.Orders.SingleAsync(x => x.Id == supportOrderId)).Status);
+        Assert.Equal(
+            OrderStatus.ReadyForExecution,
+            (await ackAssertionContext.Orders.SingleAsync(x => x.Id == busyOrderId)).Status);
+        var busyCommand = await ackAssertionContext.EdgeCommands
+            .Include(x => x.DeliveryAttempts)
+            .SingleAsync(x => x.Id == busyDispatch.Data.EdgeCommandId);
+        Assert.Equal(EdgeCommandStatus.PendingDelivery, busyCommand.Status);
+        Assert.Equal(2, busyCommand.DeliveryAttempts.Count);
+    }
+
+    private async Task PullAndAcknowledgeAsync(
+        SmokeGraph graph,
+        Guid commandId,
+        string status,
+        bool? physicalOutputMayHaveOccurred = null)
+    {
+        await using (var dbContext = _fixture.CreateDbContext())
+        {
+            var pulled = await new PullEdgeCommandsCommandHandler(
+                new EdgeCommandStore(dbContext),
+                new ArtifactCommandPayloadEnricher(_fixture.CreateObjectStorage()))
+                .HandleAsync(new PullEdgeCommandsCommand
+                {
+                    KioskId = graph.KioskId,
+                    EndpointId = graph.EndpointId,
+                    MaxCommands = 10
+                });
+            Assert.True(pulled.Succeeded, pulled.Message);
+            Assert.Contains(pulled.Data!.Commands, item => item.CommandId == commandId);
+        }
+
+        await AcknowledgeAsync(graph, commandId, status, physicalOutputMayHaveOccurred);
+    }
+
+    private async Task AcknowledgeAsync(
+        SmokeGraph graph,
+        Guid commandId,
+        string status,
+        bool? physicalOutputMayHaveOccurred = null)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var acknowledged = await new AcknowledgeEdgeCommandCommandHandler(
+            new EdgeCommandStore(dbContext),
+            new NoOpRealtimeNotificationPublisher())
+            .HandleAsync(new AcknowledgeEdgeCommandCommand
+            {
+                KioskId = graph.KioskId,
+                EndpointId = graph.EndpointId,
+                CommandId = commandId,
+                AckStatus = status,
+                AcknowledgedAt = DateTimeOffset.UtcNow,
+                RejectionCode = status == "Rejected" ? "ReadinessRejected" : null,
+                PhysicalOutputMayHaveOccurred = physicalOutputMayHaveOccurred
+            });
+        Assert.True(acknowledged.Succeeded, acknowledged.Message);
+    }
+
+    private async Task<Guid> CreatePaidOrderAsync(SmokeGraph graph)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var order = new Order
+        {
+            OrganizationId = graph.OrganizationId,
+            StoreId = graph.StoreId,
+            KioskId = graph.KioskId,
+            OrderNumber = $"SMOKE-{Guid.NewGuid():N}",
+            Currency = "VND"
+        };
+        order.AddItem(
+            graph.MenuItemId,
+            graph.ProductId,
+            graph.ProductVariantId,
+            graph.RecipeId,
+            "SMOKE-MENU-ITEM",
+            "Operational smoke item",
+            "SMOKE-PRODUCT",
+            "Operational smoke product",
+            "SMOKE-VARIANT",
+            "Operational smoke variant",
+            1,
+            1,
+            1);
+        var now = DateTimeOffset.UtcNow;
+        order.Place(now);
+        order.MarkPaid(order.TotalAmount, now);
+        dbContext.Orders.Add(order);
+        await dbContext.SaveChangesAsync();
+        return order.Id;
     }
 
     private async Task PullAndAcceptAsync(SmokeGraph graph, Guid commandId)
@@ -206,7 +374,9 @@ public sealed class RobotArtifactOperationalSmokeTests
 
         await using (var dbContext = _fixture.CreateDbContext())
         {
-            var accepted = await new AcknowledgeEdgeCommandCommandHandler(new EdgeCommandStore(dbContext))
+            var accepted = await new AcknowledgeEdgeCommandCommandHandler(
+                new EdgeCommandStore(dbContext),
+                new NoOpRealtimeNotificationPublisher())
                 .HandleAsync(new AcknowledgeEdgeCommandCommand
                 {
                     KioskId = graph.KioskId,
@@ -301,6 +471,31 @@ public sealed class RobotArtifactOperationalSmokeTests
             Name = "Operational smoke recipe",
             Status = RecipeStatus.Published
         };
+        var menu = new Menu
+        {
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            KioskId = kiosk.Id,
+            ScopeType = TenantScopeType.Kiosk,
+            Code = $"MENU-{Guid.NewGuid():N}",
+            Name = "Operational smoke menu",
+            Status = MenuStatus.Active
+        };
+        var menuItem = new MenuItem
+        {
+            MenuId = menu.Id,
+            Menu = menu,
+            ProductId = product.Id,
+            Product = product,
+            ProductVariantId = variant.Id,
+            ProductVariant = variant,
+            RecipeId = recipe.Id,
+            Recipe = recipe,
+            Code = $"ITEM-{Guid.NewGuid():N}",
+            DisplayName = "Operational smoke item",
+            Status = MenuItemStatus.Active,
+            Price = 1
+        };
         var endpoint = KioskExecutionEndpoint.CreateProvisioning(
             kiosk.Id,
             $"EDGE-{Guid.NewGuid():N}",
@@ -308,7 +503,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             ExecutionEndpointAuthenticationMode.MutualTls);
         endpoint.ReplaceSupportedRobotTargets([(RuntimeTargetCode, MachineModelCode, null)]);
 
-        dbContext.AddRange(account, organization, store, kiosk, product, variant, recipe, endpoint);
+        dbContext.AddRange(account, organization, store, kiosk, product, variant, recipe, menu, menuItem, endpoint);
         await dbContext.SaveChangesAsync();
 
         var credential = endpoint.ProvisionCredential($"cert-{Guid.NewGuid():N}", DateTimeOffset.UtcNow);
@@ -319,17 +514,23 @@ public sealed class RobotArtifactOperationalSmokeTests
         return new SmokeGraph(
             account.Id,
             organization.Id,
+            store.Id,
             kiosk.Id,
             endpoint.Id,
+            product.Id,
             variant.Id,
-            recipe.Id);
+            recipe.Id,
+            menuItem.Id);
     }
 
     private sealed record SmokeGraph(
         Guid AccountId,
         Guid OrganizationId,
+        Guid StoreId,
         Guid KioskId,
         Guid EndpointId,
+        Guid ProductId,
         Guid ProductVariantId,
-        Guid RecipeId);
+        Guid RecipeId,
+        Guid MenuItemId);
 }

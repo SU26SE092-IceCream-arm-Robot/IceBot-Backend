@@ -61,9 +61,13 @@ bulk upload .lua
 -> pull and accept command
 -> report Installed
 -> report Active
+-> create and pay a machine-produced order
+-> resolve endpoint/release/route/program
+-> create ExecuteOrder dispatch attempt 1
+-> repeat attempt 1 and receive the same command
 ```
 
-Success requires both the deployment and the endpoint observed configuration projection to reference the active release.
+Success requires the deployment and endpoint projection to reference the active release, and the paid order to produce exactly one idempotent `ExecuteOrder` command for the selected endpoint.
 
 ## Contract Coverage
 

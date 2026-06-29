@@ -9,4 +9,5 @@ public sealed class AcknowledgeEdgeCommandCommand
     public DateTimeOffset? AcknowledgedAt { get; init; }
     public string? RejectionCode { get; init; }
     public string? RejectionMessage { get; init; }
+    public bool? PhysicalOutputMayHaveOccurred { get; init; }
 }

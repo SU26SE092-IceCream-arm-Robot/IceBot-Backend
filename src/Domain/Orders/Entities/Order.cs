@@ -189,6 +189,16 @@ public partial class Order : BusinessEntity, IStoreScoped
         Notes = notes ?? Notes;
     }
 
+    public void MarkAccepted()
+    {
+        if (Status != OrderStatus.ReadyForExecution)
+        {
+            throw new DomainRuleException("Only execution-ready orders can be accepted by an executor.");
+        }
+
+        Status = OrderStatus.Accepted;
+    }
+
     public void MarkRefundRequired(string? notes = null)
     {
         if (PaymentStatus != PaymentStatus.Paid)
