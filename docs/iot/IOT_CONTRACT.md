@@ -371,15 +371,18 @@ Cloud must not:
 - Let Tablet notification depend on Edge dispatch success.
 - Create robot runtime state in the payment webhook transaction.
 
-After commit, event/outbox handlers fan out into independent flows:
+After commit, independent flows run:
 
 ```text
-PaymentSucceeded / OrderReadyForExecution
+Paid order committed
   -> Tablet status notification
-  -> Edge executable command dispatch
+  -> ExecuteOrder dispatch attempt 1
+  -> reconciliation of a missing initial command
 ```
 
-If either fan-out fails, retry that handler independently. Payment remains paid because the provider-confirmed payment is already committed.
+The dispatch handler selects exactly one active execution endpoint whose observed active release or low-cost artifact set covers every machine-produced order line. It resolves each line to a release route and ordered robot-program bindings before creating the durable command. Zero matching endpoints defers dispatch; multiple matching endpoints are rejected as ambiguous rather than selected implicitly.
+
+The command identity is `(OrderId, DispatchAttemptNo)`. Repeating the same attempt returns the existing command. The reconciliation worker creates only missing attempt `1`; it does not invent a new attempt after Edge rejection. Command expiry and the active-command admission limit are configured independently from delivery retries. Payment remains paid when dispatch fails because the provider-confirmed payment transaction has already committed.
 
 ## Cloud To Tablet Status
 
@@ -408,7 +411,9 @@ Tablet screen mapping based on projections (v1):
 
 ## Cloud To Edge Notification
 
-### MQTT Executable Order Notification
+### Optional MQTT Executable Order Notification
+
+This wake-up transport is a future optimization and is not wired in the current backend. Periodic authenticated command pull is the current delivery path.
 
 Topic:
 
@@ -570,7 +575,8 @@ Request:
   "ackStatus": "Accepted",
   "acknowledgedAt": "2026-05-21T10:00:05Z",
   "rejectionCode": null,
-  "rejectionMessage": null
+  "rejectionMessage": null,
+  "physicalOutputMayHaveOccurred": null
 }
 ```
 
@@ -579,11 +585,20 @@ Allowed `ackStatus` values:
 - `Received`
 - `Accepted`
 - `Rejected`
+- `ExecutorBusy`
 - `DeliveryFailed`
 
-Command ack is dispatch-only. `Started`, `Completed`, `Failed`, and
+Command ack owns delivery and executor-admission state. For `ExecuteOrder`, that admission decision also projects to the order lifecycle as defined below. `Started`, `Completed`, `Failed`, and
 `RequiresManualIntervention` belong to the execution event/report ingest
 boundary, not this endpoint.
+
+For `ExecuteOrder` commands:
+
+- `Accepted` moves `Order` from `ReadyForExecution` to `Accepted`.
+- `ExecutorBusy` is temporary: the command returns to `PendingDelivery` and the order remains `ReadyForExecution`.
+- `Rejected` with `physicalOutputMayHaveOccurred` absent or `false` moves the order to `ExecutionRejected`.
+- `Rejected` with `physicalOutputMayHaveOccurred=true` moves the paid order to `RefundRequired` because staff support or compensation may be required.
+- Order status changes and their `OrderStatusHistory` row commit together with the command acknowledgement.
 
 ### Execution Reports
 

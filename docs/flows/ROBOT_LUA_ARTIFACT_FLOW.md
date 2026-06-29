@@ -101,7 +101,7 @@ Fairino-Studio project
 | 15. Pull command | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/commands/pull` | Authenticates Full Edge by mTLS fingerprint or low-cost by signed request + nonce, returns deployment manifest, and enriches artifact descriptors with short-lived `DownloadUrl` values. |
 | 16. Download files | Execution endpoint | Direct HTTPS GET to presigned object-storage URL | Downloads private `.lua` bytes without exposing a public backend download route. |
 | 17. Verify files | Execution endpoint | Local operation | Verifies `ContentLengthBytes` and SHA-256 `ArtifactChecksum` before install or activation. |
-| 18. Acknowledge command | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack` | Reports transport/dispatch state: `Received`, `Accepted`, `Rejected`, or `DeliveryFailed`. It does not report installation completion. |
+| 18. Acknowledge command | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack` | Reports transport/dispatch state: `Received`, `Accepted`, `Rejected`, `ExecutorBusy`, or `DeliveryFailed`. `ExecutorBusy` is temporary and permits redelivery. It does not report installation completion. |
 | 19. Report deployment | Execution endpoint | `POST /api/v1/iot/kiosks/{kioskId}/execution-reports` | Reports `Installed`, then `Active`, or reports `Failed`; updates deployment state and the endpoint's observed active configuration snapshot. Direct `Pending -> Active` is invalid. |
 
 ## Fairino Export Mapping

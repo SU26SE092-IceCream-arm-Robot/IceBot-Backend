@@ -1,7 +1,12 @@
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Results;
+using Application.Shared.Utils;
 using Application.Shared.Wrappers;
 using Domain.Devices.Enums;
+using Domain.Orders.Entities;
+using Domain.Orders.Enums;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 
@@ -10,10 +15,14 @@ namespace Application.EdgeIntegration.Commands;
 public sealed class AcknowledgeEdgeCommandCommandHandler
 {
     private readonly IEdgeCommandStore _edgeCommandStore;
+    private readonly IRealtimeNotificationPublisher _publisher;
 
-    public AcknowledgeEdgeCommandCommandHandler(IEdgeCommandStore edgeCommandStore)
+    public AcknowledgeEdgeCommandCommandHandler(
+        IEdgeCommandStore edgeCommandStore,
+        IRealtimeNotificationPublisher publisher)
     {
         _edgeCommandStore = edgeCommandStore;
+        _publisher = publisher;
     }
 
     public async Task<ApiResult<EdgeCommandAckResult>> HandleAsync(
@@ -41,17 +50,76 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             return ApiResult<EdgeCommandAckResult>.Fail("Edge command not found.", 404);
         }
 
+        if (command.PhysicalOutputMayHaveOccurred.HasValue &&
+            (edgeCommand.CommandType != EdgeCommandType.ExecuteOrder ||
+                !string.Equals(command.AckStatus.Trim(), "Rejected", StringComparison.OrdinalIgnoreCase)))
+        {
+            return ApiResult<EdgeCommandAckResult>.Fail(
+                "Physical-output evidence is supported only for rejected execute-order commands.", 400);
+        }
+
         var observedAt = command.AcknowledgedAt ?? DateTimeOffset.UtcNow;
+        Order? order = null;
+        OrderStatus? previousOrderStatus = null;
+        if (edgeCommand.CommandType == EdgeCommandType.ExecuteOrder && edgeCommand.OrderId.HasValue)
+        {
+            order = await _edgeCommandStore.GetOrderForAcknowledgementAsync(
+                edgeCommand.OrderId.Value,
+                cancellationToken);
+            if (order is null)
+            {
+                return ApiResult<EdgeCommandAckResult>.Fail("Order for execute-order command was not found.", 409);
+            }
+
+            previousOrderStatus = order.Status;
+        }
+
         try
         {
             ApplyAck(edgeCommand, command, observedAt);
+            ApplyOrderAck(order, edgeCommand, command);
         }
         catch (Domain.Common.DomainRuleException ex)
         {
             return ApiResult<EdgeCommandAckResult>.Fail(ex.Message, 400);
         }
 
+        var orderChanged = order is not null && previousOrderStatus != order.Status;
+        if (orderChanged)
+        {
+            await _edgeCommandStore.AddOrderStatusHistoryAsync(new OrderStatusHistory
+            {
+                OrderId = order!.Id,
+                FromStatus = previousOrderStatus,
+                ToStatus = order.Status,
+                ChangedAt = observedAt,
+                Reason = BuildHistoryReason(command)
+            }, cancellationToken);
+        }
+
         await _edgeCommandStore.SaveChangesAsync(cancellationToken);
+
+        if (orderChanged)
+        {
+            var projection = OrderStatusProjector.ProjectFromOrder(order!);
+            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
+            {
+                OrderId = order!.Id,
+                OrderNumber = order.OrderNumber,
+                KioskId = order.KioskId,
+                OrganizationId = order.OrganizationId,
+                StoreId = order.StoreId,
+                OldStatus = previousOrderStatus!.Value.ToString(),
+                NewStatus = order.Status.ToString(),
+                PaymentStatus = order.PaymentStatus.ToString(),
+                CustomerStatus = projection.CustomerStatus,
+                CustomerStatusMessage = projection.CustomerStatusMessage,
+                CanRetryPayment = projection.CanRetryPayment,
+                RequiresStaffSupport = projection.RequiresStaffSupport,
+                UpdatedAt = observedAt,
+                Version = 1
+            }, cancellationToken);
+        }
 
         return ApiResult<EdgeCommandAckResult>.Success(
             EdgeCommandAckResult.FromCommand(edgeCommand),
@@ -109,6 +177,70 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             return;
         }
 
+        if (string.Equals(normalizedStatus, "ExecutorBusy", StringComparison.OrdinalIgnoreCase))
+        {
+            if (edgeCommand.Status == EdgeCommandStatus.PendingDelivery &&
+                edgeCommand.DeliveryAttempts.LastOrDefault()?.Outcome == EdgeCommandDeliveryOutcome.ExecutorBusy)
+            {
+                return;
+            }
+
+            var nextAttemptNo = edgeCommand.DeliveryAttempts.Count + 1;
+            edgeCommand.RecordDeliveryAttempt(
+                nextAttemptNo,
+                observedAt,
+                EdgeCommandDeliveryOutcome.ExecutorBusy,
+                command.RejectionCode ?? "ExecutorBusy",
+                command.RejectionMessage);
+            return;
+        }
+
         throw new Domain.Common.DomainRuleException("Unsupported dispatch acknowledgement status.");
+    }
+
+    private static void ApplyOrderAck(
+        Order? order,
+        EdgeCommand edgeCommand,
+        AcknowledgeEdgeCommandCommand command)
+    {
+        if (order is null || edgeCommand.CommandType != EdgeCommandType.ExecuteOrder)
+        {
+            return;
+        }
+
+        if (string.Equals(command.AckStatus.Trim(), "Accepted", StringComparison.OrdinalIgnoreCase))
+        {
+            if (order.Status == OrderStatus.ReadyForExecution)
+            {
+                order.MarkAccepted();
+            }
+
+            return;
+        }
+
+        if (!string.Equals(command.AckStatus.Trim(), "Rejected", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (command.PhysicalOutputMayHaveOccurred == true)
+        {
+            if (order.Status != OrderStatus.RefundRequired)
+            {
+                order.MarkRefundRequired(command.RejectionMessage);
+            }
+        }
+        else if (order.Status != OrderStatus.ExecutionRejected)
+        {
+            order.MarkExecutionRejected(command.RejectionMessage);
+        }
+    }
+
+    private static string BuildHistoryReason(AcknowledgeEdgeCommandCommand command)
+    {
+        var code = string.IsNullOrWhiteSpace(command.RejectionCode)
+            ? null
+            : $" Code: {command.RejectionCode.Trim()}.";
+        return $"Execution command acknowledgement: {command.AckStatus.Trim()}.{code}".Trim();
     }
 }

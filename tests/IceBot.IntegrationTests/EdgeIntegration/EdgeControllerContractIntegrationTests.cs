@@ -140,7 +140,9 @@ public sealed class EdgeControllerContractIntegrationTests
         string? rejectionMessage = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
-        var handler = new AcknowledgeEdgeCommandCommandHandler(new EdgeCommandStore(dbContext));
+        var handler = new AcknowledgeEdgeCommandCommandHandler(
+            new EdgeCommandStore(dbContext),
+            new NoOpRealtimeNotificationPublisher());
         return await handler.HandleAsync(new AcknowledgeEdgeCommandCommand
         {
             KioskId = graph.KioskId,

@@ -17,6 +17,14 @@ public interface IEdgeCommandStore
 
     Task<EdgeCommand?> GetByIdAsync(Guid commandId, CancellationToken cancellationToken = default);
 
+    Task<Domain.Orders.Entities.Order?> GetOrderForAcknowledgementAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
+
+    Task AddOrderStatusHistoryAsync(
+        Domain.Orders.Entities.OrderStatusHistory history,
+        CancellationToken cancellationToken = default);
+
     Task<EdgeCommand?> GetByDeploymentIdAsync(Guid deploymentId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<EdgeCommand>> ListExpiredDeploymentCommandsAsync(

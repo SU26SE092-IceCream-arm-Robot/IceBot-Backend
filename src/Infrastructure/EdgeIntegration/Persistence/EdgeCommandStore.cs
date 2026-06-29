@@ -1,5 +1,6 @@
 using Application.EdgeIntegration.Abstractions;
 using Domain.Devices.Entities;
+using Domain.Orders.Entities;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Infrastructure.Data;
@@ -59,6 +60,20 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
         return _dbContext.EdgeCommands
             .Include(command => command.DeliveryAttempts)
             .FirstOrDefaultAsync(command => command.Id == commandId, cancellationToken);
+    }
+
+    public Task<Order?> GetOrderForAcknowledgementAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Orders.FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+    }
+
+    public Task AddOrderStatusHistoryAsync(
+        OrderStatusHistory history,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrderStatusHistories.AddAsync(history, cancellationToken).AsTask();
     }
 
     public Task<EdgeCommand?> GetByDeploymentIdAsync(Guid deploymentId, CancellationToken cancellationToken = default)
