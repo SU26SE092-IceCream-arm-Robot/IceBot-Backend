@@ -51,7 +51,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
    A reconciliation worker repairs any paid `ReadyForExecution` order whose initial command was not created.
 20. Tablet status flow updates payment/order screen.
 21. Edge dispatch resolves one active execution endpoint and the active configuration release, then maps every machine-produced order line to an execution route and ordered robot programs.
-22. Edge finds the durable `ExecuteOrder` command by polling. MQTT wake-up notification remains an optional later transport optimization.
+22. Cloud publishes a best-effort MQTT `CommandAvailable` wake-up after commit. Edge still finds the durable `ExecuteOrder` command through authenticated pull; periodic polling recovers missed wake-ups.
 23. Edge pulls executable command from Cloud.
 24. Edge performs fast runtime check with 5-10 second timeout.
 25. If ready, Edge accepts command and creates its own local execution state.
@@ -125,6 +125,9 @@ Tablet Status Projection mapping (v1):
 | `PaymentExpired` | true | false | Payment session expired. Please retry. | QR payment screen + retry |
 | `PaymentFailed` | true | false | Payment failed. You can try paying again. | QR payment screen + retry |
 | `Preparing` | false | false | Payment successful. Preparing your order. | Payment successful, preparing order |
+| `Delayed` | false | false | Your order is taking longer than expected. Production is still being monitored. | Delayed, keep monitoring |
+| `PendingRecovery` | false | false | Connection to the machine was interrupted. We are checking your order. | Connection recovery in progress |
+| `SupportRequired` | false | true | We could not confirm production progress. Please contact staff for support. | Staff support required |
 | `Ready` | false | false | Your order is ready. Please pick it up! | Ready / pick up |
 | `Completed` | false | false | Order completed. Thank you! | Completed |
 | `Cancelled` | false | false | Order cancelled. | Order cancelled / aborted |
@@ -137,7 +140,7 @@ Order tracking read model boundary limitations and data exclusions are detailed 
 ```text
 1. Cloud has a paid order ready for execution.
 2. Cloud creates an executable command.
-3. Edge polls on schedule. A future MQTT wake-up may reduce latency but does not own the durable command.
+3. Cloud may publish an MQTT command-available wake-up, and Edge polls on schedule. MQTT reduces latency but does not own the durable command.
 4. Edge pulls pending commands from Cloud through its authenticated execution endpoint.
 5. Edge deduplicates by commandId/idempotencyKey.
 6. Edge performs runtime readiness check.
@@ -164,13 +167,14 @@ Pending/Delivered command expires before ACK
 Accepted without order-summary report past deadline
   -> heartbeat current: Stale / Delayed
   -> heartbeat missing, old, or Offline: Unreachable / PendingRecovery
+  -> prolonged Unreachable: Unreachable / SupportRequired
 
 Running without report past deadline
   -> same observation rules
   -> Order remains Preparing; Cloud does not infer physical failure
 ```
 
-Observation timeout is uncertainty about Edge, not proof that production failed. A later sequence-valid order-summary report restores `Fresh` and continues the normal lifecycle.
+Observation timeout is uncertainty about Edge, not proof that production failed. `SupportRequired` is a customer/support projection only; it does not automatically fail or refund the order. A later sequence-valid order-summary report restores `Fresh` and continues the normal lifecycle. REST polling and `OrderExecutionObservationChanged` SignalR events both expose the same projection so the tablet does not remain on `Preparing` indefinitely.
 
 ## Manual Redispatch
 
@@ -184,6 +188,8 @@ Latest attempt DeliveryFailed
 ```
 
 `ExecutorBusy` stays on the same attempt and is redelivered. `RefundRequired`, possible physical output, production `Failed`, and `RequiresManualIntervention` are support/refund paths, not automatic retry paths. The configured maximum attempt count is enforced inside the same order-level transaction.
+
+Execution-attempt detail exposes the ordered delivery history for that command, command-expiry timeout provenance, the redispatch actor/reason, and references to the immediately previous and next dispatch attempts. This keeps transport retries inside one dispatch attempt distinct from an operator-created redispatch attempt.
 
 MQTT payloads should stay small. Edge must pull command details from Cloud.
 
@@ -223,11 +229,14 @@ Check:
 
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
 
+Every production report must match the configuration release id and checksum embedded in its accepted execute-order command. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
+
 ## Real-time Order & Payment Updates
 
 During the checkout and execution flow, state changes (e.g. order placement, cancellation, payment webhook status updates, refund flagging) emit real-time SignalR notifications to subscribed clients:
 - **`OrderStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when order status transitions.
 - **`PaymentStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when payment transaction status changes.
+- **`OrderExecutionObservationChanged`** is published on `OrderHub` when execution observation changes to `Delayed`, `PendingRecovery`, or `SupportRequired` without changing `Order.Status`.
 
 These events allow checkout UIs to automatically update payment success/failure screens or execution status without polling.
 

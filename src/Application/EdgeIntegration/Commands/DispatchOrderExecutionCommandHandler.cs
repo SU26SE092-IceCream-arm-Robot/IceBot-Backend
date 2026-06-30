@@ -19,38 +19,41 @@ public sealed class DispatchOrderExecutionCommandHandler
 {
     private readonly IOrderExecutionDispatchStore _store;
     private readonly OrderExecutionDispatchOptions _options;
+    private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
 
     public DispatchOrderExecutionCommandHandler(
         IOrderExecutionDispatchStore store,
-        IOptions<OrderExecutionDispatchOptions> options)
+        IOptions<OrderExecutionDispatchOptions> options,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher)
     {
         _store = store;
         _options = options.Value;
+        _wakeUpPublisher = wakeUpPublisher;
     }
 
-    public Task<ApiResult<OrderExecutionDispatchResult>> HandleAsync(
+    public async Task<ApiResult<OrderExecutionDispatchResult>> HandleAsync(
         DispatchOrderExecutionCommand command,
         CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled)
         {
-            return Task.FromResult(ApiResult<OrderExecutionDispatchResult>.Fail(
-                "Order execution dispatch is disabled.", 503));
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Order execution dispatch is disabled.", 503);
         }
 
         if (command.OrderId == Guid.Empty || command.DispatchAttemptNo <= 0)
         {
-            return Task.FromResult(ApiResult<OrderExecutionDispatchResult>.Fail(
-                "Order and positive dispatch attempt are required.", 400));
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Order and positive dispatch attempt are required.", 400);
         }
 
-        return _store.ExecuteSerializedAsync(
+        var result = await _store.ExecuteSerializedAsync(
             command.OrderId,
             ct => DispatchLockedAsync(command, ct),
             cancellationToken);
+        await PublishWakeUpAsync(result, cancellationToken);
+        return result;
     }
 
-    public Task<ApiResult<OrderExecutionDispatchResult>> HandleRedispatchAsync(
+    public async Task<ApiResult<OrderExecutionDispatchResult>> HandleRedispatchAsync(
         Guid orderId,
         Guid requestedByAccountId,
         string reason,
@@ -58,20 +61,21 @@ public sealed class DispatchOrderExecutionCommandHandler
     {
         if (!_options.Enabled)
         {
-            return Task.FromResult(ApiResult<OrderExecutionDispatchResult>.Fail(
-                "Order execution dispatch is disabled.", 503));
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Order execution dispatch is disabled.", 503);
         }
 
         if (orderId == Guid.Empty || requestedByAccountId == Guid.Empty || string.IsNullOrWhiteSpace(reason))
         {
-            return Task.FromResult(ApiResult<OrderExecutionDispatchResult>.Fail(
-                "Order, requesting operator, and redispatch reason are required.", 400));
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Order, requesting operator, and redispatch reason are required.", 400);
         }
 
-        return _store.ExecuteSerializedAsync(
+        var result = await _store.ExecuteSerializedAsync(
             orderId,
             ct => RedispatchLockedAsync(orderId, requestedByAccountId, reason.Trim(), ct),
             cancellationToken);
+        await PublishWakeUpAsync(result, cancellationToken);
+        return result;
     }
 
     private async Task<ApiResult<OrderExecutionDispatchResult>> RedispatchLockedAsync(
@@ -414,6 +418,24 @@ public sealed class DispatchOrderExecutionCommandHandler
             CommandExpiryAt = command.CommandExpiryAt!.Value,
             Existing = existing
         };
+
+    private Task PublishWakeUpAsync(
+        ApiResult<OrderExecutionDispatchResult> result,
+        CancellationToken cancellationToken)
+    {
+        if (!result.Succeeded || result.Data is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        return _wakeUpPublisher.TryPublishAsync(
+            new EdgeCommandWakeUp(
+                result.Data.EdgeCommandId,
+                result.Data.KioskExecutionEndpointId,
+                EdgeCommandType.ExecuteOrder,
+                DateTimeOffset.UtcNow),
+            cancellationToken);
+    }
 
     private sealed record DispatchCandidate(
         KioskExecutionEndpoint Endpoint,

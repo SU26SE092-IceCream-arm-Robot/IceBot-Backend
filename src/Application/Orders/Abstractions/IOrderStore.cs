@@ -83,8 +83,24 @@ public interface IOrderStore
         Guid sourceCommandId,
         CancellationToken cancellationToken = default);
 
+    Task<List<EdgeCommand>> ListAdjacentExecutionAttemptsAsync(
+        Guid orderId,
+        int dispatchAttemptNo,
+        CancellationToken cancellationToken = default);
+
+    Task<OrderStatusHistory?> GetRedispatchHistoryAsync(
+        Guid orderId,
+        int dispatchAttemptNo,
+        DateTimeOffset commandCreatedAt,
+        Guid requestedByAccountId,
+        CancellationToken cancellationToken = default);
+
     Task<List<OrderExecutionRecord>> ListOrderExecutionRecordsAsync(
         IReadOnlyCollection<Guid> sourceCommandIds,
+        CancellationToken cancellationToken = default);
+
+    Task<OrderExecutionRecord?> GetLatestOrderExecutionRecordAsync(
+        Guid orderId,
         CancellationToken cancellationToken = default);
 
     Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsAsync(

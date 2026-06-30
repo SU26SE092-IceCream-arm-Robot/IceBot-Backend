@@ -63,4 +63,27 @@ internal static class ExecutionAttemptResultMapper
             CloudReceivedAt = record.CloudReceivedAt
         };
     }
+
+    public static ExecutionAttemptReferenceResult ToReference(EdgeCommand command)
+    {
+        return new ExecutionAttemptReferenceResult
+        {
+            SourceCommandId = command.Id,
+            DispatchAttemptNo = command.DispatchAttemptNo!.Value,
+            CommandStatus = command.Status.ToString(),
+            CreatedAt = command.CreatedAt
+        };
+    }
+
+    public static ExecutionDeliveryAttemptResult ToResult(EdgeCommandDeliveryAttempt attempt)
+    {
+        return new ExecutionDeliveryAttemptResult
+        {
+            DeliveryAttemptNo = attempt.DeliveryAttemptNo,
+            SentAt = attempt.SentAt,
+            Outcome = attempt.Outcome.ToString(),
+            ResponseCode = attempt.ResponseCode,
+            ResponseMessage = attempt.ResponseMessage
+        };
+    }
 }

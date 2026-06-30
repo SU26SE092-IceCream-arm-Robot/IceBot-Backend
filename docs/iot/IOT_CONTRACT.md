@@ -411,26 +411,26 @@ Tablet screen mapping based on projections (v1):
 
 ## Cloud To Edge Notification
 
-### Optional MQTT Executable Order Notification
+### MQTT Command-Available Wake-Up
 
-This wake-up transport is a future optimization and is not wired in the current backend. Periodic authenticated command pull is the current delivery path.
+After a durable `ExecuteOrder` or `DeployConfiguration` command commits, Cloud makes a best-effort MQTT publish. The wake-up lowers latency only; periodic authenticated command pull remains the delivery authority and recovers broker outages or missed messages.
 
 Topic:
 
 ```text
-icebot/kiosks/{kioskId}/commands/notify
+icebot/execution-endpoints/{executionEndpointId}/commands/available
 ```
 
 Payload:
 
 ```json
 {
-  "messageId": "uuid",
-  "type": "ExecutableOrderAvailable",
-  "kioskId": "uuid",
-  "orderId": "uuid",
-  "createdAt": "2026-05-21T10:00:00Z",
-  "contractVersion": 1
+  "type": "CommandAvailable",
+  "commandId": "uuid",
+  "commandType": "ExecuteOrder",
+  "targetExecutionEndpointId": "uuid",
+  "notifiedAt": "2026-05-21T10:00:00Z",
+  "version": 1
 }
 ```
 
@@ -438,8 +438,11 @@ Rules:
 
 - MQTT payload is a wake-up signal only.
 - Edge must call command pull after receiving this notification.
+- The message uses QoS 1 and is not retained. Duplicate delivery is expected.
+- MQTT publish failure does not roll back or fail the already committed command.
 - Duplicate MQTT messages are expected and must be harmless.
 - Missing MQTT messages are acceptable because Edge also pulls periodically.
+- Broker ACLs bind each MQTT subscriber to its own execution-endpoint topic. Edge calls command pull after every wake-up and also after reconnect/on its polling interval. Operational setup is defined in [MQTT Operations](../operations/MQTT_OPERATIONS.md).
 
 ## Edge To Cloud
 
@@ -606,7 +609,9 @@ Execution timeout reconciliation:
 - Before ACK, an expired `ExecuteOrder` command becomes `Rejected/CommandExpired`; a still-`ReadyForExecution` order becomes `ExecutionRejected` with status history.
 - An Accepted command with no order-summary report beyond the configured deadline becomes `Stale/Delayed` when the executor heartbeat is still current.
 - An Accepted or Running execution with no current heartbeat becomes `Unreachable/PendingRecovery`.
+- Prolonged unreachable observation becomes `Unreachable/SupportRequired` for customer/support handling without asserting physical failure.
 - Reconciliation changes `OrderExecutionRecord.ObservationStatus` and `CustomerExecutionStatus`; it does not claim that the physical job failed and does not change an Accepted/Preparing Order to `Failed`.
+- Customer order/payment polling reads the latest dispatch attempt projection. SignalR publishes `OrderExecutionObservationChanged` to the order group for the same projection.
 - A later valid executor report restores observation to `Fresh` through normal sequence validation.
 
 Redispatch is an explicit management operation, not an Edge-side automatic retry. Backend permits a new attempt only after transport `DeliveryFailed` or a rejection proven to be before physical output. It allocates the next attempt number under the order lock, enforces the configured maximum, and records operator/reason audit. `ExecutorBusy` redelivers the same command; possible physical output, `RefundRequired`, production failure, and manual intervention remain support/compensation flows.
@@ -693,6 +698,8 @@ Rules:
 
 - Command ack is dispatch-only. Execution reports are the current V1 boundary for deployment and production status after a command has been accepted.
 - The endpoint deduplicates by `sourceEventId` using `SyncEventInbox`.
+- Production reports must repeat the `SourceConfigurationReleaseId` and `ReleaseChecksum` from the accepted execute-order command. Cloud compares both values against the immutable command payload before creating execution or stock projections.
+- `edgeCreatedAt`, optional `executorReportedAt`, and stock-evidence `occurredAt` cannot be farther in the future than `ExecutionReportIngestion__MaxFutureClockSkewSeconds` relative to Cloud receipt time.
 - `sequenceNumber` is executor-local ordering evidence for projection updates.
 - `physicalOutputMayHaveOccurred` must be set when reporting failed production execution. It drives customer/support projection: failure before output can be handled differently from failure after possible physical output.
 - Deployment report `Active` updates the observed active configuration/artifact-set snapshot on `KioskExecutionEndpoint`.
@@ -700,9 +707,17 @@ Rules:
 - A report with `sourceProductionJobId` set is job/unit-level evidence: it updates `ProductionExecutionRecord` and optional stock evidence only. It must not complete or fail the whole order.
 - A report with `sourceProductionJobId=null` is the Edge-computed order summary: it updates the aggregate `ProductionExecutionRecord`, `OrderExecutionRecord`, and business Order. Edge emits this summary only after applying its local multi-job aggregation policy.
 - Successful order transitions publish `OrderStatusChanged` through SignalR after commit.
-- `stockMovements` is typed append-only consumption evidence. Each item has its own globally unique `sourceEventId`; duplicates are ignored. The dispenser must belong to the reporting kiosk.
+- `stockMovements` is typed append-only consumption evidence. Each item has its own globally unique `sourceEventId`; duplicates are serialized by evidence identity and ignored even when two different reports arrive concurrently. The dispenser must belong to the reporting kiosk.
 - A supplied `balanceAfter` updates the observed dispenser estimate. Without it, Cloud records evidence without guessing a new balance. Inventory evidence does not gate runtime-menu sellability or order creation in V1.
 - Applied stock evidence publishes `InventoryChanged` after commit. Do not encode authoritative stock adjustments only inside `payloadJson`.
+
+### Device Warning/Error Evidence
+
+```http
+POST /api/v1/iot/kiosks/{kioskId}/device-events
+```
+
+This single-event endpoint accepts authenticated `Warning`, `Error`, or `Critical` evidence for a device attached to the reporting kiosk. `originNodeId` must match the execution endpoint profile identity. `eventId` is globally unique and acts as the idempotency key; a retry returns the existing event and does not publish SignalR again. `occurredAt` uses the Edge telemetry future-skew limit. Optional structured payload is limited to 16384 characters, stored as evidence, and excluded from the normal management read API. After commit, Cloud publishes `DeviceEventCreated` to the kiosk operations group. A newly accepted `Error` or `Critical` event creates an Open Alert in the same transaction and publishes `AlertChanged`; Warning remains evidence only.
 
 ### Future Sync Events Batch
 
@@ -710,7 +725,7 @@ Rules:
 POST /api/v1/iot/kiosks/{kioskId}/events
 ```
 
-`/events` is reserved for a broader batch sync surface. It should be added when Edge needs to replay telemetry, independent stock events, heartbeat evidence, or detailed local runtime logs. Stock consumption tied directly to one production report already uses typed `stockMovements` on the current endpoint.
+`/events` is reserved for a broader batch sync surface. It should be added when Edge needs to replay mixed telemetry, independent stock events, heartbeat evidence, or detailed local runtime logs. Current device warning/error evidence uses `/device-events`; stock consumption tied directly to one production report uses typed `stockMovements` on the execution-report endpoint.
 
 ### Heartbeat
 
@@ -722,19 +737,32 @@ Request:
 
 ```json
 {
-  "messageId": "uuid",
-  "originNodeId": "kiosk-edge-node-id",
+  "originNodeId": "uuid-bound-to-execution-endpoint",
   "heartbeatSequence": 123,
   "reportedAt": "2026-05-21T10:00:00Z",
   "status": "Online",
   "appVersion": "1.0.0",
-  "robotSdkVersion": "farino-x.y",
+  "firmwareVersion": "farino-x.y",
   "networkStatus": "Online",
-  "runtimeStateTimestamp": "2026-05-21T09:59:59Z"
+  "robotStatus": "Ready",
+  "cpuUsagePercent": 10,
+  "memoryUsagePercent": 20,
+  "diskUsagePercent": 30,
+  "pendingSyncEventCount": 0
 }
 ```
 
-Maps to `KioskHeartbeat`.
+The request uses the same HTTPS execution-endpoint authentication as command pull and execution reports. `originNodeId` must equal the endpoint's bound `FullEdgeRuntimeId` or `ControllerId`. `(kioskId, originNodeId, heartbeatSequence)` is the idempotency key; retry returns the existing heartbeat. `reportedAt` cannot exceed `EdgeTelemetryIngestion__MaxFutureClockSkewSeconds` into the future. A newly accepted heartbeat updates `Kiosk.LastOnlineAt` with Cloud receive time, never with the Edge clock.
+
+Connectivity state machine:
+
+- An accepted `Offline` heartbeat transitions only `KioskStatus.Active -> KioskStatus.Offline`.
+- An accepted `Online` or `Degraded` heartbeat transitions only `KioskStatus.Offline -> KioskStatus.Active`, and only while the parent organization and store remain active.
+- The reconciliation job transitions `Active -> Offline` with connectivity `Unreachable` after `EdgeTelemetryIngestion__HeartbeatTimeoutSeconds` without an accepted heartbeat.
+- Connectivity automation never changes `Provisioning`, `Maintenance`, `Disabled`, or `Retired` kiosks.
+- Manual management updates cannot set `Offline` or recover `Offline -> Active`; those transitions belong to accepted heartbeat evidence and timeout reconciliation.
+- Heartbeat ingest and timeout reconciliation use the same per-kiosk serialized boundary and recheck current state inside it.
+- `KioskStatusChanged` is published only after a committed status transition. Duplicate heartbeats and unchanged states do not publish an event.
 
 ### Configuration Sync
 

@@ -32,7 +32,7 @@ Order issue
 ## Rules
 
 - Heartbeats and device events are operational evidence.
-- DeviceEvent is not a long-term actionable alert state. Add Alert entity/API later if needed.
+- `DeviceEvent` remains immutable evidence. Error/Critical device-event ingestion creates a separate actionable `Alert`; see [Alert Lifecycle Flow](ALERT_LIFECYCLE_FLOW.md). Maintenance tickets remain separate manual work items.
 - Inventory V1 is reporting/operations only and does not control runtime sellability.
 - Maintenance Ticket V1 is a manual support workflow for kiosk/device/order/event issues, not an auto-alert engine.
 - Manual refund/compensation is tracked in the backend, but actual money movement can be staff-handled outside provider integration in V1.

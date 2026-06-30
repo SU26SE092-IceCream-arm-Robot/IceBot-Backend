@@ -173,6 +173,10 @@ POST /api/v1/management/inventory/dispenser-states/{id}/refill
 POST /api/v1/management/inventory/dispenser-states/{id}/adjust-estimate
 GET /api/v1/management/kiosks/{kioskId}/heartbeats
 GET /api/v1/management/kiosks/{kioskId}/events
+GET /api/v1/management/alerts
+GET /api/v1/management/alerts/{alertId}
+PATCH /api/v1/management/alerts/{alertId}/acknowledge
+PATCH /api/v1/management/alerts/{alertId}/resolve
 GET /api/v1/management/maintenance-tickets
 GET /api/v1/management/maintenance-tickets/{ticketId}
 POST /api/v1/management/maintenance-tickets
@@ -201,8 +205,9 @@ Rules:
 - GraphQL `tenantTree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
 - Back-office order operations are manual support workflows. Paid orders should be marked `RefundRequired`; they are not cancelled directly.
 - Order status history is a back-office audit read model. It exposes order status transitions and a small actor snapshot (`changedByAccountId`, `changedByName`, `changedByEmail`), not full account objects, raw payment callback bodies, or robot telemetry.
-- Execution-attempt reads use durable `ExecuteOrder` commands as the list authority, so pending or rejected attempts remain visible before an execution projection exists. Detail combines the optional order-summary projection with job/unit `ProductionExecutionRecord` rows. It excludes command payload JSON, raw sync events, and stock payloads. Both routes use `orders.view` and enforce scope through the owning Order.
-- Accepted commands create a provisional order-execution projection with sequence `0`. Management reads may show it before the first Edge order-summary report. Timeout reconciliation changes only observation/customer projection to `Stale/Delayed` or `Unreachable/PendingRecovery`; it must not infer `OrderStatus.Failed` from silence.
+- Execution-attempt reads use durable `ExecuteOrder` commands as the list authority, so pending or rejected attempts remain visible before an execution projection exists. Detail combines the optional order-summary projection with job/unit `ProductionExecutionRecord` rows, ordered delivery-attempt history, timeout provenance, redispatch actor/reason, and previous/next dispatch references. It excludes command payload JSON, raw sync events, and stock payloads. Both routes use `orders.view` and enforce scope through the owning Order.
+- The per-order execution-attempt list remains paging-only in v1. Dispatch attempts are bounded by `OrderExecutionDispatch__MaxDispatchAttempts` (default `3`), so status/endpoint/time filters are not added until a real UI or operational query requires them.
+- Accepted commands create a provisional order-execution projection with sequence `0`. Management reads may show it before the first Edge order-summary report. Timeout reconciliation changes only observation/customer projection to `Stale/Delayed`, `Unreachable/PendingRecovery`, or prolonged `Unreachable/SupportRequired`; it must not infer `OrderStatus.Failed` from silence. Customer order/payment polling reads the latest dispatch attempt projection.
 - `POST /management/orders/{orderId}/execution-attempts` is the explicit operator redispatch command. Backend allocates `latest DispatchAttemptNo + 1` under the order advisory lock; clients do not choose attempt numbers. It requires `orders.manage`, an authenticated account, and a reason of at most 500 characters.
 - Redispatch is allowed only when the latest execute-order command is `DeliveryFailed`, or `Rejected` while the Order is `ExecutionRejected` (rejection before physical output). `RefundRequired`, `Failed`, active attempts, and possible physical-output cases are not redispatched automatically.
 - `OrderExecutionDispatch__MaxDispatchAttempts` limits attempts. The new command stores `CreatedByAccountId`; `OrderStatusHistory` stores actor, attempt number, and reason. Repeating the request by the same operator while that new attempt is active returns the existing attempt rather than allocating another.
@@ -212,7 +217,8 @@ Rules:
 - `POST /api/v1/management/orders/{orderId}/refunds` should use `Idempotency-Key` for safe manual retries.
 - Inventory management in v1 is reporting/operations only. It does not decide runtime menu sellability or robot execution availability.
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
-- `DeviceEvent` is log/evidence, not actionable alert state. Long-term alert UI should use a separate Alert API/entity if needed.
+- `DeviceEvent` is immutable log/evidence, not mutable alert state. Newly accepted Error/Critical telemetry creates a separate Open Alert in the same transaction; Warning remains evidence only.
+- Alert management uses `/api/v1/management/alerts`: scoped list/get plus acknowledge/resolve. V1 has no general manual create endpoint; alert creation belongs to authenticated telemetry ingestion.
 - Maintenance ticket V1 is a manual operations/support workflow. Tickets are kiosk-scoped work items with optional evidence links to device, order, or device event. V1 does not include auto-generated tickets, alert engine, chat, reopen, or GraphQL maintenance aggregate.
 - Execution endpoint credential rotation is a maintenance operation. It revokes the current credential binding and activates the new credential reference in one database save. Rotation preserves the endpoint's prior Active or Disabled state; Provisioning and Retired endpoints cannot rotate. Hot credential overlap is not part of V1.
 - Robot artifact bulk upload is the only public upload contract. It accepts one to 50 multipart `.lua` files, stores file bytes in S3-compatible object storage, and stores immutable metadata in `RobotArtifact`.
@@ -312,6 +318,7 @@ Current direction:
 POST /api/v1/iot/kiosks/{kioskId}/commands/pull
 POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack
 POST /api/v1/iot/kiosks/{kioskId}/execution-reports
+POST /api/v1/iot/kiosks/{kioskId}/device-events
 POST /api/v1/iot/kiosks/{kioskId}/events
 POST /api/v1/iot/kiosks/{kioskId}/heartbeat
 GET /api/v1/iot/kiosks/{kioskId}/configuration
@@ -323,12 +330,17 @@ Rules:
 - IoT routes no longer accept plaintext `X-Execution-Credential`. Full Edge endpoints authenticate with a directly presented client certificate pinned by SHA-256 fingerprint. Low-cost endpoints authenticate each raw HTTP request with ECDSA NIST P-256, timestamp, and a database-deduplicated nonce over TLS.
 - Execution endpoint reads are tenant-scoped and never return credential material. Full Edge provisioning accepts `ClientCertificateSha256Fingerprint`; low-cost provisioning accepts `EcdsaPublicKeyPem`. Both require at least one supported robot target and assign exactly one profile identity: `FullEdgeRuntimeId` or `ControllerId`.
 - Cryptographic transport verification belongs to WebAPI. Application handlers retain endpoint/kiosk/status/credential-binding checks but do not receive HTTP certificates, signatures, or plaintext credentials.
+- Heartbeat ingest derives trust from the authenticated execution endpoint, validates `originNodeId` against its bound profile identity, deduplicates by `(kioskId, originNodeId, heartbeatSequence)`, and updates `Kiosk.LastOnlineAt` using Cloud receive time.
+- The connectivity state machine owns `Active <-> Offline`: reachable heartbeat evidence recovers an Offline kiosk when its parent scope is active; an Offline heartbeat or heartbeat timeout moves an Active kiosk Offline. It does not override Provisioning, Maintenance, Disabled, or Retired. Manual management requests cannot set Offline or recover Offline to Active.
+- Heartbeat ingestion and timeout reconciliation serialize by kiosk. `KioskStatusChanged` is emitted only for a committed transition, never for duplicate heartbeat delivery or an unchanged state.
+- Device-event ingest accepts one `Warning`, `Error`, or `Critical` evidence record, verifies device/kiosk ownership, deduplicates globally by `eventId`, and publishes `DeviceEventCreated` only after a new row commits. Raw payload remains excluded from management reads.
+- Newly accepted `Error` or `Critical` device events also create one Open Alert atomically and publish `AlertChanged` after commit. Warning events do not auto-create alerts.
 - Supported robot targets are a complete replacement contract and may change only while the endpoint is `Provisioning` or `Disabled`. A device-specific target must reference a device attached to the same kiosk.
 - Endpoint activation, credential rotation, disable/reactivate, and retirement are management operations. They do not install artifacts; release deployment remains a separate command flow.
 - `POST /api/v1/iot/kiosks/{kioskId}/execution-reports` is the current V1 execution/deployment report ingest endpoint. It records a `SyncEventInbox` receipt for deduplication and applies the report to deployment state or Cloud execution projections.
 - `POST /api/v1/iot/kiosks/{kioskId}/events` remains the future broader batch event/sync surface and should not be used as the current command execution status endpoint.
 - Keep IoT DTOs separate from EF entities.
-- MQTT is notification only; Edge pulls command details through the API.
+- After an `EdgeCommand` commits, MQTT publishes a best-effort endpoint-scoped `CommandAvailable` wake-up for `ExecuteOrder` and `DeployConfiguration`. MQTT is notification only; Edge pulls command details through the API and periodic polling remains authoritative.
 
 ## Operations Health APIs
 
@@ -537,7 +549,7 @@ SignalR is not the robot runtime bus. Cloud-to-Edge and Edge-to-Cloud runtime in
 
 | Hub | Route | Scope | Events |
 | --- | --- | --- | --- |
-| `OrderHub` | `/hubs/orders` | Order-specific updates | `OrderStatusChanged`, `PaymentStatusChanged` |
+| `OrderHub` | `/hubs/orders` | Order-specific updates | `OrderStatusChanged`, `PaymentStatusChanged`, `OrderExecutionObservationChanged` |
 | `OperationsHub` | `/hubs/operations` | Kiosk & telemetry status | `KioskStatusChanged`, `DeviceEventCreated`, `MaintenanceTicketChanged`, `InventoryChanged` |
 | `ManagementDashboardHub` | `/hubs/management-dashboard` | Scoped dashboards (System, Org, Store) | `DashboardInvalidated` |
 

@@ -63,7 +63,7 @@ Extract the `token` from the response.
 ## 6. Expected Event Names
 
 - **OrderHub**: `OrderStatusChanged`, `PaymentStatusChanged`
-- **OperationsHub**: `KioskStatusChanged`, `MaintenanceTicketChanged`, `InventoryChanged`
+- **OperationsHub**: `KioskStatusChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`
 - **ManagementDashboardHub**: `DashboardInvalidated`
 
-`DeviceEventCreated` is reserved for the future device ingest/sync path and may not be emitted yet.
+`DeviceEventCreated` is emitted for a newly committed device event. `AlertChanged` is also emitted when Error/Critical telemetry creates an actionable alert and when that alert is acknowledged or resolved.

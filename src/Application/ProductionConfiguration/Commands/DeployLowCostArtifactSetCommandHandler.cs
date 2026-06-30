@@ -19,15 +19,18 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private readonly IProductionConfigurationStore _productionConfigurationStore;
     private readonly IEdgeCommandStore _edgeCommandStore;
     private readonly LowCostControllerCapacityOptions _capacity;
+    private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
 
     public DeployLowCostArtifactSetCommandHandler(
         IProductionConfigurationStore productionConfigurationStore,
         IEdgeCommandStore edgeCommandStore,
-        IOptions<LowCostControllerCapacityOptions> capacity)
+        IOptions<LowCostControllerCapacityOptions> capacity,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher)
     {
         _productionConfigurationStore = productionConfigurationStore;
         _edgeCommandStore = edgeCommandStore;
         _capacity = capacity.Value;
+        _wakeUpPublisher = wakeUpPublisher;
     }
 
     public async Task<ApiResult<ControllerArtifactSetDeploymentResult>> HandleAsync(
@@ -105,7 +108,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Command expiry must be later than the deployment request time.", 400);
         }
 
-        return await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
+        var result = await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
             endpoint.ControllerId.Value,
             async ct =>
             {
@@ -174,6 +177,19 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 }
             },
             cancellationToken);
+
+        if (result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId)
+        {
+            await _wakeUpPublisher.TryPublishAsync(
+                new EdgeCommandWakeUp(
+                    edgeCommandId,
+                    result.Data.KioskExecutionEndpointId,
+                    EdgeCommandType.DeployConfiguration,
+                    DateTimeOffset.UtcNow),
+                cancellationToken);
+        }
+
+        return result;
     }
 
     private static string BuildDeployPayload(

@@ -1,11 +1,41 @@
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 using Domain.Payments.Enums;
+using Domain.ProductionExecution.Enums;
+using Domain.ProductionExecution.Projections;
 
 namespace Application.Shared.Utils;
 
 public static class OrderStatusProjector
 {
+    public static (string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport) ProjectFromOrderAndExecution(
+        Order order,
+        OrderExecutionRecord? executionRecord,
+        PaymentTransactionStatus? latestTransactionStatus = null)
+    {
+        if ((order.Status is OrderStatus.Paid or OrderStatus.ReadyForExecution or OrderStatus.Accepted or OrderStatus.Preparing) &&
+            executionRecord is not null)
+        {
+            var executionProjection = executionRecord.CustomerExecutionStatus switch
+            {
+                CustomerExecutionStatus.Delayed =>
+                    ("Delayed", "Your order is taking longer than expected. Production is still being monitored.", false, false),
+                CustomerExecutionStatus.PendingRecovery =>
+                    ("PendingRecovery", "Connection to the machine was interrupted. We are checking your order.", false, false),
+                CustomerExecutionStatus.SupportRequired =>
+                    ("SupportRequired", "We could not confirm production progress. Please contact staff for support.", false, true),
+                _ => ((string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport)?)null
+            };
+
+            if (executionProjection.HasValue)
+            {
+                return executionProjection.Value;
+            }
+        }
+
+        return ProjectFromOrder(order, latestTransactionStatus);
+    }
+
     public static (string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport) ProjectFromOrder(Order order, PaymentTransactionStatus? latestTransactionStatus = null)
     {
         if (order.Status == OrderStatus.Draft)

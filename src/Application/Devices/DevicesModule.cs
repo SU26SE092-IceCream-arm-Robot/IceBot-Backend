@@ -11,6 +11,9 @@ public static class DevicesModule
         services.AddScoped<GetKioskHeartbeatsQueryHandler>();
         services.AddScoped<GetKioskDeviceEventsQueryHandler>();
         services.AddScoped<GetKioskStatusOverviewQueryHandler>();
+        services.AddScoped<IngestKioskHeartbeatCommandHandler>();
+        services.AddScoped<IngestDeviceEventCommandHandler>();
+        services.AddScoped<ReconcileKioskConnectivityCommandHandler>();
 
         services.AddScoped<ListDevicesQueryHandler>();
         services.AddScoped<GetDeviceQueryHandler>();

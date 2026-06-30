@@ -167,6 +167,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `maintenance.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View maintenance tickets within assigned scope |
 | `maintenance.create` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Create maintenance tickets within assigned scope |
 | `maintenance.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Manage, assign, resolve, and close maintenance tickets within assigned scope. Staff can create/view tickets but cannot assign or resolve by default |
+| `alerts.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View actionable telemetry alerts within assigned scope |
+| `alerts.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Acknowledge and resolve actionable telemetry alerts within assigned scope |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |
 | `reports.view` | `SystemAdmin`, `Manager`, `OrgAdmin` | Scope filtering must be enforced when scoped authorization is implemented |
 

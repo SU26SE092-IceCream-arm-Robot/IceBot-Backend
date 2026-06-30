@@ -135,7 +135,20 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Accepted report timeout | `OrderExecutionDispatch__AcceptedReportTimeoutMinutes` | **P1** | Maximum time after ACK before missing order-summary evidence becomes stale; default is `5`. |
 | Running report timeout | `OrderExecutionDispatch__RunningReportTimeoutMinutes` | **P1** | Maximum silence while running before observation becomes stale; default is `30`. |
 | Heartbeat unreachable threshold | `OrderExecutionDispatch__HeartbeatUnreachableMinutes` | **P1** | Missing, Offline, or older heartbeat changes stale observation to unreachable; default is `2`. |
+| Unreachable support escalation | `OrderExecutionDispatch__UnreachableSupportEscalationMinutes` | **P1** | Prolonged silence escalates customer projection from `PendingRecovery` to `SupportRequired` without changing the business order to Failed; default is `15`. |
 | Maximum order dispatch attempts | `OrderExecutionDispatch__MaxDispatchAttempts` | **P1** | Hard ceiling across initial dispatch and operator redispatch; default is `3`. |
+| Execution-report future clock skew | `ExecutionReportIngestion__MaxFutureClockSkewSeconds` | **P1** | Maximum accepted future offset for report and stock-evidence timestamps; default is `300` seconds. |
+| Edge telemetry future clock skew | `EdgeTelemetryIngestion__MaxFutureClockSkewSeconds` | **P1** | Maximum accepted future offset for heartbeat and future device-event timestamps; default is `300` seconds. |
+| Kiosk heartbeat timeout | `EdgeTelemetryIngestion__HeartbeatTimeoutSeconds` | **P1** | Maximum Cloud receive-time silence before an Active kiosk becomes Offline/Unreachable; default is `90` seconds. |
+| Connectivity reconciliation interval | `EdgeTelemetryIngestion__ConnectivityReconciliationIntervalSeconds` | **P1** | Background scan interval for heartbeat timeout transitions; default is `15` seconds. |
+| Connectivity reconciliation batch size | `EdgeTelemetryIngestion__ConnectivityReconciliationBatchSize` | **P2** | Maximum Active kiosk candidates checked per scan; appsettings default is `100`. |
+| Enable MQTT command wake-up | `EdgeCommandMqtt__Enabled` | **P1** | Default `false`; enable only when a broker and endpoint subscriptions are configured. Polling remains authoritative. |
+| MQTT broker host/port | `EdgeCommandMqtt__Host`, `EdgeCommandMqtt__Port` | **P0 Feature** | Required when MQTT wake-up is enabled. Defaults are `localhost:1883` for local development only. |
+| MQTT TLS | `EdgeCommandMqtt__UseTls` | **P0 Secret/Security** | Enable for production broker connections. Certificate trust uses the host OS trust store. |
+| MQTT credentials | `EdgeCommandMqtt__Username`, `EdgeCommandMqtt__Password` | **P0 Secret** | Supply through deployment secrets when broker authentication is enabled; do not commit values. |
+| MQTT client/topic | `EdgeCommandMqtt__ClientId`, `EdgeCommandMqtt__TopicPrefix` | **P1** | Client id must be unique per backend instance; topic prefix defaults to `icebot`. |
+
+Broker startup, endpoint-scoped ACL provisioning, Edge subscription behavior, and production TLS rules are defined in [MQTT Operations](MQTT_OPERATIONS.md).
 
 ## Observability And Diagnostics
 

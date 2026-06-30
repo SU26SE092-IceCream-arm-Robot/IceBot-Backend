@@ -14,5 +14,6 @@ public sealed class OrderExecutionDispatchOptions
     public int AcceptedReportTimeoutMinutes { get; set; } = 5;
     public int RunningReportTimeoutMinutes { get; set; } = 30;
     public int HeartbeatUnreachableMinutes { get; set; } = 2;
+    public int UnreachableSupportEscalationMinutes { get; set; } = 15;
     public int MaxDispatchAttempts { get; set; } = 3;
 }

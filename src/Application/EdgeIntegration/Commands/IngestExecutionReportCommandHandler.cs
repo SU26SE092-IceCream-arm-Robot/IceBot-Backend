@@ -15,6 +15,7 @@ using Domain.ProductionExecution.Enums;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
+using Microsoft.Extensions.Options;
 
 namespace Application.EdgeIntegration.Commands;
 
@@ -22,20 +23,23 @@ public sealed class IngestExecutionReportCommandHandler
 {
     private readonly IExecutionReportStore _executionReportStore;
     private readonly IRealtimeNotificationPublisher _publisher;
+    private readonly ExecutionReportIngestionOptions _options;
 
     public IngestExecutionReportCommandHandler(
         IExecutionReportStore executionReportStore,
-        IRealtimeNotificationPublisher publisher)
+        IRealtimeNotificationPublisher publisher,
+        IOptions<ExecutionReportIngestionOptions> options)
     {
         _executionReportStore = executionReportStore;
         _publisher = publisher;
+        _options = options.Value;
     }
 
     public async Task<ApiResult<ExecutionReportIngestResult>> HandleAsync(
         IngestExecutionReportCommand command,
         CancellationToken cancellationToken = default)
     {
-        var validationError = Validate(command);
+        var validationError = Validate(command, DateTimeOffset.UtcNow, _options.MaxFutureClockSkewSeconds);
         if (validationError is not null)
         {
             return ApiResult<ExecutionReportIngestResult>.Fail(validationError, 400);
@@ -129,7 +133,10 @@ public sealed class IngestExecutionReportCommandHandler
         }
     }
 
-    private static string? Validate(IngestExecutionReportCommand command)
+    private static string? Validate(
+        IngestExecutionReportCommand command,
+        DateTimeOffset receivedAt,
+        int maxFutureClockSkewSeconds)
     {
         if (command.KioskId == Guid.Empty ||
             command.EndpointId == Guid.Empty ||
@@ -145,6 +152,15 @@ public sealed class IngestExecutionReportCommandHandler
         if (command.EdgeCreatedAt == default)
         {
             return "Edge-created timestamp is required.";
+        }
+
+
+        var latestAcceptedTimestamp = receivedAt.AddSeconds(maxFutureClockSkewSeconds);
+        if (command.EdgeCreatedAt > latestAcceptedTimestamp ||
+            command.ExecutorReportedAt > latestAcceptedTimestamp ||
+            command.StockMovements.Any(item => item.OccurredAt > latestAcceptedTimestamp))
+        {
+            return "Execution report timestamps cannot exceed the allowed future clock skew.";
         }
 
         if (command.StockMovements.Count > 0 &&
@@ -325,6 +341,9 @@ public sealed class IngestExecutionReportCommandHandler
         {
             throw new DomainRuleException("Production execution reports require an execute-order command.");
         }
+
+
+        ValidateProductionReleaseAgainstCommand(command, edgeCommand);
 
         var status = ParseProductionStatus(command.Status);
         var physicalOutputState = ToPhysicalOutputState(command.PhysicalOutputMayHaveOccurred);
@@ -742,6 +761,41 @@ public sealed class IngestExecutionReportCommandHandler
             ProductionExecutionStatus.RequiresManualIntervention => CustomerExecutionStatus.SupportRequired,
             _ => CustomerExecutionStatus.ExecutionUnconfirmed
         };
+    }
+
+    private static void ValidateProductionReleaseAgainstCommand(
+        IngestExecutionReportCommand command,
+        EdgeCommand edgeCommand)
+    {
+        if (!command.SourceConfigurationReleaseId.HasValue ||
+            command.SourceConfigurationReleaseId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(command.ReleaseChecksum))
+        {
+            throw new DomainRuleException("Production execution reports require source configuration release and checksum.");
+        }
+
+        try
+        {
+            using var payload = JsonDocument.Parse(edgeCommand.PayloadJson);
+            var root = payload.RootElement;
+            if (!root.TryGetProperty("ConfigurationReleaseId", out var releaseIdElement) ||
+                !releaseIdElement.TryGetGuid(out var dispatchedReleaseId) ||
+                !root.TryGetProperty("ReleaseChecksum", out var checksumElement))
+            {
+                throw new DomainRuleException("Execute-order command payload is missing release provenance.");
+            }
+
+            var dispatchedChecksum = checksumElement.GetString();
+            if (command.SourceConfigurationReleaseId.Value != dispatchedReleaseId ||
+                !string.Equals(command.ReleaseChecksum.Trim(), dispatchedChecksum, StringComparison.Ordinal))
+            {
+                throw new DomainRuleException("Production execution report release does not match the dispatched command.");
+            }
+        }
+        catch (JsonException ex)
+        {
+            throw new DomainRuleException($"Execute-order command payload is invalid: {ex.Message}");
+        }
     }
 
     private sealed class ReportNotifications

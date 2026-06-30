@@ -13,6 +13,7 @@ using Infrastructure.Data;
 using Infrastructure.Devices.Persistence;
 using Infrastructure.Email;
 using Infrastructure.EdgeIntegration.Persistence;
+using Infrastructure.EdgeIntegration.Mqtt;
 using Infrastructure.Identity;
 using Infrastructure.Inventory.Persistence;
 using Infrastructure.Operations.Persistence;
@@ -63,10 +64,22 @@ namespace Infrastructure
             services.AddScoped<IInventoryStore, InventoryStore>();
             services.AddHostedService<Persistence.Jobs.DataRetentionJob>();
             services.AddScoped<IKioskTelemetryStore, KioskTelemetryStore>();
+            services.AddScoped<IEdgeTelemetryIngestionStore, EdgeTelemetryIngestionStore>();
+            services.AddOptions<Application.Devices.EdgeTelemetryIngestionOptions>()
+                .Bind(config.GetSection(Application.Devices.EdgeTelemetryIngestionOptions.SectionName))
+                .Validate(options =>
+                        options.MaxFutureClockSkewSeconds >= 0 &&
+                        options.HeartbeatTimeoutSeconds > 0 &&
+                        options.ConnectivityReconciliationIntervalSeconds > 0 &&
+                        options.ConnectivityReconciliationBatchSize > 0,
+                    "Edge telemetry clock skew and connectivity reconciliation settings are invalid.")
+                .ValidateOnStart();
+            services.AddHostedService<Devices.Jobs.KioskConnectivityReconciliationJob>();
             services.AddScoped<IDeviceManagementStore, DeviceManagementStore>();
             services.AddScoped<IExecutionEndpointStore, ExecutionEndpointStore>();
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
+            services.AddScoped<IAlertStore, AlertStore>();
             services.Configure<RobotArtifactObjectStorageOptions>(config.GetSection(RobotArtifactObjectStorageOptions.SectionName));
             services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
             services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
@@ -86,6 +99,23 @@ namespace Infrastructure
             services.AddScoped<IOrderExecutionTimeoutStore, OrderExecutionTimeoutStore>();
             services.AddScoped<IExecutionEndpointTransportAuthStore, ExecutionEndpointTransportAuthStore>();
             services.AddScoped<IExecutionReportStore, ExecutionReportStore>();
+            services.AddOptions<EdgeCommandMqttOptions>()
+                .Bind(config.GetSection(EdgeCommandMqttOptions.SectionName))
+                .Validate(options =>
+                        !options.Enabled ||
+                        (!string.IsNullOrWhiteSpace(options.Host) &&
+                         options.Port is > 0 and <= 65535 &&
+                         !string.IsNullOrWhiteSpace(options.ClientId) &&
+                         !string.IsNullOrWhiteSpace(options.TopicPrefix) &&
+                         options.ConnectTimeoutSeconds > 0),
+                    "Enabled MQTT command wake-up settings are incomplete or invalid.")
+                .ValidateOnStart();
+            services.AddSingleton<IEdgeCommandWakeUpPublisher, MqttEdgeCommandWakeUpPublisher>();
+            services.AddOptions<Application.EdgeIntegration.ExecutionReportIngestionOptions>()
+                .Bind(config.GetSection(Application.EdgeIntegration.ExecutionReportIngestionOptions.SectionName))
+                .Validate(options => options.MaxFutureClockSkewSeconds >= 0,
+                    "Execution report future clock skew cannot be negative.")
+                .ValidateOnStart();
             services.AddOptions<Application.EdgeIntegration.OrderExecutionDispatchOptions>()
                 .Bind(config.GetSection(Application.EdgeIntegration.OrderExecutionDispatchOptions.SectionName))
                 .Validate(options =>
@@ -98,6 +128,7 @@ namespace Infrastructure
                         options.AcceptedReportTimeoutMinutes > 0 &&
                         options.RunningReportTimeoutMinutes > 0 &&
                         options.HeartbeatUnreachableMinutes > 0 &&
+                        options.UnreachableSupportEscalationMinutes > 0 &&
                         options.MaxDispatchAttempts > 0,
                     "Order execution dispatch settings must be positive.")
                 .ValidateOnStart();

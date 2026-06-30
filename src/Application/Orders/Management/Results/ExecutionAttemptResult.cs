@@ -31,7 +31,41 @@ public sealed class ExecutionAttemptResult
 public sealed class ExecutionAttemptDetailResult
 {
     public required ExecutionAttemptResult Attempt { get; init; }
+    public ExecutionAttemptReferenceResult? PreviousAttempt { get; init; }
+    public ExecutionAttemptReferenceResult? NextAttempt { get; init; }
+    public required ExecutionAttemptProvenanceResult Provenance { get; init; }
+    public IReadOnlyCollection<ExecutionDeliveryAttemptResult> DeliveryAttempts { get; init; } = [];
     public IReadOnlyCollection<ProductionExecutionResult> ProductionExecutions { get; init; } = [];
+}
+
+public sealed class ExecutionAttemptReferenceResult
+{
+    public Guid SourceCommandId { get; init; }
+    public int DispatchAttemptNo { get; init; }
+    public string CommandStatus { get; init; } = null!;
+    public DateTimeOffset CreatedAt { get; init; }
+}
+
+public sealed class ExecutionAttemptProvenanceResult
+{
+    public bool IsRedispatch { get; init; }
+    public Guid? RetryOfSourceCommandId { get; init; }
+    public Guid? RequestedByAccountId { get; init; }
+    public string? RedispatchReason { get; init; }
+    public bool TimedOutBeforeAcceptance { get; init; }
+    public DateTimeOffset? TimedOutAt { get; init; }
+    public DateTimeOffset? CommandExpiryAt { get; init; }
+    public bool ExecutionReportTimedOut { get; init; }
+    public DateTimeOffset? ObservationRecordedAt { get; init; }
+}
+
+public sealed class ExecutionDeliveryAttemptResult
+{
+    public int DeliveryAttemptNo { get; init; }
+    public DateTimeOffset SentAt { get; init; }
+    public string Outcome { get; init; } = null!;
+    public string? ResponseCode { get; init; }
+    public string? ResponseMessage { get; init; }
 }
 
 public sealed class ProductionExecutionResult

@@ -1,13 +1,14 @@
 using Application.Orders.PlaceOrder.Results;
 using Domain.Orders.Entities;
+using Domain.ProductionExecution.Projections;
 
 namespace Application.Orders.PlaceOrder.Mapping;
 
 internal static class OrderResultMapper
 {
-    public static OrderResult ToResult(Order order)
+    public static OrderResult ToResult(Order order, OrderExecutionRecord? executionRecord = null)
     {
-        var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrder(order);
+        var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrderAndExecution(order, executionRecord);
 
         return new OrderResult
         {

@@ -46,6 +46,24 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         await PublishDashboardInvalidatedAsync(dashboardEvt, ct);
     }
 
+    public async Task PublishOrderExecutionObservationChangedAsync(
+        OrderExecutionObservationChangedEvent evt,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await _orderHubContext.Clients.Group($"order:{evt.OrderId}")
+                .SendAsync("OrderExecutionObservationChanged", evt, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to publish SignalR OrderExecutionObservationChanged event for order {OrderId}.",
+                evt.OrderId);
+        }
+    }
+
     public async Task PublishPaymentStatusChangedAsync(PaymentStatusChangedEvent evt, CancellationToken ct = default)
     {
         try
@@ -100,6 +118,27 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         {
             _logger.LogWarning(ex, "Failed to publish SignalR DeviceEventCreated event for kiosk {KioskId}.", evt.KioskId);
         }
+    }
+
+    public async Task PublishAlertChangedAsync(AlertChangedEvent evt, CancellationToken ct = default)
+    {
+        try
+        {
+            await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("AlertChanged", evt, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to publish SignalR AlertChanged event for alert {AlertId}.", evt.AlertId);
+        }
+
+        await PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
+        {
+            Scope = "Organization",
+            OrganizationId = evt.OrganizationId,
+            StoreId = evt.StoreId,
+            Reason = "AlertChanged",
+            UpdatedAt = evt.UpdatedAt
+        }, ct);
     }
 
     public async Task PublishMaintenanceTicketChangedAsync(MaintenanceTicketChangedEvent evt, CancellationToken ct = default)

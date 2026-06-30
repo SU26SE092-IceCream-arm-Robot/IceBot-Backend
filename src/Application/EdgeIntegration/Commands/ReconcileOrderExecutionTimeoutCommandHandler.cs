@@ -45,6 +45,13 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
                 cancellationToken);
         }
 
+        if (notifications?.OrderExecutionObservationChanged is not null)
+        {
+            await _publisher.PublishOrderExecutionObservationChangedAsync(
+                notifications.OrderExecutionObservationChanged,
+                cancellationToken);
+        }
+
         if (notifications?.DashboardInvalidated is not null)
         {
             await _publisher.PublishDashboardInvalidatedAsync(
@@ -92,6 +99,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             await _store.SaveChangesAsync(cancellationToken);
             return new ReconciliationNotifications(
                 BuildDashboardEvent(order, command.ObservedAt, "OrderExecutionCommandExpired"),
+                null,
                 order.Status == previousStatus
                     ? null
                     : BuildOrderStatusEvent(order, previousStatus, command.ObservedAt));
@@ -121,9 +129,16 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
         var unreachable = heartbeat is null ||
             heartbeat.ReceivedAt < unreachableCutoff ||
             heartbeat.Status == KioskHeartbeatStatus.Offline;
+        var supportRequired = unreachable &&
+            record.LastExecutorReportedAt <= command.ObservedAt.AddMinutes(-_options.UnreachableSupportEscalationMinutes);
+        var customerExecutionStatus = supportRequired
+            ? CustomerExecutionStatus.SupportRequired
+            : unreachable
+                ? CustomerExecutionStatus.PendingRecovery
+                : CustomerExecutionStatus.Delayed;
         var changed = record.MarkCloudObservation(
             unreachable ? ExecutionObservationStatus.Unreachable : ExecutionObservationStatus.Stale,
-            unreachable ? CustomerExecutionStatus.PendingRecovery : CustomerExecutionStatus.Delayed,
+            customerExecutionStatus,
             command.ObservedAt);
         if (!changed)
         {
@@ -135,7 +150,12 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             BuildDashboardEvent(
                 order,
                 command.ObservedAt,
-                unreachable ? "OrderExecutionUnreachable" : "OrderExecutionStale"),
+                supportRequired
+                    ? "OrderExecutionSupportRequired"
+                    : unreachable
+                        ? "OrderExecutionUnreachable"
+                        : "OrderExecutionStale"),
+            BuildOrderExecutionObservationEvent(order, record, command.ObservedAt),
             null);
     }
 
@@ -208,7 +228,32 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
         };
     }
 
+    private static OrderExecutionObservationChangedEvent BuildOrderExecutionObservationEvent(
+        Order order,
+        OrderExecutionRecord record,
+        DateTimeOffset observedAt)
+    {
+        var projection = OrderStatusProjector.ProjectFromOrderAndExecution(order, record);
+        return new OrderExecutionObservationChangedEvent
+        {
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            KioskId = order.KioskId,
+            OrganizationId = order.OrganizationId,
+            StoreId = order.StoreId,
+            ObservationStatus = record.ObservationStatus.ToString(),
+            CustomerExecutionStatus = record.CustomerExecutionStatus.ToString(),
+            CustomerStatus = projection.CustomerStatus,
+            CustomerStatusMessage = projection.CustomerStatusMessage,
+            RequiresStaffSupport = projection.RequiresStaffSupport,
+            LastExecutorReportedAt = record.LastExecutorReportedAt,
+            UpdatedAt = observedAt,
+            Version = 1
+        };
+    }
+
     private sealed record ReconciliationNotifications(
         DashboardInvalidatedEvent DashboardInvalidated,
+        OrderExecutionObservationChangedEvent? OrderExecutionObservationChanged,
         OrderStatusChangedEvent? OrderStatusChanged);
 }
