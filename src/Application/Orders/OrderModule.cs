@@ -12,9 +12,12 @@ public static class OrderModule
         services.AddScoped<Management.Queries.ListManagementOrdersQueryHandler>();
         services.AddScoped<Management.Queries.GetManagementOrderQueryHandler>();
         services.AddScoped<Management.Queries.GetOrderStatusHistoryQueryHandler>();
+        services.AddScoped<Management.Queries.GetOrderExecutionAttemptsQueryHandler>();
+        services.AddScoped<Management.Queries.GetExecutionAttemptQueryHandler>();
         services.AddScoped<Management.Queries.GetOrderOverviewQueryHandler>();
         services.AddScoped<Management.Commands.CancelManagementOrderCommandHandler>();
         services.AddScoped<Management.Commands.MarkOrderRefundRequiredCommandHandler>();
+        services.AddScoped<Management.Commands.RedispatchOrderExecutionCommandHandler>();
 
         return services;
     }

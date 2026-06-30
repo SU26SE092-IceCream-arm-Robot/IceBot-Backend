@@ -32,12 +32,14 @@ Clients must explicitly join a group to receive targeted events.
 ### OrderHub Events
 - `OrderStatusChanged`: Triggered when an order status changes (e.g., placed, preparing, completed).
 - `PaymentStatusChanged`: Triggered when payment succeeds or fails.
+- `OrderExecutionObservationChanged`: Triggered when Cloud observation changes without claiming a physical order-state transition. The payload contains `ObservationStatus`, `CustomerExecutionStatus`, customer message, support flag, and last executor report time. Clients should apply it directly to the current order screen.
 
 ### OperationsHub Events
 - `MaintenanceTicketChanged`: Triggered when a maintenance ticket is created, updated, assigned, started, resolved, closed, or cancelled.
 - `InventoryChanged`: Triggered when a dispenser is refilled or its stock estimate is adjusted.
-- `KioskStatusChanged`: Triggered when the operational status of a kiosk changes (e.g., Active, Offline, Maintenance).
-- `DeviceEventCreated`: (Reserved for future device ingest path) Triggered when a new telemetry or warning event is synced from a device.
+- `KioskStatusChanged`: Triggered only after a committed kiosk status transition. Heartbeat timeout emits `Active -> Offline` with connectivity `Unreachable`; an accepted reachable heartbeat may emit `Offline -> Active`. Duplicate heartbeat ingestion and unchanged status do not emit this event. Management transitions such as Maintenance or Disabled continue to use the same event contract.
+- `DeviceEventCreated`: Triggered once after a new warning/error device event commits. Idempotent event retries do not publish it again.
+- `AlertChanged`: Triggered after an actionable alert is created, acknowledged, or resolved. It carries a committed state delta; idempotent lifecycle retries do not publish it again.
 
 ### ManagementDashboardHub Events
 - `DashboardInvalidated`: Triggered when any significant state changes that requires the management dashboard to refresh its aggregated data.
@@ -49,6 +51,8 @@ Clients must explicitly join a group to receive targeted events.
 3. **Join Group**: Call the relevant join method (e.g., `JoinOrder` or `JoinKiosk`).
 4. **Apply Events**: Apply event payloads immediately when sufficient information is present.
 5. **Refetch**: Refetch from REST/GraphQL on reconnect, refresh, or suspected version gap.
+
+For execution silence, `Stale` maps to `Delayed`; `Unreachable` first maps to `PendingRecovery` and later escalates to `SupportRequired` after the configured threshold. This event does not imply that `Order.Status` changed or that the machine physically failed.
 
 ## Reconnect Rule
 If the SignalR connection drops, the client should attempt to reconnect. Upon successful reconnection, the client **must** refetch the current state via REST/GraphQL to ensure no events were missed during the downtime. SignalR events are fire-and-forget and do not support durable event history.

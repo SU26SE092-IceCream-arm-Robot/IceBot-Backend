@@ -1,6 +1,7 @@
 using Application.EdgeIntegration.Abstractions;
 using Domain.Devices.Entities;
 using Domain.Orders.Entities;
+using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Infrastructure.Data;
@@ -74,6 +75,22 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
         CancellationToken cancellationToken = default)
     {
         return _dbContext.OrderStatusHistories.AddAsync(history, cancellationToken).AsTask();
+    }
+
+    public Task<OrderExecutionRecord?> GetOrderExecutionRecordAsync(
+        Guid sourceCommandId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrderExecutionRecords.FirstOrDefaultAsync(
+            record => record.SourceCommandId == sourceCommandId,
+            cancellationToken);
+    }
+
+    public Task AddOrderExecutionRecordAsync(
+        OrderExecutionRecord record,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrderExecutionRecords.AddAsync(record, cancellationToken).AsTask();
     }
 
     public Task<EdgeCommand?> GetByDeploymentIdAsync(Guid deploymentId, CancellationToken cancellationToken = default)

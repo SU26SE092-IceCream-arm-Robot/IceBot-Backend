@@ -58,7 +58,8 @@ public sealed class DeploymentReleaseLifecycleTests
             {
                 MaxArtifactCount = 10,
                 MaxArtifactStorageBytes = 1024 * 1024
-            }));
+            }),
+            Substitute.For<IEdgeCommandWakeUpPublisher>());
 
     private static DeployLowCostArtifactSetCommand Command(Guid releaseId, Guid? rollbackTargetId) => new()
     {

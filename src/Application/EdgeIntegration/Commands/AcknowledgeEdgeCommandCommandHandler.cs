@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.EdgeIntegration.Abstractions;
@@ -7,6 +8,7 @@ using Application.Shared.Wrappers;
 using Domain.Devices.Enums;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
+using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 
@@ -78,6 +80,12 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
         {
             ApplyAck(edgeCommand, command, observedAt);
             ApplyOrderAck(order, edgeCommand, command);
+            await EnsureProvisionalExecutionRecordAsync(
+                endpoint,
+                edgeCommand,
+                command,
+                observedAt,
+                cancellationToken);
         }
         catch (Domain.Common.DomainRuleException ex)
         {
@@ -242,5 +250,46 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             ? null
             : $" Code: {command.RejectionCode.Trim()}.";
         return $"Execution command acknowledgement: {command.AckStatus.Trim()}.{code}".Trim();
+    }
+
+    private async Task EnsureProvisionalExecutionRecordAsync(
+        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        EdgeCommand edgeCommand,
+        AcknowledgeEdgeCommandCommand command,
+        DateTimeOffset acknowledgedAt,
+        CancellationToken cancellationToken)
+    {
+        if (edgeCommand.CommandType != EdgeCommandType.ExecuteOrder ||
+            !string.Equals(command.AckStatus.Trim(), "Accepted", StringComparison.OrdinalIgnoreCase) ||
+            !edgeCommand.OrderId.HasValue ||
+            !edgeCommand.DispatchAttemptNo.HasValue ||
+            await _edgeCommandStore.GetOrderExecutionRecordAsync(edgeCommand.Id, cancellationToken) is not null)
+        {
+            return;
+        }
+
+        var sourceExecutorId = endpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
+            ? endpoint.FullEdgeRuntimeId
+            : endpoint.ControllerId;
+        if (!sourceExecutorId.HasValue)
+        {
+            throw new Domain.Common.DomainRuleException("Execution endpoint profile identity is missing.");
+        }
+
+        using var payload = JsonDocument.Parse(edgeCommand.PayloadJson);
+        var root = payload.RootElement;
+        var releaseId = root.GetProperty("ConfigurationReleaseId").GetGuid();
+        var releaseChecksum = root.GetProperty("ReleaseChecksum").GetString();
+        var record = OrderExecutionRecord.CreateProvisionalAccepted(
+            edgeCommand.OrderId.Value,
+            edgeCommand.Id,
+            edgeCommand.DispatchAttemptNo.Value,
+            endpoint.Id,
+            endpoint.ExecutionProfile,
+            sourceExecutorId.Value,
+            releaseId,
+            releaseChecksum ?? string.Empty,
+            acknowledgedAt);
+        await _edgeCommandStore.AddOrderExecutionRecordAsync(record, cancellationToken);
     }
 }

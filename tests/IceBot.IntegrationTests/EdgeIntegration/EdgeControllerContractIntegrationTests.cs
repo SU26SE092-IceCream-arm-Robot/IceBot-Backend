@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
+using Application.EdgeIntegration;
 using Application.EdgeIntegration.Commands;
 using Application.EdgeIntegration.Services;
 using Application.RobotConfiguration.Abstractions;
@@ -18,6 +19,7 @@ using Domain.Tenants.Enums;
 using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.EdgeIntegration.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace IceBot.IntegrationTests.EdgeIntegration;
 
@@ -164,7 +166,10 @@ public sealed class EdgeControllerContractIntegrationTests
         string? errorMessage = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
-        var handler = new IngestExecutionReportCommandHandler(new ExecutionReportStore(dbContext));
+        var handler = new IngestExecutionReportCommandHandler(
+            new ExecutionReportStore(dbContext),
+            new NoOpRealtimeNotificationPublisher(),
+            Options.Create(new ExecutionReportIngestionOptions()));
         return await handler.HandleAsync(new IngestExecutionReportCommand
         {
             KioskId = graph.KioskId,

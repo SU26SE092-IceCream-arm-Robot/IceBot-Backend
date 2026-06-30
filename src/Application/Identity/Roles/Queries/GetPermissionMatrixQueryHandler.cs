@@ -212,6 +212,20 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "alerts.view",
+            Description = "View actionable telemetry alerts within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "alerts.manage",
+            Description = "Acknowledge and resolve actionable telemetry alerts within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "artifact.read",
             Description = "Read robot artifact metadata within assigned scope.",
             Roles = ["SystemAdmin", "OrgAdmin"]

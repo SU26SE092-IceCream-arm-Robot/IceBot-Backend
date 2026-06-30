@@ -45,9 +45,14 @@ public partial class Alert : SyncAggregateEntity
 
     public void Acknowledge(Guid acknowledgedByAccountId, DateTimeOffset acknowledgedAt)
     {
-        if (Status == AlertStatus.Resolved)
+        if (Status is AlertStatus.Resolved or AlertStatus.Suppressed)
         {
-            throw new DomainRuleException("Cannot acknowledge a resolved alert.");
+            throw new DomainRuleException("Cannot acknowledge a terminal alert.");
+        }
+
+        if (Status == AlertStatus.Acknowledged)
+        {
+            return;
         }
 
         AcknowledgedByAccountId = acknowledgedByAccountId;
@@ -60,6 +65,11 @@ public partial class Alert : SyncAggregateEntity
         if (Status == AlertStatus.Resolved)
         {
             return;
+        }
+
+        if (Status == AlertStatus.Suppressed)
+        {
+            throw new DomainRuleException("Cannot resolve a suppressed alert.");
         }
 
         ResolvedAt = resolvedAt;

@@ -50,7 +50,7 @@ public sealed class ListManagementOrdersQueryHandler
             cancellationToken);
 
         return PagedResult<OrderResult>.Success(
-            orders.Select(OrderResultMapper.ToResult),
+            orders.Select(order => OrderResultMapper.ToResult(order)),
             totalCount,
             pageNumber,
             pageSize,

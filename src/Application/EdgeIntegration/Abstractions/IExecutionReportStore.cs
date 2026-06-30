@@ -1,4 +1,6 @@
 using Domain.Devices.Entities;
+using Domain.Inventory.Entities;
+using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
@@ -18,6 +20,10 @@ public interface IExecutionReportStore
 
     Task<SyncEventInbox?> GetSyncEventByEventIdAsync(
         Guid eventId,
+        CancellationToken cancellationToken = default);
+
+    Task AcquireStockMovementLocksAsync(
+        IEnumerable<Guid> sourceEventIds,
         CancellationToken cancellationToken = default);
 
     Task AddSyncEventAsync(
@@ -51,6 +57,24 @@ public interface IExecutionReportStore
 
     Task AddOrderExecutionRecordAsync(
         OrderExecutionRecord record,
+        CancellationToken cancellationToken = default);
+
+    Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    Task AddOrderStatusHistoryAsync(
+        OrderStatusHistory history,
+        CancellationToken cancellationToken = default);
+
+    Task<IngredientDispenserState?> GetDispenserStateAsync(
+        Guid dispenserStateId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> StockMovementExistsAsync(
+        Guid sourceEventId,
+        CancellationToken cancellationToken = default);
+
+    Task AddStockMovementAsync(
+        StockMovement movement,
         CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);

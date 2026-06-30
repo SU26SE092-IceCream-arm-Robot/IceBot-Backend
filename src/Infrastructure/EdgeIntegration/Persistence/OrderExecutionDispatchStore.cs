@@ -95,6 +95,26 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             cancellationToken);
     }
 
+    public Task<EdgeCommand?> GetLatestCommandAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.EdgeCommands
+            .Where(command =>
+                command.CommandType == EdgeCommandType.ExecuteOrder &&
+                command.OrderId == orderId)
+            .OrderByDescending(command => command.DispatchAttemptNo)
+            .ThenByDescending(command => command.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task AddOrderStatusHistoryAsync(
+        OrderStatusHistory history,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrderStatusHistories.AddAsync(history, cancellationToken).AsTask();
+    }
+
     public Task<int> CountActiveCommandsAsync(
         Guid endpointId,
         CancellationToken cancellationToken = default)

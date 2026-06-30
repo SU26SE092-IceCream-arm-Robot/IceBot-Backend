@@ -1,0 +1,11 @@
+namespace Application.Devices;
+
+public sealed class EdgeTelemetryIngestionOptions
+{
+    public const string SectionName = "EdgeTelemetryIngestion";
+
+    public int MaxFutureClockSkewSeconds { get; set; } = 300;
+    public int HeartbeatTimeoutSeconds { get; set; } = 90;
+    public int ConnectivityReconciliationIntervalSeconds { get; set; } = 15;
+    public int ConnectivityReconciliationBatchSize { get; set; } = 100;
+}

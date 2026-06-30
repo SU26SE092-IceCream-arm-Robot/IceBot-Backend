@@ -15,13 +15,16 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
 {
     private readonly IProductionConfigurationStore _productionConfigurationStore;
     private readonly IEdgeCommandStore _edgeCommandStore;
+    private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
 
     public DeployFullEdgeConfigurationCommandHandler(
         IProductionConfigurationStore productionConfigurationStore,
-        IEdgeCommandStore edgeCommandStore)
+        IEdgeCommandStore edgeCommandStore,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher)
     {
         _productionConfigurationStore = productionConfigurationStore;
         _edgeCommandStore = edgeCommandStore;
+        _wakeUpPublisher = wakeUpPublisher;
     }
 
     public async Task<ApiResult<KioskConfigurationDeploymentResult>> HandleAsync(
@@ -69,7 +72,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Command expiry must be later than the deployment request time.", 400);
         }
 
-        return await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
+        var result = await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
             command.KioskId,
             async ct =>
             {
@@ -134,6 +137,19 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                 }
             },
             cancellationToken);
+
+        if (result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId)
+        {
+            await _wakeUpPublisher.TryPublishAsync(
+                new EdgeCommandWakeUp(
+                    edgeCommandId,
+                    result.Data.KioskExecutionEndpointId,
+                    EdgeCommandType.DeployConfiguration,
+                    DateTimeOffset.UtcNow),
+                cancellationToken);
+        }
+
+        return result;
     }
 
     private static string BuildDeployPayload(

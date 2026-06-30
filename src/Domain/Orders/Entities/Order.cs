@@ -236,6 +236,27 @@ public partial class Order : BusinessEntity, IStoreScoped
         CompletedAt = completedAt;
     }
 
+    public void MarkFailed(string? notes = null)
+    {
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled or OrderStatus.Refunded or OrderStatus.Compensated)
+        {
+            throw new DomainRuleException("Cannot fail a completed, cancelled, refunded, or compensated order.");
+        }
+
+        Status = OrderStatus.Failed;
+        Notes = notes ?? Notes;
+    }
+
+    public void PrepareRedispatch()
+    {
+        if (PaymentStatus != PaymentStatus.Paid || Status != OrderStatus.ExecutionRejected)
+        {
+            throw new DomainRuleException("Only a paid execution-rejected order can be prepared for redispatch.");
+        }
+
+        Status = OrderStatus.ReadyForExecution;
+    }
+
     public void Cancel(DateTimeOffset cancelledAt, string? notes = null)
     {
         if (Status == OrderStatus.Completed)

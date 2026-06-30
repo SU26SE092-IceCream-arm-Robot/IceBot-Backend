@@ -1,13 +1,21 @@
 using Application.Payments.PaymentSessions.Results;
 using Domain.Payments.Entities;
+using Domain.ProductionExecution.Projections;
 
 namespace Application.Payments.PaymentSessions.Mapping;
 
 internal static class PaymentStatusResultMapper
 {
-    public static PaymentStatusResult ToStatusResult(PaymentTransaction paymentTransaction)
+    public static PaymentStatusResult ToStatusResult(
+        PaymentTransaction paymentTransaction,
+        OrderExecutionRecord? executionRecord = null)
     {
-        var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromTransaction(paymentTransaction.Status, paymentTransaction.Order);
+        var customerStatusInfo = executionRecord is null
+            ? Application.Shared.Utils.OrderStatusProjector.ProjectFromTransaction(paymentTransaction.Status, paymentTransaction.Order)
+            : Application.Shared.Utils.OrderStatusProjector.ProjectFromOrderAndExecution(
+                paymentTransaction.Order,
+                executionRecord,
+                paymentTransaction.Status);
 
         return new PaymentStatusResult
         {

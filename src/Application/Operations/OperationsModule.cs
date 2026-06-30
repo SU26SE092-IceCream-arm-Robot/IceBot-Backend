@@ -1,5 +1,7 @@
 using Application.Operations.MaintenanceTickets.Commands;
 using Application.Operations.MaintenanceTickets.Queries;
+using Application.Operations.Alerts.Commands;
+using Application.Operations.Alerts.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Operations;
@@ -17,6 +19,10 @@ public static class OperationsModule
         services.AddScoped<CancelMaintenanceTicketCommandHandler>();
         services.AddScoped<GetMaintenanceTicketQueryHandler>();
         services.AddScoped<ListMaintenanceTicketsQueryHandler>();
+        services.AddScoped<ListAlertsQueryHandler>();
+        services.AddScoped<GetAlertQueryHandler>();
+        services.AddScoped<AcknowledgeAlertCommandHandler>();
+        services.AddScoped<ResolveAlertCommandHandler>();
 
         return services;
     }

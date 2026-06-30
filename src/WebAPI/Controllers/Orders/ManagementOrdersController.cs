@@ -16,21 +16,61 @@ public sealed class ManagementOrdersController : ControllerBase
     private readonly ListManagementOrdersQueryHandler _listHandler;
     private readonly GetManagementOrderQueryHandler _getHandler;
     private readonly GetOrderStatusHistoryQueryHandler _statusHistoryHandler;
+    private readonly GetOrderExecutionAttemptsQueryHandler _executionAttemptsHandler;
     private readonly CancelManagementOrderCommandHandler _cancelHandler;
     private readonly MarkOrderRefundRequiredCommandHandler _refundRequiredHandler;
+    private readonly RedispatchOrderExecutionCommandHandler _redispatchHandler;
 
     public ManagementOrdersController(
         ListManagementOrdersQueryHandler listHandler,
         GetManagementOrderQueryHandler getHandler,
         GetOrderStatusHistoryQueryHandler statusHistoryHandler,
+        GetOrderExecutionAttemptsQueryHandler executionAttemptsHandler,
         CancelManagementOrderCommandHandler cancelHandler,
-        MarkOrderRefundRequiredCommandHandler refundRequiredHandler)
+        MarkOrderRefundRequiredCommandHandler refundRequiredHandler,
+        RedispatchOrderExecutionCommandHandler redispatchHandler)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
         _statusHistoryHandler = statusHistoryHandler;
+        _executionAttemptsHandler = executionAttemptsHandler;
         _cancelHandler = cancelHandler;
         _refundRequiredHandler = refundRequiredHandler;
+        _redispatchHandler = redispatchHandler;
+    }
+
+    [HttpPost("{orderId:guid}/execution-attempts")]
+    [Authorize(Policy = "orders.manage")]
+    public async Task<IActionResult> RedispatchOrderExecution(
+        Guid orderId,
+        [FromBody] ManagementOrderReasonRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _redispatchHandler.HandleAsync(new RedispatchOrderExecutionCommand
+        {
+            OrderId = orderId,
+            UserContext = User.GetUserContext(),
+            Reason = request.Reason
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("{orderId:guid}/execution-attempts")]
+    [Authorize(Policy = "orders.view")]
+    public async Task<IActionResult> GetOrderExecutionAttempts(
+        Guid orderId,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _executionAttemptsHandler.HandleAsync(new GetOrderExecutionAttemptsQuery
+        {
+            OrderId = orderId,
+            UserContext = User.GetUserContext(),
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 
     [HttpGet]

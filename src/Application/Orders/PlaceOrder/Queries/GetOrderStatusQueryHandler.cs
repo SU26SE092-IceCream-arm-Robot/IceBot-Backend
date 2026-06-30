@@ -24,6 +24,7 @@ public sealed class GetOrderStatusQueryHandler
             return ApiResult<OrderResult>.Fail("Order not found.", 404);
         }
 
-        return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order));
+        var executionRecord = await _orderStore.GetLatestOrderExecutionRecordAsync(query.OrderId, cancellationToken);
+        return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order, executionRecord));
     }
 }
