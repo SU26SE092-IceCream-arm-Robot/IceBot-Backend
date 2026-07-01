@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.Devices.Enums;
 using Domain.ProductionExecution.Enums;
@@ -9,7 +10,7 @@ public class ProductionExecutionRecord : AuditedEntity
     public Guid SourceCommandId { get; private set; }
     public Guid KioskExecutionEndpointId { get; private set; }
     public KioskExecutionProfile ExecutionProfile { get; private set; }
-    public Guid? SourceProductionJobId { get; private set; }
+    public Guid SourceProductionJobId { get; private set; }
     public Guid? WorkcellId { get; private set; }
     public Guid? ControllerId { get; private set; }
     public string? ExecutionPlanChecksum { get; private set; }
@@ -26,7 +27,7 @@ public class ProductionExecutionRecord : AuditedEntity
     public DateTimeOffset LastExecutorReportedAt { get; private set; }
     public DateTimeOffset CloudReceivedAt { get; private set; }
 
-    public virtual Domain.Devices.Entities.KioskExecutionEndpoint KioskExecutionEndpoint { get; private set; } = null!;
+    public virtual Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint KioskExecutionEndpoint { get; private set; } = null!;
 
     public virtual Domain.Sync.Entities.EdgeCommand SourceCommand { get; private set; } = null!;
 
@@ -46,7 +47,7 @@ public class ProductionExecutionRecord : AuditedEntity
         DateTimeOffset cloudReceivedAt,
         ProductionExecutionStatus status,
         PhysicalOutputState physicalOutputState,
-        Guid? sourceProductionJobId = null,
+        Guid sourceProductionJobId,
         Guid? workcellId = null,
         Guid? controllerId = null,
         string? executionPlanChecksum = null,
@@ -55,7 +56,9 @@ public class ProductionExecutionRecord : AuditedEntity
         string? errorCode = null,
         string? errorMessage = null)
     {
-        if (sourceCommandId == Guid.Empty || kioskExecutionEndpointId == Guid.Empty || sourceExecutorId == Guid.Empty || sourceEventId == Guid.Empty || sequenceNumber <= 0)
+        if (sourceCommandId == Guid.Empty || sourceProductionJobId == Guid.Empty ||
+            kioskExecutionEndpointId == Guid.Empty || sourceExecutorId == Guid.Empty ||
+            sourceEventId == Guid.Empty || sequenceNumber <= 0)
         {
             throw new DomainRuleException("Production execution provenance and sequence are required.");
         }
@@ -144,7 +147,7 @@ public class ProductionExecutionRecord : AuditedEntity
 
         var valid = current switch
         {
-            ProductionExecutionStatus.Accepted => next is ProductionExecutionStatus.Running or ProductionExecutionStatus.Failed or ProductionExecutionStatus.RequiresManualIntervention,
+            ProductionExecutionStatus.Accepted => next is ProductionExecutionStatus.Running or ProductionExecutionStatus.Completed or ProductionExecutionStatus.Failed or ProductionExecutionStatus.RequiresManualIntervention,
             ProductionExecutionStatus.Running => next is ProductionExecutionStatus.Completed or ProductionExecutionStatus.Failed or ProductionExecutionStatus.RequiresManualIntervention,
             _ => false
         };

@@ -25,4 +25,11 @@ public class KioskStatusOverviewItemDto
     public DateTimeOffset? LastHeartbeatAt { get; set; }
     public string? LastEventSeverity { get; set; }
     public DateTimeOffset? LastEventAt { get; set; }
+    public string? ExecutionReadiness { get; set; }
+    public string? ExecutionActivity { get; set; }
+    public string? ExecutionSafety { get; set; }
+    public string? ExecutionFaultCode { get; set; }
+    public DateTimeOffset? ReadinessReportedAt { get; set; }
+    public int AvailableCapabilityCount { get; set; }
+    public int UnavailableCapabilityCount { get; set; }
 }

@@ -1,3 +1,5 @@
+using Domain.Sync.Ingestion;
+using Domain.Devices.ExecutionEndpoints;
 using System.Text.Json;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
@@ -16,21 +18,31 @@ using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
+using Application.EdgeIntegration.Observability;
 
 namespace Application.EdgeIntegration.Commands;
 
 public sealed class IngestExecutionReportCommandHandler
 {
-    private readonly IExecutionReportStore _executionReportStore;
+    private readonly IExecutionReportReceiptStore _receiptStore;
+    private readonly IDeploymentReportStore _deploymentStore;
+    private readonly IProductionExecutionReportStore _productionStore;
+    private readonly IExecutionStockEvidenceStore _stockStore;
     private readonly IRealtimeNotificationPublisher _publisher;
     private readonly ExecutionReportIngestionOptions _options;
 
     public IngestExecutionReportCommandHandler(
-        IExecutionReportStore executionReportStore,
+        IExecutionReportReceiptStore receiptStore,
+        IDeploymentReportStore deploymentStore,
+        IProductionExecutionReportStore productionStore,
+        IExecutionStockEvidenceStore stockStore,
         IRealtimeNotificationPublisher publisher,
         IOptions<ExecutionReportIngestionOptions> options)
     {
-        _executionReportStore = executionReportStore;
+        _receiptStore = receiptStore;
+        _deploymentStore = deploymentStore;
+        _productionStore = productionStore;
+        _stockStore = stockStore;
         _publisher = publisher;
         _options = options.Value;
     }
@@ -45,7 +57,7 @@ public sealed class IngestExecutionReportCommandHandler
             return ApiResult<ExecutionReportIngestResult>.Fail(validationError, 400);
         }
 
-        var endpoint = await _executionReportStore.GetEndpointForReportAuthAsync(command.EndpointId, cancellationToken);
+        var endpoint = await _receiptStore.GetEndpointForReportAuthAsync(command.EndpointId, cancellationToken);
         if (!IsUsableEndpoint(endpoint, command))
         {
             return ApiResult<ExecutionReportIngestResult>.Fail("Execution endpoint authentication failed.", 401);
@@ -58,13 +70,19 @@ public sealed class IngestExecutionReportCommandHandler
         }
 
         var notifications = new ReportNotifications();
-        var result = await _executionReportStore.ExecuteReportIngestionAsync(
+        var result = await _receiptStore.ExecuteReportIngestionAsync(
+            sourceExecutorId.Value,
             command.SourceEventId,
+            command.CommandId,
             ct => IngestLockedAsync(command, endpoint!, sourceExecutorId.Value, notifications, ct),
             cancellationToken);
 
         if (result.Succeeded && !result.Data!.Duplicate)
         {
+            var executorReportedAt = command.ExecutorReportedAt ?? command.EdgeCreatedAt;
+            IceBotEdgeMetrics.RecordExecutionReportLag(
+                DateTimeOffset.UtcNow - executorReportedAt,
+                command.ReportType);
             await PublishNotificationsAsync(notifications, cancellationToken);
         }
 
@@ -78,10 +96,18 @@ public sealed class IngestExecutionReportCommandHandler
         ReportNotifications notifications,
         CancellationToken cancellationToken)
     {
-
-        var existingEvent = await _executionReportStore.GetSyncEventByEventIdAsync(command.SourceEventId, cancellationToken);
-        if (existingEvent is not null)
+        var cloudReceivedAt = DateTimeOffset.UtcNow;
+        var candidateInboxEvent = BuildInboxEvent(command, sourceExecutorId, cloudReceivedAt);
+        var existingEvent = await _receiptStore.GetSyncEventByEventIdAsync(
+            sourceExecutorId, command.SourceEventId, cancellationToken);
+        if (existingEvent?.Status is SyncEventStatus.Processed or SyncEventStatus.Ignored)
         {
+            if (!MatchesReportIdentity(existingEvent, candidateInboxEvent))
+            {
+                return ApiResult<ExecutionReportIngestResult>.Fail(
+                    "Execution report source event id was reused with different command or payload.", 409);
+            }
+
             return ApiResult<ExecutionReportIngestResult>.Success(
                 BuildResult(command, applied: false, duplicate: true),
                 "Execution report already ingested.");
@@ -89,12 +115,12 @@ public sealed class IngestExecutionReportCommandHandler
 
         if (command.StockMovements.Count > 0)
         {
-            await _executionReportStore.AcquireStockMovementLocksAsync(
+            await _stockStore.AcquireStockMovementLocksAsync(
                 command.StockMovements.Select(item => item.SourceEventId),
                 cancellationToken);
         }
 
-        var edgeCommand = await _executionReportStore.GetCommandAsync(command.CommandId, cancellationToken);
+        var edgeCommand = await _receiptStore.GetCommandAsync(command.CommandId, cancellationToken);
         if (edgeCommand is null ||
             edgeCommand.KioskId != command.KioskId ||
             edgeCommand.TargetExecutionEndpointId != command.EndpointId ||
@@ -103,9 +129,8 @@ public sealed class IngestExecutionReportCommandHandler
             return ApiResult<ExecutionReportIngestResult>.Fail("Accepted edge command not found for execution report.", 404);
         }
 
-        var cloudReceivedAt = DateTimeOffset.UtcNow;
         var executorReportedAt = command.ExecutorReportedAt ?? command.EdgeCreatedAt;
-        var inboxEvent = BuildInboxEvent(command, sourceExecutorId, cloudReceivedAt);
+        var inboxEvent = existingEvent ?? candidateInboxEvent;
 
         try
         {
@@ -120,8 +145,9 @@ public sealed class IngestExecutionReportCommandHandler
                 cancellationToken);
 
             inboxEvent.MarkProcessed(cloudReceivedAt);
-            await _executionReportStore.AddSyncEventAsync(inboxEvent, cancellationToken);
-            await _executionReportStore.SaveChangesAsync(cancellationToken);
+            if (existingEvent is null)
+                await _receiptStore.AddSyncEventAsync(inboxEvent, cancellationToken);
+            await _receiptStore.SaveChangesAsync(cancellationToken);
 
             return ApiResult<ExecutionReportIngestResult>.Success(
                 BuildResult(command, applied, duplicate: false),
@@ -167,6 +193,11 @@ public sealed class IngestExecutionReportCommandHandler
             !string.Equals(command.ReportType, "ProductionExecution", StringComparison.OrdinalIgnoreCase))
         {
             return "Stock movement evidence is supported only for production execution reports.";
+        }
+
+        if (command.StockMovements.Count > 0 && !command.SourceProductionJobId.HasValue)
+        {
+            return "Stock movement evidence must be reported by a production job.";
         }
 
         if (command.StockMovements.Count > 100)
@@ -247,7 +278,7 @@ public sealed class IngestExecutionReportCommandHandler
 
         if (endpoint.ExecutionProfile == KioskExecutionProfile.FullEdge)
         {
-            var deployment = await _executionReportStore.GetFullEdgeDeploymentAsync(command.DeploymentId.Value, cancellationToken)
+            var deployment = await _deploymentStore.GetFullEdgeDeploymentAsync(command.DeploymentId.Value, cancellationToken)
                 ?? throw new DomainRuleException("Full Edge deployment not found.");
 
             if (deployment.KioskId != command.KioskId || deployment.KioskExecutionEndpointId != command.EndpointId)
@@ -285,7 +316,7 @@ public sealed class IngestExecutionReportCommandHandler
         }
         else
         {
-            var deployment = await _executionReportStore.GetControllerArtifactSetDeploymentAsync(command.DeploymentId.Value, cancellationToken)
+            var deployment = await _deploymentStore.GetControllerArtifactSetDeploymentAsync(command.DeploymentId.Value, cancellationToken)
                 ?? throw new DomainRuleException("Controller artifact-set deployment not found.");
 
             if (deployment.KioskId != command.KioskId || deployment.KioskExecutionEndpointId != command.EndpointId)
@@ -347,49 +378,53 @@ public sealed class IngestExecutionReportCommandHandler
 
         var status = ParseProductionStatus(command.Status);
         var physicalOutputState = ToPhysicalOutputState(command.PhysicalOutputMayHaveOccurred);
-        var productionRecord = await _executionReportStore.GetProductionExecutionRecordAsync(
-            edgeCommand.Id,
-            command.SourceProductionJobId,
-            cancellationToken);
-
-        var productionApplied = productionRecord is null;
-        if (productionRecord is null)
+        var productionApplied = false;
+        if (command.SourceProductionJobId.HasValue)
         {
-            productionRecord = ProductionExecutionRecord.Create(
+            var productionRecord = await _productionStore.GetProductionExecutionRecordAsync(
                 edgeCommand.Id,
-                endpoint.Id,
-                endpoint.ExecutionProfile,
-                sourceExecutorId,
-                command.SourceEventId,
-                command.SequenceNumber,
-                command.EdgeCreatedAt,
-                executorReportedAt,
-                cloudReceivedAt,
-                status,
-                physicalOutputState,
-                command.SourceProductionJobId,
-                command.WorkcellId,
-                command.ControllerId,
-                command.ExecutionPlanChecksum,
-                command.ActiveSetVersion,
-                command.ActiveSetChecksum,
-                command.ErrorCode,
-                command.ErrorMessage);
+                command.SourceProductionJobId.Value,
+                cancellationToken);
 
-            await _executionReportStore.AddProductionExecutionRecordAsync(productionRecord, cancellationToken);
-        }
-        else
-        {
-            productionApplied = productionRecord.ApplyObservation(
-                command.SourceEventId,
-                command.SequenceNumber,
-                command.EdgeCreatedAt,
-                executorReportedAt,
-                cloudReceivedAt,
-                status,
-                physicalOutputState,
-                command.ErrorCode,
-                command.ErrorMessage);
+            productionApplied = productionRecord is null;
+            if (productionRecord is null)
+            {
+                productionRecord = ProductionExecutionRecord.Create(
+                    edgeCommand.Id,
+                    endpoint.Id,
+                    endpoint.ExecutionProfile,
+                    sourceExecutorId,
+                    command.SourceEventId,
+                    command.SequenceNumber,
+                    command.EdgeCreatedAt,
+                    executorReportedAt,
+                    cloudReceivedAt,
+                    status,
+                    physicalOutputState,
+                    command.SourceProductionJobId.Value,
+                    command.WorkcellId,
+                    command.ControllerId,
+                    command.ExecutionPlanChecksum,
+                    command.ActiveSetVersion,
+                    command.ActiveSetChecksum,
+                    command.ErrorCode,
+                    command.ErrorMessage);
+
+                await _productionStore.AddProductionExecutionRecordAsync(productionRecord, cancellationToken);
+            }
+            else
+            {
+                productionApplied = productionRecord.ApplyObservation(
+                    command.SourceEventId,
+                    command.SequenceNumber,
+                    command.EdgeCreatedAt,
+                    executorReportedAt,
+                    cloudReceivedAt,
+                    status,
+                    physicalOutputState,
+                    command.ErrorCode,
+                    command.ErrorMessage);
+            }
         }
 
         var orderApplied = false;
@@ -454,7 +489,7 @@ public sealed class IngestExecutionReportCommandHandler
         }
 
         var customerStatus = MapCustomerStatus(status, command.PhysicalOutputMayHaveOccurred);
-        var orderRecord = await _executionReportStore.GetOrderExecutionRecordAsync(edgeCommand.Id, cancellationToken);
+        var orderRecord = await _productionStore.GetOrderExecutionRecordAsync(edgeCommand.Id, cancellationToken);
         if (orderRecord is null)
         {
             orderRecord = OrderExecutionRecord.Create(
@@ -475,7 +510,7 @@ public sealed class IngestExecutionReportCommandHandler
                 ExecutionObservationStatus.Fresh,
                 customerStatus);
 
-            await _executionReportStore.AddOrderExecutionRecordAsync(orderRecord, cancellationToken);
+            await _productionStore.AddOrderExecutionRecordAsync(orderRecord, cancellationToken);
             return true;
         }
 
@@ -509,7 +544,7 @@ public sealed class IngestExecutionReportCommandHandler
             return;
         }
 
-        var order = await _executionReportStore.GetOrderAsync(edgeCommand.OrderId.Value, cancellationToken)
+        var order = await _productionStore.GetOrderAsync(edgeCommand.OrderId.Value, cancellationToken)
             ?? throw new DomainRuleException("Order for production execution report was not found.");
         var previousStatus = order.Status;
 
@@ -537,7 +572,7 @@ public sealed class IngestExecutionReportCommandHandler
             return;
         }
 
-        await _executionReportStore.AddOrderStatusHistoryAsync(new OrderStatusHistory
+        await _productionStore.AddOrderStatusHistoryAsync(new OrderStatusHistory
         {
             OrderId = order.Id,
             FromStatus = previousStatus,
@@ -576,12 +611,12 @@ public sealed class IngestExecutionReportCommandHandler
     {
         foreach (var evidence in command.StockMovements)
         {
-            if (await _executionReportStore.StockMovementExistsAsync(evidence.SourceEventId, cancellationToken))
+            if (await _stockStore.StockMovementExistsAsync(evidence.SourceEventId, cancellationToken))
             {
                 continue;
             }
 
-            var state = await _executionReportStore.GetDispenserStateAsync(
+            var state = await _stockStore.GetDispenserStateAsync(
                 evidence.IngredientDispenserStateId,
                 cancellationToken)
                 ?? throw new DomainRuleException("Stock movement dispenser state was not found.");
@@ -621,7 +656,7 @@ public sealed class IngestExecutionReportCommandHandler
             movement.CorrelationId = edgeCommand.OrderId;
             movement.CausationId = command.SourceEventId;
 
-            await _executionReportStore.AddStockMovementAsync(movement, cancellationToken);
+            await _stockStore.AddStockMovementAsync(movement, cancellationToken);
             notifications.InventoryChanged.Add(new InventoryChangedEvent
             {
                 DispenserStateId = state.Id,
@@ -703,6 +738,16 @@ public sealed class IngestExecutionReportCommandHandler
             OccurredAt = command.EdgeCreatedAt,
             ReceivedAt = cloudReceivedAt
         };
+    }
+
+    private static bool MatchesReportIdentity(SyncEventInbox existing, SyncEventInbox candidate)
+    {
+        return existing.KioskId == candidate.KioskId &&
+               existing.CausationId == candidate.CausationId &&
+               existing.AggregateType == candidate.AggregateType &&
+               existing.AggregateId == candidate.AggregateId &&
+               string.Equals(existing.EventType, candidate.EventType, StringComparison.Ordinal) &&
+               string.Equals(existing.PayloadJson, candidate.PayloadJson, StringComparison.Ordinal);
     }
 
     private static ExecutionReportIngestResult BuildResult(

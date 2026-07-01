@@ -21,7 +21,7 @@ public partial class Menu : BusinessEntity, IKioskScoped
 
     public MenuStatus Status { get; set; } = MenuStatus.Draft;
 
-    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
+    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Organization;
 
     public string Currency { get; set; } = "VND";
 

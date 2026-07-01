@@ -208,6 +208,16 @@ Reason: duplicate movement corrupts ingredient balance. Do not retry by creating
 
 ### SyncEventInbox
 
+For `POST /api/v1/iot/execution-endpoints/{endpointId}/telemetry-events`, each successful heartbeat/device-event/local-log item records one processed inbox receipt keyed by envelope `eventId`. The typed destination is committed first and has its own dedup identity. This ordering deliberately permits safe repair: if destination commit succeeds but receipt recording is interrupted, the next retry observes the destination duplicate and records the missing receipt without repeating side effects. Production history uses `/production-sync/events` and its independent contiguous sequence checkpoint.
+
+ProductionEvent is the exception to the two-stage destination/receipt pattern: its `SyncEventInbox` row is the durable history record. `(SourceNodeId, SequenceNumber)` is unique, and `ProductionEventCheckpoint` advances only across contiguous committed rows. Events beyond a gap may be retained, but the acknowledged sequence does not skip the gap.
+
+For execution reports, `(SourceNodeId, EventId)` identifies one immutable report envelope. A retry is accepted as duplicate only when its command identity and normalized payload are identical. For production history, an existing event id must also match sequence, kiosk/job correlation, type, schema version, and payload. Reusing either identity with different content is a conflict, not an idempotent retry.
+
+Latest-state summaries have a separate idempotency boundary: `(SourceExecutorId, SummaryKind, StateRevision)`. Only a newer revision mutates `EdgeStateSummary`; stale summaries are ignored. Summary revision must never update the production-event checkpoint.
+
+Processed and ignored inbox receipts are retained for 180 days by default. This is the guaranteed Cloud transport-dedup window for raw batch replay; Edge must not expect an event replayed after that window to retain its old receipt. Some typed business destinations have stronger independent dedup rules, but callers must not assume that for every event type. Failed, processing, received, dead-lettered, or dead-letter-referenced inbox rows are not automatically purged.
+
 Already has several required fields.
 
 Recommended fields:
@@ -226,6 +236,30 @@ Recommended unique constraint:
 - `SourceNodeId + EventId`
 
 Reason: inbox is the primary deduplication boundary for edge-cloud sync.
+
+### Sync Dead-Letter Recovery
+
+Management endpoints:
+
+```text
+GET  /api/v1/management/sync-dead-letters
+GET  /api/v1/management/sync-dead-letters/{id}
+POST /api/v1/management/sync-dead-letters/{id}/retry
+POST /api/v1/management/sync-dead-letters/{id}/resolve
+POST /api/v1/management/sync-dead-letters/{id}/ignore
+```
+
+V1 is SystemAdmin-only. Every retry creates an immutable
+`SyncDeadLetterRetryAttempt` containing actor, reason, attempt number, result,
+and timestamps. Retry is allowed only when a registered typed replay contract
+can reconstruct the command safely. V1 supports `ExecutionReport.*`; unknown or
+receipt-only event types return `422` and remain Open. There is no generic JSON
+reflection dispatcher.
+
+Retry reuses the original source event identity and linked `SyncEventInbox`.
+Success marks the inbox Processed and resolves the dead letter. Failure returns
+the dead letter to Open and records the failed attempt. Resolve/ignore are
+manual terminal decisions and require operator notes.
 
 Current audit conclusion:
 
@@ -246,6 +280,8 @@ Recommended unique constraint:
 - or `NodeId + HeartbeatSequence`
 
 Reason: duplicate heartbeat is low risk, but dedupe keeps monitoring data clean.
+
+Unique lower-sequence heartbeats may be stored as delayed evidence, but only the highest sequence for an origin may update current connectivity or `LastOnlineAt`. This prevents delayed delivery from rewinding the Cloud projection.
 
 ## Entities That Need Retry
 

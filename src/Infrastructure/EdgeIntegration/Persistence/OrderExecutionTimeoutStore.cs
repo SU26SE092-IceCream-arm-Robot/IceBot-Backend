@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using Application.EdgeIntegration.Abstractions;
 using Domain.Devices.Entities;
 using Domain.Orders.Entities;

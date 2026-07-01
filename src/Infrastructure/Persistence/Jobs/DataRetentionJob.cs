@@ -1,80 +1,59 @@
-using Infrastructure.Data;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Persistence.Jobs;
 
 public sealed class DataRetentionJob : BackgroundService
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly DataRetentionOptions _options;
     private readonly ILogger<DataRetentionJob> _logger;
-    private static readonly TimeSpan Interval = TimeSpan.FromHours(24);
 
-    public DataRetentionJob(IServiceScopeFactory scopeFactory, ILogger<DataRetentionJob> logger)
+    public DataRetentionJob(
+        IServiceScopeFactory scopeFactory,
+        IOptions<DataRetentionOptions> options,
+        ILogger<DataRetentionJob> logger)
     {
         _scopeFactory = scopeFactory;
+        _options = options.Value;
         _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Data retention background job started.");
+        if (!_options.Enabled) return;
 
-        while (!stoppingToken.IsCancellationRequested)
+        using var timer = new PeriodicTimer(TimeSpan.FromHours(_options.IntervalHours));
+        do
         {
-            try
-            {
-                await RunRetentionPurgeAsync(stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred during data retention purge.");
-            }
-
-            try
-            {
-                await Task.Delay(Interval, stoppingToken);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+            await RunAsync(stoppingToken);
         }
-
-        _logger.LogInformation("Data retention background job stopped.");
+        while (await timer.WaitForNextTickAsync(stoppingToken));
     }
 
-    private async Task RunRetentionPurgeAsync(CancellationToken cancellationToken)
+    private async Task RunAsync(CancellationToken cancellationToken)
     {
-        using var scope = _scopeFactory.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<IceBotDbContext>();
-
-        var now = DateTimeOffset.UtcNow;
-        var heartbeatThreshold = now.AddDays(-30);
-        var deviceEventThreshold = now.AddDays(-90);
-
-        _logger.LogInformation("Purging raw heartbeats older than {HeartbeatThreshold} and device events older than {DeviceEventThreshold}...", heartbeatThreshold, deviceEventThreshold);
-
-        // Batch delete raw heartbeats older than 30 days by heartbeat reporting time.
-        var deletedHeartbeats = await dbContext.KioskHeartbeats
-            .Where(x => x.ReportedAt < heartbeatThreshold)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        // Batch delete raw device events older than 90 days by event occurrence time.
-        var deletedDeviceEvents = await dbContext.DeviceEvents
-            .Where(x => x.OccurredAt < deviceEventThreshold)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        var deletedExecutionRequestNonces = await dbContext.ExecutionEndpointRequestNonces
-            .Where(x => x.ExpiresAt < now)
-            .ExecuteDeleteAsync(cancellationToken);
-
-        _logger.LogInformation(
-            "Purge completed. Deleted {DeletedHeartbeats} heartbeats, {DeletedDeviceEvents} device events, and {DeletedExecutionRequestNonces} expired execution request nonces.",
-            deletedHeartbeats,
-            deletedDeviceEvents,
-            deletedExecutionRequestNonces);
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var purger = scope.ServiceProvider.GetRequiredService<DataRetentionPurger>();
+            var result = await purger.PurgeAsync(DateTimeOffset.UtcNow, cancellationToken);
+            _logger.LogInformation(
+                "Retention purge deleted {Heartbeats} heartbeats, {DeviceEvents} device events, {OperationLogs} operation logs, {SyncInboxReceipts} processed inbox receipts, and {ExecutionRequestNonces} expired request nonces.",
+                result.Heartbeats,
+                result.DeviceEvents,
+                result.OperationLogs,
+                result.SyncInboxReceipts,
+                result.ExecutionRequestNonces);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Data retention purge failed.");
+        }
     }
 }

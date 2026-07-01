@@ -44,7 +44,6 @@ internal static class ExecutionAttemptResultMapper
         return new ProductionExecutionResult
         {
             Id = record.Id,
-            IsOrderSummary = !record.SourceProductionJobId.HasValue,
             SourceProductionJobId = record.SourceProductionJobId,
             WorkcellId = record.WorkcellId,
             ControllerId = record.ControllerId,

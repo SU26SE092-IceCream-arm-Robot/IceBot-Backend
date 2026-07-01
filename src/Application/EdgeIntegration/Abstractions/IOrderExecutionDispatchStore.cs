@@ -1,7 +1,9 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Entities;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.Sync.Entities;
+using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Application.EdgeIntegration.Abstractions;
 
@@ -20,6 +22,10 @@ public interface IOrderExecutionDispatchStore
 
     Task<IReadOnlyList<KioskExecutionEndpoint>> ListActiveEndpointsAsync(
         Guid kioskId,
+        CancellationToken cancellationToken = default);
+
+    Task<ExecutionEndpointReadinessProjection?> GetReadinessAsync(
+        Guid endpointId,
         CancellationToken cancellationToken = default);
 
     Task<ConfigurationRelease?> GetReleaseAsync(Guid releaseId, CancellationToken cancellationToken = default);

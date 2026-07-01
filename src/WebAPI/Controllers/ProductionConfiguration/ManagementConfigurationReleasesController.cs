@@ -73,7 +73,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("organizations/{organizationId:guid}/configuration-release-authoring-options")]
+    [HttpGet("organizations/{organizationId:guid}/configuration-releases/authoring-options")]
     [Authorize(Policy = "release.read")]
     public async Task<IActionResult> GetConfigurationReleaseAuthoringOptions(
         Guid organizationId,

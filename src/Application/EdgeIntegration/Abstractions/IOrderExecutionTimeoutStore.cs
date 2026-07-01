@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using Domain.Devices.Entities;
 using Domain.Orders.Entities;
 using Domain.ProductionExecution.Projections;

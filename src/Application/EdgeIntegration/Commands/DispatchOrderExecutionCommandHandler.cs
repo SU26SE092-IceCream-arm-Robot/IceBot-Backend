@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using System.Text.Json;
 using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Results;
@@ -188,7 +189,7 @@ public sealed class DispatchOrderExecutionCommandHandler
         if (candidates.Count == 0)
         {
             return ApiResult<OrderExecutionDispatchResult>.Fail(
-                "No active execution endpoint configuration covers every machine-produced order item.", 409);
+                "No ready, safe execution endpoint with compatible capabilities and active configuration covers every machine-produced order item.", 409);
         }
 
         if (candidates.Count > 1)
@@ -260,6 +261,15 @@ public sealed class DispatchOrderExecutionCommandHandler
         IReadOnlyCollection<OrderItem> productionItems,
         CancellationToken cancellationToken)
     {
+        var readiness = await _store.GetReadinessAsync(endpoint.Id, cancellationToken);
+        if (readiness is null || readiness.Readiness != ExecutionReadinessState.Ready ||
+            readiness.Activity != ExecutionActivityState.Idle || readiness.Safety != ExecutionSafetyState.Safe)
+        {
+            return null;
+        }
+        var availableCapabilities = readiness.Capabilities.Where(x => x.IsAvailable)
+            .Select(x => x.CapabilityCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
         Guid? releaseId = endpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
             ? endpoint.ActiveConfigurationReleaseId
             : endpoint.ActiveArtifactSetReleaseId;
@@ -319,6 +329,11 @@ public sealed class DispatchOrderExecutionCommandHandler
             }
 
             if (bindings.Length == 0)
+            {
+                return null;
+            }
+
+            if (bindings.Any(binding => !availableCapabilities.Contains(binding.RequiredWorkcellCapabilityCode)))
             {
                 return null;
             }

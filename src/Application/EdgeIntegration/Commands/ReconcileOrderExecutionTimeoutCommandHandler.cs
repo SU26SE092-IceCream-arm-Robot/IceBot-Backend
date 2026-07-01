@@ -10,6 +10,7 @@ using Domain.ProductionExecution.Enums;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
+using Application.EdgeIntegration.Observability;
 
 namespace Application.EdgeIntegration.Commands;
 
@@ -47,6 +48,10 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
 
         if (notifications?.OrderExecutionObservationChanged is not null)
         {
+            IceBotEdgeMetrics.RecordObservationTransition(
+                notifications.OrderExecutionObservationChanged.ObservationStatus,
+                notifications.OrderExecutionObservationChanged.CustomerExecutionStatus,
+                command.ObservedAt - notifications.OrderExecutionObservationChanged.LastExecutorReportedAt);
             await _publisher.PublishOrderExecutionObservationChangedAsync(
                 notifications.OrderExecutionObservationChanged,
                 cancellationToken);

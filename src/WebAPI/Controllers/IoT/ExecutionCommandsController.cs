@@ -9,7 +9,7 @@ namespace WebAPI.Controllers.IoT;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/iot/kiosks/{kioskId:guid}/commands")]
+[Route("api/v{version:apiVersion}/iot/execution-endpoints/{endpointId:guid}/commands")]
 public sealed class ExecutionCommandsController : ControllerBase
 {
     private readonly PullEdgeCommandsCommandHandler _pullCommandsHandler;
@@ -28,17 +28,16 @@ public sealed class ExecutionCommandsController : ControllerBase
 
     [HttpPost("pull")]
     public async Task<IActionResult> PullCommands(
-        Guid kioskId,
-        [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
+        Guid endpointId,
         [FromBody] PullEdgeCommandsRequest request,
         CancellationToken cancellationToken)
     {
-        var authentication = await _authenticator.AuthenticateAsync(HttpContext, kioskId, endpointId, cancellationToken);
+        var authentication = await _authenticator.AuthenticateAsync(HttpContext, endpointId, cancellationToken);
         if (!authentication.Succeeded) return Unauthorized(ApiResult<object>.Fail(authentication.Message, 401));
 
         var command = new PullEdgeCommandsCommand
         {
-            KioskId = kioskId,
+            KioskId = authentication.Endpoint!.KioskId,
             EndpointId = endpointId,
             MaxCommands = request.MaxCommands,
             EdgeTime = request.EdgeTime
@@ -50,18 +49,17 @@ public sealed class ExecutionCommandsController : ControllerBase
 
     [HttpPost("{commandId:guid}/ack")]
     public async Task<IActionResult> AcknowledgeCommand(
-        Guid kioskId,
+        Guid endpointId,
         Guid commandId,
-        [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
         [FromBody] AcknowledgeEdgeCommandRequest request,
         CancellationToken cancellationToken)
     {
-        var authentication = await _authenticator.AuthenticateAsync(HttpContext, kioskId, endpointId, cancellationToken);
+        var authentication = await _authenticator.AuthenticateAsync(HttpContext, endpointId, cancellationToken);
         if (!authentication.Succeeded) return Unauthorized(ApiResult<object>.Fail(authentication.Message, 401));
 
         var command = new AcknowledgeEdgeCommandCommand
         {
-            KioskId = kioskId,
+            KioskId = authentication.Endpoint!.KioskId,
             EndpointId = endpointId,
             CommandId = commandId,
             AckStatus = request.AckStatus,

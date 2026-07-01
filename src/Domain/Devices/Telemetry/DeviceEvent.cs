@@ -1,8 +1,9 @@
 using Domain.Common;
+using Domain.Devices.Entities;
 using Domain.Common.Enums;
 using Domain.Tenants.Entities;
 
-namespace Domain.Devices.Entities;
+namespace Domain.Devices.Telemetry;
 
 public partial class DeviceEvent : AppendOnlySyncEntity
 {

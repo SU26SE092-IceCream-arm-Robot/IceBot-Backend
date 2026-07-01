@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
 using Domain.Devices.Entities;
 using Infrastructure.Data;

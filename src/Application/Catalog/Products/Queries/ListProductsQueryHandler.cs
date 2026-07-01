@@ -2,6 +2,7 @@ using Application.Catalog.Abstractions;
 using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.Catalog.Products.Queries;
 
@@ -20,16 +21,20 @@ public sealed class ListProductsQueryHandler
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var effectiveScope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.ProductsManage, query.UserContext);
+        var canReadGlobalTemplates = query.UserContext.IsSystemAdmin || query.UserContext.RoleScopes.Any(scope =>
+            ScopeRoleSets.ProductTemplatesRead.Contains(scope.RoleCode, StringComparer.OrdinalIgnoreCase));
 
         var totalCount = await _products.CountProductsAsync(
             query.Search,
             query.OrganizationId,
             query.StoreId,
             query.KioskId,
-            query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            query.GlobalTemplatesOnly,
+            query.UserContext.IsSystemAdmin || (query.GlobalTemplatesOnly && canReadGlobalTemplates),
+            effectiveScope.OrganizationIds,
+            effectiveScope.StoreIds,
+            effectiveScope.KioskIds,
             cancellationToken);
 
         var products = await _products.ListProductsAsync(
@@ -37,10 +42,11 @@ public sealed class ListProductsQueryHandler
             query.OrganizationId,
             query.StoreId,
             query.KioskId,
-            query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            query.GlobalTemplatesOnly,
+            query.UserContext.IsSystemAdmin || (query.GlobalTemplatesOnly && canReadGlobalTemplates),
+            effectiveScope.OrganizationIds,
+            effectiveScope.StoreIds,
+            effectiveScope.KioskIds,
             pageNumber,
             pageSize,
             cancellationToken);

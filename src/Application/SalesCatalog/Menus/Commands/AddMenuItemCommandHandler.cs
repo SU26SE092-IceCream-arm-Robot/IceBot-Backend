@@ -31,9 +31,16 @@ public sealed class AddMenuItemCommandHandler
             return ApiResult<MenuItemResult>.Fail("Menu not found.", 404);
         }
 
+        var accessError = MenuManagementCommandRules.ValidateExisting<MenuItemResult>(command.Scope, menu);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var validationError = await MenuItemRequestValidator.ValidateMenuItemFieldsAsync(
             _menus,
             menu.Id,
+            command.Scope.OrganizationId,
             request.ProductId,
             request.ProductVariantId,
             request.RecipeId,

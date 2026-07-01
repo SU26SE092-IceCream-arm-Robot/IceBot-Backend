@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.Sync.Enums;
 
@@ -23,7 +24,7 @@ public class EdgeCommand : AuditedEntity
     public DateTimeOffset? RespondedAt { get; private set; }
     public IReadOnlyCollection<EdgeCommandDeliveryAttempt> DeliveryAttempts => _deliveryAttempts;
 
-    public virtual Domain.Devices.Entities.KioskExecutionEndpoint TargetExecutionEndpoint { get; private set; } = null!;
+    public virtual Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint TargetExecutionEndpoint { get; private set; } = null!;
 
     private EdgeCommand()
     {

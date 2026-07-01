@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
 using Application.ProductionConfiguration;
 using Application.ProductionConfiguration.Abstractions;
@@ -37,7 +38,7 @@ public sealed class DeploymentReleaseLifecycleTests
         store.GetPublishedReleaseForDeploymentAsync(release.Id, Arg.Any<CancellationToken>())
             .Returns(release);
         store.GetEndpointForDeploymentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
-            .Returns((Domain.Devices.Entities.KioskExecutionEndpoint?)null);
+            .Returns((Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint?)null);
         var handler = CreateHandler(store);
 
         var result = await handler.HandleAsync(Command(release.Id, Guid.NewGuid()));

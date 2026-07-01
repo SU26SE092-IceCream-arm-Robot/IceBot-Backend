@@ -41,6 +41,7 @@ public sealed class DeploymentStateTests
             Guid.NewGuid(),
             Guid.NewGuid(),
             Guid.NewGuid(),
+            Guid.NewGuid(),
             new string('d', 64),
             1,
             Guid.NewGuid().ToString("N"),

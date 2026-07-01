@@ -1,9 +1,11 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.Devices.Abstractions;
 using Application.Devices.Mapping;
 using Application.Devices.Results;
 using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
 using Domain.Common;
+using Domain.Devices.Enums;
 
 namespace Application.Devices.Commands;
 
@@ -11,7 +13,7 @@ internal static class ExecutionEndpointLifecycleHandler
 {
     public static async Task<ApiResult<ExecutionEndpointResult>> HandleAsync(
         IExecutionEndpointStore store, CurrentUserContext userContext, Guid endpointId,
-        Action<Domain.Devices.Entities.KioskExecutionEndpoint> transition, string message,
+        Action<Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint> transition, string message,
         CancellationToken cancellationToken)
     {
         var loaded = await ExecutionEndpointCommandRules.LoadAccessibleAsync(store, userContext, endpointId, cancellationToken);
@@ -51,5 +53,10 @@ public sealed class RetireExecutionEndpointCommandHandler
     private readonly IExecutionEndpointStore _store;
     public RetireExecutionEndpointCommandHandler(IExecutionEndpointStore store) => _store = store;
     public Task<ApiResult<ExecutionEndpointResult>> HandleAsync(RetireExecutionEndpointCommand command, CancellationToken cancellationToken = default) =>
-        ExecutionEndpointLifecycleHandler.HandleAsync(_store, command.UserContext, command.EndpointId, endpoint => endpoint.Retire(), "Execution endpoint retired successfully.", cancellationToken);
+        ExecutionEndpointLifecycleHandler.HandleAsync(_store, command.UserContext, command.EndpointId, endpoint =>
+        {
+            if (endpoint.MqttCredential is not null && endpoint.MqttCredential.Status != ExecutionEndpointMqttCredentialStatus.Revoked)
+                throw new DomainRuleException("Revoke the MQTT credential before retiring the execution endpoint.");
+            endpoint.Retire();
+        }, "Execution endpoint retired successfully.", cancellationToken);
 }

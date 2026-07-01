@@ -87,7 +87,39 @@ Dashboard and OTel act as your "radar" (showing what failed and where). Debug bo
 - When `Enabled: true`, it safely truncates payloads over `MaxBodyLength` and masks sensitive fields (like passwords/tokens).
 - Authentication, password, and webhook endpoints are explicitly ignored by the middleware for safety.
 
-## 4. Production Guidance
+## 4. Edge Runtime Metrics
+
+The `IceBot.EdgeIntegration` meter is registered with the existing OpenTelemetry metrics pipeline. These metrics describe machine-integration latency and failure; ASP.NET instrumentation continues to own ordinary HTTP duration/error metrics.
+
+| Metric | Type | Meaning | Bounded tags |
+| --- | --- | --- | --- |
+| `icebot.mqtt.wakeup.publish.attempts` | Counter | MQTT wake-up outcomes, including disabled/succeeded/failed | `outcome`, `command.type` |
+| `icebot.edge.command.pull.latency` | Histogram (seconds) | Durable command creation until it is returned by command pull | `command.type` |
+| `icebot.edge.command.ack.latency` | Histogram (seconds) | Command delivery until Cloud receives the first state-changing ACK | `command.type`, `ack.status` |
+| `icebot.edge.execution.report.lag` | Histogram (seconds) | Executor-reported timestamp until Cloud receives a new report | `report.type` |
+| `icebot.edge.execution.observation.transitions` | Counter | Transitions to stale/unreachable customer observations | `observation.status`, `customer.status` |
+| `icebot.edge.execution.stale.age` | Histogram (seconds) | Age of the last executor report at stale/unreachable transition | `observation.status` |
+| `icebot.edge.execution.observed` | Observable gauge | Current active execution projections that are Stale or Unreachable | `observation.status` |
+
+Rules:
+
+- Metrics are recorded only after their owning database commit succeeds.
+- Duplicate ACKs and duplicate execution reports do not add latency/transition measurements.
+- The stale/unreachable gauge is refreshed from PostgreSQL every 30 seconds; it is not an in-memory lifecycle counter.
+- IDs such as command, order, kiosk, endpoint, or device must never be metric tags. Use traces/logs for entity-level investigation.
+- MQTT disabled is an explicit outcome, not a publish failure. Alert only on `outcome=failed` when MQTT is expected to be enabled.
+
+Suggested initial alerts:
+
+- sustained increase of MQTT `failed` outcomes;
+- p95 pull or ACK latency above the command expiry budget;
+- p95 report lag above the report reconciliation threshold;
+- non-zero Unreachable gauge for a sustained interval;
+- growing Stale gauge combined with low heartbeat freshness.
+
+Exact thresholds are deployment-specific and should be tuned from observed baselines rather than hardcoded in application code.
+
+## 5. Production Guidance
 
 For production environments:
 1. **Logs**: Continue using Serilog. You can add a Serilog sink to export directly to Seq, Loki, or Elasticsearch.

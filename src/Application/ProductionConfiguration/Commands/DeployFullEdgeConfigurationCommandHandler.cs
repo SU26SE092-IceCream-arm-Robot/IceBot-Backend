@@ -101,6 +101,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                 endpoint, endpoint.FullEdgeRuntimeId ?? Guid.Empty, allowRetiredRelease: command.IsRollback);
             var deployment = KioskConfigurationDeployment.CreatePending(
                 endpoint.KioskId,
+                endpoint.Kiosk.OrganizationId,
                 endpoint.Id,
                 endpoint.FullEdgeRuntimeId!.Value,
                 release.Id,

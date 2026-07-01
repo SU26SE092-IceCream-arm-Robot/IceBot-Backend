@@ -22,6 +22,12 @@ public sealed class DeleteMenuCommandHandler
             return ApiResult<bool>.Fail("Menu not found.", 404);
         }
 
+        var accessError = MenuManagementCommandRules.ValidateExisting<bool>(command.Scope, menu);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var now = DateTimeOffset.UtcNow;
         menu.DeletedAt = now;
         menu.DeletedByAccountId = command.DeletedByAccountId;

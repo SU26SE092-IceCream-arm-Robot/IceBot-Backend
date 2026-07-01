@@ -91,6 +91,7 @@ internal static class ProductRequestValidator
     public static async Task<string?> ValidateCreateRequestAsync(
         IProductStore products,
         CreateProductRequest request,
+        Guid? organizationId,
         CancellationToken cancellationToken)
     {
         var validationError = await ValidateProductFieldsAsync(
@@ -101,7 +102,7 @@ internal static class ProductRequestValidator
             request.Currency,
             request.PreparationTimeSeconds,
             request.ScopeType,
-            request.OrganizationId,
+            organizationId,
             request.StoreId,
             request.KioskId,
             request.CategoryId,

@@ -1,10 +1,13 @@
 using Domain.Common;
+using Domain.Devices.Entities;
 
-namespace Domain.Devices.Entities;
+namespace Domain.Devices.ExecutionEndpoints;
 
 public class ExecutionEndpointSupportedRobotTarget : AuditedEntity
 {
     public Guid KioskExecutionEndpointId { get; private set; }
+
+    public Guid KioskId { get; private set; }
 
     public string RuntimeTargetCode { get; private set; } = null!;
 
@@ -22,11 +25,12 @@ public class ExecutionEndpointSupportedRobotTarget : AuditedEntity
 
     internal static ExecutionEndpointSupportedRobotTarget Create(
         Guid kioskExecutionEndpointId,
+        Guid kioskId,
         string runtimeTargetCode,
         string machineModelCode,
         Device? device = null)
     {
-        if (kioskExecutionEndpointId == Guid.Empty ||
+        if (kioskExecutionEndpointId == Guid.Empty || kioskId == Guid.Empty ||
             string.IsNullOrWhiteSpace(runtimeTargetCode) ||
             string.IsNullOrWhiteSpace(machineModelCode))
         {
@@ -36,6 +40,7 @@ public class ExecutionEndpointSupportedRobotTarget : AuditedEntity
         return new ExecutionEndpointSupportedRobotTarget
         {
             KioskExecutionEndpointId = kioskExecutionEndpointId,
+            KioskId = kioskId,
             RuntimeTargetCode = runtimeTargetCode.Trim(),
             MachineModelCode = machineModelCode.Trim(),
             DeviceId = device?.Id,

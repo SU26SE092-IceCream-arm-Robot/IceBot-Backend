@@ -13,14 +13,9 @@ namespace WebAPI.Controllers.Identity;
 public sealed class ManagementRolesController : ControllerBase
 {
     private readonly ListManagementRolesQueryHandler _listRolesHandler;
-    private readonly GetPermissionMatrixQueryHandler _permissionMatrixHandler;
-
-    public ManagementRolesController(
-        ListManagementRolesQueryHandler listRolesHandler,
-        GetPermissionMatrixQueryHandler permissionMatrixHandler)
+    public ManagementRolesController(ListManagementRolesQueryHandler listRolesHandler)
     {
         _listRolesHandler = listRolesHandler;
-        _permissionMatrixHandler = permissionMatrixHandler;
     }
 
     [HttpGet("roles")]
@@ -40,12 +35,4 @@ public sealed class ManagementRolesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("permission-matrix")]
-    [Authorize(Policy = "roles.view")]
-    public async Task<IActionResult> GetPermissionMatrix(CancellationToken cancellationToken)
-    {
-        var query = new GetPermissionMatrixQuery();
-        var result = await _permissionMatrixHandler.HandleAsync(query, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
 }

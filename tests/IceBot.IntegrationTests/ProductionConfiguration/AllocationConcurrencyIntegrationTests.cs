@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using System.Reflection;
 using Domain.Common.Enums;
 using Domain.Devices.Entities;
@@ -75,6 +76,7 @@ public sealed class AllocationConcurrencyIntegrationTests
                     cancellationToken);
                 var deployment = KioskConfigurationDeployment.CreatePending(
                     graph.KioskId,
+                    graph.OrganizationId,
                     graph.EndpointId,
                     graph.EdgeRuntimeId,
                     graph.ReleaseId,
@@ -138,7 +140,7 @@ public sealed class AllocationConcurrencyIntegrationTests
         endpoint.Activate(edgeRuntimeId, DateTimeOffset.UtcNow);
         dbContext.ExecutionEndpointCredentialBindings.Add(credential);
         await dbContext.SaveChangesAsync();
-        return new FullEdgeGraph(kiosk.Id, endpoint.Id, edgeRuntimeId, release.Id, checksum);
+        return new FullEdgeGraph(organization.Id, kiosk.Id, endpoint.Id, edgeRuntimeId, release.Id, checksum);
     }
 
     private static Organization NewOrganization() => new()
@@ -158,6 +160,7 @@ public sealed class AllocationConcurrencyIntegrationTests
     }
 
     private sealed record FullEdgeGraph(
+        Guid OrganizationId,
         Guid KioskId,
         Guid EndpointId,
         Guid EdgeRuntimeId,

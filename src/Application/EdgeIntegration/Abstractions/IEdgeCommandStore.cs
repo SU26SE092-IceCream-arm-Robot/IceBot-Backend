@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Sync.Entities;
 using Domain.ProductionExecution.Projections;
 
@@ -5,7 +6,7 @@ namespace Application.EdgeIntegration.Abstractions;
 
 public interface IEdgeCommandStore
 {
-    Task<Domain.Devices.Entities.KioskExecutionEndpoint?> GetEndpointForCommandAuthAsync(
+    Task<Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint?> GetEndpointForCommandAuthAsync(
         Guid endpointId,
         CancellationToken cancellationToken = default);
 

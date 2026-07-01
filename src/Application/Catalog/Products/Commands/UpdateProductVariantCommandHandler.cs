@@ -25,6 +25,18 @@ public sealed class UpdateProductVariantCommandHandler
         var request = command.Request;
         var updatedByAccountId = command.UpdatedByAccountId;
 
+        var product = await _products.GetProductByIdAsync(productId, cancellationToken: cancellationToken);
+        if (product is null)
+        {
+            return ApiResult<ProductVariantResult>.Fail("Product not found.", 404);
+        }
+
+        var accessError = ProductManagementCommandRules.ValidateExisting<ProductVariantResult>(command.Scope, product);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var variant = await _products.GetProductVariantByIdAsync(productId, variantId, asNoTracking: false, cancellationToken: cancellationToken);
         if (variant is null)
         {

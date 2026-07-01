@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using System.Text.Json;
 using Application.EdgeIntegration.Abstractions;
 using Application.ProductionConfiguration.Abstractions;
@@ -138,6 +139,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
 
             var deployment = ControllerArtifactSetDeployment.CreatePending(
                 endpoint.KioskId,
+                endpoint.Kiosk.OrganizationId,
                 endpoint.Id,
                 endpoint.ControllerId!.Value,
                 release.Id,
@@ -258,7 +260,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     }
 
     private static IReadOnlyCollection<ControllerArtifactSetItemSnapshot> MaterializeItems(
-        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         ConfigurationRelease release,
         IReadOnlyCollection<DeployLowCostArtifactSelection> selections)
     {

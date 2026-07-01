@@ -3,6 +3,7 @@ using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
+using Domain.Tenants.Enums;
 
 namespace Application.Catalog.Products.Queries;
 
@@ -25,13 +26,25 @@ public sealed class GetProductQueryHandler
             return ApiResult<ProductResult>.Fail("Product not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProductsManage,
-            query.UserContext,
-            product.OrganizationId,
-            product.StoreId,
-            product.KioskId))
+        if (query.IsGlobalTemplate)
         {
-            return ApiResult<ProductResult>.Fail("Access denied.", 403);
+            var canReadTemplates = query.UserContext.IsSystemAdmin || query.UserContext.RoleScopes.Any(scope =>
+                ScopeRoleSets.ProductTemplatesRead.Contains(scope.RoleCode, StringComparer.OrdinalIgnoreCase));
+            if (!canReadTemplates || product.ScopeType != TenantScopeType.Global || product.OrganizationId is not null)
+            {
+                return ApiResult<ProductResult>.Fail("Product template not found.", 404);
+            }
+        }
+        else if (!query.OrganizationId.HasValue ||
+                 product.OrganizationId != query.OrganizationId ||
+                 product.ScopeType == TenantScopeType.Global ||
+                 !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ProductsManage,
+                     query.UserContext,
+                     product.OrganizationId,
+                     product.StoreId,
+                     product.KioskId))
+        {
+            return ApiResult<ProductResult>.Fail("Product not found.", 404);
         }
 
         return ApiResult<ProductResult>.Success(ProductResultMapper.ToResult(product));

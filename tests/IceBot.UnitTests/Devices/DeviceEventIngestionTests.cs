@@ -16,6 +16,7 @@ public sealed class DeviceEventIngestionTests
         var store = Substitute.For<IEdgeTelemetryIngestionStore>();
         var handler = new IngestDeviceEventCommandHandler(
             store,
+            Substitute.For<IAlertIngestionStore>(),
             Substitute.For<IRealtimeNotificationPublisher>(),
             Options.Create(new EdgeTelemetryIngestionOptions()));
 

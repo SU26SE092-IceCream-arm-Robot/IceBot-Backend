@@ -30,11 +30,13 @@ public sealed class UpdateProductCommandHandler
             return ApiResult<ProductResult>.Fail("Product not found.", 404);
         }
 
+        var accessError = ProductManagementCommandRules.ValidateExisting<ProductResult>(command.Scope, product);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var newCode = string.IsNullOrWhiteSpace(request.Code) ? product.Code : ProductNormalizer.NormalizeCode(request.Code);
-        var newOrganizationId = request.OrganizationId ?? product.OrganizationId;
-        var newStoreId = request.StoreId ?? product.StoreId;
-        var newKioskId = request.KioskId ?? product.KioskId;
-        var newScopeType = request.ScopeType ?? product.ScopeType;
 
         var validationError = await ProductRequestValidator.ValidateProductFieldsAsync(
             _products,
@@ -43,10 +45,10 @@ public sealed class UpdateProductCommandHandler
             request.BasePrice ?? product.BasePrice,
             request.Currency ?? product.Currency,
             request.PreparationTimeSeconds ?? product.PreparationTimeSeconds,
-            newScopeType,
-            newOrganizationId,
-            newStoreId,
-            newKioskId,
+            product.ScopeType,
+            product.OrganizationId,
+            product.StoreId,
+            product.KioskId,
             request.CategoryId ?? product.CategoryId,
             productId,
             cancellationToken);
@@ -56,10 +58,6 @@ public sealed class UpdateProductCommandHandler
             return ApiResult<ProductResult>.Fail(validationError);
         }
 
-        product.OrganizationId = newOrganizationId;
-        product.StoreId = newStoreId;
-        product.KioskId = newKioskId;
-        product.TemplateProductId = request.TemplateProductId ?? product.TemplateProductId;
         product.CategoryId = request.CategoryId ?? product.CategoryId;
         product.Code = newCode;
         product.Name = string.IsNullOrWhiteSpace(request.Name) ? product.Name : request.Name.Trim();
@@ -76,7 +74,6 @@ public sealed class UpdateProductCommandHandler
         product.PreparationTimeSeconds = request.PreparationTimeSeconds ?? product.PreparationTimeSeconds;
         product.ImageUrl = request.ImageUrl is null ? product.ImageUrl : ProductNormalizer.TrimToNull(request.ImageUrl);
         product.MetadataJson = request.MetadataJson is null ? product.MetadataJson : ProductNormalizer.TrimToNull(request.MetadataJson);
-        product.ScopeType = newScopeType;
         product.UpdatedAt = DateTimeOffset.UtcNow;
         product.UpdatedByAccountId = updatedByAccountId;
 

@@ -9,6 +9,7 @@ public interface IProductStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool globalTemplatesOnly,
         bool isSystemAdmin,
         IReadOnlySet<Guid> allowedOrganizationIds,
         IReadOnlySet<Guid> allowedStoreIds,
@@ -20,6 +21,7 @@ public interface IProductStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool globalTemplatesOnly,
         bool isSystemAdmin,
         IReadOnlySet<Guid> allowedOrganizationIds,
         IReadOnlySet<Guid> allowedStoreIds,
@@ -54,6 +56,12 @@ public interface IProductStore
         CancellationToken cancellationToken = default);
 
     Task<bool> ProductCategoryExistsAsync(long categoryId, CancellationToken cancellationToken = default);
+
+    Task<bool> TenantScopeExistsAsync(
+        Guid organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        CancellationToken cancellationToken = default);
 
     Task AddProductAsync(Product product, CancellationToken cancellationToken = default);
 

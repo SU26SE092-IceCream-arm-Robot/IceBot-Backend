@@ -25,13 +25,15 @@ public sealed class GetMenuQueryHandler
             return ApiResult<MenuResult>.Fail("Menu not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.MenusManage,
+        if (menu.OrganizationId != query.OrganizationId ||
+            menu.ScopeType == Domain.Tenants.Enums.TenantScopeType.Global ||
+            !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.MenusManage,
             query.UserContext,
             menu.OrganizationId,
             menu.StoreId,
             menu.KioskId))
         {
-            return ApiResult<MenuResult>.Fail("Access denied.", 403);
+            return ApiResult<MenuResult>.Fail("Menu not found.", 404);
         }
 
         return ApiResult<MenuResult>.Success(MenuResultMapper.ToResult(menu));

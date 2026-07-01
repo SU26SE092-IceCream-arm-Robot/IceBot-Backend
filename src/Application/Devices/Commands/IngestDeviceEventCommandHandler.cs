@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using System.Text.Json;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
@@ -17,15 +18,18 @@ public sealed class IngestDeviceEventCommandHandler
 {
     private const int MaxPayloadCharacters = 16 * 1024;
     private readonly IEdgeTelemetryIngestionStore _store;
+    private readonly IAlertIngestionStore _alertStore;
     private readonly IRealtimeNotificationPublisher _publisher;
     private readonly EdgeTelemetryIngestionOptions _options;
 
     public IngestDeviceEventCommandHandler(
         IEdgeTelemetryIngestionStore store,
+        IAlertIngestionStore alertStore,
         IRealtimeNotificationPublisher publisher,
         IOptions<EdgeTelemetryIngestionOptions> options)
     {
         _store = store;
+        _alertStore = alertStore;
         _publisher = publisher;
         _options = options.Value;
     }
@@ -120,23 +124,18 @@ public sealed class IngestDeviceEventCommandHandler
         AlertChangedEvent? alertNotification = null;
         if (command.Severity is SeverityLevel.Error or SeverityLevel.Critical)
         {
-            var alert = new Alert
-            {
-                KioskId = command.KioskId,
-                DeviceId = device.Id,
-                AlertCode = deviceEvent.EventType,
-                Severity = command.Severity,
-                Title = Truncate($"{device.Name}: {deviceEvent.EventType}", 500)!,
-                Message = Truncate(deviceEvent.Message, 500),
-                Status = AlertStatus.Open,
-                SourceType = "DeviceEvent",
-                SourceId = deviceEvent.Id,
-                RaisedAt = deviceEvent.OccurredAt,
-                OriginNodeId = command.OriginNodeId,
-                Version = 1,
-                SyncedAt = receivedAt
-            };
-            await _store.AddAlertAsync(alert, cancellationToken);
+            var alert = Alert.RaiseFromDeviceEvent(
+                command.KioskId,
+                device.Id,
+                deviceEvent.Id,
+                deviceEvent.EventType,
+                command.Severity,
+                Truncate($"{device.Name}: {deviceEvent.EventType}", 500)!,
+                Truncate(deviceEvent.Message, 500),
+                deviceEvent.OccurredAt,
+                command.OriginNodeId,
+                receivedAt);
+            await _alertStore.AddAlertAsync(alert, cancellationToken);
             alertNotification = new AlertChangedEvent
             {
                 AlertId = alert.Id,

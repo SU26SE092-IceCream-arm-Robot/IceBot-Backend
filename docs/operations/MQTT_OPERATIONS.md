@@ -21,15 +21,27 @@ Local development uses Mosquitto from the independent `IceBot-Tools` lifecycle:
 ```powershell
 cd ..\IceBot-Tools\docker
 $env:MQTT_BACKEND_PASSWORD = "local-backend-secret"
+$env:MQTT_DYNSEC_ADMIN_PASSWORD = "local-dynsec-admin-secret"
 docker compose --profile mqtt up -d mqtt-init mosquitto
 ```
 
-Provision one MQTT subscriber after its execution endpoint exists:
+Local Mosquitto uses the Dynamic Security plugin. Bootstrap creates a backend
+publisher role and a shared endpoint subscriber role whose `%u` username is
+restricted to its endpoint topic.
+
+Enable backend credential administration without committing the dynsec admin secret:
+
+```powershell
+$env:MqttCredentialProvisioning__Enabled = "true"
+$env:MqttCredentialProvisioning__AdminPassword = $env:MQTT_DYNSEC_ADMIN_PASSWORD
+```
+
+Provision one MQTT subscriber after its execution endpoint is active:
 
 ```powershell
 .\mqtt\provision-endpoint.ps1 `
   -ExecutionEndpointId "00000000-0000-0000-0000-000000000000" `
-  -Password "local-edge-secret"
+  -BearerToken "management-jwt"
 ```
 
 Enable backend publishing without committing credentials:
@@ -49,6 +61,11 @@ Local ACL boundary:
 - An Edge MQTT username must equal its `executionEndpointId` UUID.
 - That endpoint may subscribe only to `icebot/execution-endpoints/{executionEndpointId}/commands/available`.
 - No anonymous access is enabled.
+- The management API creates or rotates the broker client through Mosquitto
+  Dynamic Security. PostgreSQL stores lifecycle metadata only; it never stores
+  the MQTT password or broker password hash.
+- Provision/rotate returns the generated password once. Rotation invalidates
+  the previous password immediately; hot overlap is intentionally not V1.
 
 EMQX may replace Mosquitto locally when its dashboard or richer policy tooling is useful, but it must preserve the same topic and endpoint identity boundary.
 
@@ -63,8 +80,7 @@ icebot/execution-endpoints/{executionEndpointId}/commands/available
 For every notification, including duplicates, Edge calls:
 
 ```http
-POST /api/v1/iot/kiosks/{kioskId}/commands/pull
-X-Execution-Endpoint-Id: {executionEndpointId}
+POST /api/v1/iot/execution-endpoints/{endpointId}/commands/pull
 ```
 
 Edge must also pull on a periodic timer and immediately after reconnect. MQTT receipt does not mark a command Delivered or Accepted; only the command pull/ack contracts do that.
@@ -82,6 +98,28 @@ Production must use:
 - broker connection, authentication failure, publish failure, and client-session metrics;
 - credential rotation coordinated with execution-endpoint provisioning.
 
-Do not reuse the HTTPS execution credential as an MQTT password unless the provisioning design explicitly manages both protocols as one rotatable credential bundle. Never put broker credentials or private keys in appsettings or Git.
+HTTPS and MQTT credentials are separate. Never reuse the mTLS certificate or
+signed-request credential as the MQTT password. Dynsec administrator and
+backend publisher credentials come from deployment secrets, never appsettings
+or Git.
+
+Management lifecycle:
+
+```text
+POST   /api/v1/management/execution-endpoints/{id}/mqtt-credential   provision
+PATCH  /api/v1/management/execution-endpoints/{id}/mqtt-credential   rotate
+DELETE /api/v1/management/execution-endpoints/{id}/mqtt-credential   revoke
+```
+
+Broker mutation and database audit cannot share a distributed transaction.
+The handler serializes each endpoint operation and uses idempotent broker
+upsert. A failed or interrupted operation is retried through the same endpoint;
+durable command polling remains available while MQTT credentials are repaired.
+An endpoint with a non-revoked MQTT credential cannot be retired; revoke the
+broker client first. Disabling an endpoint blocks command pull/dispatch but does
+not rotate or delete its MQTT identity, so reactivation can preserve the same
+subscriber setup.
 
 For multiple backend replicas, each replica needs a unique MQTT client id. Retained wake-ups remain disabled; durable command recovery comes from command pull, not broker retention.
+
+Backend publish outcomes are exported through `icebot.mqtt.wakeup.publish.attempts`. Broker-side connection/session/authentication metrics remain owned by Mosquitto/EMQX and should be scraped or exported separately; application metrics cannot observe subscriber disconnects that never reach the backend.

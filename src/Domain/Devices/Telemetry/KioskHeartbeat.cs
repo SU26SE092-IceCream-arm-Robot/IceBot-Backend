@@ -2,7 +2,7 @@ using Domain.Common;
 using Domain.Devices.Enums;
 using Domain.Tenants.Entities;
 
-namespace Domain.Devices.Entities;
+namespace Domain.Devices.Telemetry;
 
 public partial class KioskHeartbeat : AppendOnlySyncEntity
 {

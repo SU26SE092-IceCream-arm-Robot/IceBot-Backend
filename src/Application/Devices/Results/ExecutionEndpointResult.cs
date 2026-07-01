@@ -12,8 +12,32 @@ public sealed class ExecutionEndpointResult
     public Guid? ProfileIdentity { get; init; }
     public Guid? CredentialBindingId { get; init; }
     public string? CredentialStatus { get; init; }
+    public string? MqttUsername { get; init; }
+    public string? MqttCredentialStatus { get; init; }
+    public int? MqttCredentialVersion { get; init; }
+    public ExecutionEndpointReadinessResult? Readiness { get; init; }
     public DateTimeOffset? ProvisionedAt { get; init; }
     public IReadOnlyList<ExecutionEndpointRobotTargetResult> SupportedRobotTargets { get; init; } = [];
+}
+
+public sealed class ExecutionEndpointReadinessResult
+{
+    public long StateRevision { get; init; }
+    public required string Readiness { get; init; }
+    public required string Activity { get; init; }
+    public required string Safety { get; init; }
+    public Guid? CurrentCommandId { get; init; }
+    public required string PhysicalOutputState { get; init; }
+    public string? FaultCode { get; init; }
+    public DateTimeOffset ExecutorReportedAt { get; init; }
+    public IReadOnlyList<ExecutionEndpointCapabilityResult> Capabilities { get; init; } = [];
+}
+public sealed class ExecutionEndpointCapabilityResult
+{
+    public required string CapabilityCode { get; init; }
+    public string? WorkcellCode { get; init; }
+    public bool IsAvailable { get; init; }
+    public string? UnavailableReason { get; init; }
 }
 
 public sealed class ExecutionEndpointRobotTargetResult

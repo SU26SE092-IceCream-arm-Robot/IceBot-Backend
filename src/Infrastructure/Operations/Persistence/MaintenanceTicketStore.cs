@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using Application.Operations.Abstractions;
 using Domain.Operations.Entities;
 using Domain.Operations.Enums;

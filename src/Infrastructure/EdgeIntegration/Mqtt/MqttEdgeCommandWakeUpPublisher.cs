@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Application.EdgeIntegration.Abstractions;
+using Application.EdgeIntegration.Observability;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MQTTnet;
@@ -47,6 +48,7 @@ public sealed class MqttEdgeCommandWakeUpPublisher : IEdgeCommandWakeUpPublisher
     {
         if (!_options.Enabled)
         {
+            IceBotEdgeMetrics.RecordMqttWakeUp("disabled", notification.CommandType.ToString());
             return false;
         }
 
@@ -72,10 +74,12 @@ public sealed class MqttEdgeCommandWakeUpPublisher : IEdgeCommandWakeUpPublisher
                 .Build();
 
             await _client.PublishAsync(message, cancellationToken);
+            IceBotEdgeMetrics.RecordMqttWakeUp("succeeded", notification.CommandType.ToString());
             return true;
         }
         catch (Exception ex)
         {
+            IceBotEdgeMetrics.RecordMqttWakeUp("failed", notification.CommandType.ToString());
             _logger.LogWarning(
                 ex,
                 "MQTT command wake-up publish failed for command {CommandId} and endpoint {EndpointId}; periodic pull remains authoritative.",

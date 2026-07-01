@@ -23,6 +23,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
     private readonly ListRobotArtifactsQueryHandler _listRobotArtifactsHandler;
     private readonly GetRobotArtifactQueryHandler _getRobotArtifactHandler;
     private readonly CreateRobotArtifactReviewUrlQueryHandler _createReviewUrlHandler;
+    private readonly CloneRobotArtifactTemplateCommandHandler _cloneTemplateHandler;
 
     public ManagementRobotArtifactsController(
         BulkUploadRobotArtifactsCommandHandler bulkUploadRobotArtifactsHandler,
@@ -32,7 +33,8 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         DiscardDraftRobotArtifactCommandHandler discardDraftRobotArtifactHandler,
         ListRobotArtifactsQueryHandler listRobotArtifactsHandler,
         GetRobotArtifactQueryHandler getRobotArtifactHandler,
-        CreateRobotArtifactReviewUrlQueryHandler createReviewUrlHandler)
+        CreateRobotArtifactReviewUrlQueryHandler createReviewUrlHandler,
+        CloneRobotArtifactTemplateCommandHandler cloneTemplateHandler)
     {
         _bulkUploadRobotArtifactsHandler = bulkUploadRobotArtifactsHandler;
         _bulkPublishRobotArtifactsHandler = bulkPublishRobotArtifactsHandler;
@@ -42,6 +44,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         _listRobotArtifactsHandler = listRobotArtifactsHandler;
         _getRobotArtifactHandler = getRobotArtifactHandler;
         _createReviewUrlHandler = createReviewUrlHandler;
+        _cloneTemplateHandler = cloneTemplateHandler;
     }
 
     [HttpGet("organizations/{organizationId:guid}/robot-artifacts")]
@@ -143,6 +146,26 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         }
     }
 
+    [HttpPost("organizations/{organizationId:guid}/robot-artifacts/from-template")]
+    [Authorize(Policy = "artifact.upload")]
+    public async Task<IActionResult> CloneFromTemplate(
+        Guid organizationId,
+        [FromBody] CloneRobotArtifactTemplateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _cloneTemplateHandler.HandleAsync(new CloneRobotArtifactTemplateCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            TemplateId = request.TemplateId,
+            ArtifactCode = request.ArtifactCode,
+            ArtifactName = request.ArtifactName,
+            Description = request.Description,
+            MetadataJson = request.MetadataJson
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/publish")]
     [Authorize(Policy = "artifact.upload")]
     public async Task<IActionResult> PublishRobotArtifact(
@@ -238,6 +261,23 @@ public sealed class BulkPublishRobotArtifactsRequest
 {
     [Required, MinLength(1), MaxLength(100)]
     public IReadOnlyCollection<Guid> RobotArtifactIds { get; init; } = Array.Empty<Guid>();
+}
+
+public sealed class CloneRobotArtifactTemplateRequest
+{
+    [Required]
+    public Guid TemplateId { get; init; }
+
+    [Required, StringLength(100)]
+    public string ArtifactCode { get; init; } = string.Empty;
+
+    [Required, StringLength(200)]
+    public string ArtifactName { get; init; } = string.Empty;
+
+    [StringLength(500)]
+    public string? Description { get; init; }
+
+    public string? MetadataJson { get; init; }
 }
 
 public sealed class BulkUploadRobotArtifactManifestItemRequest

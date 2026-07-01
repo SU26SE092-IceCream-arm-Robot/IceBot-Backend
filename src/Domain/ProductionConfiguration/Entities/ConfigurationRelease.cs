@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.Enums;
@@ -163,7 +164,7 @@ public class ConfigurationRelease : BusinessEntity
     }
 
     public void ValidateFullEdgeDeploymentTarget(
-        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         Guid edgeRuntimeId,
         bool allowRetiredRelease = false)
     {

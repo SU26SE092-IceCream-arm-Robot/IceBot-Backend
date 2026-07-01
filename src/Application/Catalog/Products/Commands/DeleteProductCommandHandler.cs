@@ -22,6 +22,12 @@ public sealed class DeleteProductCommandHandler
             return ApiResult<bool>.Fail("Product not found.", 404);
         }
 
+        var accessError = ProductManagementCommandRules.ValidateExisting<bool>(command.Scope, product);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var now = DateTimeOffset.UtcNow;
         product.DeletedAt = now;
         product.DeletedByAccountId = command.DeletedByAccountId;

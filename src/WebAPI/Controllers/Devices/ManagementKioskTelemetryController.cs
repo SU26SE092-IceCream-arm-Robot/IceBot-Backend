@@ -50,7 +50,7 @@ public sealed class ManagementKioskTelemetryController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("events")]
+    [HttpGet("device-events")]
     public async Task<IActionResult> GetEvents(
         Guid kioskId,
         [FromQuery] SeverityLevel? minSeverity,

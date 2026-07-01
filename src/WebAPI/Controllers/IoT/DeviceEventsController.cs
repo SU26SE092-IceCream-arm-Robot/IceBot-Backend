@@ -11,7 +11,7 @@ namespace WebAPI.Controllers.IoT;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/iot/kiosks/{kioskId:guid}/device-events")]
+[Route("api/v{version:apiVersion}/iot/execution-endpoints/{endpointId:guid}/device-events")]
 public sealed class DeviceEventsController : ControllerBase
 {
     private readonly IngestDeviceEventCommandHandler _handler;
@@ -27,12 +27,11 @@ public sealed class DeviceEventsController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> IngestDeviceEvent(
-        Guid kioskId,
-        [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
+        Guid endpointId,
         [FromBody] IngestDeviceEventRequest request,
         CancellationToken cancellationToken)
     {
-        var authentication = await _authenticator.AuthenticateAsync(HttpContext, kioskId, endpointId, cancellationToken);
+        var authentication = await _authenticator.AuthenticateAsync(HttpContext, endpointId, cancellationToken);
         if (!authentication.Succeeded)
         {
             return Unauthorized(ApiResult<object>.Fail(authentication.Message, 401));
@@ -40,7 +39,7 @@ public sealed class DeviceEventsController : ControllerBase
 
         var result = await _handler.HandleAsync(new IngestDeviceEventCommand
         {
-            KioskId = kioskId,
+            KioskId = authentication.Endpoint!.KioskId,
             EndpointId = endpointId,
             OriginNodeId = request.OriginNodeId,
             DeviceId = request.DeviceId,

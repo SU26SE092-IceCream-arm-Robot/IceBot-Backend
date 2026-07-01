@@ -1,3 +1,5 @@
+using Domain.Devices.Telemetry;
+using Domain.Devices.ExecutionEndpoints;
 using Application.Devices.Abstractions;
 using Domain.Devices.Entities;
 using Domain.Tenants.Entities;
@@ -7,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Devices.Persistence;
 
-public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore
+public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore, IAlertIngestionStore
 {
     private readonly IceBotDbContext _dbContext;
 
@@ -42,6 +44,12 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default) =>
         ExecuteSerializedAsync([$"kiosk-connectivity:{kioskId:D}"], action, cancellationToken);
+
+    public Task<T> ExecuteOperationLogIngestionAsync<T>(
+        Guid sourceEventId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default) =>
+        ExecuteSerializedAsync([$"operation-log:{sourceEventId:D}"], action, cancellationToken);
 
     public Task<List<Guid>> ListConnectivityTimeoutCandidateIdsAsync(
         DateTimeOffset cutoff,
@@ -95,11 +103,28 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore
             cancellationToken);
     }
 
+    public Task<KioskHeartbeat?> GetLatestHeartbeatAsync(
+        Guid kioskId,
+        Guid originNodeId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.KioskHeartbeats.AsNoTracking()
+            .Where(heartbeat => heartbeat.KioskId == kioskId && heartbeat.NodeId == originNodeId)
+            .OrderByDescending(heartbeat => heartbeat.HeartbeatSequence)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public Task<DeviceEvent?> GetDeviceEventAsync(Guid eventId, CancellationToken cancellationToken = default)
     {
         return _dbContext.DeviceEvents.AsNoTracking()
             .FirstOrDefaultAsync(deviceEvent => deviceEvent.EventId == eventId, cancellationToken);
     }
+
+    public Task<OperationLog?> GetOperationLogAsync(
+        Guid sourceEventId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.OperationLogs.AsNoTracking()
+            .FirstOrDefaultAsync(log => log.SourceEventId == sourceEventId, cancellationToken);
 
     public Task<Kiosk?> GetKioskAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
@@ -115,6 +140,12 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore
             .FirstOrDefaultAsync(device => device.Id == deviceId, cancellationToken);
     }
 
+    public Task<bool> OrderBelongsToKioskAsync(
+        Guid orderId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Orders.AnyAsync(order => order.Id == orderId && order.KioskId == kioskId, cancellationToken);
+
     public Task AddHeartbeatAsync(KioskHeartbeat heartbeat, CancellationToken cancellationToken = default) =>
         _dbContext.KioskHeartbeats.AddAsync(heartbeat, cancellationToken).AsTask();
 
@@ -123,6 +154,9 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore
 
     public Task AddAlertAsync(Alert alert, CancellationToken cancellationToken = default) =>
         _dbContext.Alerts.AddAsync(alert, cancellationToken).AsTask();
+
+    public Task AddOperationLogAsync(OperationLog operationLog, CancellationToken cancellationToken = default) =>
+        _dbContext.OperationLogs.AddAsync(operationLog, cancellationToken).AsTask();
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _dbContext.SaveChangesAsync(cancellationToken);

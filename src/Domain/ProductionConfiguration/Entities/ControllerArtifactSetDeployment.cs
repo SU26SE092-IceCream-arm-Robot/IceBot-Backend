@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.Devices.Entities;
 using Domain.Devices.Enums;
@@ -13,6 +14,7 @@ public class ControllerArtifactSetDeployment : AuditedEntity
     private readonly List<ControllerArtifactSetItem> _items = [];
 
     public Guid KioskId { get; private set; }
+    public Guid OrganizationId { get; private set; }
     public Guid KioskExecutionEndpointId { get; private set; }
     public Guid ControllerId { get; private set; }
     public Guid SourceConfigurationReleaseId { get; private set; }
@@ -43,7 +45,7 @@ public class ControllerArtifactSetDeployment : AuditedEntity
     }
 
     public static ControllerArtifactSetDeployment CreatePending(
-        Guid kioskId, Guid endpointId, Guid controllerId, Guid releaseId, string releaseChecksum,
+        Guid kioskId, Guid organizationId, Guid endpointId, Guid controllerId, Guid releaseId, string releaseChecksum,
         long activeSetVersion,
         string idempotencyKey,
         int maxArtifactCount,
@@ -52,7 +54,7 @@ public class ControllerArtifactSetDeployment : AuditedEntity
         DateTimeOffset requestedAt,
         IEnumerable<ControllerArtifactSetItemSnapshot> items)
     {
-        if (kioskId == Guid.Empty || endpointId == Guid.Empty || controllerId == Guid.Empty || releaseId == Guid.Empty ||
+        if (kioskId == Guid.Empty || organizationId == Guid.Empty || endpointId == Guid.Empty || controllerId == Guid.Empty || releaseId == Guid.Empty ||
             string.IsNullOrWhiteSpace(releaseChecksum) ||
             activeSetVersion <= 0 || string.IsNullOrWhiteSpace(idempotencyKey) || maxArtifactCount <= 0 || maxArtifactStorageBytes <= 0)
         {
@@ -61,7 +63,8 @@ public class ControllerArtifactSetDeployment : AuditedEntity
 
         var deployment = new ControllerArtifactSetDeployment
         {
-            KioskId = kioskId, KioskExecutionEndpointId = endpointId, ControllerId = controllerId,
+            KioskId = kioskId, OrganizationId = organizationId,
+            KioskExecutionEndpointId = endpointId, ControllerId = controllerId,
             SourceConfigurationReleaseId = releaseId, ReleaseChecksum = releaseChecksum,
             ActiveSetVersion = activeSetVersion,
             IdempotencyKey = idempotencyKey.Trim(),

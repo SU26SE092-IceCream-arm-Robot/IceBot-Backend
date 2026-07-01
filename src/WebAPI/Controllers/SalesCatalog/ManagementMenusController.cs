@@ -11,7 +11,7 @@ namespace WebAPI.Controllers.SalesCatalog;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/management/menus")]
+[Route("api/v{version:apiVersion}/management/organizations/{organizationId:guid}/menus")]
 [Authorize(Policy = "menus.manage")]
 public sealed class ManagementMenusController : ControllerBase
 {
@@ -52,8 +52,8 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> ListMenus(
+        Guid organizationId,
         [FromQuery] string? search,
-        [FromQuery] Guid? organizationId,
         [FromQuery] Guid? storeId,
         [FromQuery] Guid? kioskId,
         [FromQuery] int pageNumber = 1,
@@ -75,10 +75,11 @@ public sealed class ManagementMenusController : ControllerBase
     }
 
     [HttpGet("{menuId:guid}")]
-    public async Task<IActionResult> GetMenu(Guid menuId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetMenu(Guid organizationId, Guid menuId, CancellationToken cancellationToken)
     {
         var query = new GetMenuQuery(menuId)
         {
+            OrganizationId = organizationId,
             UserContext = User.GetUserContext()
         };
         var result = await _getMenuHandler.HandleAsync(query, cancellationToken);
@@ -87,11 +88,13 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> CreateMenu(
+        Guid organizationId,
         [FromBody] CreateMenuRequest request,
         CancellationToken cancellationToken)
     {
         var command = new CreateMenuCommand
         {
+            Scope = Scope(organizationId),
             Request = request,
             CreatedByAccountId = GetCurrentAccountId()
         };
@@ -102,12 +105,14 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpPut("{menuId:guid}")]
     public async Task<IActionResult> UpdateMenu(
+        Guid organizationId,
         Guid menuId,
         [FromBody] UpdateMenuRequest request,
         CancellationToken cancellationToken)
     {
         var command = new UpdateMenuCommand
         {
+            Scope = Scope(organizationId),
             MenuId = menuId,
             Request = request,
             UpdatedByAccountId = GetCurrentAccountId()
@@ -119,12 +124,14 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpPatch("{menuId:guid}/status")]
     public async Task<IActionResult> SetMenuStatus(
+        Guid organizationId,
         Guid menuId,
         [FromBody] SetMenuStatusRequest request,
         CancellationToken cancellationToken)
     {
         var command = new SetMenuStatusCommand
         {
+            Scope = Scope(organizationId),
             MenuId = menuId,
             Status = request.Status,
             UpdatedByAccountId = GetCurrentAccountId()
@@ -135,10 +142,11 @@ public sealed class ManagementMenusController : ControllerBase
     }
 
     [HttpDelete("{menuId:guid}")]
-    public async Task<IActionResult> DeleteMenu(Guid menuId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteMenu(Guid organizationId, Guid menuId, CancellationToken cancellationToken)
     {
         var command = new DeleteMenuCommand
         {
+            Scope = Scope(organizationId),
             MenuId = menuId,
             DeletedByAccountId = GetCurrentAccountId()
         };
@@ -149,12 +157,14 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpPost("{menuId:guid}/items")]
     public async Task<IActionResult> AddMenuItem(
+        Guid organizationId,
         Guid menuId,
         [FromBody] CreateMenuItemRequest request,
         CancellationToken cancellationToken)
     {
         var command = new AddMenuItemCommand
         {
+            Scope = Scope(organizationId),
             MenuId = menuId,
             Request = request,
             CreatedByAccountId = GetCurrentAccountId()
@@ -166,6 +176,7 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpPut("{menuId:guid}/items/{menuItemId:guid}")]
     public async Task<IActionResult> UpdateMenuItem(
+        Guid organizationId,
         Guid menuId,
         Guid menuItemId,
         [FromBody] UpdateMenuItemRequest request,
@@ -173,6 +184,7 @@ public sealed class ManagementMenusController : ControllerBase
     {
         var command = new UpdateMenuItemCommand
         {
+            Scope = Scope(organizationId),
             MenuId = menuId,
             MenuItemId = menuItemId,
             Request = request,
@@ -185,6 +197,7 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpPatch("{menuId:guid}/items/{menuItemId:guid}/status")]
     public async Task<IActionResult> SetMenuItemStatus(
+        Guid organizationId,
         Guid menuId,
         Guid menuItemId,
         [FromBody] SetMenuItemStatusRequest request,
@@ -192,6 +205,7 @@ public sealed class ManagementMenusController : ControllerBase
     {
         var command = new SetMenuItemStatusCommand
         {
+            Scope = Scope(organizationId),
             MenuId = menuId,
             MenuItemId = menuItemId,
             Status = request.Status,
@@ -204,12 +218,14 @@ public sealed class ManagementMenusController : ControllerBase
 
     [HttpDelete("{menuId:guid}/items/{menuItemId:guid}")]
     public async Task<IActionResult> DeleteMenuItem(
+        Guid organizationId,
         Guid menuId,
         Guid menuItemId,
         CancellationToken cancellationToken)
     {
         var command = new DeleteMenuItemCommand
         {
+            Scope = Scope(organizationId),
             MenuId = menuId,
             MenuItemId = menuItemId,
             DeletedByAccountId = GetCurrentAccountId()
@@ -224,4 +240,7 @@ public sealed class ManagementMenusController : ControllerBase
         var accountId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(accountId, out var parsedAccountId) ? parsedAccountId : null;
     }
+
+    private MenuManagementCommandScope Scope(Guid organizationId) =>
+        new(User.GetUserContext(), organizationId);
 }

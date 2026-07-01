@@ -73,6 +73,12 @@ public interface IMenuStore
         Guid? excludedMenuItemId = null,
         CancellationToken cancellationToken = default);
 
+    Task<bool> TenantScopeExistsAsync(
+        Guid organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        CancellationToken cancellationToken = default);
+
     Task AddMenuAsync(Menu menu, CancellationToken cancellationToken = default);
 
     Task AddMenuItemAsync(MenuItem menuItem, CancellationToken cancellationToken = default);

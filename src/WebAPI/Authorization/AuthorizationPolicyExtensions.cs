@@ -11,6 +11,8 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("payments.manage", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("products.manage", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("product-templates.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("product-templates.manage", "SystemAdmin");
         options.AddScopedRolePolicy("menus.manage", "SystemAdmin", "Manager");
 
         options.AddScopedRolePolicy("organizations.manage", "SystemAdmin");
@@ -39,6 +41,7 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("maintenance.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("maintenance.create", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("maintenance.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
+        options.AddScopedRolePolicy("sync-dead-letters.manage", "SystemAdmin");
 
         options.AddScopedRolePolicy("alerts.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("alerts.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");

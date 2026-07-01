@@ -9,7 +9,7 @@ public sealed class ListProductsQuery
     public Guid? OrganizationId { get; init; }
     public Guid? StoreId { get; init; }
     public Guid? KioskId { get; init; }
+    public bool GlobalTemplatesOnly { get; init; }
     public int PageNumber { get; init; }
     public int PageSize { get; init; }
 }
-

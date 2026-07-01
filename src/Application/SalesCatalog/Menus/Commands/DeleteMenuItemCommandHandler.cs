@@ -16,6 +16,18 @@ public sealed class DeleteMenuItemCommandHandler
         DeleteMenuItemCommand command,
         CancellationToken cancellationToken = default)
     {
+        var menu = await _menus.GetMenuByIdAsync(command.MenuId, cancellationToken: cancellationToken);
+        if (menu is null)
+        {
+            return ApiResult<bool>.Fail("Menu not found.", 404);
+        }
+
+        var accessError = MenuManagementCommandRules.ValidateExisting<bool>(command.Scope, menu);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var item = await _menus.GetMenuItemByIdAsync(command.MenuId, command.MenuItemId, asNoTracking: false, cancellationToken);
         if (item is null)
         {

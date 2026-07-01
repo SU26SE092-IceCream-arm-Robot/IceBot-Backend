@@ -101,14 +101,28 @@ internal static class PermissionMatrixRules
         new()
         {
             Policy = "products.manage",
-            Description = "Manage products and variants.",
+            Description = "Manage organization-owned products and variants within assigned scope.",
             Roles = new[] { "SystemAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
         {
+            Policy = "product-templates.read",
+            Description = "Browse global product templates for tenant cloning.",
+            Roles = new[] { "SystemAdmin", "Manager" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "product-templates.manage",
+            Description = "Manage global product templates.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "menus.manage",
-            Description = "Manage menus and menu items.",
+            Description = "Manage organization-owned menus and menu items within assigned scope.",
             Roles = new[] { "SystemAdmin", "Manager" },
             ScopeRequired = true
         },
@@ -223,6 +237,13 @@ internal static class PermissionMatrixRules
             Description = "Acknowledge and resolve actionable telemetry alerts within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "sync-dead-letters.manage",
+            Description = "Inspect, retry, resolve, or ignore Cloud sync dead letters.",
+            Roles = ["SystemAdmin"],
+            ScopeRequired = false
         },
         new()
         {

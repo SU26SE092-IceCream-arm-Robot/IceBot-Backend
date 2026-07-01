@@ -142,11 +142,20 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Kiosk heartbeat timeout | `EdgeTelemetryIngestion__HeartbeatTimeoutSeconds` | **P1** | Maximum Cloud receive-time silence before an Active kiosk becomes Offline/Unreachable; default is `90` seconds. |
 | Connectivity reconciliation interval | `EdgeTelemetryIngestion__ConnectivityReconciliationIntervalSeconds` | **P1** | Background scan interval for heartbeat timeout transitions; default is `15` seconds. |
 | Connectivity reconciliation batch size | `EdgeTelemetryIngestion__ConnectivityReconciliationBatchSize` | **P2** | Maximum Active kiosk candidates checked per scan; appsettings default is `100`. |
+| Edge batch event count | `EdgeTelemetryIngestion__MaxBatchEventCount` | **P1** | Maximum items accepted by one telemetry replay or production-history replay request; default is `100`. Request body size remains bounded separately by execution-endpoint security. |
+| Enable retention purge | `DataRetention__Enabled` | **P1** | Default `true`; disable only for controlled maintenance/debugging. |
+| Retention schedule | `DataRetention__IntervalHours` | **P2** | Default `24` hours. The job runs once at startup, then on this interval. |
+| Raw telemetry retention | `DataRetention__HeartbeatDays`, `DataRetention__DeviceEventDays`, `DataRetention__OperationLogDays` | **P1** | Defaults: heartbeat `30`, device events `90`, operation logs `90` days. Ticket-referenced device events are protected. |
+| Processed inbox retention | `DataRetention__ProcessedSyncInboxDays` | **P1** | Default `180` days. Applies only to Processed/Ignored rows without a dead-letter reference. |
+| Retention work limits | `DataRetention__BatchSize`, `DataRetention__MaxBatchesPerRun` | **P1** | Defaults `1000` rows per SQL delete and `20` batches per entity per run. Tune against database load. |
 | Enable MQTT command wake-up | `EdgeCommandMqtt__Enabled` | **P1** | Default `false`; enable only when a broker and endpoint subscriptions are configured. Polling remains authoritative. |
 | MQTT broker host/port | `EdgeCommandMqtt__Host`, `EdgeCommandMqtt__Port` | **P0 Feature** | Required when MQTT wake-up is enabled. Defaults are `localhost:1883` for local development only. |
 | MQTT TLS | `EdgeCommandMqtt__UseTls` | **P0 Secret/Security** | Enable for production broker connections. Certificate trust uses the host OS trust store. |
 | MQTT credentials | `EdgeCommandMqtt__Username`, `EdgeCommandMqtt__Password` | **P0 Secret** | Supply through deployment secrets when broker authentication is enabled; do not commit values. |
 | MQTT client/topic | `EdgeCommandMqtt__ClientId`, `EdgeCommandMqtt__TopicPrefix` | **P1** | Client id must be unique per backend instance; topic prefix defaults to `icebot`. |
+| MQTT credential provisioning | `MqttCredentialProvisioning__Enabled`, `__Provider`, `__Host`, `__Port`, `__UseTls` | **P0 Feature/Security** | Enables execution-endpoint subscriber provisioning through Mosquitto Dynamic Security. Disabled by default. Production requires TLS. |
+| MQTT dynsec administrator | `MqttCredentialProvisioning__AdminUsername`, `__AdminPassword` | **P0 Secret** | Broker-control identity used only for client credential lifecycle. Supply from secret manager; never reuse backend publisher or endpoint credentials. |
+| MQTT endpoint subscriber role | `MqttCredentialProvisioning__SubscriberRole` | **P1** | Must exist on the broker and restrict `%u` to `icebot/execution-endpoints/%u/commands/available`. Local bootstrap creates `icebot-endpoint-subscriber`. |
 
 Broker startup, endpoint-scoped ACL provisioning, Edge subscription behavior, and production TLS rules are defined in [MQTT Operations](MQTT_OPERATIONS.md).
 

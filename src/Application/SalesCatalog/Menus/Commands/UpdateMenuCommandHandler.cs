@@ -30,13 +30,15 @@ public sealed class UpdateMenuCommandHandler
             return ApiResult<MenuResult>.Fail("Menu not found.", 404);
         }
 
+        var accessError = MenuManagementCommandRules.ValidateExisting<MenuResult>(command.Scope, menu);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var newCode = string.IsNullOrWhiteSpace(request.Code) ? menu.Code : MenuNormalizer.NormalizeCode(request.Code);
         var newName = string.IsNullOrWhiteSpace(request.Name) ? menu.Name : request.Name;
         var newCurrency = string.IsNullOrWhiteSpace(request.Currency) ? menu.Currency : request.Currency;
-        var newScopeType = request.ScopeType ?? menu.ScopeType;
-        var newOrganizationId = request.OrganizationId ?? menu.OrganizationId;
-        var newStoreId = request.StoreId ?? menu.StoreId;
-        var newKioskId = request.KioskId ?? menu.KioskId;
         var newEffectiveFrom = request.EffectiveFrom ?? menu.EffectiveFrom;
         var newEffectiveTo = request.EffectiveTo ?? menu.EffectiveTo;
 
@@ -45,10 +47,10 @@ public sealed class UpdateMenuCommandHandler
             newCode,
             newName,
             newCurrency,
-            newScopeType,
-            newOrganizationId,
-            newStoreId,
-            newKioskId,
+            menu.ScopeType,
+            menu.OrganizationId,
+            menu.StoreId,
+            menu.KioskId,
             newEffectiveFrom,
             newEffectiveTo,
             menu.Id,
@@ -59,14 +61,10 @@ public sealed class UpdateMenuCommandHandler
             return ApiResult<MenuResult>.Fail(validationError);
         }
 
-        menu.OrganizationId = newOrganizationId;
-        menu.StoreId = newStoreId;
-        menu.KioskId = newKioskId;
         menu.Code = newCode;
         menu.Name = newName.Trim();
         menu.Description = request.Description is null ? menu.Description : MenuNormalizer.TrimToNull(request.Description);
         menu.Status = request.Status ?? menu.Status;
-        menu.ScopeType = newScopeType;
         menu.Currency = MenuNormalizer.NormalizeCode(newCurrency);
         menu.EffectiveFrom = newEffectiveFrom;
         menu.EffectiveTo = newEffectiveTo;

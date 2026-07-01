@@ -23,7 +23,13 @@ public sealed class ListExecutionEndpointsQueryHandler
                 query.UserContext.AllowedOrganizationIds, query.UserContext.AllowedStoreIds, query.UserContext.AllowedKioskIds,
                 query.OrganizationId, query.StoreId, query.KioskId, query.Profile, query.Status, cancellationToken);
 
-        return ApiResult<IReadOnlyList<ExecutionEndpointResult>>.Success(endpoints.Select(ExecutionEndpointResultMapper.ToResult).ToList());
+        var readiness = (await _store.ListReadinessAsync(endpoints.Select(endpoint => endpoint.Id), cancellationToken))
+            .ToDictionary(projection => projection.KioskExecutionEndpointId);
+        return ApiResult<IReadOnlyList<ExecutionEndpointResult>>.Success(endpoints
+            .Select(endpoint => ExecutionEndpointResultMapper.ToResult(
+                endpoint,
+                readiness.GetValueOrDefault(endpoint.Id)))
+            .ToList());
     }
 
     private static bool IsValidEnum<T>(string? value) where T : struct, Enum =>

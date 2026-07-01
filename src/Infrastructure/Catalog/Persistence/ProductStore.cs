@@ -19,6 +19,7 @@ public sealed class ProductStore : IProductStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool globalTemplatesOnly,
         bool isSystemAdmin,
         IReadOnlySet<Guid> allowedOrganizationIds,
         IReadOnlySet<Guid> allowedStoreIds,
@@ -31,6 +32,7 @@ public sealed class ProductStore : IProductStore
                 organizationId,
                 storeId,
                 kioskId,
+                globalTemplatesOnly,
                 isSystemAdmin,
                 allowedOrganizationIds,
                 allowedStoreIds,
@@ -43,6 +45,7 @@ public sealed class ProductStore : IProductStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool globalTemplatesOnly,
         bool isSystemAdmin,
         IReadOnlySet<Guid> allowedOrganizationIds,
         IReadOnlySet<Guid> allowedStoreIds,
@@ -59,6 +62,7 @@ public sealed class ProductStore : IProductStore
                 organizationId,
                 storeId,
                 kioskId,
+                globalTemplatesOnly,
                 isSystemAdmin,
                 allowedOrganizationIds,
                 allowedStoreIds,
@@ -141,6 +145,28 @@ public sealed class ProductStore : IProductStore
         return _dbContext.ProductCategories.AnyAsync(category => category.Id == categoryId, cancellationToken);
     }
 
+    public async Task<bool> TenantScopeExistsAsync(
+        Guid organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _dbContext.Organizations.AnyAsync(x => x.Id == organizationId, cancellationToken))
+        {
+            return false;
+        }
+
+        if (storeId.HasValue && !await _dbContext.Stores.AnyAsync(
+                x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
+        {
+            return false;
+        }
+
+        return !kioskId.HasValue || await _dbContext.Kiosks.AnyAsync(
+            x => x.Id == kioskId && x.OrganizationId == organizationId &&
+                 (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
+    }
+
     public async Task AddProductAsync(Product product, CancellationToken cancellationToken = default)
     {
         await _dbContext.Products.AddAsync(product, cancellationToken);
@@ -162,11 +188,19 @@ public sealed class ProductStore : IProductStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool globalTemplatesOnly,
         bool isSystemAdmin,
         IReadOnlySet<Guid> allowedOrganizationIds,
         IReadOnlySet<Guid> allowedStoreIds,
         IReadOnlySet<Guid> allowedKioskIds)
     {
+        if (globalTemplatesOnly)
+        {
+            query = query.Where(product =>
+                product.ScopeType == Domain.Tenants.Enums.TenantScopeType.Global &&
+                product.OrganizationId == null && product.StoreId == null && product.KioskId == null);
+        }
+
         if (!isSystemAdmin)
         {
             var allowedOrgIds = allowedOrganizationIds.ToArray();

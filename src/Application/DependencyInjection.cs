@@ -11,6 +11,7 @@ using Application.ProductionConfiguration;
 using Application.RobotConfiguration;
 using Application.SalesCatalog;
 using Application.Tenants;
+using Application.Sync;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application
@@ -21,6 +22,11 @@ namespace Application
         {
             services.AddCatalogModule();
             services.AddDevicesModule();
+            services.AddScoped<ListSyncDeadLettersQueryHandler>();
+            services.AddScoped<GetSyncDeadLetterQueryHandler>();
+            services.AddScoped<ResolveSyncDeadLetterCommandHandler>();
+            services.AddScoped<IgnoreSyncDeadLetterCommandHandler>();
+            services.AddScoped<RetrySyncDeadLetterCommandHandler>();
             services.AddEdgeIntegrationModule();
             services.AddIdentityApplication();
             services.AddInventoryModule();

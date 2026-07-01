@@ -11,13 +11,14 @@ namespace WebAPI.Controllers.Catalog;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/management/products")]
+[Route("api/v{version:apiVersion}/management/organizations/{organizationId:guid}/products")]
 [Authorize(Policy = "products.manage")]
 public sealed class ManagementProductsController : ControllerBase
 {
     private readonly ListProductsQueryHandler _listProductsHandler;
     private readonly GetProductQueryHandler _getProductHandler;
     private readonly CreateProductCommandHandler _createProductHandler;
+    private readonly CloneProductTemplateCommandHandler _cloneTemplateHandler;
     private readonly UpdateProductCommandHandler _updateProductHandler;
     private readonly SetProductAvailabilityCommandHandler _setProductAvailabilityHandler;
     private readonly DeleteProductCommandHandler _deleteProductHandler;
@@ -30,6 +31,7 @@ public sealed class ManagementProductsController : ControllerBase
         ListProductsQueryHandler listProductsHandler,
         GetProductQueryHandler getProductHandler,
         CreateProductCommandHandler createProductHandler,
+        CloneProductTemplateCommandHandler cloneTemplateHandler,
         UpdateProductCommandHandler updateProductHandler,
         SetProductAvailabilityCommandHandler setProductAvailabilityHandler,
         DeleteProductCommandHandler deleteProductHandler,
@@ -41,6 +43,7 @@ public sealed class ManagementProductsController : ControllerBase
         _listProductsHandler = listProductsHandler;
         _getProductHandler = getProductHandler;
         _createProductHandler = createProductHandler;
+        _cloneTemplateHandler = cloneTemplateHandler;
         _updateProductHandler = updateProductHandler;
         _setProductAvailabilityHandler = setProductAvailabilityHandler;
         _deleteProductHandler = deleteProductHandler;
@@ -52,8 +55,8 @@ public sealed class ManagementProductsController : ControllerBase
 
     [HttpGet]
     public async Task<IActionResult> ListProducts(
+        Guid organizationId,
         [FromQuery] string? search,
-        [FromQuery] Guid? organizationId,
         [FromQuery] Guid? storeId,
         [FromQuery] Guid? kioskId,
         [FromQuery] int pageNumber = 1,
@@ -75,10 +78,11 @@ public sealed class ManagementProductsController : ControllerBase
     }
 
     [HttpGet("{productId:guid}")]
-    public async Task<IActionResult> GetProduct(Guid productId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetProduct(Guid organizationId, Guid productId, CancellationToken cancellationToken)
     {
         var query = new GetProductQuery(productId)
         {
+            OrganizationId = organizationId,
             UserContext = User.GetUserContext()
         };
         var result = await _getProductHandler.HandleAsync(query, cancellationToken);
@@ -87,11 +91,13 @@ public sealed class ManagementProductsController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> CreateProduct(
+        Guid organizationId,
         [FromBody] CreateProductRequest request,
         CancellationToken cancellationToken)
     {
         var command = new CreateProductCommand
         {
+            Scope = Scope(organizationId),
             Request = request,
             CreatedByAccountId = GetCurrentAccountId()
         };
@@ -100,14 +106,30 @@ public sealed class ManagementProductsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPost("from-template")]
+    public async Task<IActionResult> CloneTemplate(
+        Guid organizationId,
+        [FromBody] CloneProductTemplateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _cloneTemplateHandler.HandleAsync(new CloneProductTemplateCommand
+        {
+            Scope = Scope(organizationId),
+            Request = request
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPut("{productId:guid}")]
     public async Task<IActionResult> UpdateProduct(
+        Guid organizationId,
         Guid productId,
         [FromBody] UpdateProductRequest request,
         CancellationToken cancellationToken)
     {
         var command = new UpdateProductCommand
         {
+            Scope = Scope(organizationId),
             ProductId = productId,
             Request = request,
             UpdatedByAccountId = GetCurrentAccountId()
@@ -119,12 +141,14 @@ public sealed class ManagementProductsController : ControllerBase
 
     [HttpPatch("{productId:guid}/availability")]
     public async Task<IActionResult> SetProductAvailability(
+        Guid organizationId,
         Guid productId,
         [FromBody] SetAvailabilityRequest request,
         CancellationToken cancellationToken)
     {
         var command = new SetProductAvailabilityCommand
         {
+            Scope = Scope(organizationId),
             ProductId = productId,
             IsAvailable = request.IsAvailable,
             UpdatedByAccountId = GetCurrentAccountId()
@@ -135,10 +159,11 @@ public sealed class ManagementProductsController : ControllerBase
     }
 
     [HttpDelete("{productId:guid}")]
-    public async Task<IActionResult> DeleteProduct(Guid productId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DeleteProduct(Guid organizationId, Guid productId, CancellationToken cancellationToken)
     {
         var command = new DeleteProductCommand
         {
+            Scope = Scope(organizationId),
             ProductId = productId,
             DeletedByAccountId = GetCurrentAccountId()
         };
@@ -149,12 +174,14 @@ public sealed class ManagementProductsController : ControllerBase
 
     [HttpPost("{productId:guid}/variants")]
     public async Task<IActionResult> AddVariant(
+        Guid organizationId,
         Guid productId,
         [FromBody] UpsertProductVariantRequest request,
         CancellationToken cancellationToken)
     {
         var command = new AddProductVariantCommand
         {
+            Scope = Scope(organizationId),
             ProductId = productId,
             Request = request,
             CreatedByAccountId = GetCurrentAccountId()
@@ -166,6 +193,7 @@ public sealed class ManagementProductsController : ControllerBase
 
     [HttpPut("{productId:guid}/variants/{variantId:guid}")]
     public async Task<IActionResult> UpdateVariant(
+        Guid organizationId,
         Guid productId,
         Guid variantId,
         [FromBody] UpdateProductVariantRequest request,
@@ -173,6 +201,7 @@ public sealed class ManagementProductsController : ControllerBase
     {
         var command = new UpdateProductVariantCommand
         {
+            Scope = Scope(organizationId),
             ProductId = productId,
             VariantId = variantId,
             Request = request,
@@ -185,6 +214,7 @@ public sealed class ManagementProductsController : ControllerBase
 
     [HttpPatch("{productId:guid}/variants/{variantId:guid}/availability")]
     public async Task<IActionResult> SetVariantAvailability(
+        Guid organizationId,
         Guid productId,
         Guid variantId,
         [FromBody] SetAvailabilityRequest request,
@@ -192,6 +222,7 @@ public sealed class ManagementProductsController : ControllerBase
     {
         var command = new SetProductVariantAvailabilityCommand
         {
+            Scope = Scope(organizationId),
             ProductId = productId,
             VariantId = variantId,
             IsAvailable = request.IsAvailable,
@@ -204,12 +235,14 @@ public sealed class ManagementProductsController : ControllerBase
 
     [HttpDelete("{productId:guid}/variants/{variantId:guid}")]
     public async Task<IActionResult> DeleteVariant(
+        Guid organizationId,
         Guid productId,
         Guid variantId,
         CancellationToken cancellationToken)
     {
         var command = new DeleteProductVariantCommand
         {
+            Scope = Scope(organizationId),
             ProductId = productId,
             VariantId = variantId,
             DeletedByAccountId = GetCurrentAccountId()
@@ -224,4 +257,7 @@ public sealed class ManagementProductsController : ControllerBase
         var accountId = User.FindFirstValue(ClaimTypes.NameIdentifier);
         return Guid.TryParse(accountId, out var parsedAccountId) ? parsedAccountId : null;
     }
+
+    private ProductManagementCommandScope Scope(Guid organizationId) =>
+        new(User.GetUserContext(), organizationId);
 }

@@ -24,6 +24,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     private readonly ReactivateExecutionEndpointCommandHandler _reactivateHandler;
     private readonly RetireExecutionEndpointCommandHandler _retireHandler;
     private readonly RotateExecutionEndpointCredentialCommandHandler _rotateCredentialHandler;
+    private readonly ProvisionMqttEndpointCredentialCommandHandler _provisionMqttHandler;
+    private readonly RotateMqttEndpointCredentialCommandHandler _rotateMqttHandler;
+    private readonly RevokeMqttEndpointCredentialCommandHandler _revokeMqttHandler;
 
     public ManagementExecutionEndpointsController(
         ListExecutionEndpointsQueryHandler listHandler,
@@ -34,7 +37,10 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         DisableExecutionEndpointCommandHandler disableHandler,
         ReactivateExecutionEndpointCommandHandler reactivateHandler,
         RetireExecutionEndpointCommandHandler retireHandler,
-        RotateExecutionEndpointCredentialCommandHandler rotateCredentialHandler)
+        RotateExecutionEndpointCredentialCommandHandler rotateCredentialHandler,
+        ProvisionMqttEndpointCredentialCommandHandler provisionMqttHandler,
+        RotateMqttEndpointCredentialCommandHandler rotateMqttHandler,
+        RevokeMqttEndpointCredentialCommandHandler revokeMqttHandler)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
@@ -45,6 +51,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         _reactivateHandler = reactivateHandler;
         _retireHandler = retireHandler;
         _rotateCredentialHandler = rotateCredentialHandler;
+        _provisionMqttHandler = provisionMqttHandler;
+        _rotateMqttHandler = rotateMqttHandler;
+        _revokeMqttHandler = revokeMqttHandler;
     }
 
     [HttpGet("execution-endpoints")]
@@ -167,6 +176,39 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         };
 
         var result = await _rotateCredentialHandler.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("execution-endpoints/{endpointId:guid}/mqtt-credential")]
+    [Authorize(Policy = "devices.manage")]
+    public async Task<IActionResult> ProvisionMqttCredential(Guid endpointId, CancellationToken cancellationToken)
+    {
+        var result = await _provisionMqttHandler.HandleAsync(new ProvisionMqttEndpointCredentialCommand
+        {
+            UserContext = User.GetUserContext(), EndpointId = endpointId
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPatch("execution-endpoints/{endpointId:guid}/mqtt-credential")]
+    [Authorize(Policy = "devices.manage")]
+    public async Task<IActionResult> RotateMqttCredential(Guid endpointId, CancellationToken cancellationToken)
+    {
+        var result = await _rotateMqttHandler.HandleAsync(new RotateMqttEndpointCredentialCommand
+        {
+            UserContext = User.GetUserContext(), EndpointId = endpointId
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("execution-endpoints/{endpointId:guid}/mqtt-credential")]
+    [Authorize(Policy = "devices.manage")]
+    public async Task<IActionResult> RevokeMqttCredential(Guid endpointId, CancellationToken cancellationToken)
+    {
+        var result = await _revokeMqttHandler.HandleAsync(new RevokeMqttEndpointCredentialCommand
+        {
+            UserContext = User.GetUserContext(), EndpointId = endpointId
+        }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

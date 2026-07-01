@@ -1,16 +1,8 @@
 using Domain.SalesCatalog.Enums;
-using Domain.Tenants.Enums;
-
 namespace Application.SalesCatalog.Menus.Requests;
 
 public sealed class UpdateMenuRequest
 {
-    public Guid? OrganizationId { get; set; }
-
-    public Guid? StoreId { get; set; }
-
-    public Guid? KioskId { get; set; }
-
     public string? Code { get; set; }
 
     public string? Name { get; set; }
@@ -18,8 +10,6 @@ public sealed class UpdateMenuRequest
     public string? Description { get; set; }
 
     public MenuStatus? Status { get; set; }
-
-    public TenantScopeType? ScopeType { get; set; }
 
     public string? Currency { get; set; }
 

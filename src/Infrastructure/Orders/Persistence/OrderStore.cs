@@ -1,5 +1,7 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.Orders.Abstractions;
 using Application.Orders.Management.Results;
+using Domain.Devices.Enums;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionExecution.Projections;
@@ -139,16 +141,20 @@ public sealed class OrderStore : IOrderStore
         Guid recipeId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.KioskConfigurationDeployments
+        return _dbContext.ExecutionEndpointReadinessProjections
             .AsNoTracking()
-            .AnyAsync(deployment =>
-                deployment.KioskId == kioskId &&
-                deployment.Status == KioskConfigurationDeploymentStatus.Active &&
-                deployment.ConfigurationRelease.Status == ConfigurationReleaseStatus.Published &&
-                deployment.ConfigurationRelease.ExecutionRoutes.Any(route =>
-                    route.ProductVariantId == productVariantId &&
-                    route.RecipeId == recipeId &&
-                    route.RobotBindings.Any()),
+            .AnyAsync(readiness =>
+                readiness.KioskId == kioskId && readiness.Readiness == ExecutionReadinessState.Ready &&
+                readiness.Safety == ExecutionSafetyState.Safe &&
+                readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
+                _dbContext.ConfigurationReleases.Any(release =>
+                    release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
+                        ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
+                        : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
+                    release.Status == ConfigurationReleaseStatus.Published &&
+                    release.ExecutionRoutes.Any(route => route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
+                        route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
+                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))),
                 cancellationToken);
     }
 
@@ -356,8 +362,7 @@ public sealed class OrderStore : IOrderStore
     {
         return _dbContext.ProductionExecutionRecords.AsNoTracking()
             .Where(record => record.SourceCommandId == sourceCommandId)
-            .OrderBy(record => record.SourceProductionJobId == null ? 0 : 1)
-            .ThenBy(record => record.SourceProductionJobId)
+            .OrderBy(record => record.SourceProductionJobId)
             .ToListAsync(cancellationToken);
     }
 

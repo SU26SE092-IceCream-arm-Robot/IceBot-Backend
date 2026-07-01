@@ -5,8 +5,6 @@ namespace Application.SalesCatalog.Menus.Requests;
 
 public sealed class CreateMenuRequest
 {
-    public Guid? OrganizationId { get; set; }
-
     public Guid? StoreId { get; set; }
 
     public Guid? KioskId { get; set; }
@@ -19,7 +17,7 @@ public sealed class CreateMenuRequest
 
     public MenuStatus Status { get; set; } = MenuStatus.Draft;
 
-    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
+    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Organization;
 
     public string Currency { get; set; } = "VND";
 

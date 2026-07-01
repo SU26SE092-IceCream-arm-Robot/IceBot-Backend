@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.ProductionConfiguration.Enums;
 
@@ -6,6 +7,8 @@ namespace Domain.ProductionConfiguration.Entities;
 public class KioskConfigurationDeployment : BusinessEntity
 {
     public Guid KioskId { get; private set; }
+
+    public Guid OrganizationId { get; private set; }
 
     public Guid KioskExecutionEndpointId { get; private set; }
 
@@ -36,7 +39,7 @@ public class KioskConfigurationDeployment : BusinessEntity
 
     public virtual ConfigurationRelease ConfigurationRelease { get; private set; } = null!;
 
-    public virtual Domain.Devices.Entities.KioskExecutionEndpoint KioskExecutionEndpoint { get; private set; } = null!;
+    public virtual Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint KioskExecutionEndpoint { get; private set; } = null!;
 
     private KioskConfigurationDeployment()
     {
@@ -44,6 +47,7 @@ public class KioskConfigurationDeployment : BusinessEntity
 
     public static KioskConfigurationDeployment CreatePending(
         Guid kioskId,
+        Guid organizationId,
         Guid endpointId,
         Guid edgeRuntimeId,
         Guid configurationReleaseId,
@@ -53,7 +57,7 @@ public class KioskConfigurationDeployment : BusinessEntity
         DateTimeOffset requestedAt,
         Guid? requestedByAccountId = null)
     {
-        if (kioskId == Guid.Empty || endpointId == Guid.Empty || edgeRuntimeId == Guid.Empty ||
+        if (kioskId == Guid.Empty || organizationId == Guid.Empty || endpointId == Guid.Empty || edgeRuntimeId == Guid.Empty ||
             configurationReleaseId == Guid.Empty || string.IsNullOrWhiteSpace(releaseChecksum))
         {
             throw new DomainRuleException("An active Full Edge endpoint and a published configuration release checksum are required.");
@@ -67,6 +71,7 @@ public class KioskConfigurationDeployment : BusinessEntity
         return new KioskConfigurationDeployment
         {
             KioskId = kioskId,
+            OrganizationId = organizationId,
             KioskExecutionEndpointId = endpointId,
             EdgeRuntimeId = edgeRuntimeId,
             ConfigurationReleaseId = configurationReleaseId,

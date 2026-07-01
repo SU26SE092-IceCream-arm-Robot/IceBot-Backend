@@ -1,0 +1,212 @@
+using Application.Catalog.Abstractions;
+using Application.Catalog.Products.Commands;
+using Application.Catalog.Products.Requests;
+using Application.Catalog.Products.Queries;
+using Application.Identity.Tokens.Claims;
+using Application.SalesCatalog.Abstractions;
+using Application.SalesCatalog.Menus.Commands;
+using Application.SalesCatalog.Menus.Requests;
+using Application.Tenants;
+using Domain.Catalog.Entities;
+using Domain.SalesCatalog.Entities;
+using Domain.Tenants.Enums;
+using NSubstitute;
+
+namespace IceBot.UnitTests.Catalog;
+
+public sealed class CatalogManagementTenantBoundaryTests
+{
+    [Fact]
+    public void StoreRole_DoesNotExpandToOrganizationScope()
+    {
+        var organizationId = Guid.NewGuid();
+        var assignedStoreId = Guid.NewGuid();
+        var context = new CurrentUserContext
+        {
+            RoleScopes = new[] { new UserRoleScope("Manager", organizationId, assignedStoreId, null) }
+        };
+
+        Assert.False(ScopeAccessRules.CanAccessScopedRow(
+            ScopeRoleSets.ProductsManage, context, organizationId, Guid.NewGuid(), null));
+        Assert.True(ScopeAccessRules.CanAccessScopedRow(
+            ScopeRoleSets.ProductsManage, context, organizationId, assignedStoreId, null));
+
+        var effectiveScope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.ProductsManage, context);
+        Assert.Empty(effectiveScope.OrganizationIds);
+        Assert.Contains(assignedStoreId, effectiveScope.StoreIds);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_RejectsProductOwnedByAnotherOrganization()
+    {
+        var routeOrganizationId = Guid.NewGuid();
+        var product = ProductFor(Guid.NewGuid());
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(product.Id, false, Arg.Any<CancellationToken>()).Returns(product);
+
+        var result = await new UpdateProductCommandHandler(store).HandleAsync(new UpdateProductCommand
+        {
+            Scope = new ProductManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
+            ProductId = product.Id,
+            Request = new UpdateProductRequest { Name = "Cross tenant update" }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(404, result.StatusCode);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CreateProduct_RejectsStoreOutsideRouteOrganization()
+    {
+        var organizationId = Guid.NewGuid();
+        var storeId = Guid.NewGuid();
+        var store = Substitute.For<IProductStore>();
+        store.TenantScopeExistsAsync(organizationId, storeId, null, Arg.Any<CancellationToken>()).Returns(false);
+
+        var result = await new CreateProductCommandHandler(store).HandleAsync(new CreateProductCommand
+        {
+            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+            Request = new CreateProductRequest
+            {
+                StoreId = storeId,
+                ScopeType = TenantScopeType.Store,
+                Code = "COFFEE",
+                Name = "Coffee",
+                BasePrice = 10_000
+            }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Product scope does not belong to the route organization.", result.Message);
+        await store.DidNotReceive().AddProductAsync(Arg.Any<Product>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateMenu_RejectsMenuOwnedByAnotherOrganization()
+    {
+        var routeOrganizationId = Guid.NewGuid();
+        var menu = new Menu
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = Guid.NewGuid(),
+            ScopeType = TenantScopeType.Organization,
+            Code = "MAIN",
+            Name = "Main",
+            Currency = "VND"
+        };
+        var store = Substitute.For<IMenuStore>();
+        store.GetMenuByIdAsync(menu.Id, false, Arg.Any<CancellationToken>()).Returns(menu);
+
+        var result = await new UpdateMenuCommandHandler(store).HandleAsync(new UpdateMenuCommand
+        {
+            Scope = new MenuManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
+            MenuId = menu.Id,
+            Request = new UpdateMenuRequest { Name = "Cross tenant update" }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(404, result.StatusCode);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task OrganizationRoute_DoesNotMutateGlobalProductTemplate()
+    {
+        var organizationId = Guid.NewGuid();
+        var template = ProductFor(null, TenantScopeType.Global);
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(template.Id, false, Arg.Any<CancellationToken>()).Returns(template);
+
+        var result = await new SetProductAvailabilityCommandHandler(store).HandleAsync(
+            new SetProductAvailabilityCommand
+            {
+                Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+                ProductId = template.Id,
+                IsAvailable = false
+            });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(404, result.StatusCode);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task CloneProductTemplate_CreatesOrganizationOwnedCopyWithLineage()
+    {
+        var organizationId = Guid.NewGuid();
+        var template = ProductFor(null, TenantScopeType.Global);
+        template.ProductVariants.Add(new ProductVariant
+        {
+            Id = Guid.NewGuid(),
+            ProductId = template.Id,
+            Code = "DEFAULT",
+            Name = "Default",
+            Currency = "VND"
+        });
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(template.Id, true, Arg.Any<CancellationToken>()).Returns(template);
+        store.TenantScopeExistsAsync(organizationId, null, null, Arg.Any<CancellationToken>()).Returns(true);
+        Product? saved = null;
+        store.When(x => x.AddProductAsync(Arg.Any<Product>(), Arg.Any<CancellationToken>()))
+            .Do(call => saved = call.Arg<Product>());
+
+        var result = await new CloneProductTemplateCommandHandler(store).HandleAsync(
+            new CloneProductTemplateCommand
+            {
+                Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+                Request = new CloneProductTemplateRequest { TemplateProductId = template.Id }
+            });
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.NotNull(saved);
+        Assert.Equal(organizationId, saved.OrganizationId);
+        Assert.Equal(template.Id, saved.TemplateProductId);
+        Assert.Equal(TenantScopeType.Organization, saved.ScopeType);
+        Assert.Single(saved.ProductVariants);
+    }
+
+    [Fact]
+    public async Task Manager_CanReadButCannotMutateGlobalProductTemplate()
+    {
+        var organizationId = Guid.NewGuid();
+        var template = ProductFor(null, TenantScopeType.Global);
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(template.Id, true, Arg.Any<CancellationToken>()).Returns(template);
+        var manager = Manager(organizationId);
+
+        var read = await new GetProductQueryHandler(store).HandleAsync(new GetProductQuery(template.Id)
+        {
+            UserContext = manager,
+            IsGlobalTemplate = true
+        });
+        var mutation = await new SetProductAvailabilityCommandHandler(store).HandleAsync(
+            new SetProductAvailabilityCommand
+            {
+                Scope = new ProductManagementCommandScope(manager, null, IsGlobalTemplate: true),
+                ProductId = template.Id,
+                IsAvailable = false
+            });
+
+        Assert.True(read.Succeeded, read.Message);
+        Assert.False(mutation.Succeeded);
+        Assert.Equal(404, mutation.StatusCode);
+    }
+
+    private static Product ProductFor(Guid? organizationId, TenantScopeType scopeType = TenantScopeType.Organization) => new()
+    {
+        Id = Guid.NewGuid(),
+        OrganizationId = organizationId,
+        ScopeType = scopeType,
+        Code = "PRODUCT",
+        Name = "Product",
+        Currency = "VND"
+    };
+
+    private static CurrentUserContext Manager(Guid organizationId) => new()
+    {
+        AccountId = Guid.NewGuid(),
+        AllowedOrganizationIds = new HashSet<Guid> { organizationId },
+        RoleScopes = new[] { new UserRoleScope("Manager", organizationId, null, null) }
+    };
+}

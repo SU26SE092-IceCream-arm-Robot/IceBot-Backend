@@ -1,7 +1,7 @@
 using Domain.Common;
 using Domain.Devices.Enums;
 
-namespace Domain.Devices.Entities;
+namespace Domain.Devices.ExecutionEndpoints;
 
 public class ExecutionEndpointCredentialBinding : AuditedEntity
 {
