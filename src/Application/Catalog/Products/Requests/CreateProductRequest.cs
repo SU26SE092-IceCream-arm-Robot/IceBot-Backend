@@ -4,13 +4,9 @@ namespace Application.Catalog.Products.Requests;
 
 public sealed class CreateProductRequest
 {
-    public Guid? OrganizationId { get; set; }
-
     public Guid? StoreId { get; set; }
 
     public Guid? KioskId { get; set; }
-
-    public Guid? TemplateProductId { get; set; }
 
     public long? CategoryId { get; set; }
 
@@ -36,7 +32,7 @@ public sealed class CreateProductRequest
 
     public string? MetadataJson { get; set; }
 
-    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
+    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Organization;
 
     public List<UpsertProductVariantRequest> Variants { get; set; } = new();
 }

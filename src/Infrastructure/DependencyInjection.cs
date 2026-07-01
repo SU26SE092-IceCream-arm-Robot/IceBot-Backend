@@ -24,6 +24,7 @@ using Infrastructure.RobotConfiguration.ObjectStorage;
 using Infrastructure.RobotConfiguration.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
+using Infrastructure.Sync;
 using Infrastructure.Tenants;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -62,16 +63,36 @@ namespace Infrastructure
             services.AddSalesCatalogInfrastructure();
             services.AddTenantsInfrastructure();
             services.AddScoped<IInventoryStore, InventoryStore>();
+            services.AddOptions<Persistence.Jobs.DataRetentionOptions>()
+                .Bind(config.GetSection(Persistence.Jobs.DataRetentionOptions.SectionName))
+                .Validate(options =>
+                        options.IntervalHours > 0 &&
+                        options.HeartbeatDays > 0 &&
+                        options.DeviceEventDays > 0 &&
+                        options.OperationLogDays > 0 &&
+                        options.ProcessedSyncInboxDays > 0 &&
+                        options.BatchSize > 0 &&
+                        options.MaxBatchesPerRun > 0,
+                    "Data retention settings must be positive.")
+                .ValidateOnStart();
+            services.AddScoped<Persistence.Jobs.DataRetentionPurger>();
             services.AddHostedService<Persistence.Jobs.DataRetentionJob>();
             services.AddScoped<IKioskTelemetryStore, KioskTelemetryStore>();
-            services.AddScoped<IEdgeTelemetryIngestionStore, EdgeTelemetryIngestionStore>();
+            services.AddScoped<EdgeTelemetryIngestionStore>();
+            services.AddScoped<IEdgeTelemetryIngestionStore>(provider => provider.GetRequiredService<EdgeTelemetryIngestionStore>());
+            services.AddScoped<IAlertIngestionStore>(provider => provider.GetRequiredService<EdgeTelemetryIngestionStore>());
+            services.AddScoped<IBatchEventSyncStore, BatchEventSyncStore>();
+            services.AddScoped<IProductionEventSyncStore, ProductionEventSyncStore>();
+            services.AddScoped<IExecutionReadinessStore, ExecutionReadinessStore>();
+            services.AddScoped<Application.Sync.Abstractions.ISyncDeadLetterStore, SyncDeadLetterStore>();
             services.AddOptions<Application.Devices.EdgeTelemetryIngestionOptions>()
                 .Bind(config.GetSection(Application.Devices.EdgeTelemetryIngestionOptions.SectionName))
                 .Validate(options =>
                         options.MaxFutureClockSkewSeconds >= 0 &&
                         options.HeartbeatTimeoutSeconds > 0 &&
                         options.ConnectivityReconciliationIntervalSeconds > 0 &&
-                        options.ConnectivityReconciliationBatchSize > 0,
+                        options.ConnectivityReconciliationBatchSize > 0 &&
+                        options.MaxBatchEventCount > 0,
                     "Edge telemetry clock skew and connectivity reconciliation settings are invalid.")
                 .ValidateOnStart();
             services.AddHostedService<Devices.Jobs.KioskConnectivityReconciliationJob>();
@@ -98,7 +119,11 @@ namespace Infrastructure
             services.AddScoped<IOrderExecutionDispatchStore, OrderExecutionDispatchStore>();
             services.AddScoped<IOrderExecutionTimeoutStore, OrderExecutionTimeoutStore>();
             services.AddScoped<IExecutionEndpointTransportAuthStore, ExecutionEndpointTransportAuthStore>();
-            services.AddScoped<IExecutionReportStore, ExecutionReportStore>();
+            services.AddScoped<ExecutionReportStore>();
+            services.AddScoped<IExecutionReportReceiptStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
+            services.AddScoped<IDeploymentReportStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
+            services.AddScoped<IProductionExecutionReportStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
+            services.AddScoped<IExecutionStockEvidenceStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
             services.AddOptions<EdgeCommandMqttOptions>()
                 .Bind(config.GetSection(EdgeCommandMqttOptions.SectionName))
                 .Validate(options =>
@@ -111,6 +136,17 @@ namespace Infrastructure
                     "Enabled MQTT command wake-up settings are incomplete or invalid.")
                 .ValidateOnStart();
             services.AddSingleton<IEdgeCommandWakeUpPublisher, MqttEdgeCommandWakeUpPublisher>();
+            services.AddOptions<MqttCredentialProvisioningOptions>()
+                .Bind(config.GetSection(MqttCredentialProvisioningOptions.SectionName))
+                .Validate(options => !options.Enabled ||
+                    (!string.IsNullOrWhiteSpace(options.Host) && options.Port > 0 &&
+                     !string.IsNullOrWhiteSpace(options.AdminUsername) &&
+                     !string.IsNullOrWhiteSpace(options.AdminPassword) &&
+                     !string.IsNullOrWhiteSpace(options.SubscriberRole) &&
+                     !string.IsNullOrWhiteSpace(options.TopicPrefix) && options.TimeoutSeconds > 0),
+                    "Enabled MQTT credential provisioning settings are incomplete or invalid.")
+                .ValidateOnStart();
+            services.AddScoped<IMqttEndpointCredentialProvisioner, MosquittoDynamicSecurityCredentialProvisioner>();
             services.AddOptions<Application.EdgeIntegration.ExecutionReportIngestionOptions>()
                 .Bind(config.GetSection(Application.EdgeIntegration.ExecutionReportIngestionOptions.SectionName))
                 .Validate(options => options.MaxFutureClockSkewSeconds >= 0,
@@ -134,6 +170,7 @@ namespace Infrastructure
                 .ValidateOnStart();
             services.AddHostedService<EdgeIntegration.Jobs.OrderExecutionDispatchReconciliationJob>();
             services.AddHostedService<EdgeIntegration.Jobs.OrderExecutionTimeoutReconciliationJob>();
+            services.AddHostedService<EdgeIntegration.Jobs.ExecutionMetricsCollectionJob>();
 
             return services;
         }

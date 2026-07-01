@@ -24,7 +24,32 @@ public sealed class CreateProductCommandHandler
         var request = command.Request;
         var createdByAccountId = command.CreatedByAccountId;
 
-        var validationError = await ProductRequestValidator.ValidateCreateRequestAsync(_products, request, cancellationToken);
+        var accessError = ProductManagementCommandRules.ValidateCreate<ProductResult>(
+            command.Scope, request.ScopeType, request.StoreId, request.KioskId);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
+        if (!command.Scope.IsGlobalTemplate &&
+            !await _products.TenantScopeExistsAsync(
+                command.Scope.OrganizationId!.Value, request.StoreId, request.KioskId, cancellationToken))
+        {
+            return ApiResult<ProductResult>.Fail("Product scope does not belong to the route organization.");
+        }
+
+        if (command.Scope.IsGlobalTemplate)
+        {
+            request.ScopeType = Domain.Tenants.Enums.TenantScopeType.Global;
+            request.StoreId = null;
+            request.KioskId = null;
+        }
+
+        var validationError = await ProductRequestValidator.ValidateCreateRequestAsync(
+            _products,
+            request,
+            command.Scope.IsGlobalTemplate ? null : command.Scope.OrganizationId,
+            cancellationToken);
         if (validationError is not null)
         {
             return ApiResult<ProductResult>.Fail(validationError);
@@ -33,10 +58,10 @@ public sealed class CreateProductCommandHandler
         var now = DateTimeOffset.UtcNow;
         var product = new Product
         {
-            OrganizationId = request.OrganizationId,
+            OrganizationId = command.Scope.IsGlobalTemplate ? null : command.Scope.OrganizationId,
             StoreId = request.StoreId,
             KioskId = request.KioskId,
-            TemplateProductId = request.TemplateProductId,
+            TemplateProductId = null,
             CategoryId = request.CategoryId,
             Code = ProductNormalizer.NormalizeCode(request.Code),
             Name = request.Name.Trim(),

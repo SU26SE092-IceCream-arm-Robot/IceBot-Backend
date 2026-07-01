@@ -4,6 +4,7 @@ namespace Application.Catalog.Products.Commands;
 
 public sealed class CreateProductCommand
 {
+    public required ProductManagementCommandScope Scope { get; init; }
     public CreateProductRequest Request { get; init; } = null!;
     public Guid? CreatedByAccountId { get; init; }
 }

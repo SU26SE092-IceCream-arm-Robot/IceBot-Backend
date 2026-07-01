@@ -1,7 +1,9 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.Devices.Abstractions;
 using Domain.Devices.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Infrastructure.Devices.Persistence;
 
@@ -12,6 +14,20 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
     public ExecutionEndpointStore(IceBotDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task<T> ExecuteMqttCredentialMutationAsync<T>(
+        Guid endpointId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"mqtt-credential:{endpointId:D}"}, 0));",
+            cancellationToken);
+        var result = await action(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
     }
 
     public async Task<IReadOnlyList<KioskExecutionEndpoint>> ListAsync(
@@ -48,6 +64,18 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
     public Task<KioskExecutionEndpoint?> GetByIdAsync(Guid endpointId, CancellationToken cancellationToken = default)
     {
         return BaseReadQuery().FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ExecutionEndpointReadinessProjection>> ListReadinessAsync(
+        IEnumerable<Guid> endpointIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = endpointIds.Distinct().ToArray();
+        return await _dbContext.ExecutionEndpointReadinessProjections
+            .AsNoTracking()
+            .Include(projection => projection.Capabilities)
+            .Where(projection => ids.Contains(projection.KioskExecutionEndpointId))
+            .ToListAsync(cancellationToken);
     }
 
     public Task<Domain.Tenants.Entities.Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
@@ -87,6 +115,7 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
         return _dbContext.KioskExecutionEndpoints
             .Include(endpoint => endpoint.Kiosk)
             .Include(endpoint => endpoint.CredentialBinding)
+            .Include(endpoint => endpoint.MqttCredential)
             .FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId, cancellationToken);
     }
 
@@ -106,6 +135,11 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
         return _dbContext.ExecutionEndpointCredentialBindings.AddAsync(credentialBinding, cancellationToken).AsTask();
     }
 
+    public Task AddMqttCredentialAsync(
+        ExecutionEndpointMqttCredential credential,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.ExecutionEndpointMqttCredentials.AddAsync(credential, cancellationToken).AsTask();
+
     public void RemoveSupportedRobotTargets(IEnumerable<ExecutionEndpointSupportedRobotTarget> targets)
     {
         _dbContext.ExecutionEndpointSupportedRobotTargets.RemoveRange(targets);
@@ -121,6 +155,7 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
         return _dbContext.KioskExecutionEndpoints
             .Include(endpoint => endpoint.Kiosk)
             .Include(endpoint => endpoint.CredentialBinding)
+            .Include(endpoint => endpoint.MqttCredential)
             .Include(endpoint => endpoint.SupportedRobotTargets)
                 .ThenInclude(target => target.Device);
     }

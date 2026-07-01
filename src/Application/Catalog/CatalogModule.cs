@@ -11,6 +11,7 @@ public static class CatalogModule
         services.AddScoped<ListProductsQueryHandler>();
         services.AddScoped<GetProductQueryHandler>();
         services.AddScoped<CreateProductCommandHandler>();
+        services.AddScoped<CloneProductTemplateCommandHandler>();
         services.AddScoped<UpdateProductCommandHandler>();
         services.AddScoped<SetProductAvailabilityCommandHandler>();
         services.AddScoped<DeleteProductCommandHandler>();

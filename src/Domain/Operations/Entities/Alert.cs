@@ -9,6 +9,43 @@ namespace Domain.Operations.Entities;
 
 public partial class Alert : SyncAggregateEntity
 {
+    public static Alert RaiseFromDeviceEvent(
+        Guid kioskId,
+        Guid deviceId,
+        Guid deviceEventId,
+        string alertCode,
+        SeverityLevel severity,
+        string title,
+        string? message,
+        DateTimeOffset raisedAt,
+        Guid originNodeId,
+        DateTimeOffset syncedAt)
+    {
+        if (kioskId == Guid.Empty || deviceId == Guid.Empty || deviceEventId == Guid.Empty ||
+            originNodeId == Guid.Empty || string.IsNullOrWhiteSpace(alertCode) ||
+            string.IsNullOrWhiteSpace(title))
+        {
+            throw new DomainRuleException("Device-event alert identity, code, and title are required.");
+        }
+
+        return new Alert
+        {
+            KioskId = kioskId,
+            DeviceId = deviceId,
+            AlertCode = alertCode.Trim(),
+            Severity = severity,
+            Title = title.Trim(),
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
+            Status = AlertStatus.Open,
+            SourceType = "DeviceEvent",
+            SourceId = deviceEventId,
+            RaisedAt = raisedAt,
+            OriginNodeId = originNodeId,
+            Version = 1,
+            SyncedAt = syncedAt
+        };
+    }
+
     public Guid KioskId { get; set; }
 
     public Guid? DeviceId { get; set; }

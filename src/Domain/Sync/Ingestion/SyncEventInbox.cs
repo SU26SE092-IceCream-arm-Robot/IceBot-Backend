@@ -2,7 +2,7 @@ using Domain.Common;
 using Domain.Sync.Enums;
 using Domain.Tenants.Entities;
 
-namespace Domain.Sync.Entities;
+namespace Domain.Sync.Ingestion;
 
 public partial class SyncEventInbox : GuidEntity
 {
@@ -11,6 +11,8 @@ public partial class SyncEventInbox : GuidEntity
     public Guid? KioskId { get; set; }
 
     public Guid SourceNodeId { get; set; }
+
+    public long? SequenceNumber { get; set; }
 
     public Guid? CorrelationId { get; set; }
 
@@ -98,4 +100,15 @@ public partial class SyncEventInbox : GuidEntity
     }
 
     public bool CanRetry => ProcessingAttempts < MaxProcessingAttempts;
+
+    public void PrepareManualRetry(DateTimeOffset requestedAt)
+    {
+        if (Status != SyncEventStatus.DeadLettered && Status != SyncEventStatus.Failed)
+            throw new DomainRuleException("Only failed or dead-lettered sync events can be retried.");
+        Status = SyncEventStatus.Failed;
+        ProcessingAttempts = 0;
+        NextRetryAt = requestedAt;
+        LockId = null;
+        LockedUntil = null;
+    }
 }

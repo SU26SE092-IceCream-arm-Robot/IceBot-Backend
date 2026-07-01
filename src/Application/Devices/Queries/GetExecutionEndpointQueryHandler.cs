@@ -17,6 +17,7 @@ public sealed class GetExecutionEndpointQueryHandler
         if (endpoint is null) return ApiResult<ExecutionEndpointResult>.Fail("Execution endpoint not found.", 404);
         if (!KioskAccessRules.CanAccessKiosk(query.UserContext, endpoint.Kiosk))
             return ApiResult<ExecutionEndpointResult>.Fail("Access denied.", 403);
-        return ApiResult<ExecutionEndpointResult>.Success(ExecutionEndpointResultMapper.ToResult(endpoint));
+        var readiness = (await _store.ListReadinessAsync([endpoint.Id], cancellationToken)).SingleOrDefault();
+        return ApiResult<ExecutionEndpointResult>.Success(ExecutionEndpointResultMapper.ToResult(endpoint, readiness));
     }
 }

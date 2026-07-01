@@ -4,6 +4,7 @@ using Application.EdgeIntegration.Services;
 using Application.Shared.Wrappers;
 using Domain.Devices.Enums;
 using Domain.Sync.Enums;
+using Application.EdgeIntegration.Observability;
 
 namespace Application.EdgeIntegration.Commands;
 
@@ -59,6 +60,10 @@ public sealed class PullEdgeCommandsCommandHandler
         }
 
         await _edgeCommandStore.SaveChangesAsync(cancellationToken);
+        foreach (var edgeCommand in commands)
+        {
+            IceBotEdgeMetrics.RecordCommandPull(now - edgeCommand.CreatedAt, edgeCommand.CommandType.ToString());
+        }
 
         return ApiResult<EdgeCommandPullResult>.Success(
             EdgeCommandPullResult.FromCommands(now, commandResults),

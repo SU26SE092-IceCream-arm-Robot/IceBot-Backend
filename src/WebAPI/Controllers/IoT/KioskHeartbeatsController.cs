@@ -10,7 +10,7 @@ namespace WebAPI.Controllers.IoT;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/iot/kiosks/{kioskId:guid}/heartbeat")]
+[Route("api/v{version:apiVersion}/iot/execution-endpoints/{endpointId:guid}/heartbeat")]
 public sealed class KioskHeartbeatsController : ControllerBase
 {
     private readonly IngestKioskHeartbeatCommandHandler _handler;
@@ -26,14 +26,12 @@ public sealed class KioskHeartbeatsController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> IngestHeartbeat(
-        Guid kioskId,
-        [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
+        Guid endpointId,
         [FromBody] IngestKioskHeartbeatRequest request,
         CancellationToken cancellationToken)
     {
         var authentication = await _authenticator.AuthenticateAsync(
             HttpContext,
-            kioskId,
             endpointId,
             cancellationToken);
         if (!authentication.Succeeded)
@@ -43,7 +41,7 @@ public sealed class KioskHeartbeatsController : ControllerBase
 
         var result = await _handler.HandleAsync(new IngestKioskHeartbeatCommand
         {
-            KioskId = kioskId,
+            KioskId = authentication.Endpoint!.KioskId,
             EndpointId = endpointId,
             OriginNodeId = request.OriginNodeId,
             HeartbeatSequence = request.HeartbeatSequence,

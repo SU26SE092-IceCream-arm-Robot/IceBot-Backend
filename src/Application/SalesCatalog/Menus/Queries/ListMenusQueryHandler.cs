@@ -2,6 +2,7 @@ using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.Menus.Mapping;
 using Application.SalesCatalog.Menus.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.SalesCatalog.Menus.Queries;
 
@@ -20,6 +21,7 @@ public sealed class ListMenusQueryHandler
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var effectiveScope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.MenusManage, query.UserContext);
 
         var totalCount = await _menus.CountMenusAsync(
             query.Search,
@@ -27,9 +29,9 @@ public sealed class ListMenusQueryHandler
             query.StoreId,
             query.KioskId,
             query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            effectiveScope.OrganizationIds,
+            effectiveScope.StoreIds,
+            effectiveScope.KioskIds,
             cancellationToken);
 
         var menus = await _menus.ListMenusAsync(
@@ -38,9 +40,9 @@ public sealed class ListMenusQueryHandler
             query.StoreId,
             query.KioskId,
             query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            effectiveScope.OrganizationIds,
+            effectiveScope.StoreIds,
+            effectiveScope.KioskIds,
             pageNumber,
             pageSize,
             cancellationToken);

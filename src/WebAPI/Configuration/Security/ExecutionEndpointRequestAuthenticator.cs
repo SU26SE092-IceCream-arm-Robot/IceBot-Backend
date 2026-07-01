@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
@@ -9,10 +10,14 @@ using WebAPI.Middlewares;
 
 namespace WebAPI.Configuration.Security;
 
-public sealed record ExecutionEndpointRequestAuthenticationResult(bool Succeeded, string Message)
+public sealed record ExecutionEndpointRequestAuthenticationResult(
+    bool Succeeded,
+    string Message,
+    KioskExecutionEndpoint? Endpoint)
 {
-    public static ExecutionEndpointRequestAuthenticationResult Success() => new(true, "Authenticated.");
-    public static ExecutionEndpointRequestAuthenticationResult Fail(string message) => new(false, message);
+    public static ExecutionEndpointRequestAuthenticationResult Success(KioskExecutionEndpoint? endpoint = null) =>
+        new(true, "Authenticated.", endpoint);
+    public static ExecutionEndpointRequestAuthenticationResult Fail(string message) => new(false, message, null);
 }
 
 public sealed class ExecutionEndpointRequestAuthenticator
@@ -34,7 +39,6 @@ public sealed class ExecutionEndpointRequestAuthenticator
 
     public async Task<ExecutionEndpointRequestAuthenticationResult> AuthenticateAsync(
         HttpContext context,
-        Guid kioskId,
         Guid endpointId,
         CancellationToken cancellationToken)
     {
@@ -45,7 +49,7 @@ public sealed class ExecutionEndpointRequestAuthenticator
             return ExecutionEndpointRequestAuthenticationResult.Fail("Execution endpoint id is required.");
 
         var endpoint = await _store.GetEndpointAsync(endpointId, cancellationToken);
-        if (endpoint is null || endpoint.KioskId != kioskId ||
+        if (endpoint is null ||
             endpoint.Status != KioskExecutionEndpointStatus.Active ||
             endpoint.CredentialBinding is null ||
             endpoint.CredentialBinding.Status != ExecutionEndpointCredentialBindingStatus.Active)
@@ -53,7 +57,7 @@ public sealed class ExecutionEndpointRequestAuthenticator
             return ExecutionEndpointRequestAuthenticationResult.Fail("Execution endpoint authentication failed.");
         }
 
-        return endpoint.AuthenticationMode switch
+        var authentication = endpoint.AuthenticationMode switch
         {
             ExecutionEndpointAuthenticationMode.MutualTls =>
                 await AuthenticateMutualTlsAsync(context, endpoint.CredentialBinding, cancellationToken),
@@ -61,6 +65,9 @@ public sealed class ExecutionEndpointRequestAuthenticator
                 await AuthenticateSignedRequestAsync(context, endpoint, cancellationToken),
             _ => ExecutionEndpointRequestAuthenticationResult.Fail("Execution endpoint authentication mode is unsupported.")
         };
+        return authentication.Succeeded
+            ? ExecutionEndpointRequestAuthenticationResult.Success(endpoint)
+            : authentication;
     }
 
     private static async Task<ExecutionEndpointRequestAuthenticationResult> AuthenticateMutualTlsAsync(
@@ -90,7 +97,7 @@ public sealed class ExecutionEndpointRequestAuthenticator
 
     private async Task<ExecutionEndpointRequestAuthenticationResult> AuthenticateSignedRequestAsync(
         HttpContext context,
-        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         CancellationToken cancellationToken)
     {
         var timestampText = context.Request.Headers[TimestampHeader].ToString();

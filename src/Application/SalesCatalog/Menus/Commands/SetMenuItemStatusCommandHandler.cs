@@ -18,6 +18,18 @@ public sealed class SetMenuItemStatusCommandHandler
         SetMenuItemStatusCommand command,
         CancellationToken cancellationToken = default)
     {
+        var menu = await _menus.GetMenuByIdAsync(command.MenuId, cancellationToken: cancellationToken);
+        if (menu is null)
+        {
+            return ApiResult<MenuItemResult>.Fail("Menu not found.", 404);
+        }
+
+        var accessError = MenuManagementCommandRules.ValidateExisting<MenuItemResult>(command.Scope, menu);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var item = await _menus.GetMenuItemByIdAsync(command.MenuId, command.MenuItemId, asNoTracking: false, cancellationToken);
         if (item is null)
         {

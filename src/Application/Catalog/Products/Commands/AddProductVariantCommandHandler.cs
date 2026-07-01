@@ -30,6 +30,12 @@ public sealed class AddProductVariantCommandHandler
             return ApiResult<ProductVariantResult>.Fail("Product not found.", 404);
         }
 
+        var accessError = ProductManagementCommandRules.ValidateExisting<ProductVariantResult>(command.Scope, product);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var validationError = await ProductVariantRequestValidator.ValidateVariantFieldsAsync(
             _products,
             productId,

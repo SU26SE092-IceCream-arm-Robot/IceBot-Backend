@@ -24,6 +24,12 @@ public sealed class SetMenuStatusCommandHandler
             return ApiResult<MenuResult>.Fail("Menu not found.", 404);
         }
 
+        var accessError = MenuManagementCommandRules.ValidateExisting<MenuResult>(command.Scope, menu);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         menu.Status = command.Status;
         menu.UpdatedAt = DateTimeOffset.UtcNow;
         menu.UpdatedByAccountId = command.UpdatedByAccountId;

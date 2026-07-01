@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.ProductionConfiguration.Abstractions;
 using Application.ProductionConfiguration.ReadModels;
 using Application.ProductionConfiguration.Results;
@@ -61,7 +62,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler
     private async Task<ApiResult<ConfigurationDeploymentRollbackResult>> RollbackFullEdgeAsync(
         RollbackConfigurationDeploymentCommand command,
         ConfigurationDeploymentReadModel target,
-        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         CancellationToken cancellationToken)
     {
         if (endpoint.ExecutionProfile != KioskExecutionProfile.FullEdge)
@@ -113,7 +114,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler
     private async Task<ApiResult<ConfigurationDeploymentRollbackResult>> RollbackLowCostAsync(
         RollbackConfigurationDeploymentCommand command,
         ConfigurationDeploymentReadModel target,
-        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         CancellationToken cancellationToken)
     {
         if (endpoint.ExecutionProfile != KioskExecutionProfile.LowCostController)

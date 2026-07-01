@@ -120,6 +120,22 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         }
     }
 
+    public async Task PublishExecutionReadinessChangedAsync(ExecutionReadinessChangedEvent evt, CancellationToken ct = default)
+    {
+        try
+        {
+            await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("ExecutionReadinessChanged", evt, ct);
+            await PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
+            {
+                Scope = "System", Reason = "ExecutionReadinessChanged", UpdatedAt = evt.OccurredAt
+            }, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to publish readiness change for endpoint {EndpointId}.", evt.EndpointId);
+        }
+    }
+
     public async Task PublishAlertChangedAsync(AlertChangedEvent evt, CancellationToken ct = default)
     {
         try

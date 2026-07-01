@@ -24,13 +24,26 @@ public sealed class CreateMenuCommandHandler
         var request = command.Request;
         var createdByAccountId = command.CreatedByAccountId;
 
+        var accessError = MenuManagementCommandRules.ValidateCreate<MenuResult>(
+            command.Scope, request.ScopeType, request.StoreId, request.KioskId);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
+        if (!await _menus.TenantScopeExistsAsync(
+                command.Scope.OrganizationId, request.StoreId, request.KioskId, cancellationToken))
+        {
+            return ApiResult<MenuResult>.Fail("Menu scope does not belong to the route organization.");
+        }
+
         var validationError = await MenuRequestValidator.ValidateMenuFieldsAsync(
             _menus,
             request.Code,
             request.Name,
             request.Currency,
             request.ScopeType,
-            request.OrganizationId,
+            command.Scope.OrganizationId,
             request.StoreId,
             request.KioskId,
             request.EffectiveFrom,
@@ -45,7 +58,7 @@ public sealed class CreateMenuCommandHandler
 
         var menu = new Menu
         {
-            OrganizationId = request.OrganizationId,
+            OrganizationId = command.Scope.OrganizationId,
             StoreId = request.StoreId,
             KioskId = request.KioskId,
             Code = MenuNormalizer.NormalizeCode(request.Code),

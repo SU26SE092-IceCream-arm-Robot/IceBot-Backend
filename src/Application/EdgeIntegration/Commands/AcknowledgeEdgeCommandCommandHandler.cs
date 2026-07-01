@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using System.Text.Json;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
@@ -11,6 +12,8 @@ using Domain.Orders.Enums;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
+using Application.EdgeIntegration.Observability;
+using Microsoft.Extensions.Options;
 
 namespace Application.EdgeIntegration.Commands;
 
@@ -18,20 +21,24 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
 {
     private readonly IEdgeCommandStore _edgeCommandStore;
     private readonly IRealtimeNotificationPublisher _publisher;
+    private readonly ExecutionReportIngestionOptions _options;
 
     public AcknowledgeEdgeCommandCommandHandler(
         IEdgeCommandStore edgeCommandStore,
-        IRealtimeNotificationPublisher publisher)
+        IRealtimeNotificationPublisher publisher,
+        IOptions<ExecutionReportIngestionOptions>? options = null)
     {
         _edgeCommandStore = edgeCommandStore;
         _publisher = publisher;
+        _options = options?.Value ?? new ExecutionReportIngestionOptions();
     }
 
     public async Task<ApiResult<EdgeCommandAckResult>> HandleAsync(
         AcknowledgeEdgeCommandCommand command,
         CancellationToken cancellationToken = default)
     {
-        if (command.KioskId == Guid.Empty || command.EndpointId == Guid.Empty || command.CommandId == Guid.Empty)
+        if (command.KioskId == Guid.Empty || command.EndpointId == Guid.Empty || command.CommandId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(command.AckStatus))
         {
             return ApiResult<EdgeCommandAckResult>.Fail("Kiosk, execution endpoint, and command are required.", 400);
         }
@@ -60,7 +67,19 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
                 "Physical-output evidence is supported only for rejected execute-order commands.", 400);
         }
 
-        var observedAt = command.AcknowledgedAt ?? DateTimeOffset.UtcNow;
+        var cloudReceivedAt = DateTimeOffset.UtcNow;
+        var observedAt = command.AcknowledgedAt ?? cloudReceivedAt;
+        var allowedSkew = TimeSpan.FromSeconds(Math.Max(_options.MaxFutureClockSkewSeconds, 0));
+        if (observedAt > cloudReceivedAt.Add(allowedSkew) ||
+            observedAt < edgeCommand.CreatedAt.Subtract(allowedSkew) ||
+            (edgeCommand.DeliveredAt.HasValue && observedAt < edgeCommand.DeliveredAt.Value.Subtract(allowedSkew)))
+        {
+            return ApiResult<EdgeCommandAckResult>.Fail(
+                "Acknowledgement timestamp is outside the allowed command clock-skew window.", 400);
+        }
+        var priorStatus = edgeCommand.Status;
+        var priorDeliveryAttemptCount = edgeCommand.DeliveryAttempts.Count;
+        var deliveredAt = edgeCommand.DeliveredAt;
         Order? order = null;
         OrderStatus? previousOrderStatus = null;
         if (edgeCommand.CommandType == EdgeCommandType.ExecuteOrder && edgeCommand.OrderId.HasValue)
@@ -106,6 +125,15 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
         }
 
         await _edgeCommandStore.SaveChangesAsync(cancellationToken);
+
+        if ((edgeCommand.Status != priorStatus || edgeCommand.DeliveryAttempts.Count != priorDeliveryAttemptCount) &&
+            deliveredAt.HasValue)
+        {
+            IceBotEdgeMetrics.RecordCommandAck(
+                cloudReceivedAt - deliveredAt.Value,
+                edgeCommand.CommandType.ToString(),
+                command.AckStatus.Trim());
+        }
 
         if (orderChanged)
         {
@@ -253,7 +281,7 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
     }
 
     private async Task EnsureProvisionalExecutionRecordAsync(
-        Domain.Devices.Entities.KioskExecutionEndpoint endpoint,
+        Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         EdgeCommand edgeCommand,
         AcknowledgeEdgeCommandCommand command,
         DateTimeOffset acknowledgedAt,

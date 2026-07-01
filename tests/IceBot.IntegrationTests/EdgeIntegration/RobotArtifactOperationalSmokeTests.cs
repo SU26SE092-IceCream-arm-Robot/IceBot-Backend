@@ -1,3 +1,6 @@
+using Domain.Sync.Ingestion;
+using Domain.Devices.Telemetry;
+using Domain.Devices.ExecutionEndpoints;
 using System.Text;
 using Application.EdgeIntegration;
 using Application.EdgeIntegration.Commands;
@@ -22,11 +25,13 @@ using Domain.Inventory.Enums;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 using Domain.Operations.Enums;
+using Domain.Operations.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionExecution.Enums;
 using Domain.SalesCatalog.Entities;
 using Domain.SalesCatalog.Enums;
 using Domain.Sync.Enums;
+using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using IceBot.IntegrationTests.Infrastructure;
@@ -35,9 +40,11 @@ using Infrastructure.Devices.Persistence;
 using Infrastructure.Orders.Persistence;
 using Infrastructure.ProductionConfiguration.Persistence;
 using Infrastructure.RobotConfiguration.Persistence;
+using Infrastructure.Persistence.Jobs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace IceBot.IntegrationTests.EdgeIntegration;
 
@@ -54,7 +61,60 @@ public sealed class RobotArtifactOperationalSmokeTests
     }
 
     [IntegrationFact]
-    public async Task HeartbeatIngestion_DeduplicatesSequenceAndUpdatesLastOnlineAt()
+    public async Task ReadinessIngestion_AppliesNewRevisionAndReplacesCapabilitySnapshot()
+    {
+        var graph = await SeedPrerequisitesAsync();
+        var publisher = new NoOpRealtimeNotificationPublisher();
+
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.ExecutionReadinessResult>> IngestAsync(
+            long revision,
+            params ExecutionCapabilityInput[] capabilities)
+        {
+            await using var dbContext = _fixture.CreateDbContext();
+            return await new IngestExecutionReadinessCommandHandler(
+                new ExecutionReadinessStore(dbContext),
+                publisher,
+                Options.Create(new EdgeTelemetryIngestionOptions()))
+                .HandleAsync(new IngestExecutionReadinessCommand
+                {
+                    KioskId = graph.KioskId,
+                    EndpointId = graph.EndpointId,
+                    SourceExecutorId = graph.SourceExecutorId,
+                    StateRevision = revision,
+                    ExecutorReportedAt = DateTimeOffset.UtcNow.AddSeconds(-1),
+                    Readiness = ExecutionReadinessState.Ready,
+                    Activity = ExecutionActivityState.Idle,
+                    Safety = ExecutionSafetyState.Safe,
+                    Capabilities = capabilities
+                });
+        }
+
+        var revisionTwo = new ExecutionCapabilityInput("ICE_CREAM", "CELL-A", true, null);
+        var first = await IngestAsync(2, revisionTwo);
+        var duplicate = await IngestAsync(2, revisionTwo);
+        var replacement = await IngestAsync(3,
+            new ExecutionCapabilityInput("COFFEE", "CELL-B", false, "Cleaning"));
+
+        Assert.True(first.Succeeded, first.Message);
+        Assert.True(first.Data!.Applied);
+        Assert.True(duplicate.Succeeded, duplicate.Message);
+        Assert.True(duplicate.Data!.DuplicateOrStale);
+        Assert.True(replacement.Succeeded, replacement.Message);
+        Assert.Equal(2, publisher.ExecutionReadinessChangedEvents.Count);
+
+        await using var assertionContext = _fixture.CreateDbContext();
+        var projection = await assertionContext.ExecutionEndpointReadinessProjections
+            .Include(item => item.Capabilities)
+            .SingleAsync(item => item.KioskExecutionEndpointId == graph.EndpointId);
+        Assert.Equal(3, projection.StateRevision);
+        var capability = Assert.Single(projection.Capabilities);
+        Assert.Equal("COFFEE", capability.CapabilityCode);
+        Assert.False(capability.IsAvailable);
+        Assert.Equal("Cleaning", capability.UnavailableReason);
+    }
+
+    [IntegrationFact]
+    public async Task HeartbeatIngestion_DeduplicatesAndDoesNotLetStaleSequenceRewindConnectivity()
     {
         var graph = await SeedPrerequisitesAsync();
         var reportedAt = DateTimeOffset.UtcNow.AddSeconds(-5);
@@ -67,7 +127,9 @@ public sealed class RobotArtifactOperationalSmokeTests
             await setupContext.SaveChangesAsync();
         }
 
-        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.HeartbeatIngestResult>> IngestAsync()
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.HeartbeatIngestResult>> IngestAsync(
+            long sequence,
+            KioskHeartbeatStatus status)
         {
             await using var dbContext = _fixture.CreateDbContext();
             return await new IngestKioskHeartbeatCommandHandler(
@@ -79,9 +141,9 @@ public sealed class RobotArtifactOperationalSmokeTests
                     KioskId = graph.KioskId,
                     EndpointId = graph.EndpointId,
                     OriginNodeId = graph.SourceExecutorId,
-                    HeartbeatSequence = 1,
+                    HeartbeatSequence = sequence,
                     ReportedAt = reportedAt,
-                    Status = KioskHeartbeatStatus.Online,
+                    Status = status,
                     AppVersion = "1.0.0",
                     CpuUsagePercent = 10,
                     MemoryUsagePercent = 20,
@@ -89,23 +151,27 @@ public sealed class RobotArtifactOperationalSmokeTests
                 });
         }
 
-        var first = await IngestAsync();
-        var duplicate = await IngestAsync();
+        var first = await IngestAsync(2, KioskHeartbeatStatus.Online);
+        var stale = await IngestAsync(1, KioskHeartbeatStatus.Offline);
+        var duplicate = await IngestAsync(2, KioskHeartbeatStatus.Online);
 
         Assert.True(first.Succeeded, first.Message);
         Assert.Equal(201, first.StatusCode);
         Assert.False(first.Data!.Duplicate);
+        Assert.True(stale.Succeeded, stale.Message);
+        Assert.True(stale.Data!.Stale);
         Assert.True(duplicate.Succeeded, duplicate.Message);
         Assert.True(duplicate.Data!.Duplicate);
         Assert.Equal(first.Data.HeartbeatId, duplicate.Data.HeartbeatId);
 
         await using var assertionContext = _fixture.CreateDbContext();
-        var heartbeat = Assert.Single(await assertionContext.KioskHeartbeats
+        var heartbeats = await assertionContext.KioskHeartbeats
             .Where(item =>
                 item.KioskId == graph.KioskId &&
-                item.NodeId == graph.SourceExecutorId &&
-                item.HeartbeatSequence == 1)
-            .ToListAsync());
+                item.NodeId == graph.SourceExecutorId)
+            .ToListAsync();
+        Assert.Equal(2, heartbeats.Count);
+        var heartbeat = Assert.Single(heartbeats, item => item.HeartbeatSequence == 2);
         var kiosk = await assertionContext.Kiosks.SingleAsync(item => item.Id == graph.KioskId);
         Assert.Equal(first.Data.ReceivedAt, heartbeat.ReceivedAt);
         Assert.Equal(first.Data.ReceivedAt, kiosk.LastOnlineAt);
@@ -169,8 +235,10 @@ public sealed class RobotArtifactOperationalSmokeTests
         async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.DeviceEventIngestResult>> IngestAsync()
         {
             await using var dbContext = _fixture.CreateDbContext();
+            var telemetryStore = new EdgeTelemetryIngestionStore(dbContext);
             return await new IngestDeviceEventCommandHandler(
-                new EdgeTelemetryIngestionStore(dbContext),
+                telemetryStore,
+                telemetryStore,
                 publisher,
                 Options.Create(new EdgeTelemetryIngestionOptions()))
                 .HandleAsync(new IngestDeviceEventCommand
@@ -210,6 +278,222 @@ public sealed class RobotArtifactOperationalSmokeTests
             .Where(item => item.SourceType == "DeviceEvent" && item.SourceId == first.Data.DeviceEventId)
             .ToListAsync());
         Assert.Equal(AlertStatus.Open, alert.Status);
+    }
+
+    [IntegrationFact]
+    public async Task BatchEventSync_ReplaysMixedTelemetryWithoutDuplicates()
+    {
+        var graph = await SeedPrerequisitesAsync();
+        var publisher = new NoOpRealtimeNotificationPublisher();
+        var heartbeatEventId = Guid.NewGuid();
+        var deviceEventId = Guid.NewGuid();
+        var localLogEventId = Guid.NewGuid();
+
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.BatchEventSyncResult>> IngestAsync()
+        {
+            await using var dbContext = _fixture.CreateDbContext();
+            var telemetryStore = new EdgeTelemetryIngestionStore(dbContext);
+            var options = Options.Create(new EdgeTelemetryIngestionOptions());
+            return await new IngestBatchEventsCommandHandler(
+                    new BatchEventSyncStore(dbContext),
+                    new IngestKioskHeartbeatCommandHandler(telemetryStore, publisher, options),
+                    new IngestDeviceEventCommandHandler(telemetryStore, telemetryStore, publisher, options),
+                    new IngestLocalOperationLogCommandHandler(telemetryStore, options),
+                    options,
+                    NullLogger<IngestBatchEventsCommandHandler>.Instance)
+                .HandleAsync(new IngestBatchEventsCommand
+                {
+                    KioskId = graph.KioskId,
+                    EndpointId = graph.EndpointId,
+                    OriginNodeId = graph.SourceExecutorId,
+                    Events =
+                    [
+                        new BatchSyncEventItem
+                        {
+                            EventId = heartbeatEventId,
+                            EventType = BatchSyncEventType.Heartbeat,
+                            Heartbeat = new BatchHeartbeatData
+                            {
+                                HeartbeatSequence = 991,
+                                ReportedAt = DateTimeOffset.UtcNow,
+                                Status = KioskHeartbeatStatus.Online
+                            }
+                        },
+                        new BatchSyncEventItem
+                        {
+                            EventId = deviceEventId,
+                            EventType = BatchSyncEventType.DeviceEvent,
+                            DeviceEvent = new BatchDeviceEventData
+                            {
+                                DeviceId = graph.DeviceId,
+                                EventType = "BatchMotorFault",
+                                Severity = SeverityLevel.Error,
+                                Message = "Motor fault replayed from local storage.",
+                                OccurredAt = DateTimeOffset.UtcNow
+                            }
+                        },
+                        new BatchSyncEventItem
+                        {
+                            EventId = localLogEventId,
+                            EventType = BatchSyncEventType.LocalLog,
+                            LocalLog = new BatchLocalLogData
+                            {
+                                DeviceId = graph.DeviceId,
+                                Action = "RuntimeRestarted",
+                                Category = "EdgeRuntime",
+                                Severity = SeverityLevel.Info,
+                                Message = "Runtime restarted after a local power interruption.",
+                                OccurredAt = DateTimeOffset.UtcNow
+                            }
+                        }
+                    ]
+                });
+        }
+
+        var first = await IngestAsync();
+        var replay = await IngestAsync();
+
+        Assert.True(first.Succeeded, first.Message);
+        Assert.Equal(3, first.Data!.AcceptedCount);
+        Assert.Equal(0, first.Data.DuplicateCount);
+        Assert.True(replay.Succeeded, replay.Message);
+        Assert.Equal(3, replay.Data!.DuplicateCount);
+
+        await using var assertionContext = _fixture.CreateDbContext();
+        Assert.Equal(3, await assertionContext.SyncEventInbox.CountAsync(item =>
+            item.EventId == heartbeatEventId || item.EventId == deviceEventId || item.EventId == localLogEventId));
+        Assert.Single(await assertionContext.OperationLogs.Where(item => item.SourceEventId == localLogEventId).ToListAsync());
+        var persistedDeviceEvent = Assert.Single(
+            await assertionContext.DeviceEvents.Where(item => item.EventId == deviceEventId).ToListAsync());
+        Assert.Single(await assertionContext.Alerts.Where(item => item.SourceId == persistedDeviceEvent.Id).ToListAsync());
+    }
+
+    [IntegrationFact]
+    public async Task RetentionPurge_PreservesTicketEvidenceAndNonTerminalInbox()
+    {
+        var graph = await SeedPrerequisitesAsync();
+        var now = DateTimeOffset.UtcNow;
+        var oldTimestamp = now.AddDays(-200);
+        var protectedEvent = new DeviceEvent
+        {
+            DeviceId = graph.DeviceId,
+            KioskId = graph.KioskId,
+            EventId = Guid.NewGuid(),
+            EventType = "ProtectedEvidence",
+            Severity = SeverityLevel.Error,
+            Message = "Referenced by maintenance ticket.",
+            OccurredAt = oldTimestamp,
+            OriginNodeId = graph.SourceExecutorId,
+            Version = 1
+        };
+        var deletableEvent = new DeviceEvent
+        {
+            DeviceId = graph.DeviceId,
+            KioskId = graph.KioskId,
+            EventId = Guid.NewGuid(),
+            EventType = "ExpiredEvidence",
+            Severity = SeverityLevel.Warning,
+            Message = "Unreferenced old evidence.",
+            OccurredAt = oldTimestamp,
+            OriginNodeId = graph.SourceExecutorId,
+            Version = 1
+        };
+        var processedInboxId = Guid.NewGuid();
+        var failedInboxId = Guid.NewGuid();
+
+        await using var dbContext = _fixture.CreateDbContext();
+        dbContext.AddRange(
+            protectedEvent,
+            deletableEvent,
+            new KioskHeartbeat
+            {
+                KioskId = graph.KioskId,
+                NodeId = graph.SourceExecutorId,
+                OriginNodeId = graph.SourceExecutorId,
+                HeartbeatSequence = 7001,
+                Version = 7001,
+                ReportedAt = oldTimestamp,
+                ReceivedAt = oldTimestamp,
+                Status = KioskHeartbeatStatus.Online
+            },
+            new OperationLog
+            {
+                KioskId = graph.KioskId,
+                SourceEventId = Guid.NewGuid(),
+                Action = "OldLog",
+                Category = "RetentionTest",
+                Severity = SeverityLevel.Info,
+                Message = "Old local log.",
+                OccurredAt = oldTimestamp,
+                OriginNodeId = graph.SourceExecutorId,
+                Version = 1
+            },
+            new SyncEventInbox
+            {
+                Id = processedInboxId,
+                EventId = Guid.NewGuid(),
+                KioskId = graph.KioskId,
+                SourceNodeId = graph.SourceExecutorId,
+                EventType = "Retention.Processed",
+                PayloadJson = "{}",
+                Status = SyncEventStatus.Processed,
+                OccurredAt = oldTimestamp,
+                ReceivedAt = oldTimestamp,
+                ProcessedAt = oldTimestamp
+            },
+            new SyncEventInbox
+            {
+                Id = failedInboxId,
+                EventId = Guid.NewGuid(),
+                KioskId = graph.KioskId,
+                SourceNodeId = graph.SourceExecutorId,
+                EventType = "Retention.Failed",
+                PayloadJson = "{}",
+                Status = SyncEventStatus.Failed,
+                OccurredAt = oldTimestamp,
+                ReceivedAt = oldTimestamp,
+                LastError = "Keep for retry investigation."
+            });
+        await dbContext.SaveChangesAsync();
+        dbContext.MaintenanceTickets.Add(new MaintenanceTicket
+        {
+            OrganizationId = graph.OrganizationId,
+            StoreId = graph.StoreId,
+            KioskId = graph.KioskId,
+            DeviceId = graph.DeviceId,
+            DeviceEventId = protectedEvent.Id,
+            TicketNumber = $"MT-{Guid.NewGuid():N}",
+            IssueCode = "DEVICE_EVENT_EVIDENCE",
+            Title = "Protected retention evidence",
+            Priority = MaintenancePriority.Medium,
+            Status = MaintenanceTicketStatus.Open,
+            ReportedAt = oldTimestamp
+        });
+        await dbContext.SaveChangesAsync();
+        dbContext.ChangeTracker.Clear();
+
+        var purger = new DataRetentionPurger(
+            dbContext,
+            Options.Create(new DataRetentionOptions
+            {
+                HeartbeatDays = 30,
+                DeviceEventDays = 90,
+                OperationLogDays = 90,
+                ProcessedSyncInboxDays = 180,
+                BatchSize = 1,
+                MaxBatchesPerRun = 10
+            }));
+        var result = await purger.PurgeAsync(now);
+        dbContext.ChangeTracker.Clear();
+
+        Assert.Equal(1, result.Heartbeats);
+        Assert.Equal(1, result.DeviceEvents);
+        Assert.Equal(1, result.OperationLogs);
+        Assert.Equal(1, result.SyncInboxReceipts);
+        Assert.True(await dbContext.DeviceEvents.AnyAsync(item => item.Id == protectedEvent.Id));
+        Assert.False(await dbContext.DeviceEvents.AnyAsync(item => item.Id == deletableEvent.Id));
+        Assert.False(await dbContext.SyncEventInbox.AnyAsync(item => item.Id == processedInboxId));
+        Assert.True(await dbContext.SyncEventInbox.AnyAsync(item => item.Id == failedInboxId));
     }
 
     [IntegrationFact]
@@ -576,8 +860,12 @@ public sealed class RobotArtifactOperationalSmokeTests
         await PullAndAcknowledgeAsync(graph, releaseMismatchDispatch.Data!.EdgeCommandId, "Accepted");
         await using (var mismatchContext = _fixture.CreateDbContext())
         {
+            var mismatchStore = new ExecutionReportStore(mismatchContext);
             var mismatch = await new IngestExecutionReportCommandHandler(
-                new ExecutionReportStore(mismatchContext),
+                mismatchStore,
+                mismatchStore,
+                mismatchStore,
+                mismatchStore,
                 new NoOpRealtimeNotificationPublisher(),
                 Options.Create(new ExecutionReportIngestionOptions()))
                 .HandleAsync(new IngestExecutionReportCommand
@@ -637,12 +925,11 @@ public sealed class RobotArtifactOperationalSmokeTests
                 UserContext = user
             });
         Assert.True(attemptDetail.Succeeded, attemptDetail.Message);
-        Assert.Equal(2, attemptDetail.Data!.ProductionExecutions.Count);
+        var productionExecution = Assert.Single(attemptDetail.Data!.ProductionExecutions);
+        Assert.NotEqual(Guid.Empty, productionExecution.SourceProductionJobId);
         Assert.NotEmpty(attemptDetail.Data.DeliveryAttempts);
         Assert.False(attemptDetail.Data.Provenance.IsRedispatch);
         Assert.Null(attemptDetail.Data.PreviousAttempt);
-        Assert.Single(attemptDetail.Data.ProductionExecutions, item => item.IsOrderSummary);
-        Assert.Single(attemptDetail.Data.ProductionExecutions, item => !item.IsOrderSummary);
 
         var expiryOrderId = await CreatePaidOrderAsync(graph);
         var expiryBase = DateTimeOffset.UtcNow;
@@ -966,8 +1253,12 @@ public sealed class RobotArtifactOperationalSmokeTests
         IReadOnlyCollection<StockMovementEvidenceInput>? stockMovements = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
+        var reportStore = new ExecutionReportStore(dbContext);
         var result = await new IngestExecutionReportCommandHandler(
-            new ExecutionReportStore(dbContext),
+            reportStore,
+            reportStore,
+            reportStore,
+            reportStore,
             new NoOpRealtimeNotificationPublisher(),
             Options.Create(new ExecutionReportIngestionOptions()))
             .HandleAsync(new IngestExecutionReportCommand
@@ -1032,8 +1323,12 @@ public sealed class RobotArtifactOperationalSmokeTests
         string status)
     {
         await using var dbContext = _fixture.CreateDbContext();
+        var reportStore = new ExecutionReportStore(dbContext);
         var result = await new IngestExecutionReportCommandHandler(
-            new ExecutionReportStore(dbContext),
+            reportStore,
+            reportStore,
+            reportStore,
+            reportStore,
             new NoOpRealtimeNotificationPublisher(),
             Options.Create(new ExecutionReportIngestionOptions()))
             .HandleAsync(new IngestExecutionReportCommand
@@ -1195,6 +1490,17 @@ public sealed class RobotArtifactOperationalSmokeTests
         var credential = endpoint.ProvisionCredential($"cert-{Guid.NewGuid():N}", DateTimeOffset.UtcNow);
         endpoint.Activate(Guid.NewGuid(), DateTimeOffset.UtcNow);
         dbContext.ExecutionEndpointCredentialBindings.Add(credential);
+        var readiness = ExecutionEndpointReadinessProjection.Create(
+            kiosk.Id, endpoint.Id, endpoint.FullEdgeRuntimeId!.Value, 1,
+            ExecutionReadinessState.Ready, ExecutionActivityState.Idle, ExecutionSafetyState.Safe,
+            null, PhysicalOutputState.No, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        dbContext.ExecutionEndpointReadinessProjections.Add(readiness);
+        dbContext.ExecutionEndpointCapabilityProjections.Add(new ExecutionEndpointCapabilityProjection
+        {
+            ExecutionEndpointReadinessProjectionId = readiness.Id,
+            CapabilityCode = "ICE_CREAM",
+            IsAvailable = true
+        });
         await dbContext.SaveChangesAsync();
 
         return new SmokeGraph(

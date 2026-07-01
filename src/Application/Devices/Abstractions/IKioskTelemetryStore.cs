@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using Application.Devices.Results;
 using Domain.Common.Enums;
 using Domain.Devices.Entities;

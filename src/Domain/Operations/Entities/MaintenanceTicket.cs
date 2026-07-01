@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using Domain.Common;
 using Domain.Devices.Entities;
 using Domain.Identity.Entities;

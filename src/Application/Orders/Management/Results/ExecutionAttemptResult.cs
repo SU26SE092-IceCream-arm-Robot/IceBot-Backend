@@ -71,7 +71,6 @@ public sealed class ExecutionDeliveryAttemptResult
 public sealed class ProductionExecutionResult
 {
     public Guid Id { get; init; }
-    public bool IsOrderSummary { get; init; }
     public Guid? SourceProductionJobId { get; init; }
     public Guid? WorkcellId { get; init; }
     public Guid? ControllerId { get; init; }

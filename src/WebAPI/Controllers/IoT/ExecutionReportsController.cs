@@ -9,7 +9,7 @@ namespace WebAPI.Controllers.IoT;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/iot/kiosks/{kioskId:guid}/execution-reports")]
+[Route("api/v{version:apiVersion}/iot/execution-endpoints/{endpointId:guid}/commands/{commandId:guid}/reports")]
 public sealed class ExecutionReportsController : ControllerBase
 {
     private readonly IngestExecutionReportCommandHandler _ingestExecutionReportHandler;
@@ -25,19 +25,19 @@ public sealed class ExecutionReportsController : ControllerBase
 
     [HttpPost]
     public async Task<IActionResult> IngestExecutionReport(
-        Guid kioskId,
-        [FromHeader(Name = "X-Execution-Endpoint-Id")] Guid endpointId,
+        Guid endpointId,
+        Guid commandId,
         [FromBody] IngestExecutionReportRequest request,
         CancellationToken cancellationToken)
     {
-        var authentication = await _authenticator.AuthenticateAsync(HttpContext, kioskId, endpointId, cancellationToken);
+        var authentication = await _authenticator.AuthenticateAsync(HttpContext, endpointId, cancellationToken);
         if (!authentication.Succeeded) return Unauthorized(ApiResult<object>.Fail(authentication.Message, 401));
 
         var command = new IngestExecutionReportCommand
         {
-            KioskId = kioskId,
+            KioskId = authentication.Endpoint!.KioskId,
             EndpointId = endpointId,
-            CommandId = request.CommandId,
+            CommandId = commandId,
             SourceEventId = request.SourceEventId,
             SequenceNumber = request.SequenceNumber,
             EdgeCreatedAt = request.EdgeCreatedAt,
@@ -73,9 +73,6 @@ public sealed class ExecutionReportsController : ControllerBase
 
 public sealed class IngestExecutionReportRequest
 {
-    [Required]
-    public Guid CommandId { get; init; }
-
     [Required]
     public Guid SourceEventId { get; init; }
 

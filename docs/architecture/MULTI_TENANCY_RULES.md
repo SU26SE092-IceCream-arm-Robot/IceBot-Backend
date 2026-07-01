@@ -231,6 +231,15 @@ Recommended uniqueness:
 
 Global product templates should have all scope IDs null.
 
+Management transport separates platform templates from tenant rows:
+
+- `/management/product-templates/*` can address only `Global` products. `Manager` may read templates for cloning; only `SystemAdmin` may create or mutate them.
+- `/management/organizations/{organizationId}/products/*` can address only products owned by that organization.
+- `/management/organizations/{organizationId}/menus/*` can address only menus owned by that organization.
+- `Menu` has no global authoring/runtime fallback in this API version; an effective menu must belong to the kiosk organization and may be narrowed to Store or Kiosk scope.
+- tenant ownership (`OrganizationId`, `ScopeType`, `StoreId`, `KioskId`, and template lineage) is immutable after creation; moving ownership requires an explicit clone/promote use case rather than generic update.
+- every product/menu mutation revalidates actor scope and route ownership in the Application handler. Route nesting is not the authorization boundary by itself.
+
 ### ProductVariant
 
 `ProductVariant` belongs to a `Product` and represents a sellable/recipe-bearing variant such as size, portion, flavor, or package.

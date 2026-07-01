@@ -38,6 +38,7 @@ Clients must explicitly join a group to receive targeted events.
 - `MaintenanceTicketChanged`: Triggered when a maintenance ticket is created, updated, assigned, started, resolved, closed, or cancelled.
 - `InventoryChanged`: Triggered when a dispenser is refilled or its stock estimate is adjusted.
 - `KioskStatusChanged`: Triggered only after a committed kiosk status transition. Heartbeat timeout emits `Active -> Offline` with connectivity `Unreachable`; an accepted reachable heartbeat may emit `Offline -> Active`. Duplicate heartbeat ingestion and unchanged status do not emit this event. Management transitions such as Maintenance or Disabled continue to use the same event contract.
+- `ExecutionReadinessChanged`: Triggered after a newer typed readiness/capability projection commits. Payload carries endpoint, revision, readiness, activity, and safety; clients refresh detailed capability state from the read model when needed.
 - `DeviceEventCreated`: Triggered once after a new warning/error device event commits. Idempotent event retries do not publish it again.
 - `AlertChanged`: Triggered after an actionable alert is created, acknowledged, or resolved. It carries a committed state delta; idempotent lifecycle retries do not publish it again.
 

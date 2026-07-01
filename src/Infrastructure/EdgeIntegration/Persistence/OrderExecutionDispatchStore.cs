@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
 using Domain.Catalog.Enums;
 using Domain.Devices.Entities;
@@ -10,6 +11,7 @@ using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -67,6 +69,13 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             .OrderBy(endpoint => endpoint.Id)
             .ToListAsync(cancellationToken);
     }
+
+    public Task<ExecutionEndpointReadinessProjection?> GetReadinessAsync(
+        Guid endpointId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.ExecutionEndpointReadinessProjections.AsNoTracking()
+            .Include(x => x.Capabilities)
+            .FirstOrDefaultAsync(x => x.KioskExecutionEndpointId == endpointId, cancellationToken);
 
     public Task<ConfigurationRelease?> GetReleaseAsync(
         Guid releaseId,

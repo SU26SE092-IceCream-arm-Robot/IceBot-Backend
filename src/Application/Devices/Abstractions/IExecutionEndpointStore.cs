@@ -1,9 +1,16 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Entities;
+using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Application.Devices.Abstractions;
 
 public interface IExecutionEndpointStore
 {
+    Task<T> ExecuteMqttCredentialMutationAsync<T>(
+        Guid endpointId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<KioskExecutionEndpoint>> ListAsync(
         Guid? organizationId,
         Guid? storeId,
@@ -25,6 +32,10 @@ public interface IExecutionEndpointStore
 
     Task<KioskExecutionEndpoint?> GetByIdAsync(Guid endpointId, CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<ExecutionEndpointReadinessProjection>> ListReadinessAsync(
+        IEnumerable<Guid> endpointIds,
+        CancellationToken cancellationToken = default);
+
     Task<Domain.Tenants.Entities.Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<Device?> GetDeviceByIdAsync(Guid deviceId, CancellationToken cancellationToken = default);
@@ -45,6 +56,10 @@ public interface IExecutionEndpointStore
 
     Task AddCredentialBindingAsync(
         ExecutionEndpointCredentialBinding credentialBinding,
+        CancellationToken cancellationToken = default);
+
+    Task AddMqttCredentialAsync(
+        ExecutionEndpointMqttCredential credential,
         CancellationToken cancellationToken = default);
 
     void RemoveSupportedRobotTargets(IEnumerable<ExecutionEndpointSupportedRobotTarget> targets);

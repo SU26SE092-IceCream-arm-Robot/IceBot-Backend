@@ -39,12 +39,14 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Device management | `/api/v1/management/devices/*`, `/api/v1/management/kiosks/*/devices` | create/update/set management status/retire devices, list and view devices |
 | Execution endpoint management | `/api/v1/management/execution-endpoints/*`, `/api/v1/management/kiosks/{kioskId}/execution-endpoints` | create, provision, inspect, configure compatibility, disable/reactivate, rotate credentials, and retire Full Edge or low-cost execution endpoints |
 | Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
-| Product and menu management | `/api/v1/management/products`, `/api/v1/management/menus` | back-office catalog/menu/pricing operations |
+| Global product templates | `/api/v1/management/product-templates/*` | SystemAdmin-only platform template authoring |
+| Organization product and menu management | `/api/v1/management/organizations/{organizationId}/products/*`, `/api/v1/management/organizations/{organizationId}/menus/*` | tenant-scoped catalog/menu/pricing operations |
 | Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/organizations/{organizationId}/robot-programs/*`, `/api/v1/management/organizations/{organizationId}/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments/{profile}` | upload immutable robot Lua artifacts, publish robot programs, publish immutable configuration releases, and request Full Edge or low-cost controller deployment |
 | Global robot artifact templates | `/api/v1/management/robot-artifact-templates/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts/from-template` | manage reusable global Lua templates and clone a Published template into an organization-owned Draft artifact |
 | Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/execution-attempts`, `/api/v1/management/refunds` | internal order search, execution-attempt inspection, unpaid cancellation, refund-required marking, manual refund tracking |
 | Inventory management | `/api/v1/management/inventory/*` | dispenser states, stock movement history, refill, estimate adjustment |
-| Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/events` | kiosk connectivity history and device warnings/errors |
+| Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/device-events` | kiosk connectivity history and device warnings/errors |
+| Sync dead-letter operations | `/api/v1/management/sync-dead-letters` | SystemAdmin inspection, typed retry, retry audit, resolve, and ignore |
 | Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, execution reports, future event batch sync, heartbeat, configuration sync |
@@ -82,8 +84,10 @@ Management APIs are for internal operations, not only the `Manager` role.
 Current examples:
 
 ```text
-GET /api/v1/management/products
-GET /api/v1/management/menus
+GET /api/v1/management/product-templates
+GET /api/v1/management/organizations/{organizationId}/products
+POST /api/v1/management/organizations/{organizationId}/products/from-template
+GET /api/v1/management/organizations/{organizationId}/menus
 GET /api/v1/management/accounts
 GET /api/v1/management/accounts/{accountId}/effective-access
 PUT /api/v1/management/accounts/{accountId}/roles
@@ -112,6 +116,9 @@ PUT /api/v1/management/devices/{deviceId}
 PATCH /api/v1/management/devices/{deviceId}/status
 DELETE /api/v1/management/devices/{deviceId}
 PATCH /api/v1/management/execution-endpoints/{endpointId}/credential
+POST /api/v1/management/execution-endpoints/{endpointId}/mqtt-credential
+PATCH /api/v1/management/execution-endpoints/{endpointId}/mqtt-credential
+DELETE /api/v1/management/execution-endpoints/{endpointId}/mqtt-credential
 GET /api/v1/management/execution-endpoints
 GET /api/v1/management/execution-endpoints/{endpointId}
 POST /api/v1/management/kiosks/{kioskId}/execution-endpoints
@@ -146,7 +153,7 @@ GET /api/v1/management/organizations/{organizationId}/robot-programs
 GET /api/v1/management/organizations/{organizationId}/robot-programs/{programId}
 PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}
 GET /api/v1/management/organizations/{organizationId}/configuration-releases
-GET /api/v1/management/organizations/{organizationId}/configuration-release-authoring-options
+GET /api/v1/management/organizations/{organizationId}/configuration-releases/authoring-options
 GET /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}
 POST /api/v1/management/organizations/{organizationId}/configuration-releases
 PUT /api/v1/management/organizations/{organizationId}/configuration-releases/{releaseId}/routes
@@ -172,7 +179,7 @@ GET /api/v1/management/inventory/stock-movements
 POST /api/v1/management/inventory/dispenser-states/{id}/refill
 POST /api/v1/management/inventory/dispenser-states/{id}/adjust-estimate
 GET /api/v1/management/kiosks/{kioskId}/heartbeats
-GET /api/v1/management/kiosks/{kioskId}/events
+GET /api/v1/management/kiosks/{kioskId}/device-events
 GET /api/v1/management/alerts
 GET /api/v1/management/alerts/{alertId}
 PATCH /api/v1/management/alerts/{alertId}/acknowledge
@@ -202,6 +209,7 @@ Rules:
 - It is valid for multiple roles to share the same management endpoint when policy allows it.
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
 - Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
+- Product and menu ownership comes from the organization route, never from a body-supplied `OrganizationId`. Generic updates cannot move `OrganizationId`, `ScopeType`, `StoreId`, `KioskId`, or template lineage. Global product templates are managed separately by `SystemAdmin`; `POST .../products/from-template` copies template metadata and variants into a new organization-owned product and records `TemplateProductId`.
 - GraphQL `tenantTree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
 - Back-office order operations are manual support workflows. Paid orders should be marked `RefundRequired`; they are not cancelled directly.
 - Order status history is a back-office audit read model. It exposes order status transitions and a small actor snapshot (`changedByAccountId`, `changedByName`, `changedByEmail`), not full account objects, raw payment callback bodies, or robot telemetry.
@@ -238,7 +246,7 @@ Rules:
 - `RobotProgramArtifact` is aggregate membership, not an independent management resource. Clients replace the ordered collection through the program endpoint instead of creating or deleting membership rows individually.
 - Configuration releases are created as organization-owned drafts with backend-assigned release numbers. Route authoring replaces the complete Draft route/binding collection; `ExecutionRoute` and `ExecutionRouteRobotBinding` are aggregate children, not independent CRUD resources.
 - Draft robot programs and Draft configuration releases can be hard-discarded through their `DELETE` endpoints. Published or referenced records are preserved; retirement remains the lifecycle operation for published history.
-- `GET /management/organizations/{organizationId}/configuration-release-authoring-options` is a tenant-scoped UI lookup read model. It returns eligible machine-produced ProductVariant options, Published/Active Recipes, and organization-owned Published RobotPrograms with scope and display metadata. `productVariantId`, `search`, and `limit` are optional; `limit` applies independently to each result group. The command handler still revalidates every selected id when routes are submitted.
+- `GET /management/organizations/{organizationId}/configuration-releases/authoring-options` is a tenant-scoped UI lookup read model owned by configuration-release authoring. It returns eligible machine-produced ProductVariant options, Published/Active Recipes, and organization-owned Published RobotPrograms with scope and display metadata. `productVariantId`, `search`, and `limit` are optional; `limit` applies independently to each result group. The command handler still revalidates every selected id when routes are submitted.
 - Release route authoring requires Published/Active recipes to belong to their product variants and bindings to reference Published robot programs owned by the release organization. Kiosk/device compatibility remains a deployment-time validation.
 - Release lists return summaries without manifest JSON or route/binding collections. Release detail remains the review surface for the complete authored graph.
 - Configuration deployment reads unify Full Edge and Low-cost histories behind one tenant-scoped, paged management surface. Filters include organization, store, kiosk, release, profile, and status. Profile-specific provenance remains nullable rather than being discarded.
@@ -315,13 +323,17 @@ IoT/edge APIs are for local edge backend and kiosk runtime integration.
 Current direction:
 
 ```text
-POST /api/v1/iot/kiosks/{kioskId}/commands/pull
-POST /api/v1/iot/kiosks/{kioskId}/commands/{commandId}/ack
-POST /api/v1/iot/kiosks/{kioskId}/execution-reports
-POST /api/v1/iot/kiosks/{kioskId}/device-events
-POST /api/v1/iot/kiosks/{kioskId}/events
-POST /api/v1/iot/kiosks/{kioskId}/heartbeat
-GET /api/v1/iot/kiosks/{kioskId}/configuration
+POST /api/v1/iot/execution-endpoints/{endpointId}/commands/pull
+POST /api/v1/iot/execution-endpoints/{endpointId}/commands/{commandId}/ack
+POST /api/v1/iot/execution-endpoints/{endpointId}/commands/{commandId}/reports
+POST /api/v1/iot/execution-endpoints/{endpointId}/device-events
+POST /api/v1/iot/execution-endpoints/{endpointId}/telemetry-events
+POST /api/v1/iot/execution-endpoints/{endpointId}/production-sync/events
+GET /api/v1/iot/execution-endpoints/{endpointId}/production-sync/checkpoint
+POST /api/v1/iot/execution-endpoints/{endpointId}/production-sync/state-summaries
+POST /api/v1/iot/execution-endpoints/{endpointId}/heartbeat
+POST /api/v1/iot/execution-endpoints/{endpointId}/readiness
+GET /api/v1/iot/execution-endpoints/{endpointId}/configuration
 ```
 
 Rules:
@@ -330,15 +342,23 @@ Rules:
 - IoT routes no longer accept plaintext `X-Execution-Credential`. Full Edge endpoints authenticate with a directly presented client certificate pinned by SHA-256 fingerprint. Low-cost endpoints authenticate each raw HTTP request with ECDSA NIST P-256, timestamp, and a database-deduplicated nonce over TLS.
 - Execution endpoint reads are tenant-scoped and never return credential material. Full Edge provisioning accepts `ClientCertificateSha256Fingerprint`; low-cost provisioning accepts `EcdsaPublicKeyPem`. Both require at least one supported robot target and assign exactly one profile identity: `FullEdgeRuntimeId` or `ControllerId`.
 - Cryptographic transport verification belongs to WebAPI. Application handlers retain endpoint/kiosk/status/credential-binding checks but do not receive HTTP certificates, signatures, or plaintext credentials.
-- Heartbeat ingest derives trust from the authenticated execution endpoint, validates `originNodeId` against its bound profile identity, deduplicates by `(kioskId, originNodeId, heartbeatSequence)`, and updates `Kiosk.LastOnlineAt` using Cloud receive time.
+- Heartbeat ingest derives trust from the authenticated execution endpoint, validates `originNodeId` against its bound profile identity, and deduplicates by `(kioskId, originNodeId, heartbeatSequence)`. Unique stale sequences remain history-only; only the newest `Online`/`Degraded` sequence advances `Kiosk.LastOnlineAt` using Cloud receive time or changes current connectivity.
 - The connectivity state machine owns `Active <-> Offline`: reachable heartbeat evidence recovers an Offline kiosk when its parent scope is active; an Offline heartbeat or heartbeat timeout moves an Active kiosk Offline. It does not override Provisioning, Maintenance, Disabled, or Retired. Manual management requests cannot set Offline or recover Offline to Active.
 - Heartbeat ingestion and timeout reconciliation serialize by kiosk. `KioskStatusChanged` is emitted only for a committed transition, never for duplicate heartbeat delivery or an unchanged state.
+- Readiness ingest is a typed complete snapshot per execution endpoint. `stateRevision` is monotonic per executor; a newer revision replaces readiness/activity/safety and the complete capability set. It does not mutate `KioskStatus`.
+- Machine-produced menu/order readiness requires at least one Active endpoint whose latest projection is Ready and Safe and whose available capability set covers every route binding. Dispatch additionally requires the selected endpoint to be Idle.
 - Device-event ingest accepts one `Warning`, `Error`, or `Critical` evidence record, verifies device/kiosk ownership, deduplicates globally by `eventId`, and publishes `DeviceEventCreated` only after a new row commits. Raw payload remains excluded from management reads.
 - Newly accepted `Error` or `Critical` device events also create one Open Alert atomically and publish `AlertChanged` after commit. Warning events do not auto-create alerts.
 - Supported robot targets are a complete replacement contract and may change only while the endpoint is `Provisioning` or `Disabled`. A device-specific target must reference a device attached to the same kiosk.
 - Endpoint activation, credential rotation, disable/reactivate, and retirement are management operations. They do not install artifacts; release deployment remains a separate command flow.
-- `POST /api/v1/iot/kiosks/{kioskId}/execution-reports` is the current V1 execution/deployment report ingest endpoint. It records a `SyncEventInbox` receipt for deduplication and applies the report to deployment state or Cloud execution projections.
-- `POST /api/v1/iot/kiosks/{kioskId}/events` remains the future broader batch event/sync surface and should not be used as the current command execution status endpoint.
+- MQTT subscriber credentials have a separate endpoint-scoped lifecycle: `POST/PATCH/DELETE /management/execution-endpoints/{id}/mqtt-credential`. Provision and rotation return a generated password once; normal reads expose only username, status, and credential version. HTTPS transport credentials are never reused for MQTT.
+- `POST /api/v1/iot/execution-endpoints/{endpointId}/commands/{commandId}/reports` is the current V1 execution/deployment report ingest endpoint. It records an immutable `SyncEventInbox` envelope; the same source event id with a different command or payload returns conflict.
+- Order-level reports update only `OrderExecutionRecord`; job-level reports require `sourceProductionJobId` and update only the matching `ProductionExecutionRecord`. Stock evidence is job-scoped. The ingestion coordinator keeps one database transaction while deployment, order/job projection, and stock persistence use separate aggregate ports.
+- `POST /api/v1/iot/execution-endpoints/{endpointId}/telemetry-events` replays only typed Heartbeat, DeviceEvent, and LocalLog items with item-level atomicity and per-item results.
+- `POST /api/v1/iot/execution-endpoints/{endpointId}/production-sync/events` owns durable ProductionEvent replay and contiguous sequence acknowledgement. Production history does not replace typed command reports or stock movements.
+- Production events are ordered by monotonic `(originNodeId, sequenceNumber)`. Cloud may store a later event across a gap, but acknowledges only `ProductionEventCheckpoint.LastContiguousSequenceNumber`.
+- Latest-state summaries use a separate `(sourceExecutorId, summaryKind, stateRevision)` channel. Cloud applies only newer revisions; summaries never advance the production-history checkpoint or prove that historical events were received.
+- Successful telemetry items receive processed `SyncEventInbox` receipts after their typed destination commits. A ProductionEvent is itself stored in `SyncEventInbox` with its sequence and advances its checkpoint in the same transaction.
 - Keep IoT DTOs separate from EF entities.
 - After an `EdgeCommand` commits, MQTT publishes a best-effort endpoint-scoped `CommandAvailable` wake-up for `ExecuteOrder` and `DeployConfiguration`. MQTT is notification only; Edge pulls command details through the API and periodic polling remains authoritative.
 

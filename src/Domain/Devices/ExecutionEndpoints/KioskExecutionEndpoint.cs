@@ -1,8 +1,9 @@
 using Domain.Common;
+using Domain.Devices.Entities;
 using Domain.Devices.Enums;
 using Domain.Tenants.Entities;
 
-namespace Domain.Devices.Entities;
+namespace Domain.Devices.ExecutionEndpoints;
 
 public class KioskExecutionEndpoint : BusinessEntity
 {
@@ -38,6 +39,7 @@ public class KioskExecutionEndpoint : BusinessEntity
     public virtual Kiosk Kiosk { get; private set; } = null!;
 
     public virtual ExecutionEndpointCredentialBinding? CredentialBinding { get; private set; }
+    public virtual ExecutionEndpointMqttCredential? MqttCredential { get; private set; }
 
     public IReadOnlyCollection<ExecutionEndpointSupportedRobotTarget> SupportedRobotTargets => _supportedRobotTargets;
 
@@ -149,6 +151,7 @@ public class KioskExecutionEndpoint : BusinessEntity
 
         _supportedRobotTargets.Add(ExecutionEndpointSupportedRobotTarget.Create(
             Id,
+            KioskId,
             normalizedRuntimeTargetCode,
             normalizedMachineModelCode,
             device));

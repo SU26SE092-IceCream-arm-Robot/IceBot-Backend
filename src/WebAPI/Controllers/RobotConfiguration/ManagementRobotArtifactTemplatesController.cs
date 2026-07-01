@@ -22,7 +22,6 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
     private readonly PublishRobotArtifactTemplateCommandHandler _publish;
     private readonly RetireRobotArtifactTemplateCommandHandler _retire;
     private readonly DiscardDraftRobotArtifactTemplateCommandHandler _discard;
-    private readonly CloneRobotArtifactTemplateCommandHandler _clone;
 
     public ManagementRobotArtifactTemplatesController(
         BulkUploadRobotArtifactTemplatesCommandHandler bulkUpload,
@@ -31,11 +30,10 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
         CreateRobotArtifactTemplateReviewUrlQueryHandler review,
         PublishRobotArtifactTemplateCommandHandler publish,
         RetireRobotArtifactTemplateCommandHandler retire,
-        DiscardDraftRobotArtifactTemplateCommandHandler discard,
-        CloneRobotArtifactTemplateCommandHandler clone)
+        DiscardDraftRobotArtifactTemplateCommandHandler discard)
     {
         _bulkUpload = bulkUpload; _list = list; _get = get; _review = review;
-        _publish = publish; _retire = retire; _discard = discard; _clone = clone;
+        _publish = publish; _retire = retire; _discard = discard;
     }
 
     [HttpGet("robot-artifact-templates")]
@@ -131,17 +129,6 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("organizations/{organizationId:guid}/robot-artifacts/from-template")]
-    [Authorize(Policy = "artifact.upload")]
-    public async Task<IActionResult> Clone(Guid organizationId, [FromBody] CloneRobotArtifactTemplateRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _clone.HandleAsync(new CloneRobotArtifactTemplateCommand
-        {
-            UserContext = User.GetUserContext(), OrganizationId = organizationId, TemplateId = request.TemplateId,
-            ArtifactCode = request.ArtifactCode, ArtifactName = request.ArtifactName, Description = request.Description, MetadataJson = request.MetadataJson
-        }, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
 }
 
 public sealed class BulkUploadRobotArtifactTemplatesRequest
@@ -158,15 +145,6 @@ public sealed class RobotArtifactTemplateManifestItemRequest
     [Required, StringLength(100)] public string RuntimeTargetCode { get; init; } = string.Empty;
     [Required, StringLength(100)] public string MachineModelCode { get; init; } = string.Empty;
     public DateTimeOffset? ExportedAt { get; init; }
-    [StringLength(500)] public string? Description { get; init; }
-    public string? MetadataJson { get; init; }
-}
-
-public sealed class CloneRobotArtifactTemplateRequest
-{
-    [Required] public Guid TemplateId { get; init; }
-    [Required, StringLength(100)] public string ArtifactCode { get; init; } = string.Empty;
-    [Required, StringLength(200)] public string ArtifactName { get; init; } = string.Empty;
     [StringLength(500)] public string? Description { get; init; }
     public string? MetadataJson { get; init; }
 }

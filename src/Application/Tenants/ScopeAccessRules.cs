@@ -14,8 +14,14 @@ public static class ScopeAccessRules
             .ToArray();
 
         return new EffectiveScope(
-            matchingScopes.Where(scope => scope.OrganizationId.HasValue).Select(scope => scope.OrganizationId!.Value).ToHashSet(),
-            matchingScopes.Where(scope => scope.StoreId.HasValue).Select(scope => scope.StoreId!.Value).ToHashSet(),
+            matchingScopes
+                .Where(scope => scope.OrganizationId.HasValue && !scope.StoreId.HasValue && !scope.KioskId.HasValue)
+                .Select(scope => scope.OrganizationId!.Value)
+                .ToHashSet(),
+            matchingScopes
+                .Where(scope => scope.StoreId.HasValue && !scope.KioskId.HasValue)
+                .Select(scope => scope.StoreId!.Value)
+                .ToHashSet(),
             matchingScopes.Where(scope => scope.KioskId.HasValue).Select(scope => scope.KioskId!.Value).ToHashSet());
     }
 
@@ -32,10 +38,24 @@ public static class ScopeAccessRules
         }
 
         return userContext.RoleScopes.Any(scope =>
-            allowedRoles.Contains(scope.RoleCode, StringComparer.OrdinalIgnoreCase) &&
-            ((scope.OrganizationId.HasValue && scope.OrganizationId == organizationId) ||
-             (scope.StoreId.HasValue && scope.StoreId == storeId) ||
-             (scope.KioskId.HasValue && scope.KioskId == kioskId)));
+        {
+            if (!allowedRoles.Contains(scope.RoleCode, StringComparer.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (scope.KioskId.HasValue)
+            {
+                return scope.KioskId == kioskId;
+            }
+
+            if (scope.StoreId.HasValue)
+            {
+                return scope.StoreId == storeId;
+            }
+
+            return scope.OrganizationId.HasValue && scope.OrganizationId == organizationId;
+        });
     }
 
     public static bool SharesAnyActiveScope(CurrentUserContext userContext, IEnumerable<AccountRole> roles)
@@ -64,6 +84,7 @@ public sealed record EffectiveScope(
 public static class ScopeRoleSets
 {
     public static readonly string[] ProductsManage = ["SystemAdmin", "Manager"];
+    public static readonly string[] ProductTemplatesRead = ["SystemAdmin", "Manager"];
     public static readonly string[] MenusManage = ["SystemAdmin", "Manager"];
     public static readonly string[] InventoryManage = ["SystemAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] OrdersView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff"];

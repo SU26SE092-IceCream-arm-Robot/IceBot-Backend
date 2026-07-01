@@ -3,6 +3,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Sinks.OpenTelemetry;
+using Application.EdgeIntegration.Observability;
 
 namespace WebAPI.Configuration.Observability;
 
@@ -99,6 +100,7 @@ public static class ObservabilityExtensions
             .WithMetrics(metrics =>
             {
                 metrics
+                    .AddMeter(IceBotEdgeMetrics.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();

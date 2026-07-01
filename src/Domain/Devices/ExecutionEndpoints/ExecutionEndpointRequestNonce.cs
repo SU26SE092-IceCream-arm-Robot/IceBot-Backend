@@ -1,6 +1,6 @@
 using Domain.Common;
 
-namespace Domain.Devices.Entities;
+namespace Domain.Devices.ExecutionEndpoints;
 
 public class ExecutionEndpointRequestNonce : AppendOnlyEntity
 {

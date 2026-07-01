@@ -1,3 +1,5 @@
+using Domain.Devices.Telemetry;
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Entities;
 using Domain.Tenants.Entities;
 using Domain.Operations.Entities;
@@ -23,6 +25,11 @@ public interface IEdgeTelemetryIngestionStore
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default);
 
+    Task<T> ExecuteOperationLogIngestionAsync<T>(
+        Guid sourceEventId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
     Task<List<Guid>> ListConnectivityTimeoutCandidateIdsAsync(
         DateTimeOffset cutoff,
         int batchSize,
@@ -38,19 +45,33 @@ public interface IEdgeTelemetryIngestionStore
         long heartbeatSequence,
         CancellationToken cancellationToken = default);
 
+    Task<KioskHeartbeat?> GetLatestHeartbeatAsync(
+        Guid kioskId,
+        Guid originNodeId,
+        CancellationToken cancellationToken = default);
+
     Task<DeviceEvent?> GetDeviceEventAsync(
         Guid eventId,
+        CancellationToken cancellationToken = default);
+
+    Task<OperationLog?> GetOperationLogAsync(
+        Guid sourceEventId,
         CancellationToken cancellationToken = default);
 
     Task<Kiosk?> GetKioskAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<Device?> GetDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);
 
+    Task<bool> OrderBelongsToKioskAsync(
+        Guid orderId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
+
     Task AddHeartbeatAsync(KioskHeartbeat heartbeat, CancellationToken cancellationToken = default);
 
     Task AddDeviceEventAsync(DeviceEvent deviceEvent, CancellationToken cancellationToken = default);
 
-    Task AddAlertAsync(Alert alert, CancellationToken cancellationToken = default);
+    Task AddOperationLogAsync(OperationLog operationLog, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

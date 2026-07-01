@@ -1,3 +1,5 @@
+using Domain.Sync.Ingestion;
+using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
 using Domain.Devices.Entities;
 using Domain.Inventory.Entities;
@@ -10,7 +12,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
-public sealed class ExecutionReportStore : IExecutionReportStore
+public sealed class ExecutionReportStore :
+    IExecutionReportReceiptStore,
+    IDeploymentReportStore,
+    IProductionExecutionReportStore,
+    IExecutionStockEvidenceStore
 {
     private readonly IceBotDbContext _dbContext;
 
@@ -20,13 +26,18 @@ public sealed class ExecutionReportStore : IExecutionReportStore
     }
 
     public async Task<T> ExecuteReportIngestionAsync<T>(
+        Guid sourceExecutorId,
         Guid sourceEventId,
+        Guid commandId,
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({$"execution-report:{sourceEventId:D}"}, 0));",
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"execution-command:{commandId:D}"}, 0));",
+            cancellationToken);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"execution-report:{sourceExecutorId:D}:{sourceEventId:D}"}, 0));",
             cancellationToken);
         var result = await action(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -43,11 +54,14 @@ public sealed class ExecutionReportStore : IExecutionReportStore
     }
 
     public Task<SyncEventInbox?> GetSyncEventByEventIdAsync(
+        Guid sourceExecutorId,
         Guid eventId,
         CancellationToken cancellationToken = default)
     {
         return _dbContext.SyncEventInbox
-            .FirstOrDefaultAsync(syncEvent => syncEvent.EventId == eventId, cancellationToken);
+            .FirstOrDefaultAsync(
+                syncEvent => syncEvent.SourceNodeId == sourceExecutorId && syncEvent.EventId == eventId,
+                cancellationToken);
     }
 
     public async Task AcquireStockMovementLocksAsync(
@@ -97,7 +111,7 @@ public sealed class ExecutionReportStore : IExecutionReportStore
 
     public Task<ProductionExecutionRecord?> GetProductionExecutionRecordAsync(
         Guid sourceCommandId,
-        Guid? sourceProductionJobId,
+        Guid sourceProductionJobId,
         CancellationToken cancellationToken = default)
     {
         return _dbContext.ProductionExecutionRecords

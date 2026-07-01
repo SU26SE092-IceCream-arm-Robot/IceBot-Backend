@@ -1,12 +1,14 @@
+using Domain.Sync.Ingestion;
 using Domain.Common;
 using Domain.Identity.Entities;
 using Domain.Sync.Enums;
 using Domain.Tenants.Entities;
 
-namespace Domain.Sync.Entities;
+namespace Domain.Sync.DeadLetters;
 
 public partial class SyncDeadLetter : GuidEntity
 {
+    private readonly List<SyncDeadLetterRetryAttempt> _retryAttempts = [];
     public Guid? SyncEventInboxId { get; set; }
 
     public Guid? EventId { get; set; }
@@ -48,10 +50,11 @@ public partial class SyncDeadLetter : GuidEntity
     public virtual Account? ResolvedByAccount { get; set; }
 
     public virtual SyncEventInbox? SyncEventInbox { get; set; }
+    public IReadOnlyCollection<SyncDeadLetterRetryAttempt> RetryAttempts => _retryAttempts;
 
     public void Resolve(Guid resolvedByAccountId, DateTimeOffset resolvedAt, string? resolutionNotes = null)
     {
-        if (Status == SyncDeadLetterStatus.Resolved)
+        if (Status is not (SyncDeadLetterStatus.Open or SyncDeadLetterStatus.RetryInProgress))
         {
             throw new DomainRuleException("Sync dead letter is already resolved.");
         }
@@ -64,6 +67,8 @@ public partial class SyncDeadLetter : GuidEntity
 
     public void Ignore(Guid resolvedByAccountId, DateTimeOffset resolvedAt, string reason)
     {
+        if (Status != SyncDeadLetterStatus.Open)
+            throw new DomainRuleException("Only open sync dead letters can be ignored.");
         if (string.IsNullOrWhiteSpace(reason))
         {
             throw new DomainRuleException("Ignore reason is required.");
@@ -73,5 +78,20 @@ public partial class SyncDeadLetter : GuidEntity
         ResolvedAt = resolvedAt;
         ResolutionNotes = reason.Trim();
         Status = SyncDeadLetterStatus.Ignored;
+    }
+
+    public void BeginRetry()
+    {
+        if (Status != SyncDeadLetterStatus.Open)
+            throw new DomainRuleException("Only open sync dead letters can be retried.");
+        Status = SyncDeadLetterStatus.RetryInProgress;
+    }
+
+    public void ReturnToOpen(string error)
+    {
+        if (Status != SyncDeadLetterStatus.RetryInProgress)
+            throw new DomainRuleException("Sync dead letter retry is not in progress.");
+        Status = SyncDeadLetterStatus.Open;
+        ErrorMessage = string.IsNullOrWhiteSpace(error) ? "Retry failed." : error.Trim();
     }
 }

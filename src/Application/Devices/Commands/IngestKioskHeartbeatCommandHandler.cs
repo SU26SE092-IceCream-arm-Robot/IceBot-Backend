@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.Devices.Abstractions;
@@ -92,6 +93,11 @@ public sealed class IngestKioskHeartbeatCommandHandler
             return new HeartbeatIngestionOutcome(ApiResult<HeartbeatIngestResult>.Fail("Kiosk not found.", 404), null);
         }
 
+        var latestHeartbeat = await _store.GetLatestHeartbeatAsync(
+            command.KioskId, command.OriginNodeId, cancellationToken);
+        var advancesCurrentState = latestHeartbeat?.HeartbeatSequence is null ||
+            command.HeartbeatSequence > latestHeartbeat.HeartbeatSequence.Value;
+
         var receivedAt = DateTimeOffset.UtcNow;
         var heartbeat = new KioskHeartbeat
         {
@@ -114,19 +120,22 @@ public sealed class IngestKioskHeartbeatCommandHandler
             PendingSyncEventCount = command.PendingSyncEventCount
         };
 
-        if (!kiosk.LastOnlineAt.HasValue || receivedAt > kiosk.LastOnlineAt.Value)
+        if (advancesCurrentState &&
+            (command.Status is KioskHeartbeatStatus.Online or KioskHeartbeatStatus.Degraded) &&
+            (!kiosk.LastOnlineAt.HasValue || receivedAt > kiosk.LastOnlineAt.Value))
         {
             kiosk.LastOnlineAt = receivedAt;
         }
 
         var oldStatus = kiosk.Status;
         string? transitionReason = null;
-        if (command.Status == KioskHeartbeatStatus.Offline && oldStatus == KioskStatus.Active)
+        if (advancesCurrentState && command.Status == KioskHeartbeatStatus.Offline && oldStatus == KioskStatus.Active)
         {
             kiosk.Status = KioskStatus.Offline;
             transitionReason = "HeartbeatReportedOffline";
         }
-        else if (command.Status is KioskHeartbeatStatus.Online or KioskHeartbeatStatus.Degraded &&
+        else if (advancesCurrentState &&
+                 (command.Status is KioskHeartbeatStatus.Online or KioskHeartbeatStatus.Degraded) &&
                  oldStatus == KioskStatus.Offline &&
                  kiosk.Organization.Status == EntityStatus.Active &&
                  kiosk.Store.Status == EntityStatus.Active)
@@ -157,7 +166,10 @@ public sealed class IngestKioskHeartbeatCommandHandler
         await _store.AddHeartbeatAsync(heartbeat, cancellationToken);
         await _store.SaveChangesAsync(cancellationToken);
         return new HeartbeatIngestionOutcome(
-            ApiResult<HeartbeatIngestResult>.Success(ToResult(heartbeat, duplicate: false), "Heartbeat ingested.", 201),
+            ApiResult<HeartbeatIngestResult>.Success(
+                ToResult(heartbeat, duplicate: false, stale: !advancesCurrentState),
+                advancesCurrentState ? "Heartbeat ingested." : "Stale heartbeat stored without changing current connectivity.",
+                201),
             statusChangedEvent);
     }
 
@@ -192,12 +204,13 @@ public sealed class IngestKioskHeartbeatCommandHandler
 
     private static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static HeartbeatIngestResult ToResult(KioskHeartbeat heartbeat, bool duplicate) => new()
+    private static HeartbeatIngestResult ToResult(KioskHeartbeat heartbeat, bool duplicate, bool stale = false) => new()
     {
         HeartbeatId = heartbeat.Id,
         HeartbeatSequence = heartbeat.HeartbeatSequence!.Value,
         ReceivedAt = heartbeat.ReceivedAt,
-        Duplicate = duplicate
+        Duplicate = duplicate,
+        Stale = stale
     };
 
     private sealed record HeartbeatIngestionOutcome(

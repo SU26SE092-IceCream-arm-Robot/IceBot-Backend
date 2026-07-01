@@ -157,8 +157,10 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `release.deploy` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request configuration deployment to assigned kiosks |
 | `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request a new deployment from a previously Active Full Edge release or low-cost artifact set within assigned scope |
 | `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |
-| `products.manage` | `SystemAdmin`, `Manager` | Product/catalog management. Staff and Technician should not change product pricing/catalog by default |
-| `menus.manage` | `SystemAdmin`, `Manager` | Menu, price, promotion, and sellable offer management |
+| `product-templates.read` | `SystemAdmin`, `Manager` | Browse global product templates for cloning into an assigned organization |
+| `product-templates.manage` | `SystemAdmin` | Manage global product templates; tenant roles cannot author or mutate global catalog rows |
+| `products.manage` | `SystemAdmin`, `Manager` | Manage organization-owned products and variants within assigned organization/store/kiosk scope |
+| `menus.manage` | `SystemAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
 | `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |
 | `refunds.manage` | `SystemAdmin`, `Manager`, `Staff` | Manual support/refund workflow. Auto provider refund is future work |
 | `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
@@ -167,6 +169,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `maintenance.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View maintenance tickets within assigned scope |
 | `maintenance.create` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Create maintenance tickets within assigned scope |
 | `maintenance.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Manage, assign, resolve, and close maintenance tickets within assigned scope. Staff can create/view tickets but cannot assign or resolve by default |
+| `sync-dead-letters.manage` | `SystemAdmin` | Inspect retry audit, replay supported sync event types, and resolve/ignore Cloud dead letters. Raw replay control is intentionally not tenant-admin self-service in V1 |
 | `alerts.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View actionable telemetry alerts within assigned scope |
 | `alerts.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Acknowledge and resolve actionable telemetry alerts within assigned scope |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |

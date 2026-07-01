@@ -1,3 +1,5 @@
+using Domain.Sync.Ingestion;
+using Domain.Devices.ExecutionEndpoints;
 using System.Net;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -166,8 +168,12 @@ public sealed class EdgeControllerContractIntegrationTests
         string? errorMessage = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
+        var reportStore = new ExecutionReportStore(dbContext);
         var handler = new IngestExecutionReportCommandHandler(
-            new ExecutionReportStore(dbContext),
+            reportStore,
+            reportStore,
+            reportStore,
+            reportStore,
             new NoOpRealtimeNotificationPublisher(),
             Options.Create(new ExecutionReportIngestionOptions()));
         return await handler.HandleAsync(new IngestExecutionReportCommand
@@ -240,6 +246,7 @@ public sealed class EdgeControllerContractIntegrationTests
 
         var deployment = KioskConfigurationDeployment.CreatePending(
             kiosk.Id,
+            organization.Id,
             endpoint.Id,
             edgeRuntimeId,
             release.Id,

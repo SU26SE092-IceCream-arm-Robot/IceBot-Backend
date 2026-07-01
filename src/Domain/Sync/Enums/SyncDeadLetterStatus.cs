@@ -4,6 +4,7 @@
     {
         Open = 1,
         Resolved = 2,
-        Ignored = 3
+        Ignored = 3,
+        RetryInProgress = 4
     }
 }

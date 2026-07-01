@@ -78,6 +78,20 @@ Examples:
 
 Database foreign keys only prove the referenced row exists. They do not prove the scope combination is meaningful. Enforce this in admin/application use cases or domain methods.
 
+When a persisted row duplicates a parent scope id for filtering, audit, or
+historical projection, enforce the pair at the database boundary as well:
+
+- `(ExecutionEndpointId, KioskId)` must reference the same execution endpoint.
+- `(DeviceId, KioskId)` must reference a device installed in that kiosk.
+- `(ConfigurationReleaseId, OrganizationId)` must reference a release owned by that organization.
+- `(KioskId, OrganizationId)` must reference a kiosk owned by that organization.
+- execution records that store both `SourceCommandId` and endpoint id must reference the command and its actual target endpoint together.
+
+Use alternate keys plus composite foreign keys for these invariants. Handler
+scope checks remain necessary for authorization, but they are not a substitute
+for persistence constraints that prevent cross-tenant rows during concurrency,
+background processing, sync ingestion, or future code changes.
+
 ## Audit Field Automation
 
 Current v1 audit convention:
@@ -153,13 +167,23 @@ High-volume tables include:
 - `ProductionExecutionRecords`
 - `SyncEventInbox`
 - `SyncDeadLetters`
+- `ProductionEventCheckpoints`
+- `EdgeStateSummaries`
 
 Rules:
 
 - Every high-volume table must have a time-based index aligned with its normal query field, such as `ReportedAt`, `OccurredAt`, `ReceivedAt`, or `FailedAt`.
 - Kiosk/device scoped logs should include the scope id before the time field in common query indexes, such as `(KioskId, ReportedAt)` or `(DeviceId, OccurredAt)`.
 - Background-worker queues must have indexes matching their scan predicate. For example, `SyncEventInbox` needs `(Status, NextRetryAt, LockedUntil)` for retry/lock scans.
-- Define retention policy before production. Current V1 retention keeps raw `KioskHeartbeats` for 30 days and raw `DeviceEvents` for 90 days, then purges them by scheduled job. V1 does not require archive or aggregate tables.
+- Current retention policy:
+  - raw `KioskHeartbeats`: 30 days;
+  - raw `DeviceEvents`: 90 days, except an event referenced by any `MaintenanceTicket` is retained;
+  - raw `OperationLogs`: 90 days;
+  - `SyncEventInbox` with `Processed` or `Ignored` status: 180 days after processing/receipt, only when no `SyncDeadLetter` references it;
+  - `SyncEventInbox` in `Received`, `Processing`, `Failed`, or `DeadLettered`: retained until a separate recovery/manual-resolution policy handles it;
+  - expired execution-request nonces: removed on the next retention run.
+- Retention deletes bounded batches instead of issuing one unbounded table delete. `BatchSize` limits each SQL delete and `MaxBatchesPerRun` limits total work per scheduled run.
+- V1 does not require archive or aggregate tables for raw telemetry.
 - Define a PostgreSQL partition plan for high-volume append-only tables before production. Monthly range partitions by the main time field are the default starting point.
 - Do not rely on EF Core fluent configuration alone for partition lifecycle. PostgreSQL partition creation/maintenance should be handled by raw SQL migrations, DBA scripts, or scheduled database maintenance.
 

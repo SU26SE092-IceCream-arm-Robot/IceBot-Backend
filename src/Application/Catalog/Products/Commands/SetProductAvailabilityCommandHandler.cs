@@ -24,6 +24,12 @@ public sealed class SetProductAvailabilityCommandHandler
             return ApiResult<ProductResult>.Fail("Product not found.", 404);
         }
 
+        var accessError = ProductManagementCommandRules.ValidateExisting<ProductResult>(command.Scope, product);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         product.IsAvailable = command.IsAvailable;
         product.UpdatedAt = DateTimeOffset.UtcNow;
         product.UpdatedByAccountId = command.UpdatedByAccountId;

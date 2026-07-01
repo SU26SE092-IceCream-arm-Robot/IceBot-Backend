@@ -8,4 +8,5 @@ public sealed class EdgeTelemetryIngestionOptions
     public int HeartbeatTimeoutSeconds { get; set; } = 90;
     public int ConnectivityReconciliationIntervalSeconds { get; set; } = 15;
     public int ConnectivityReconciliationBatchSize { get; set; } = 100;
+    public int MaxBatchEventCount { get; set; } = 100;
 }

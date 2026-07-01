@@ -1,5 +1,7 @@
+using Domain.Devices.ExecutionEndpoints;
 using Application.SalesCatalog.Abstractions;
 using Domain.Catalog.Entities;
+using Domain.Devices.Enums;
 using Domain.SalesCatalog.Entities;
 using Domain.SalesCatalog.Enums;
 using Domain.ProductionConfiguration.Enums;
@@ -104,7 +106,6 @@ public sealed class MenuStore : IMenuStore
                 (menu.EffectiveFrom == null || menu.EffectiveFrom <= now) &&
                 (menu.EffectiveTo == null || menu.EffectiveTo >= now) &&
                 (
-                    menu.ScopeType == TenantScopeType.Global ||
                     (organizationId.HasValue &&
                         menu.ScopeType == TenantScopeType.Organization &&
                         menu.OrganizationId == organizationId.Value) ||
@@ -129,16 +130,23 @@ public sealed class MenuStore : IMenuStore
         Guid recipeId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.KioskConfigurationDeployments
+        return _dbContext.ExecutionEndpointReadinessProjections
             .AsNoTracking()
-            .AnyAsync(deployment =>
-                deployment.KioskId == kioskId &&
-                deployment.Status == KioskConfigurationDeploymentStatus.Active &&
-                deployment.ConfigurationRelease.Status == ConfigurationReleaseStatus.Published &&
-                deployment.ConfigurationRelease.ExecutionRoutes.Any(route =>
-                    route.ProductVariantId == productVariantId &&
-                    route.RecipeId == recipeId &&
-                    route.RobotBindings.Any()),
+            .AnyAsync(readiness =>
+                readiness.KioskId == kioskId &&
+                readiness.Readiness == ExecutionReadinessState.Ready &&
+                readiness.Safety == ExecutionSafetyState.Safe &&
+                readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
+                _dbContext.ConfigurationReleases.Any(release =>
+                    release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
+                        ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
+                        : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
+                    release.Status == ConfigurationReleaseStatus.Published &&
+                    release.ExecutionRoutes.Any(route =>
+                        route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
+                        route.RobotBindings.Any() &&
+                        route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
+                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))),
                 cancellationToken);
     }
 
@@ -224,6 +232,28 @@ public sealed class MenuStore : IMenuStore
                 item.Code == code &&
                 (!excludedMenuItemId.HasValue || item.Id != excludedMenuItemId.Value),
             cancellationToken);
+    }
+
+    public async Task<bool> TenantScopeExistsAsync(
+        Guid organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await _dbContext.Organizations.AnyAsync(x => x.Id == organizationId, cancellationToken))
+        {
+            return false;
+        }
+
+        if (storeId.HasValue && !await _dbContext.Stores.AnyAsync(
+                x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
+        {
+            return false;
+        }
+
+        return !kioskId.HasValue || await _dbContext.Kiosks.AnyAsync(
+            x => x.Id == kioskId && x.OrganizationId == organizationId &&
+                 (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
     }
 
     public Task AddMenuAsync(Menu menu, CancellationToken cancellationToken = default)

@@ -25,6 +25,18 @@ public sealed class UpdateMenuItemCommandHandler
         var request = command.Request;
         var updatedByAccountId = command.UpdatedByAccountId;
 
+        var menu = await _menus.GetMenuByIdAsync(menuId, cancellationToken: cancellationToken);
+        if (menu is null)
+        {
+            return ApiResult<MenuItemResult>.Fail("Menu not found.", 404);
+        }
+
+        var accessError = MenuManagementCommandRules.ValidateExisting<MenuItemResult>(command.Scope, menu);
+        if (accessError is not null)
+        {
+            return accessError;
+        }
+
         var item = await _menus.GetMenuItemByIdAsync(menuId, menuItemId, asNoTracking: false, cancellationToken);
         if (item is null)
         {
@@ -46,6 +58,7 @@ public sealed class UpdateMenuItemCommandHandler
         var validationError = await MenuItemRequestValidator.ValidateMenuItemFieldsAsync(
             _menus,
             menuId,
+            command.Scope.OrganizationId,
             newProductId,
             newProductVariantId,
             newRecipeId,

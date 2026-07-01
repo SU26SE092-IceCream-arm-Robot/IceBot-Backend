@@ -1,17 +1,7 @@
-using Domain.Tenants.Enums;
-
 namespace Application.Catalog.Products.Requests;
 
 public sealed class UpdateProductRequest
 {
-    public Guid? OrganizationId { get; set; }
-
-    public Guid? StoreId { get; set; }
-
-    public Guid? KioskId { get; set; }
-
-    public Guid? TemplateProductId { get; set; }
-
     public long? CategoryId { get; set; }
 
     public string? Code { get; set; }
@@ -36,5 +26,4 @@ public sealed class UpdateProductRequest
 
     public string? MetadataJson { get; set; }
 
-    public TenantScopeType? ScopeType { get; set; }
 }

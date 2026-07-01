@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.Devices.Enums;
 using Domain.ProductionExecution.Enums;
@@ -23,7 +24,7 @@ public class OrderExecutionRecord : AuditedEntity
     public DateTimeOffset LastExecutorReportedAt { get; private set; }
     public DateTimeOffset CloudReceivedAt { get; private set; }
 
-    public virtual Domain.Devices.Entities.KioskExecutionEndpoint KioskExecutionEndpoint { get; private set; } = null!;
+    public virtual Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint KioskExecutionEndpoint { get; private set; } = null!;
 
     public virtual Domain.Sync.Entities.EdgeCommand SourceCommand { get; private set; } = null!;
 
@@ -202,7 +203,7 @@ public class OrderExecutionRecord : AuditedEntity
 
         var valid = current switch
         {
-            ProductionExecutionStatus.Accepted => next is ProductionExecutionStatus.Running or ProductionExecutionStatus.Failed or ProductionExecutionStatus.RequiresManualIntervention,
+            ProductionExecutionStatus.Accepted => next is ProductionExecutionStatus.Running or ProductionExecutionStatus.Completed or ProductionExecutionStatus.Failed or ProductionExecutionStatus.RequiresManualIntervention,
             ProductionExecutionStatus.Running => next is ProductionExecutionStatus.Completed or ProductionExecutionStatus.Failed or ProductionExecutionStatus.RequiresManualIntervention,
             _ => false
         };

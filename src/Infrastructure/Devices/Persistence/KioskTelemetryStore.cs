@@ -1,3 +1,4 @@
+using Domain.Devices.Telemetry;
 using Application.Devices.Abstractions;
 using Application.Devices.Results;
 using Domain.Common.Enums;
@@ -88,6 +89,19 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
             })
             .ToDictionaryAsync(x => x.KioskId, x => x.LastEvent, cancellationToken);
 
+        var readiness = await _dbContext.ExecutionEndpointReadinessProjections.AsNoTracking()
+            .Where(x => kioskIds.Contains(x.KioskId))
+            .Select(x => new
+            {
+                x.KioskId, x.Readiness, x.Activity, x.Safety, x.FaultCode, x.ExecutorReportedAt,
+                Available = x.Capabilities.Count(c => c.IsAvailable),
+                Unavailable = x.Capabilities.Count(c => !c.IsAvailable)
+            })
+            .ToListAsync(cancellationToken);
+        var readinessByKiosk = readiness.GroupBy(x => x.KioskId).ToDictionary(
+            g => g.Key,
+            g => g.OrderByDescending(x => x.ExecutorReportedAt).First());
+
         var items = kiosksList.Select(k =>
         {
             DateTimeOffset? lastHeartbeat = lastHeartbeats.TryGetValue(k.Id, out var hbAt) ? hbAt : k.LastOnlineAt;
@@ -100,6 +114,7 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
                 lastEventAt = lastEv.OccurredAt;
             }
 
+            readinessByKiosk.TryGetValue(k.Id, out var ready);
             return new KioskStatusOverviewItemDto
             {
                 KioskId = k.Id,
@@ -111,7 +126,14 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
                 Status = k.Status.ToString(),
                 LastHeartbeatAt = lastHeartbeat,
                 LastEventSeverity = severity,
-                LastEventAt = lastEventAt
+                LastEventAt = lastEventAt,
+                ExecutionReadiness = ready?.Readiness.ToString(),
+                ExecutionActivity = ready?.Activity.ToString(),
+                ExecutionSafety = ready?.Safety.ToString(),
+                ExecutionFaultCode = ready?.FaultCode,
+                ReadinessReportedAt = ready?.ExecutorReportedAt,
+                AvailableCapabilityCount = ready?.Available ?? 0,
+                UnavailableCapabilityCount = ready?.Unavailable ?? 0
             };
         }).ToList();
 
