@@ -38,7 +38,7 @@ services:
 
   icebot-backend-api:
     build:
-      context: .
+      context: ..
       dockerfile: Dockerfile
     container_name: icebot-backend-api
     restart: unless-stopped
