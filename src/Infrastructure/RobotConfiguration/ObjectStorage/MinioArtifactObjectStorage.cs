@@ -44,6 +44,10 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         {
             return false;
         }
+        catch (BucketNotFoundException)
+        {
+            return false;
+        }
     }
 
     public async Task<ArtifactObjectWriteResult> WriteImmutableAsync(
@@ -51,7 +55,7 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         Stream content,
         CancellationToken cancellationToken = default)
     {
-        await EnsureBucketAsync(cancellationToken);
+        await EnsureReadyAsync(cancellationToken);
 
         if (await ExistsAsync(request.StorageKey, cancellationToken))
         {
@@ -97,7 +101,7 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         ArtifactObjectWriteRequest destination,
         CancellationToken cancellationToken = default)
     {
-        await EnsureBucketAsync(cancellationToken);
+        await EnsureReadyAsync(cancellationToken);
         if (!await ExistsAsync(sourceStorageKey, cancellationToken))
             throw new InvalidOperationException("Source artifact object does not exist.");
         if (await ExistsAsync(destination.StorageKey, cancellationToken))
@@ -122,6 +126,8 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         string prefix,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        await EnsureReadyAsync(cancellationToken);
+
         var args = new ListObjectsArgs()
             .WithBucket(_options.BucketName)
             .WithPrefix(prefix)
@@ -164,17 +170,38 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
             .Build();
     }
 
-    private async Task EnsureBucketAsync(CancellationToken cancellationToken)
+    public async Task EnsureReadyAsync(CancellationToken cancellationToken = default)
     {
         var exists = await _client.BucketExistsAsync(
             new BucketExistsArgs().WithBucket(_options.BucketName),
             cancellationToken);
 
-        if (!exists)
+        if (exists)
+        {
+            return;
+        }
+
+        if (!_options.AutoCreateBucket)
+        {
+            throw new InvalidOperationException(
+                $"Robot artifact bucket '{_options.BucketName}' does not exist and automatic creation is disabled.");
+        }
+
+        try
         {
             await _client.MakeBucketAsync(
                 new MakeBucketArgs().WithBucket(_options.BucketName),
                 cancellationToken);
+        }
+        catch (MinioException)
+        {
+            // Another backend instance may have created the bucket after the existence check.
+            if (!await _client.BucketExistsAsync(
+                    new BucketExistsArgs().WithBucket(_options.BucketName),
+                    cancellationToken))
+            {
+                throw;
+            }
         }
     }
 }

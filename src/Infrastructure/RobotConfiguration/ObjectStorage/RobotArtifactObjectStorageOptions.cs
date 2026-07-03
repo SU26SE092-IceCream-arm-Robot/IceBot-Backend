@@ -24,6 +24,8 @@ public sealed class RobotArtifactObjectStorageOptions
 
     public bool? DownloadUseSsl { get; init; }
 
+    public bool AutoCreateBucket { get; init; }
+
     [Range(60, 604800)]
     public int DownloadUrlExpirySeconds { get; init; } = 900;
 

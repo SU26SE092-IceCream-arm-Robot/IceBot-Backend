@@ -103,6 +103,7 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Object-storage access key | `RobotArtifacts__ObjectStorage__AccessKey` | **P0 Feature** | **Secret/env required.** Do not deploy `minioadmin`. |
 | Object-storage secret key | `RobotArtifacts__ObjectStorage__SecretKey` | **P0 Feature** | **Secret/env required.** Do not deploy `minioadmin`. |
 | Object-storage bucket | `RobotArtifacts__ObjectStorage__BucketName` | **P1** | Appsettings default is acceptable only when the deployment uses the same private bucket name. |
+| Auto-create bucket | `RobotArtifacts__ObjectStorage__AutoCreateBucket` | **P0 Feature** | Keep `false` in production and provision the bucket through infrastructure. Development and the local backend compose may set `true`. |
 | Storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` | **P1** | Review for the internal storage endpoint; production usually requires TLS. |
 | Download TLS toggle | `RobotArtifacts__ObjectStorage__DownloadUseSsl` | **P1** | Review for the Edge-facing endpoint; production should use TLS. |
 | Presigned URL lifetime | `RobotArtifacts__ObjectStorage__DownloadUrlExpirySeconds` | **P2** | Use appsettings default `900` seconds unless deployment latency requires tuning. |
@@ -110,6 +111,8 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Orphan grace period | `RobotArtifacts__ObjectStorage__OrphanGracePeriodHours` | **P2** | Use appsettings default `24`. |
 | Orphan cleanup interval | `RobotArtifacts__ObjectStorage__OrphanCleanupIntervalHours` | **P2** | Use appsettings default `24`. |
 | Cleanup delete limit | `RobotArtifacts__ObjectStorage__OrphanCleanupMaxDeletesPerRun` | **P2** | Use appsettings default `100`. |
+
+Object storage is validated before background jobs start. Connection failure, invalid credentials, or a missing bucket while `AutoCreateBucket=false` stops application startup. This prevents the API from reporting healthy while artifact upload and deployment are unavailable.
 
 ## Runtime Safety And Capacity
 

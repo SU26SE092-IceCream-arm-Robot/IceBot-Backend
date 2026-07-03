@@ -101,8 +101,21 @@ namespace Infrastructure
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
             services.AddScoped<IAlertStore, AlertStore>();
-            services.Configure<RobotArtifactObjectStorageOptions>(config.GetSection(RobotArtifactObjectStorageOptions.SectionName));
+            services.AddOptions<RobotArtifactObjectStorageOptions>()
+                .Bind(config.GetSection(RobotArtifactObjectStorageOptions.SectionName))
+                .Validate(options =>
+                        !string.IsNullOrWhiteSpace(options.Endpoint) &&
+                        !string.IsNullOrWhiteSpace(options.AccessKey) &&
+                        !string.IsNullOrWhiteSpace(options.SecretKey) &&
+                        !string.IsNullOrWhiteSpace(options.BucketName) &&
+                        options.DownloadUrlExpirySeconds is >= 60 and <= 604800 &&
+                        options.OrphanGracePeriodHours is >= 1 and <= 720 &&
+                        options.OrphanCleanupIntervalHours is >= 1 and <= 168 &&
+                        options.OrphanCleanupMaxDeletesPerRun is >= 1 and <= 10000,
+                    "Robot artifact object storage settings are invalid.")
+                .ValidateOnStart();
             services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
+            services.AddHostedService<RobotArtifactObjectStorageStartupValidator>();
             services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
             services.AddScoped<IRobotArtifactTemplateStore, RobotArtifactTemplateStore>();
