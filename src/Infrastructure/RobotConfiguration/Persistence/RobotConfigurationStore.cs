@@ -7,6 +7,7 @@ using Domain.RobotConfiguration.Enums;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Npgsql;
 using Application.RobotConfiguration.ReadModels;
+using Domain.RobotConfiguration.Manifests;
 
 namespace Infrastructure.RobotConfiguration.Persistence;
 
@@ -29,7 +30,6 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
     {
         return _dbContext.RobotPrograms
             .Include(program => program.RobotProgramArtifacts)
-                .ThenInclude(programArtifact => programArtifact.RobotArtifact)
             .FirstOrDefaultAsync(program => program.Id == programId, cancellationToken);
     }
 
@@ -37,7 +37,6 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
     {
         return _dbContext.RobotPrograms
             .Include(program => program.RobotProgramArtifacts)
-                .ThenInclude(programArtifact => programArtifact.RobotArtifact)
             .FirstOrDefaultAsync(program => program.Id == programId, cancellationToken);
     }
 
@@ -56,7 +55,6 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
     {
         return _dbContext.RobotPrograms.AsNoTracking()
             .Include(program => program.RobotProgramArtifacts)
-                .ThenInclude(programArtifact => programArtifact.RobotArtifact)
             .FirstOrDefaultAsync(program => program.Id == programId, cancellationToken);
     }
 
@@ -211,6 +209,26 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
     {
         return await _dbContext.RobotArtifacts
             .Where(artifact => artifactIds.Contains(artifact.Id))
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<RobotArtifactManifestSnapshot>> ListArtifactManifestSnapshotsAsync(
+        IReadOnlyCollection<Guid> artifactIds,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.RobotArtifacts.AsNoTracking()
+            .Where(artifact => artifactIds.Contains(artifact.Id))
+            .Select(artifact => new RobotArtifactManifestSnapshot(
+                artifact.Id,
+                artifact.ArtifactCode,
+                artifact.ArtifactName,
+                artifact.FileName,
+                artifact.Status,
+                artifact.Checksum,
+                artifact.StorageKey,
+                artifact.RuntimeTargetCode,
+                artifact.MachineModelCode,
+                artifact.ContentLengthBytes))
             .ToListAsync(cancellationToken);
     }
 

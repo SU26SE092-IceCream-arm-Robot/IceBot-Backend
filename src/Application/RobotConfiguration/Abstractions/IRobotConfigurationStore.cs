@@ -2,6 +2,7 @@ using Domain.RobotConfiguration.Entities;
 using Domain.Tenants.Enums;
 using Domain.RobotConfiguration.Enums;
 using Application.RobotConfiguration.ReadModels;
+using Domain.RobotConfiguration.Manifests;
 
 namespace Application.RobotConfiguration.Abstractions;
 
@@ -94,6 +95,10 @@ public interface IRobotConfigurationStore
         CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<RobotArtifact>> ListArtifactsByIdsAsync(
+        IReadOnlyCollection<Guid> artifactIds,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<RobotArtifactManifestSnapshot>> ListArtifactManifestSnapshotsAsync(
         IReadOnlyCollection<Guid> artifactIds,
         CancellationToken cancellationToken = default);
 

@@ -548,10 +548,10 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => x.SourceEventId).IsUnique().HasFilter("\"SourceEventId\" IS NOT NULL");
             entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.OccurredAt });
             entity.HasOne(x => x.CreatedByAccount).WithMany().HasForeignKey(x => x.CreatedByAccountId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Kiosk>().WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Device>().WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.IngredientDispenserState).WithMany().HasForeignKey(x => x.IngredientDispenserStateId).OnDelete(DeleteBehavior.Restrict);
         });
@@ -671,10 +671,10 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("RobotPrograms");
             entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.DeviceId, x.Code }).IsUnique().HasFilter(ActiveRowFilter);
-            entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Kiosk>().WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Device>().WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
             entity.Property(x => x.ProgramManifestJson).HasColumnType("jsonb");
             entity.HasIndex(x => x.ProgramManifestChecksum).IsUnique().HasFilter("\"ProgramManifestChecksum\" IS NOT NULL");
             entity.Navigation(x => x.RobotProgramArtifacts).UsePropertyAccessMode(PropertyAccessMode.Field);
@@ -686,8 +686,8 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.OrganizationId, x.ArtifactCode, x.Checksum }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasIndex(x => x.StorageKey).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasIndex(x => new { x.RuntimeTargetCode, x.MachineModelCode, x.Status });
-            entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.SourceRobotArtifactTemplate).WithMany().HasForeignKey(x => x.SourceRobotArtifactTemplateId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<RobotArtifactTemplate>().WithMany().HasForeignKey(x => x.SourceRobotArtifactTemplateId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<RobotArtifactTemplate>(entity =>
@@ -704,7 +704,7 @@ public class IceBotDbContext : DbContext
             entity.HasIndex(x => new { x.RobotProgramId, x.RunOrder }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasIndex(x => x.RobotArtifactId);
             entity.HasOne(x => x.RobotProgram).WithMany(x => x.RobotProgramArtifacts).HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.RobotArtifact).WithMany().HasForeignKey(x => x.RobotArtifactId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<RobotArtifact>().WithMany().HasForeignKey(x => x.RobotArtifactId).OnDelete(DeleteBehavior.Restrict);
         });
 
     }

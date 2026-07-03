@@ -3,6 +3,7 @@ using Application.RobotConfiguration.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
+using Application.RobotConfiguration.Mapping;
 
 namespace Application.RobotConfiguration.Commands;
 
@@ -41,7 +42,8 @@ public sealed class UpdateRobotProgramCommandHandler
             program.UpdatedByAccountId = command.UserContext.AccountId;
             await _store.SaveChangesAsync(cancellationToken);
             return ApiResult<RobotProgramResult>.Success(
-                RobotProgramResult.FromEntity(program), "Robot program updated successfully.");
+                await RobotProgramResultMapper.ToResultAsync(_store, program, cancellationToken),
+                "Robot program updated successfully.");
         }
         catch (DomainRuleException ex)
         {

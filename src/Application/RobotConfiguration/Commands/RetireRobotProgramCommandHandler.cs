@@ -3,6 +3,7 @@ using Application.RobotConfiguration.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
+using Application.RobotConfiguration.Mapping;
 
 namespace Application.RobotConfiguration.Commands;
 
@@ -28,7 +29,9 @@ public sealed class RetireRobotProgramCommandHandler
             program.Retire(DateTimeOffset.UtcNow);
             program.UpdatedByAccountId = command.UserContext.AccountId;
             await _store.SaveChangesAsync(cancellationToken);
-            return ApiResult<RobotProgramResult>.Success(RobotProgramResult.FromEntity(program), "Robot program retired successfully.");
+            return ApiResult<RobotProgramResult>.Success(
+                await RobotProgramResultMapper.ToResultAsync(_store, program, cancellationToken),
+                "Robot program retired successfully.");
         }
         catch (DomainRuleException ex)
         {

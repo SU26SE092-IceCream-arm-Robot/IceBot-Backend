@@ -16,8 +16,6 @@ public class RobotProgramArtifact : RobotConfigurationEntity
 
     public virtual RobotProgram RobotProgram { get; private set; } = null!;
 
-    public virtual RobotArtifact RobotArtifact { get; private set; } = null!;
-
     private RobotProgramArtifact()
     {
     }

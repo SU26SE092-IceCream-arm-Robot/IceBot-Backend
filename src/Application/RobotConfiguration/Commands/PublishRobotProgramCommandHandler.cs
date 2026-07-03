@@ -3,6 +3,7 @@ using Application.RobotConfiguration.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
+using Application.RobotConfiguration.Mapping;
 
 namespace Application.RobotConfiguration.Commands;
 
@@ -32,10 +33,14 @@ public sealed class PublishRobotProgramCommandHandler
 
         try
         {
-            program.Publish(DateTimeOffset.UtcNow);
+            var artifactSnapshots = await RobotProgramResultMapper.LoadArtifactSnapshotsAsync(
+                _robotConfigurationStore, program, cancellationToken);
+            program.Publish(DateTimeOffset.UtcNow, artifactSnapshots);
             program.UpdatedByAccountId = command.UserContext.AccountId;
             await _robotConfigurationStore.SaveChangesAsync(cancellationToken);
-            return ApiResult<RobotProgramResult>.Success(RobotProgramResult.FromEntity(program), "Robot program published successfully.");
+            return ApiResult<RobotProgramResult>.Success(
+                RobotProgramResult.FromEntity(program, artifactSnapshots),
+                "Robot program published successfully.");
         }
         catch (DomainRuleException ex)
         {

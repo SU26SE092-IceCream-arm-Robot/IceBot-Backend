@@ -1,8 +1,6 @@
 using Domain.Common;
-using Domain.Devices.Entities;
 using Domain.RobotConfiguration.Manifests;
 using Domain.RobotConfiguration.Enums;
-using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 
 namespace Domain.RobotConfiguration.Entities;
@@ -38,14 +36,6 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
     public DateTimeOffset? PublishedAt { get; private set; }
 
     public DateTimeOffset? RetiredAt { get; private set; }
-
-    public virtual Organization? Organization { get; private set; }
-
-    public virtual Store? Store { get; private set; }
-
-    public virtual Kiosk? Kiosk { get; private set; }
-
-    public virtual Device? Device { get; private set; }
 
     public IReadOnlyCollection<RobotProgramArtifact> RobotProgramArtifacts => _robotProgramArtifacts;
 
@@ -166,7 +156,10 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         _robotProgramArtifacts.Remove(artifact);
     }
 
-    public void Publish(DateTimeOffset publishedAt, int programManifestSchemaVersion = 1)
+    public void Publish(
+        DateTimeOffset publishedAt,
+        IReadOnlyCollection<RobotArtifactManifestSnapshot> artifactSnapshots,
+        int programManifestSchemaVersion = 1)
     {
         EnsureDraft();
 
@@ -180,7 +173,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
             throw new DomainRuleException("Robot program manifest schema version must be greater than zero.");
         }
 
-        var manifest = RobotProgramManifestBuilder.Create(this, programManifestSchemaVersion);
+        var manifest = RobotProgramManifestBuilder.Create(this, artifactSnapshots, programManifestSchemaVersion);
         ProgramManifestSchemaVersion = programManifestSchemaVersion;
         ProgramManifestJson = manifest.Json;
         ProgramManifestChecksum = manifest.Checksum;

@@ -181,8 +181,6 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
                 .ThenInclude(route => route.Recipe)
             .Include(release => release.ExecutionRoutes)
                 .ThenInclude(route => route.RobotBindings)
-                    .ThenInclude(binding => binding.RobotProgram)
-                        .ThenInclude(program => program.RobotProgramArtifacts)
-                            .ThenInclude(programArtifact => programArtifact.RobotArtifact);
+                    .ThenInclude(binding => binding.RobotProgram);
     }
 }

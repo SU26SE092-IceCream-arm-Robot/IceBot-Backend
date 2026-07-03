@@ -132,6 +132,9 @@ Controllers should be thin. They should call application handlers/services and r
 ## Bounded Context Rules
 
 - Prefer ids and snapshots across contexts.
+- Domain entities do not expose cross-context navigation properties. Keep scalar foreign-key ids and database constraints; query-side Infrastructure code may join or project data from multiple contexts.
+- Aggregate children do not expose live navigation properties to independent aggregate roots, even inside the same bounded context. Commands validate referenced aggregate ids explicitly, and published workflows consume immutable snapshots/manifests.
+- Parent-child navigation inside one aggregate remains allowed when it represents the aggregate's invariant boundary.
 - Keep navigation collections selective.
 - Do not load large object graphs for API responses.
 - Context-specific enums stay in that context.
