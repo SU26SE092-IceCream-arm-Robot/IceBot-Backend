@@ -8,6 +8,12 @@ using Domain.Sync.Ingestion;
 
 namespace Application.EdgeIntegration.Abstractions;
 
+public interface IExecutionReportUnitOfWork :
+    IExecutionReportReceiptStore,
+    IDeploymentReportStore,
+    IProductionExecutionReportStore,
+    IExecutionStockEvidenceStore;
+
 public interface IExecutionReportReceiptStore
 {
     Task<T> ExecuteReportIngestionAsync<T>(

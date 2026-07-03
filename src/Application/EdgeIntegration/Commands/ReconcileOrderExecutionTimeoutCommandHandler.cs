@@ -178,7 +178,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             throw new Domain.Common.DomainRuleException("Execution endpoint profile identity is missing.");
         }
 
-        var payload = ExecuteOrderCommandPayloadCodec.Deserialize(edgeCommand.PayloadJson);
+        var payload = ExecuteOrderCommandPayloadCodec.ReadProvenance(edgeCommand.PayloadJson);
         var record = OrderExecutionRecord.CreateProvisionalAccepted(
             edgeCommand.OrderId!.Value,
             edgeCommand.Id,

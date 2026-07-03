@@ -13,14 +13,15 @@ namespace Application.EdgeIntegration.Services;
 internal static class OrderExecutionLifecycleApplier
 {
     public static async Task ApplyAsync(
-        IProductionExecutionReportStore store,
-        IngestExecutionReportCommand command,
-        EdgeCommand edgeCommand,
+        IExecutionReportUnitOfWork store,
+        ExecutionReportProcessingContext context,
         ProductionExecutionStatus status,
-        DateTimeOffset executorReportedAt,
-        ExecutionReportNotifications notifications,
         CancellationToken cancellationToken)
     {
+        var command = context.Command;
+        var edgeCommand = context.EdgeCommand;
+        var executorReportedAt = context.ExecutorReportedAt;
+        var notifications = context.Notifications;
         if (!edgeCommand.OrderId.HasValue) return;
         var order = await store.GetOrderAsync(edgeCommand.OrderId.Value, cancellationToken)
             ?? throw new DomainRuleException("Order for production execution report was not found.");

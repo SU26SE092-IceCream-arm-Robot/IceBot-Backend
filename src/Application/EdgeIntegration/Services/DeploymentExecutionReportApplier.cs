@@ -9,12 +9,13 @@ namespace Application.EdgeIntegration.Services;
 internal static class DeploymentExecutionReportApplier
 {
     public static async Task<bool> ApplyAsync(
-        IDeploymentReportStore store,
-        IngestExecutionReportCommand command,
-        KioskExecutionEndpoint endpoint,
-        DateTimeOffset cloudReceivedAt,
+        IExecutionReportUnitOfWork store,
+        ExecutionReportProcessingContext context,
         CancellationToken cancellationToken)
     {
+        var command = context.Command;
+        var endpoint = context.Endpoint;
+        var cloudReceivedAt = context.CloudReceivedAt;
         if (command.DeploymentId is null || command.DeploymentId == Guid.Empty)
             throw new DomainRuleException("Deployment reports require deployment id.");
 
@@ -23,27 +24,27 @@ internal static class DeploymentExecutionReportApplier
             var deployment = await store.GetFullEdgeDeploymentAsync(command.DeploymentId.Value, cancellationToken)
                 ?? throw new DomainRuleException("Full Edge deployment not found.");
             EnsureOwnership(deployment.KioskId, deployment.KioskExecutionEndpointId, command);
-            if (ExecutionReportRules.IsStatus(command.Status, "Installed"))
+            if (ExecutionReportStatusMapper.Is(command.Status, "Installed"))
                 return deployment.MarkInstalled(command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt);
-            if (ExecutionReportRules.IsStatus(command.Status, "Active"))
+            if (ExecutionReportStatusMapper.Is(command.Status, "Active"))
             {
                 var changed = deployment.MarkActive(command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt);
                 endpoint.ApplyFullEdgeObservedActivation(deployment.Id, deployment.ConfigurationReleaseId,
                     deployment.ReleaseChecksum, command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt);
                 return changed;
             }
-            if (ExecutionReportRules.IsStatus(command.Status, "Failed"))
+            if (ExecutionReportStatusMapper.Is(command.Status, "Failed"))
                 return deployment.MarkFailed(command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt,
-                    ExecutionReportRules.RequiredErrorCode(command), command.ErrorMessage);
+                    RequiredErrorCode(command), command.ErrorMessage);
         }
         else
         {
             var deployment = await store.GetControllerArtifactSetDeploymentAsync(command.DeploymentId.Value, cancellationToken)
                 ?? throw new DomainRuleException("Controller artifact-set deployment not found.");
             EnsureOwnership(deployment.KioskId, deployment.KioskExecutionEndpointId, command);
-            if (ExecutionReportRules.IsStatus(command.Status, "Installed"))
+            if (ExecutionReportStatusMapper.Is(command.Status, "Installed"))
                 return deployment.MarkInstalled(command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt);
-            if (ExecutionReportRules.IsStatus(command.Status, "Active"))
+            if (ExecutionReportStatusMapper.Is(command.Status, "Active"))
             {
                 var changed = deployment.MarkActive(command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt);
                 endpoint.ApplyLowCostObservedActivation(deployment.Id, deployment.SourceConfigurationReleaseId,
@@ -51,9 +52,9 @@ internal static class DeploymentExecutionReportApplier
                     command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt);
                 return changed;
             }
-            if (ExecutionReportRules.IsStatus(command.Status, "Failed"))
+            if (ExecutionReportStatusMapper.Is(command.Status, "Failed"))
                 return deployment.MarkFailed(command.SourceEventId, command.EdgeCreatedAt, cloudReceivedAt,
-                    ExecutionReportRules.RequiredErrorCode(command), command.ErrorMessage);
+                    RequiredErrorCode(command), command.ErrorMessage);
         }
 
         throw new DomainRuleException("Unsupported deployment report status.");
@@ -64,4 +65,7 @@ internal static class DeploymentExecutionReportApplier
         if (kioskId != command.KioskId || endpointId != command.EndpointId)
             throw new DomainRuleException("Deployment does not belong to the reporting endpoint.");
     }
+
+    private static string RequiredErrorCode(IngestExecutionReportCommand command) =>
+        string.IsNullOrWhiteSpace(command.ErrorCode) ? "ExecutorReportedFailure" : command.ErrorCode.Trim();
 }

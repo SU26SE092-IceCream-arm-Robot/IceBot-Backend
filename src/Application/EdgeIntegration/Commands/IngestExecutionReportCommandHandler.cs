@@ -26,25 +26,16 @@ namespace Application.EdgeIntegration.Commands;
 
 public sealed class IngestExecutionReportCommandHandler
 {
-    private readonly IExecutionReportReceiptStore _receiptStore;
-    private readonly IDeploymentReportStore _deploymentStore;
-    private readonly IProductionExecutionReportStore _productionStore;
-    private readonly IExecutionStockEvidenceStore _stockStore;
+    private readonly IExecutionReportUnitOfWork _unitOfWork;
     private readonly IRealtimeNotificationPublisher _publisher;
     private readonly ExecutionReportIngestionOptions _options;
 
     public IngestExecutionReportCommandHandler(
-        IExecutionReportReceiptStore receiptStore,
-        IDeploymentReportStore deploymentStore,
-        IProductionExecutionReportStore productionStore,
-        IExecutionStockEvidenceStore stockStore,
+        IExecutionReportUnitOfWork unitOfWork,
         IRealtimeNotificationPublisher publisher,
         IOptions<ExecutionReportIngestionOptions> options)
     {
-        _receiptStore = receiptStore;
-        _deploymentStore = deploymentStore;
-        _productionStore = productionStore;
-        _stockStore = stockStore;
+        _unitOfWork = unitOfWork;
         _publisher = publisher;
         _options = options.Value;
     }
@@ -53,26 +44,26 @@ public sealed class IngestExecutionReportCommandHandler
         IngestExecutionReportCommand command,
         CancellationToken cancellationToken = default)
     {
-        var validationError = ExecutionReportRules.Validate(command, DateTimeOffset.UtcNow, _options.MaxFutureClockSkewSeconds);
+        var validationError = ExecutionReportValidator.Validate(command, DateTimeOffset.UtcNow, _options.MaxFutureClockSkewSeconds);
         if (validationError is not null)
         {
             return ApiResult<ExecutionReportIngestResult>.Fail(validationError, 400);
         }
 
-        var endpoint = await _receiptStore.GetEndpointForReportAuthAsync(command.EndpointId, cancellationToken);
-        if (!ExecutionReportRules.IsUsableEndpoint(endpoint, command))
+        var endpoint = await _unitOfWork.GetEndpointForReportAuthAsync(command.EndpointId, cancellationToken);
+        if (!ExecutionEndpointReportAuthenticator.IsUsable(endpoint, command))
         {
             return ApiResult<ExecutionReportIngestResult>.Fail("Execution endpoint authentication failed.", 401);
         }
 
-        var sourceExecutorId = ExecutionReportRules.GetSourceExecutorId(endpoint!);
+        var sourceExecutorId = ExecutionEndpointReportAuthenticator.GetSourceExecutorId(endpoint!);
         if (sourceExecutorId is null)
         {
             return ApiResult<ExecutionReportIngestResult>.Fail("Execution endpoint profile identity is missing.", 400);
         }
 
         var notifications = new ExecutionReportNotifications();
-        var result = await _receiptStore.ExecuteReportIngestionAsync(
+        var result = await _unitOfWork.ExecuteReportIngestionAsync(
             sourceExecutorId.Value,
             command.SourceEventId,
             command.CommandId,
@@ -99,30 +90,30 @@ public sealed class IngestExecutionReportCommandHandler
         CancellationToken cancellationToken)
     {
         var cloudReceivedAt = DateTimeOffset.UtcNow;
-        var candidateInboxEvent = ExecutionReportRules.BuildInboxEvent(command, sourceExecutorId, cloudReceivedAt);
-        var existingEvent = await _receiptStore.GetSyncEventByEventIdAsync(
+        var candidateInboxEvent = ExecutionReportInboxFactory.Create(command, sourceExecutorId, cloudReceivedAt);
+        var existingEvent = await _unitOfWork.GetSyncEventByEventIdAsync(
             sourceExecutorId, command.SourceEventId, cancellationToken);
         if (existingEvent?.Status is SyncEventStatus.Processed or SyncEventStatus.Ignored)
         {
-            if (!ExecutionReportRules.MatchesIdentity(existingEvent, candidateInboxEvent))
+            if (!ExecutionReportInboxFactory.HasSameIdentity(existingEvent, candidateInboxEvent))
             {
                 return ApiResult<ExecutionReportIngestResult>.Fail(
                     "Execution report source event id was reused with different command or payload.", 409);
             }
 
             return ApiResult<ExecutionReportIngestResult>.Success(
-                ExecutionReportRules.BuildResult(command, applied: false, duplicate: true),
+                BuildResult(command, applied: false, duplicate: true),
                 "Execution report already ingested.");
         }
 
         if (command.StockMovements.Count > 0)
         {
-            await _stockStore.AcquireStockMovementLocksAsync(
+            await _unitOfWork.AcquireStockMovementLocksAsync(
                 command.StockMovements.Select(item => item.SourceEventId),
                 cancellationToken);
         }
 
-        var edgeCommand = await _receiptStore.GetCommandAsync(command.CommandId, cancellationToken);
+        var edgeCommand = await _unitOfWork.GetCommandAsync(command.CommandId, cancellationToken);
         if (edgeCommand is null ||
             edgeCommand.KioskId != command.KioskId ||
             edgeCommand.TargetExecutionEndpointId != command.EndpointId ||
@@ -133,26 +124,20 @@ public sealed class IngestExecutionReportCommandHandler
 
         var executorReportedAt = command.ExecutorReportedAt ?? command.EdgeCreatedAt;
         var inboxEvent = existingEvent ?? candidateInboxEvent;
+        var processingContext = new ExecutionReportProcessingContext(
+            command, endpoint, sourceExecutorId, edgeCommand, executorReportedAt, cloudReceivedAt, notifications);
 
         try
         {
-            var applied = await ApplyReportAsync(
-                command,
-                endpoint,
-                sourceExecutorId,
-                edgeCommand,
-                executorReportedAt,
-                cloudReceivedAt,
-                notifications,
-                cancellationToken);
+            var applied = await ApplyReportAsync(processingContext, cancellationToken);
 
             inboxEvent.MarkProcessed(cloudReceivedAt);
             if (existingEvent is null)
-                await _receiptStore.AddSyncEventAsync(inboxEvent, cancellationToken);
-            await _receiptStore.SaveChangesAsync(cancellationToken);
+                await _unitOfWork.AddSyncEventAsync(inboxEvent, cancellationToken);
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             return ApiResult<ExecutionReportIngestResult>.Success(
-                ExecutionReportRules.BuildResult(command, applied, duplicate: false),
+                BuildResult(command, applied, duplicate: false),
                 applied ? "Execution report applied successfully." : "Execution report accepted but did not change projection.");
         }
         catch (DomainRuleException ex)
@@ -162,26 +147,20 @@ public sealed class IngestExecutionReportCommandHandler
     }
 
     private async Task<bool> ApplyReportAsync(
-        IngestExecutionReportCommand command,
-        KioskExecutionEndpoint endpoint,
-        Guid sourceExecutorId,
-        EdgeCommand edgeCommand,
-        DateTimeOffset executorReportedAt,
-        DateTimeOffset cloudReceivedAt,
-        ExecutionReportNotifications notifications,
+        ExecutionReportProcessingContext context,
         CancellationToken cancellationToken)
     {
+        var command = context.Command;
         if (string.Equals(command.ReportType, "Deployment", StringComparison.OrdinalIgnoreCase))
         {
             return await DeploymentExecutionReportApplier.ApplyAsync(
-                _deploymentStore, command, endpoint, cloudReceivedAt, cancellationToken);
+                _unitOfWork, context, cancellationToken);
         }
 
         if (string.Equals(command.ReportType, "ProductionExecution", StringComparison.OrdinalIgnoreCase))
         {
             return await ProductionExecutionReportApplier.ApplyAsync(
-                _productionStore, _stockStore, command, endpoint, sourceExecutorId, edgeCommand,
-                executorReportedAt, cloudReceivedAt, notifications, cancellationToken);
+                _unitOfWork, context, cancellationToken);
         }
 
         throw new DomainRuleException("Unsupported execution report type.");
@@ -204,4 +183,16 @@ public sealed class IngestExecutionReportCommandHandler
         }
     }
 
+    private static ExecutionReportIngestResult BuildResult(
+        IngestExecutionReportCommand command,
+        bool applied,
+        bool duplicate) => new()
+    {
+        CommandId = command.CommandId,
+        SourceEventId = command.SourceEventId,
+        ReportType = command.ReportType.Trim(),
+        Status = command.Status.Trim(),
+        Applied = applied,
+        Duplicate = duplicate
+    };
 }

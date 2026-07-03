@@ -134,10 +134,7 @@ namespace Infrastructure
             services.AddScoped<IOrderExecutionTimeoutStore, OrderExecutionTimeoutStore>();
             services.AddScoped<IExecutionEndpointTransportAuthStore, ExecutionEndpointTransportAuthStore>();
             services.AddScoped<ExecutionReportStore>();
-            services.AddScoped<IExecutionReportReceiptStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
-            services.AddScoped<IDeploymentReportStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
-            services.AddScoped<IProductionExecutionReportStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
-            services.AddScoped<IExecutionStockEvidenceStore>(provider => provider.GetRequiredService<ExecutionReportStore>());
+            services.AddScoped<IExecutionReportUnitOfWork>(provider => provider.GetRequiredService<ExecutionReportStore>());
             services.AddOptions<EdgeCommandMqttOptions>()
                 .Bind(config.GetSection(EdgeCommandMqttOptions.SectionName))
                 .Validate(options =>

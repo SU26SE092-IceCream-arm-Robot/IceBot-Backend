@@ -11,14 +11,14 @@ namespace Application.EdgeIntegration.Services;
 internal static class ExecutionStockEvidenceApplier
 {
     public static async Task ApplyAsync(
-        IExecutionStockEvidenceStore store,
-        IngestExecutionReportCommand command,
-        KioskExecutionEndpoint endpoint,
-        Guid sourceExecutorId,
-        EdgeCommand edgeCommand,
-        ExecutionReportNotifications notifications,
+        IExecutionReportUnitOfWork store,
+        ExecutionReportProcessingContext context,
         CancellationToken cancellationToken)
     {
+        var command = context.Command;
+        var endpoint = context.Endpoint;
+        var edgeCommand = context.EdgeCommand;
+        var notifications = context.Notifications;
         foreach (var evidence in command.StockMovements)
         {
             if (await store.StockMovementExistsAsync(evidence.SourceEventId, cancellationToken)) continue;
@@ -36,7 +36,7 @@ internal static class ExecutionStockEvidenceApplier
                 state.IngredientId, "CONSUME", -evidence.QuantityConsumed, evidence.BalanceAfter, state.Unit,
                 occurredAt, "PRODUCTION_EXECUTION", "Order", edgeCommand.OrderId, evidence.SourceEventId,
                 evidence.IsEstimated);
-            movement.OriginNodeId = sourceExecutorId;
+            movement.OriginNodeId = context.SourceExecutorId;
             movement.Version = command.SequenceNumber;
             movement.CorrelationId = edgeCommand.OrderId;
             movement.CausationId = command.SourceEventId;

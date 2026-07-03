@@ -12,59 +12,51 @@ namespace Application.EdgeIntegration.Services;
 internal static class ProductionExecutionReportApplier
 {
     public static async Task<bool> ApplyAsync(
-        IProductionExecutionReportStore productionStore,
-        IExecutionStockEvidenceStore stockStore,
-        IngestExecutionReportCommand command,
-        KioskExecutionEndpoint endpoint,
-        Guid sourceExecutorId,
-        EdgeCommand edgeCommand,
-        DateTimeOffset executorReportedAt,
-        DateTimeOffset cloudReceivedAt,
-        ExecutionReportNotifications notifications,
+        IExecutionReportUnitOfWork unitOfWork,
+        ExecutionReportProcessingContext context,
         CancellationToken cancellationToken)
     {
+        var command = context.Command;
+        var endpoint = context.Endpoint;
+        var edgeCommand = context.EdgeCommand;
         if (edgeCommand.CommandType != EdgeCommandType.ExecuteOrder)
             throw new DomainRuleException("Production execution reports require an execute-order command.");
 
-        ExecutionReportRules.ValidateRelease(command, edgeCommand);
-        var status = ExecutionReportRules.ParseProductionStatus(command.Status);
-        var physicalOutputState = ExecutionReportRules.ToPhysicalOutputState(command.PhysicalOutputMayHaveOccurred);
+        ExecuteOrderReleaseValidator.Validate(command, edgeCommand);
+        var status = ExecutionReportStatusMapper.ParseProductionStatus(command.Status);
+        var physicalOutputState = ExecutionReportStatusMapper.ToPhysicalOutputState(command.PhysicalOutputMayHaveOccurred);
         var productionApplied = await ApplyProductionRecordAsync(
-            productionStore, command, endpoint, sourceExecutorId, edgeCommand, executorReportedAt,
-            cloudReceivedAt, status, physicalOutputState, cancellationToken);
+            unitOfWork, context, status, physicalOutputState, cancellationToken);
         var orderApplied = !command.SourceProductionJobId.HasValue && await ApplyOrderRecordAsync(
-            productionStore, command, endpoint, sourceExecutorId, edgeCommand, executorReportedAt,
-            cloudReceivedAt, status, cancellationToken);
+            unitOfWork, context, status, cancellationToken);
 
         if (orderApplied)
             await OrderExecutionLifecycleApplier.ApplyAsync(
-                productionStore, command, edgeCommand, status, executorReportedAt, notifications, cancellationToken);
+                unitOfWork, context, status, cancellationToken);
         if (productionApplied && command.StockMovements.Count > 0)
             await ExecutionStockEvidenceApplier.ApplyAsync(
-                stockStore, command, endpoint, sourceExecutorId, edgeCommand, notifications, cancellationToken);
+                unitOfWork, context, cancellationToken);
         return productionApplied || orderApplied;
     }
 
     private static async Task<bool> ApplyProductionRecordAsync(
         IProductionExecutionReportStore store,
-        IngestExecutionReportCommand command,
-        KioskExecutionEndpoint endpoint,
-        Guid sourceExecutorId,
-        EdgeCommand edgeCommand,
-        DateTimeOffset executorReportedAt,
-        DateTimeOffset cloudReceivedAt,
+        ExecutionReportProcessingContext context,
         ProductionExecutionStatus status,
         PhysicalOutputState physicalOutputState,
         CancellationToken cancellationToken)
     {
+        var command = context.Command;
+        var endpoint = context.Endpoint;
+        var edgeCommand = context.EdgeCommand;
         if (!command.SourceProductionJobId.HasValue) return false;
         var record = await store.GetProductionExecutionRecordAsync(
             edgeCommand.Id, command.SourceProductionJobId.Value, cancellationToken);
         if (record is null)
         {
             record = ProductionExecutionRecord.Create(
-                edgeCommand.Id, endpoint.Id, endpoint.ExecutionProfile, sourceExecutorId, command.SourceEventId,
-                command.SequenceNumber, command.EdgeCreatedAt, executorReportedAt, cloudReceivedAt, status,
+                edgeCommand.Id, endpoint.Id, endpoint.ExecutionProfile, context.SourceExecutorId, command.SourceEventId,
+                command.SequenceNumber, command.EdgeCreatedAt, context.ExecutorReportedAt, context.CloudReceivedAt, status,
                 physicalOutputState, command.SourceProductionJobId.Value, command.WorkcellId, command.ControllerId,
                 command.ExecutionPlanChecksum, command.ActiveSetVersion, command.ActiveSetChecksum,
                 command.ErrorCode, command.ErrorMessage);
@@ -73,35 +65,33 @@ internal static class ProductionExecutionReportApplier
         }
 
         return record.ApplyObservation(
-            command.SourceEventId, command.SequenceNumber, command.EdgeCreatedAt, executorReportedAt,
-            cloudReceivedAt, status, physicalOutputState, command.ErrorCode, command.ErrorMessage);
+            command.SourceEventId, command.SequenceNumber, command.EdgeCreatedAt, context.ExecutorReportedAt,
+            context.CloudReceivedAt, status, physicalOutputState, command.ErrorCode, command.ErrorMessage);
     }
 
     private static async Task<bool> ApplyOrderRecordAsync(
         IProductionExecutionReportStore store,
-        IngestExecutionReportCommand command,
-        KioskExecutionEndpoint endpoint,
-        Guid sourceExecutorId,
-        EdgeCommand edgeCommand,
-        DateTimeOffset executorReportedAt,
-        DateTimeOffset cloudReceivedAt,
+        ExecutionReportProcessingContext context,
         ProductionExecutionStatus status,
         CancellationToken cancellationToken)
     {
+        var command = context.Command;
+        var endpoint = context.Endpoint;
+        var edgeCommand = context.EdgeCommand;
         if (edgeCommand.OrderId is null || edgeCommand.DispatchAttemptNo is null) return false;
         if (command.SourceConfigurationReleaseId is null || command.SourceConfigurationReleaseId == Guid.Empty ||
             string.IsNullOrWhiteSpace(command.ReleaseChecksum))
             throw new DomainRuleException("Order execution reports require source configuration release and checksum.");
 
-        var customerStatus = ExecutionReportRules.MapCustomerStatus(status, command.PhysicalOutputMayHaveOccurred);
+        var customerStatus = ExecutionReportStatusMapper.ToCustomerStatus(status, command.PhysicalOutputMayHaveOccurred);
         var record = await store.GetOrderExecutionRecordAsync(edgeCommand.Id, cancellationToken);
         if (record is null)
         {
             record = OrderExecutionRecord.Create(
                 edgeCommand.OrderId.Value, edgeCommand.Id, edgeCommand.DispatchAttemptNo.Value, endpoint.Id,
-                endpoint.ExecutionProfile, sourceExecutorId, command.SourceConfigurationReleaseId.Value,
+                endpoint.ExecutionProfile, context.SourceExecutorId, command.SourceConfigurationReleaseId.Value,
                 command.ReleaseChecksum, command.SourceEventId, command.SequenceNumber, command.EdgeCreatedAt,
-                executorReportedAt, cloudReceivedAt, status, ExecutionObservationStatus.Fresh, customerStatus);
+                context.ExecutorReportedAt, context.CloudReceivedAt, status, ExecutionObservationStatus.Fresh, customerStatus);
             await store.AddOrderExecutionRecordAsync(record, cancellationToken);
             return true;
         }
@@ -111,7 +101,7 @@ internal static class ProductionExecutionReportApplier
             throw new DomainRuleException("Order execution report release does not match the dispatched command.");
 
         return record.ApplyObservation(
-            command.SourceEventId, command.SequenceNumber, command.EdgeCreatedAt, executorReportedAt,
-            cloudReceivedAt, status, ExecutionObservationStatus.Fresh, customerStatus);
+            command.SourceEventId, command.SequenceNumber, command.EdgeCreatedAt, context.ExecutorReportedAt,
+            context.CloudReceivedAt, status, ExecutionObservationStatus.Fresh, customerStatus);
     }
 }

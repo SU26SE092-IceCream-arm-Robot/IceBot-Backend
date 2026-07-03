@@ -13,10 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Infrastructure.EdgeIntegration.Persistence;
 
 public sealed class ExecutionReportStore :
-    IExecutionReportReceiptStore,
-    IDeploymentReportStore,
-    IProductionExecutionReportStore,
-    IExecutionStockEvidenceStore
+    IExecutionReportUnitOfWork
 {
     private readonly IceBotDbContext _dbContext;
 

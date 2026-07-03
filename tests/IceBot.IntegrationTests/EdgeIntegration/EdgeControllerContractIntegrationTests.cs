@@ -171,9 +171,6 @@ public sealed class EdgeControllerContractIntegrationTests
         var reportStore = new ExecutionReportStore(dbContext);
         var handler = new IngestExecutionReportCommandHandler(
             reportStore,
-            reportStore,
-            reportStore,
-            reportStore,
             new NoOpRealtimeNotificationPublisher(),
             Options.Create(new ExecutionReportIngestionOptions()));
         return await handler.HandleAsync(new IngestExecutionReportCommand

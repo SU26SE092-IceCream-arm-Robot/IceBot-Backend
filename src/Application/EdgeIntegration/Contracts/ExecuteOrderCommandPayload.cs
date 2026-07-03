@@ -5,6 +5,7 @@ namespace Application.EdgeIntegration.Contracts;
 
 public sealed record ExecuteOrderCommandPayload
 {
+    public int SchemaVersion { get; init; } = 1;
     public Guid CommandId { get; init; }
     public int DispatchAttemptNo { get; init; }
     public Guid OrderId { get; init; }
@@ -71,19 +72,20 @@ public static class ExecuteOrderCommandPayloadCodec
         PropertyNameCaseInsensitive = false
     };
 
-    public static string Serialize(ExecuteOrderCommandPayload payload) =>
-        JsonSerializer.Serialize(payload, JsonOptions);
+    public static string Serialize(ExecuteOrderCommandPayload payload)
+    {
+        ValidateFull(payload);
+        return JsonSerializer.Serialize(payload, JsonOptions);
+    }
 
-    public static ExecuteOrderCommandPayload Deserialize(string payloadJson)
+    public static ExecuteOrderCommandProvenance ReadProvenance(string payloadJson)
     {
         try
         {
-            var payload = JsonSerializer.Deserialize<ExecuteOrderCommandPayload>(payloadJson, JsonOptions)
+            var payload = JsonSerializer.Deserialize<ExecuteOrderCommandProvenance>(payloadJson, JsonOptions)
                 ?? throw new DomainRuleException("Execute-order command payload is empty.");
             if (payload.ConfigurationReleaseId == Guid.Empty || string.IsNullOrWhiteSpace(payload.ReleaseChecksum))
-            {
-                throw new DomainRuleException("Execute-order command payload is missing required identity or release provenance.");
-            }
+                throw new DomainRuleException("Execute-order command payload is missing release provenance.");
 
             return payload;
         }
@@ -92,4 +94,46 @@ public static class ExecuteOrderCommandPayloadCodec
             throw new DomainRuleException($"Execute-order command payload is invalid: {ex.Message}");
         }
     }
+
+    public static ExecuteOrderCommandPayload DeserializeAndValidateFull(string payloadJson)
+    {
+        try
+        {
+            var payload = JsonSerializer.Deserialize<ExecuteOrderCommandPayload>(payloadJson, JsonOptions)
+                ?? throw new DomainRuleException("Execute-order command payload is empty.");
+            ValidateFull(payload);
+            return payload;
+        }
+        catch (JsonException ex)
+        {
+            throw new DomainRuleException($"Execute-order command payload is invalid: {ex.Message}");
+        }
+    }
+
+    private static void ValidateFull(ExecuteOrderCommandPayload payload)
+    {
+        if (payload.SchemaVersion != 1)
+            throw new DomainRuleException("Execute-order command payload schema version is unsupported.");
+        if (payload.CommandId == Guid.Empty || payload.DispatchAttemptNo <= 0 || payload.OrderId == Guid.Empty ||
+            payload.KioskId == Guid.Empty || payload.TargetExecutionEndpointId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(payload.OrderNumber) || string.IsNullOrWhiteSpace(payload.ExecutionProfile) ||
+            payload.ConfigurationReleaseId == Guid.Empty || string.IsNullOrWhiteSpace(payload.ReleaseChecksum) ||
+            payload.CommandExpiryAt == default || payload.OrderLines.Count == 0)
+            throw new DomainRuleException("Execute-order command payload is missing required command identity or execution data.");
+
+        if (payload.OrderLines.Any(line => line.OrderItemId == Guid.Empty || line.ProductId == Guid.Empty ||
+                line.ProductVariantId == Guid.Empty || line.Quantity <= 0 || line.ExecutionRouteId == Guid.Empty ||
+                line.RobotPrograms.Count == 0 || line.RobotPrograms.Any(program =>
+                    program.RobotProgramId == Guid.Empty || program.BindingOrder <= 0 || program.Artifacts.Count == 0 ||
+                    program.Artifacts.Any(artifact => artifact.RobotArtifactId == Guid.Empty || artifact.RunOrder <= 0 ||
+                        string.IsNullOrWhiteSpace(artifact.ArtifactChecksum)))))
+            throw new DomainRuleException("Execute-order command payload contains an invalid order line or robot program manifest.");
+    }
+}
+
+public sealed record ExecuteOrderCommandProvenance
+{
+    public int SchemaVersion { get; init; }
+    public Guid ConfigurationReleaseId { get; init; }
+    public string ReleaseChecksum { get; init; } = string.Empty;
 }

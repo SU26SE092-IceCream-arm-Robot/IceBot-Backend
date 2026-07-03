@@ -19,16 +19,16 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly PayOsOptions _options;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<PayOsPaymentGateway> _logger;
 
     public PayOsPaymentGateway(
         IOptions<PayOsOptions> options,
-        IHttpClientFactory httpClientFactory,
+        HttpClient httpClient,
         ILogger<PayOsPaymentGateway> logger)
     {
         _options = options.Value;
-        _httpClientFactory = httpClientFactory;
+        _httpClient = httpClient;
         _logger = logger;
     }
 
@@ -72,12 +72,7 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         var requestJson = JsonSerializer.Serialize(request, JsonOptions);
         using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-        var httpClient = _httpClientFactory.CreateClient();
-        httpClient.DefaultRequestHeaders.Add("x-client-id", _options.ClientId);
-        httpClient.DefaultRequestHeaders.Add("x-api-key", _options.ApiKey);
-
-        var url = $"{_options.BaseUrl.TrimEnd('/')}/v2/payment-requests";
-        var response = await httpClient.PostAsync(url, content, cancellationToken);
+        var response = await _httpClient.PostAsync("v2/payment-requests", content, cancellationToken);
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)

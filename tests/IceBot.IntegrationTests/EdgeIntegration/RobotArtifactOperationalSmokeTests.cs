@@ -872,9 +872,6 @@ public sealed class RobotArtifactOperationalSmokeTests
             var mismatchStore = new ExecutionReportStore(mismatchContext);
             var mismatch = await new IngestExecutionReportCommandHandler(
                 mismatchStore,
-                mismatchStore,
-                mismatchStore,
-                mismatchStore,
                 new NoOpRealtimeNotificationPublisher(),
                 Options.Create(new ExecutionReportIngestionOptions()))
                 .HandleAsync(new IngestExecutionReportCommand
@@ -1265,9 +1262,6 @@ public sealed class RobotArtifactOperationalSmokeTests
         var reportStore = new ExecutionReportStore(dbContext);
         var result = await new IngestExecutionReportCommandHandler(
             reportStore,
-            reportStore,
-            reportStore,
-            reportStore,
             new NoOpRealtimeNotificationPublisher(),
             Options.Create(new ExecutionReportIngestionOptions()))
             .HandleAsync(new IngestExecutionReportCommand
@@ -1334,9 +1328,6 @@ public sealed class RobotArtifactOperationalSmokeTests
         await using var dbContext = _fixture.CreateDbContext();
         var reportStore = new ExecutionReportStore(dbContext);
         var result = await new IngestExecutionReportCommandHandler(
-            reportStore,
-            reportStore,
-            reportStore,
             reportStore,
             new NoOpRealtimeNotificationPublisher(),
             Options.Create(new ExecutionReportIngestionOptions()))

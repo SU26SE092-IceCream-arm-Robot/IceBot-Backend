@@ -331,6 +331,19 @@ Notes:
 - The unique `OrganizationId + ReleaseNumber` index remains the final integrity boundary.
 - `RobotArtifactOrphanCleanupJob` uses a PostgreSQL session advisory lock. At most one backend instance scans/deletes orphans per run; another instance skips when the lock is held. A crashed instance releases the lock when its database connection closes.
 
+## External Dependency Resilience
+
+HTTP integrations use `Microsoft.Extensions.Http.Resilience`, which integrates Polly resilience pipelines with `IHttpClientFactory`. Do not construct ad hoc Polly pipelines inside handlers or gateways when the operation is HTTP-based.
+
+- Configure resilience per named or typed dependency client, not as one global backend policy.
+- Use timeout, circuit breaker, telemetry, and transient-response handling at the HTTP adapter boundary.
+- Retry only when the operation is proven idempotent through a provider idempotency key or equivalent durable identity.
+- Unsafe HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`) are not retried by default.
+- Validation/authentication failures and ordinary `4xx` responses are not transient failures.
+- Non-HTTP boundaries such as MQTT operations or custom background processing may use Polly `ResiliencePipeline` directly when their retry semantics are explicit.
+
+PayOS is the first adopted HTTP resilience boundary. Its typed client uses the standard resilience handler with per-attempt and total timeouts, while retry remains disabled for payment-creation `POST` requests. A future retry policy requires an explicitly verified PayOS idempotency guarantee; deterministic local order-code generation alone is not assumed to prove provider-side idempotency.
+
 ## Do Not Soft Delete Event Tables
 
 Event, callback, retry, and append-only evidence tables should not use soft delete as a normal lifecycle.

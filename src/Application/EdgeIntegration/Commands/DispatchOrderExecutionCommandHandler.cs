@@ -94,7 +94,7 @@ public sealed class DispatchOrderExecutionCommandHandler
             if (latest.CreatedByAccountId == requestedByAccountId)
             {
                 return ApiResult<OrderExecutionDispatchResult>.Success(
-                    ToResult(latest, ExecuteOrderCommandPayloadCodec.Deserialize(latest.PayloadJson).ConfigurationReleaseId, existing: true),
+                    ToResult(latest, ExecuteOrderCommandPayloadCodec.ReadProvenance(latest.PayloadJson).ConfigurationReleaseId, existing: true),
                     "Existing operator redispatch attempt returned.");
             }
 
@@ -139,7 +139,7 @@ public sealed class DispatchOrderExecutionCommandHandler
         if (existing is not null)
         {
             return ApiResult<OrderExecutionDispatchResult>.Success(
-                ToResult(existing, ExecuteOrderCommandPayloadCodec.Deserialize(existing.PayloadJson).ConfigurationReleaseId, existing: true),
+                ToResult(existing, ExecuteOrderCommandPayloadCodec.ReadProvenance(existing.PayloadJson).ConfigurationReleaseId, existing: true),
                 "Existing order execution command returned for idempotent dispatch retry.");
         }
 
