@@ -80,14 +80,14 @@ namespace Infrastructure.Migrations
                 table: "Alerts");
 
             migrationBuilder.RenameIndex(
-                name: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpoi~",
-                table: "ExecutionEndpointSupportedRobotTargets",
-                newName: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~1");
-
-            migrationBuilder.RenameIndex(
                 name: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~1",
                 table: "ExecutionEndpointSupportedRobotTargets",
                 newName: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~2");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpoi~",
+                table: "ExecutionEndpointSupportedRobotTargets",
+                newName: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~1");
 
             migrationBuilder.AlterColumn<Guid>(
                 name: "SourceProductionJobId",
@@ -497,14 +497,14 @@ namespace Infrastructure.Migrations
                 table: "ControllerArtifactSetDeployments");
 
             migrationBuilder.RenameIndex(
-                name: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~2",
-                table: "ExecutionEndpointSupportedRobotTargets",
-                newName: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~1");
-
-            migrationBuilder.RenameIndex(
                 name: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~1",
                 table: "ExecutionEndpointSupportedRobotTargets",
                 newName: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpoi~");
+
+            migrationBuilder.RenameIndex(
+                name: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~2",
+                table: "ExecutionEndpointSupportedRobotTargets",
+                newName: "IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~1");
 
             migrationBuilder.AlterColumn<Guid>(
                 name: "SourceProductionJobId",
