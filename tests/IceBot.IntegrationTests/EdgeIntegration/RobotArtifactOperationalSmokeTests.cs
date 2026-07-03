@@ -226,13 +226,15 @@ public sealed class RobotArtifactOperationalSmokeTests
     }
 
     [IntegrationFact]
-    public async Task DeviceEventIngestion_DeduplicatesEventAndPublishesSignalROnce()
+    public async Task DeviceEventIngestion_DeduplicatesSourceEventAndCorrelatesRepeatedAlerts()
     {
         var graph = await SeedPrerequisitesAsync();
         var eventId = Guid.NewGuid();
         var publisher = new NoOpRealtimeNotificationPublisher();
 
-        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.DeviceEventIngestResult>> IngestAsync()
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.DeviceEventIngestResult>> IngestAsync(
+            Guid sourceEventId,
+            SeverityLevel severity = SeverityLevel.Error)
         {
             await using var dbContext = _fixture.CreateDbContext();
             var telemetryStore = new EdgeTelemetryIngestionStore(dbContext);
@@ -247,17 +249,18 @@ public sealed class RobotArtifactOperationalSmokeTests
                     EndpointId = graph.EndpointId,
                     OriginNodeId = graph.SourceExecutorId,
                     DeviceId = graph.DeviceId,
-                    EventId = eventId,
+                    EventId = sourceEventId,
                     EventType = "MotorOverheat",
-                    Severity = SeverityLevel.Error,
+                    Severity = severity,
                     Message = "Motor temperature exceeded warning threshold.",
                     OccurredAt = DateTimeOffset.UtcNow,
                     PayloadJson = "{\"temperatureC\":85}"
                 });
         }
 
-        var first = await IngestAsync();
-        var duplicate = await IngestAsync();
+        var first = await IngestAsync(eventId);
+        var duplicate = await IngestAsync(eventId);
+        var correlated = await IngestAsync(Guid.NewGuid(), SeverityLevel.Critical);
 
         Assert.True(first.Succeeded, first.Message);
         Assert.Equal(201, first.StatusCode);
@@ -265,19 +268,25 @@ public sealed class RobotArtifactOperationalSmokeTests
         Assert.True(duplicate.Succeeded, duplicate.Message);
         Assert.True(duplicate.Data!.Duplicate);
         Assert.Equal(first.Data.DeviceEventId, duplicate.Data.DeviceEventId);
-        var notification = Assert.Single(publisher.DeviceEventCreatedEvents);
-        Assert.Equal(first.Data.DeviceEventId, notification.DeviceEventId);
-        Assert.Equal("Error", notification.Severity);
-        var alertNotification = Assert.Single(publisher.AlertChangedEvents);
+        Assert.True(correlated.Succeeded, correlated.Message);
+        Assert.False(correlated.Data!.Duplicate);
+        Assert.Equal(2, publisher.DeviceEventCreatedEvents.Count);
+        Assert.Equal(2, publisher.AlertChangedEvents.Count);
+        var alertNotification = publisher.AlertChangedEvents[^1];
+        Assert.Equal("Open", alertNotification.OldStatus);
         Assert.Equal("Open", alertNotification.NewStatus);
         Assert.Equal("MotorOverheat", alertNotification.AlertCode);
+        Assert.Equal(2, alertNotification.OccurrenceCount);
 
         await using var assertionContext = _fixture.CreateDbContext();
-        Assert.Single(await assertionContext.DeviceEvents.Where(item => item.EventId == eventId).ToListAsync());
+        Assert.Equal(2, await assertionContext.DeviceEvents.CountAsync(item => item.KioskId == graph.KioskId));
         var alert = Assert.Single(await assertionContext.Alerts
-            .Where(item => item.SourceType == "DeviceEvent" && item.SourceId == first.Data.DeviceEventId)
+            .Where(item => item.KioskId == graph.KioskId && item.AlertCode == "MotorOverheat")
             .ToListAsync());
         Assert.Equal(AlertStatus.Open, alert.Status);
+        Assert.Equal(SeverityLevel.Critical, alert.Severity);
+        Assert.Equal(2, alert.OccurrenceCount);
+        Assert.Equal(correlated.Data.DeviceEventId, alert.SourceId);
     }
 
     [IntegrationFact]

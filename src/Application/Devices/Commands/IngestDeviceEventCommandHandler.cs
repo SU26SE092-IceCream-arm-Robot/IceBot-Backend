@@ -61,8 +61,12 @@ public sealed class IngestDeviceEventCommandHandler
                 "Device event origin node does not match the execution endpoint identity.", 400);
         }
 
+        var alertCorrelationKey = Alert.NormalizeCorrelationKey(command.EventType);
         var outcome = await _store.ExecuteDeviceEventIngestionAsync(
             command.EventId,
+            command.KioskId,
+            command.DeviceId,
+            alertCorrelationKey,
             ct => IngestLockedAsync(command, ct),
             cancellationToken);
 
@@ -124,18 +128,43 @@ public sealed class IngestDeviceEventCommandHandler
         AlertChangedEvent? alertNotification = null;
         if (command.Severity is SeverityLevel.Error or SeverityLevel.Critical)
         {
-            var alert = Alert.RaiseFromDeviceEvent(
+            var correlationWindow = TimeSpan.FromMinutes(_options.AlertCorrelationWindowMinutes);
+            var correlationKey = Alert.NormalizeCorrelationKey(deviceEvent.EventType);
+            var alert = await _alertStore.FindCorrelatableAlertAsync(
                 command.KioskId,
                 device.Id,
-                deviceEvent.Id,
-                deviceEvent.EventType,
-                command.Severity,
-                Truncate($"{device.Name}: {deviceEvent.EventType}", 500)!,
-                Truncate(deviceEvent.Message, 500),
-                deviceEvent.OccurredAt,
-                command.OriginNodeId,
-                receivedAt);
-            await _alertStore.AddAlertAsync(alert, cancellationToken);
+                correlationKey,
+                deviceEvent.OccurredAt - correlationWindow,
+                deviceEvent.OccurredAt + correlationWindow,
+                cancellationToken);
+            var oldStatus = alert?.Status.ToString();
+
+            if (alert is null)
+            {
+                alert = Alert.RaiseFromDeviceEvent(
+                    command.KioskId,
+                    device.Id,
+                    deviceEvent.Id,
+                    deviceEvent.EventType,
+                    command.Severity,
+                    Truncate($"{device.Name}: {deviceEvent.EventType}", 500)!,
+                    Truncate(deviceEvent.Message, 500),
+                    deviceEvent.OccurredAt,
+                    command.OriginNodeId,
+                    receivedAt);
+                await _alertStore.AddAlertAsync(alert, cancellationToken);
+            }
+            else
+            {
+                alert.RecordOccurrence(
+                    deviceEvent.Id,
+                    command.Severity,
+                    Truncate($"{device.Name}: {deviceEvent.EventType}", 500)!,
+                    Truncate(deviceEvent.Message, 500),
+                    deviceEvent.OccurredAt,
+                    receivedAt);
+            }
+
             alertNotification = new AlertChangedEvent
             {
                 AlertId = alert.Id,
@@ -145,10 +174,12 @@ public sealed class IngestDeviceEventCommandHandler
                 DeviceId = device.Id,
                 AlertCode = alert.AlertCode,
                 Severity = alert.Severity.ToString(),
-                OldStatus = null,
+                OldStatus = oldStatus,
                 NewStatus = alert.Status.ToString(),
                 UpdatedAt = receivedAt,
-                Version = 1
+                Version = checked((int)alert.Version),
+                OccurrenceCount = alert.OccurrenceCount,
+                LastOccurredAt = alert.LastOccurredAt
             };
         }
 

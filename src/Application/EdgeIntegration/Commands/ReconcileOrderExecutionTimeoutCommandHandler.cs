@@ -1,4 +1,4 @@
-using System.Text.Json;
+using Application.EdgeIntegration.Contracts;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.EdgeIntegration.Abstractions;
@@ -178,7 +178,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             throw new Domain.Common.DomainRuleException("Execution endpoint profile identity is missing.");
         }
 
-        using var payload = JsonDocument.Parse(edgeCommand.PayloadJson);
+        var payload = ExecuteOrderCommandPayloadCodec.Deserialize(edgeCommand.PayloadJson);
         var record = OrderExecutionRecord.CreateProvisionalAccepted(
             edgeCommand.OrderId!.Value,
             edgeCommand.Id,
@@ -186,8 +186,8 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             endpoint.Id,
             endpoint.ExecutionProfile,
             sourceExecutorId.Value,
-            payload.RootElement.GetProperty("ConfigurationReleaseId").GetGuid(),
-            payload.RootElement.GetProperty("ReleaseChecksum").GetString() ?? string.Empty,
+            payload.ConfigurationReleaseId,
+            payload.ReleaseChecksum,
             edgeCommand.RespondedAt ?? observedAt);
         await _store.AddOrderExecutionRecordAsync(record, cancellationToken);
         return record;

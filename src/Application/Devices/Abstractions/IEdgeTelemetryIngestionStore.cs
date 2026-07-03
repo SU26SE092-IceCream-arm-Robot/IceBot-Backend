@@ -17,6 +17,9 @@ public interface IEdgeTelemetryIngestionStore
 
     Task<T> ExecuteDeviceEventIngestionAsync<T>(
         Guid eventId,
+        Guid kioskId,
+        Guid deviceId,
+        string alertCorrelationKey,
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default);
 

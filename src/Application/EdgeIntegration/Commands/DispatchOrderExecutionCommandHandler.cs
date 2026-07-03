@@ -1,19 +1,16 @@
 using Domain.Devices.ExecutionEndpoints;
-using System.Text.Json;
 using Application.EdgeIntegration.Abstractions;
+using Application.EdgeIntegration.Contracts;
 using Application.EdgeIntegration.Results;
+using Application.EdgeIntegration.Services;
 using Application.Shared.Wrappers;
 using Domain.Catalog.Enums;
 using Domain.Common;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
-using Domain.ProductionConfiguration.Entities;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
-using Domain.RobotConfiguration.Manifests;
 
 namespace Application.EdgeIntegration.Commands;
 
@@ -97,7 +94,7 @@ public sealed class DispatchOrderExecutionCommandHandler
             if (latest.CreatedByAccountId == requestedByAccountId)
             {
                 return ApiResult<OrderExecutionDispatchResult>.Success(
-                    ToResult(latest, ReadConfigurationReleaseId(latest.PayloadJson), existing: true),
+                    ToResult(latest, ExecuteOrderCommandPayloadCodec.Deserialize(latest.PayloadJson).ConfigurationReleaseId, existing: true),
                     "Existing operator redispatch attempt returned.");
             }
 
@@ -142,7 +139,7 @@ public sealed class DispatchOrderExecutionCommandHandler
         if (existing is not null)
         {
             return ApiResult<OrderExecutionDispatchResult>.Success(
-                ToResult(existing, ReadConfigurationReleaseId(existing.PayloadJson), existing: true),
+                ToResult(existing, ExecuteOrderCommandPayloadCodec.Deserialize(existing.PayloadJson).ConfigurationReleaseId, existing: true),
                 "Existing order execution command returned for idempotent dispatch retry.");
         }
 
@@ -177,10 +174,11 @@ public sealed class DispatchOrderExecutionCommandHandler
         }
 
         var endpoints = await _store.ListActiveEndpointsAsync(order.KioskId, cancellationToken);
-        var candidates = new List<DispatchCandidate>();
+        var candidates = new List<OrderExecutionDispatchCandidate>();
         foreach (var endpoint in endpoints)
         {
-            var candidate = await TryBuildCandidateAsync(endpoint, productionItems, cancellationToken);
+            var candidate = await OrderExecutionDispatchPlanner.TryBuildCandidateAsync(
+                _store, endpoint, productionItems, cancellationToken);
             if (candidate is not null)
             {
                 candidates.Add(candidate);
@@ -216,7 +214,8 @@ public sealed class DispatchOrderExecutionCommandHandler
         }
 
         var commandId = GuidId.New();
-        var payload = BuildPayload(commandId, command.DispatchAttemptNo, order, selected, productionItems, expiry);
+        var payload = OrderExecutionDispatchPlanner.BuildPayload(
+            commandId, command.DispatchAttemptNo, order, selected, productionItems, expiry);
         var edgeCommand = EdgeCommand.Create(
             EdgeCommandType.ExecuteOrder,
             order.KioskId,
@@ -257,173 +256,6 @@ public sealed class DispatchOrderExecutionCommandHandler
             201);
     }
 
-    private async Task<DispatchCandidate?> TryBuildCandidateAsync(
-        KioskExecutionEndpoint endpoint,
-        IReadOnlyCollection<OrderItem> productionItems,
-        CancellationToken cancellationToken)
-    {
-        var readiness = await _store.GetReadinessAsync(endpoint.Id, cancellationToken);
-        if (readiness is null || readiness.Readiness != ExecutionReadinessState.Ready ||
-            readiness.Activity != ExecutionActivityState.Idle || readiness.Safety != ExecutionSafetyState.Safe)
-        {
-            return null;
-        }
-        var availableCapabilities = readiness.Capabilities.Where(x => x.IsAvailable)
-            .Select(x => x.CapabilityCode).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        Guid? releaseId = endpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
-            ? endpoint.ActiveConfigurationReleaseId
-            : endpoint.ActiveArtifactSetReleaseId;
-        string? releaseChecksum = endpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
-            ? endpoint.ActiveConfigurationReleaseChecksum
-            : endpoint.ActiveArtifactSetReleaseChecksum;
-        if (!releaseId.HasValue || string.IsNullOrWhiteSpace(releaseChecksum))
-        {
-            return null;
-        }
-
-        var release = await _store.GetReleaseAsync(releaseId.Value, cancellationToken);
-        if (release is null || !string.Equals(release.ReleaseChecksum, releaseChecksum, StringComparison.Ordinal))
-        {
-            return null;
-        }
-
-        ControllerArtifactSetDeployment? activeSet = null;
-        if (endpoint.ExecutionProfile == KioskExecutionProfile.LowCostController)
-        {
-            if (!endpoint.ActiveArtifactSetDeploymentId.HasValue ||
-                !endpoint.ActiveSetVersionIsUsable())
-            {
-                return null;
-            }
-
-            activeSet = await _store.GetControllerActiveSetAsync(
-                endpoint.ActiveArtifactSetDeploymentId.Value,
-                cancellationToken);
-            if (activeSet is null)
-            {
-                return null;
-            }
-        }
-
-        var routes = new List<ResolvedRoute>(productionItems.Count);
-        foreach (var item in productionItems)
-        {
-            var route = release.ExecutionRoutes
-                .Where(candidate => candidate.ProductVariantId == item.ProductVariantId && candidate.RecipeId == item.RecipeId)
-                .OrderBy(candidate => candidate.Priority)
-                .ThenBy(candidate => candidate.RouteCode)
-                .FirstOrDefault();
-            if (route is null)
-            {
-                return null;
-            }
-
-            var bindings = route.RobotBindings.OrderBy(binding => binding.BindingOrder).ToArray();
-            if (activeSet is not null)
-            {
-                bindings = bindings
-                    .Where(binding => activeSet.Items.Any(activeItem =>
-                        activeItem.ExecutionRouteId == route.Id &&
-                        activeItem.RobotProgramId == binding.RobotProgramId))
-                    .ToArray();
-            }
-
-            if (bindings.Length == 0)
-            {
-                return null;
-            }
-
-            if (bindings.Any(binding => !availableCapabilities.Contains(binding.RequiredWorkcellCapabilityCode)))
-            {
-                return null;
-            }
-
-            routes.Add(new ResolvedRoute(item.Id, route, bindings));
-        }
-
-        return new DispatchCandidate(endpoint, release, activeSet, routes);
-    }
-
-    private static string BuildPayload(
-        Guid commandId,
-        int dispatchAttemptNo,
-        Order order,
-        DispatchCandidate candidate,
-        IReadOnlyCollection<OrderItem> productionItems,
-        DateTimeOffset commandExpiryAt)
-    {
-        var routeByOrderItem = candidate.Routes.ToDictionary(route => route.OrderItemId);
-        return JsonSerializer.Serialize(new
-        {
-            CommandId = commandId,
-            DispatchAttemptNo = dispatchAttemptNo,
-            OrderId = order.Id,
-            order.OrderNumber,
-            order.KioskId,
-            TargetExecutionEndpointId = candidate.Endpoint.Id,
-            ExecutionProfile = candidate.Endpoint.ExecutionProfile.ToString(),
-            ConfigurationReleaseId = candidate.Release.Id,
-            candidate.Release.ReleaseChecksum,
-            candidate.Release.ReleaseManifestSchemaVersion,
-            candidate.Release.ManifestJson,
-            ActiveSetVersion = candidate.ActiveSet?.ActiveSetVersion,
-            ActiveSetChecksum = candidate.ActiveSet?.ActiveSetChecksum,
-            CommandExpiryAt = commandExpiryAt,
-            OrderLines = productionItems.Select(item =>
-            {
-                var selected = routeByOrderItem[item.Id];
-                return new
-                {
-                    OrderItemId = item.Id,
-                    item.ProductId,
-                    item.ProductVariantId,
-                    item.RecipeId,
-                    item.Quantity,
-                    item.ProductCodeSnapshot,
-                    item.ProductVariantCodeSnapshot,
-                    item.RecipeVersionSnapshot,
-                    item.RecipeSnapshotSchemaVersion,
-                    item.RecipeSnapshotJson,
-                    item.OptionsSchemaVersion,
-                    item.OptionsJson,
-                    ExecutionRouteId = selected.Route.Id,
-                    selected.Route.RouteCode,
-                    selected.Route.RequiredCapabilitiesJson,
-                    RobotPrograms = selected.Bindings.Select(binding => new
-                    {
-                        binding.BindingOrder,
-                        binding.RequiredWorkcellCapabilityCode,
-                        RobotProgramId = binding.RobotProgram.Id,
-                        binding.RobotProgram.ProgramManifestSchemaVersion,
-                        binding.RobotProgram.ProgramManifestChecksum,
-                        Artifacts = RobotProgramManifestBuilder.Parse(
-                                binding.RobotProgram.ProgramManifestJson
-                                    ?? throw new DomainRuleException("Published robot program manifest is missing."))
-                            .Artifacts
-                            .OrderBy(programArtifact => programArtifact.RunOrder)
-                            .Select(programArtifact => new
-                            {
-                                RobotArtifactId = programArtifact.RobotArtifact.Id,
-                                programArtifact.RunOrder,
-                                programArtifact.ParametersSchemaVersion,
-                                ParametersJson = programArtifact.Parameters?.ToJsonString(),
-                                ArtifactChecksum = programArtifact.RobotArtifact.Checksum,
-                                programArtifact.RobotArtifact.RuntimeTargetCode,
-                                programArtifact.RobotArtifact.MachineModelCode
-                            })
-                    })
-                };
-            })
-        });
-    }
-
-    private static Guid ReadConfigurationReleaseId(string payloadJson)
-    {
-        using var document = JsonDocument.Parse(payloadJson);
-        return document.RootElement.GetProperty("ConfigurationReleaseId").GetGuid();
-    }
-
     private static OrderExecutionDispatchResult ToResult(
         EdgeCommand command,
         Guid releaseId,
@@ -456,23 +288,5 @@ public sealed class DispatchOrderExecutionCommandHandler
             cancellationToken);
     }
 
-    private sealed record DispatchCandidate(
-        KioskExecutionEndpoint Endpoint,
-        ConfigurationRelease Release,
-        ControllerArtifactSetDeployment? ActiveSet,
-        IReadOnlyCollection<ResolvedRoute> Routes);
-
-    private sealed record ResolvedRoute(
-        Guid OrderItemId,
-        ExecutionRoute Route,
-        IReadOnlyCollection<ExecutionRouteRobotBinding> Bindings);
-
     private sealed record RedispatchContext(Guid RequestedByAccountId, string Reason);
-}
-
-internal static class KioskExecutionEndpointDispatchExtensions
-{
-    public static bool ActiveSetVersionIsUsable(this KioskExecutionEndpoint endpoint) =>
-        endpoint.ActiveArtifactSetVersion is > 0 &&
-        !string.IsNullOrWhiteSpace(endpoint.ActiveArtifactSetChecksum);
 }

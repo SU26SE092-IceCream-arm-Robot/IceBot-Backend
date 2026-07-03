@@ -884,6 +884,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("Alerts");
             entity.HasIndex(x => new { x.KioskId, x.Status, x.RaisedAt });
+            entity.HasIndex(x => new { x.KioskId, x.DeviceId, x.CorrelationKey, x.Status, x.LastOccurredAt });
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Device).WithMany()
                 .HasForeignKey(x => new { x.DeviceId, x.KioskId })

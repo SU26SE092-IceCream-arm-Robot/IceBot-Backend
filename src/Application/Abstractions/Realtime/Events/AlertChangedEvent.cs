@@ -14,4 +14,6 @@ public sealed record AlertChangedEvent
     public required string NewStatus { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
     public required int Version { get; init; }
+    public required int OccurrenceCount { get; init; }
+    public required DateTimeOffset LastOccurredAt { get; init; }
 }

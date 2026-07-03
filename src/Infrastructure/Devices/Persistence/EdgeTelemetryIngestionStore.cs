@@ -33,10 +33,16 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore, 
 
     public Task<T> ExecuteDeviceEventIngestionAsync<T>(
         Guid eventId,
+        Guid kioskId,
+        Guid deviceId,
+        string alertCorrelationKey,
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default)
     {
-        return ExecuteSerializedAsync([$"device-event:{eventId:D}"], action, cancellationToken);
+        return ExecuteSerializedAsync(
+            [$"device-event:{eventId:D}", $"alert-correlation:{kioskId:D}:{deviceId:D}:{alertCorrelationKey}"],
+            action,
+            cancellationToken);
     }
 
     public Task<T> ExecuteConnectivityReconciliationAsync<T>(
@@ -154,6 +160,26 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore, 
 
     public Task AddAlertAsync(Alert alert, CancellationToken cancellationToken = default) =>
         _dbContext.Alerts.AddAsync(alert, cancellationToken).AsTask();
+
+    public Task<Alert?> FindCorrelatableAlertAsync(
+        Guid kioskId,
+        Guid deviceId,
+        string correlationKey,
+        DateTimeOffset windowStart,
+        DateTimeOffset windowEnd,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Alerts
+            .Where(alert =>
+                alert.DeletedAt == null &&
+                alert.KioskId == kioskId &&
+                alert.DeviceId == deviceId &&
+                alert.CorrelationKey == correlationKey &&
+                alert.Status != Domain.Operations.Enums.AlertStatus.Resolved &&
+                alert.Status != Domain.Operations.Enums.AlertStatus.Suppressed &&
+                alert.LastOccurredAt >= windowStart &&
+                alert.LastOccurredAt <= windowEnd)
+            .OrderByDescending(alert => alert.LastOccurredAt)
+            .FirstOrDefaultAsync(cancellationToken);
 
     public Task AddOperationLogAsync(OperationLog operationLog, CancellationToken cancellationToken = default) =>
         _dbContext.OperationLogs.AddAsync(operationLog, cancellationToken).AsTask();

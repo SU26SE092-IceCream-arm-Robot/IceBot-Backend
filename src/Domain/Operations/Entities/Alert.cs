@@ -9,6 +9,16 @@ namespace Domain.Operations.Entities;
 
 public partial class Alert : SyncAggregateEntity
 {
+    public static string NormalizeCorrelationKey(string alertCode)
+    {
+        if (string.IsNullOrWhiteSpace(alertCode))
+        {
+            throw new DomainRuleException("Alert code is required.");
+        }
+
+        return alertCode.Trim().ToUpperInvariant();
+    }
+
     public static Alert RaiseFromDeviceEvent(
         Guid kioskId,
         Guid deviceId,
@@ -33,6 +43,7 @@ public partial class Alert : SyncAggregateEntity
             KioskId = kioskId,
             DeviceId = deviceId,
             AlertCode = alertCode.Trim(),
+            CorrelationKey = NormalizeCorrelationKey(alertCode),
             Severity = severity,
             Title = title.Trim(),
             Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
@@ -40,6 +51,8 @@ public partial class Alert : SyncAggregateEntity
             SourceType = "DeviceEvent",
             SourceId = deviceEventId,
             RaisedAt = raisedAt,
+            LastOccurredAt = raisedAt,
+            OccurrenceCount = 1,
             OriginNodeId = originNodeId,
             Version = 1,
             SyncedAt = syncedAt
@@ -53,6 +66,8 @@ public partial class Alert : SyncAggregateEntity
     public Guid? AcknowledgedByAccountId { get; set; }
 
     public string AlertCode { get; set; } = null!;
+
+    public string CorrelationKey { get; private set; } = null!;
 
     public SeverityLevel Severity { get; set; } = SeverityLevel.Warning;
 
@@ -68,6 +83,10 @@ public partial class Alert : SyncAggregateEntity
 
     public DateTimeOffset RaisedAt { get; set; }
 
+    public DateTimeOffset LastOccurredAt { get; private set; }
+
+    public int OccurrenceCount { get; private set; } = 1;
+
     public DateTimeOffset? AcknowledgedAt { get; set; }
 
     public DateTimeOffset? ResolvedAt { get; set; }
@@ -79,6 +98,34 @@ public partial class Alert : SyncAggregateEntity
     public virtual Device? Device { get; set; }
 
     public virtual Kiosk Kiosk { get; set; } = null!;
+
+    public void RecordOccurrence(
+        Guid sourceId,
+        SeverityLevel severity,
+        string title,
+        string? message,
+        DateTimeOffset occurredAt,
+        DateTimeOffset syncedAt)
+    {
+        if (Status is AlertStatus.Resolved or AlertStatus.Suppressed)
+        {
+            throw new DomainRuleException("Cannot correlate an occurrence into a terminal alert.");
+        }
+
+        if (sourceId == Guid.Empty || string.IsNullOrWhiteSpace(title))
+        {
+            throw new DomainRuleException("Alert occurrence source and title are required.");
+        }
+
+        OccurrenceCount = checked(OccurrenceCount + 1);
+        LastOccurredAt = occurredAt > LastOccurredAt ? occurredAt : LastOccurredAt;
+        SourceId = sourceId;
+        Severity = severity > Severity ? severity : Severity;
+        Title = title.Trim();
+        Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim();
+        SyncedAt = syncedAt;
+        Version++;
+    }
 
     public void Acknowledge(Guid acknowledgedByAccountId, DateTimeOffset acknowledgedAt)
     {

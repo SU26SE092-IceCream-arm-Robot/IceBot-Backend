@@ -1,5 +1,5 @@
 using Domain.Devices.ExecutionEndpoints;
-using System.Text.Json;
+using Application.EdgeIntegration.Contracts;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.EdgeIntegration.Abstractions;
@@ -304,10 +304,7 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             throw new Domain.Common.DomainRuleException("Execution endpoint profile identity is missing.");
         }
 
-        using var payload = JsonDocument.Parse(edgeCommand.PayloadJson);
-        var root = payload.RootElement;
-        var releaseId = root.GetProperty("ConfigurationReleaseId").GetGuid();
-        var releaseChecksum = root.GetProperty("ReleaseChecksum").GetString();
+        var payload = ExecuteOrderCommandPayloadCodec.Deserialize(edgeCommand.PayloadJson);
         var record = OrderExecutionRecord.CreateProvisionalAccepted(
             edgeCommand.OrderId.Value,
             edgeCommand.Id,
@@ -315,8 +312,8 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             endpoint.Id,
             endpoint.ExecutionProfile,
             sourceExecutorId.Value,
-            releaseId,
-            releaseChecksum ?? string.Empty,
+            payload.ConfigurationReleaseId,
+            payload.ReleaseChecksum,
             acknowledgedAt);
         await _edgeCommandStore.AddOrderExecutionRecordAsync(record, cancellationToken);
     }

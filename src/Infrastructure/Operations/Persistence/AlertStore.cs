@@ -67,7 +67,7 @@ public sealed class AlertStore : IAlertStore
         CancellationToken cancellationToken = default) =>
         ApplyFilters(status, severity, organizationId, storeId, kioskId, deviceId, from, to,
                 isSystemAdmin, allowedOrganizationIds, allowedStoreIds, allowedKioskIds)
-            .OrderByDescending(alert => alert.RaisedAt)
+            .OrderByDescending(alert => alert.LastOccurredAt)
             .ThenByDescending(alert => alert.Id)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
@@ -107,8 +107,8 @@ public sealed class AlertStore : IAlertStore
         if (storeId.HasValue) query = query.Where(alert => alert.Kiosk.StoreId == storeId.Value);
         if (kioskId.HasValue) query = query.Where(alert => alert.KioskId == kioskId.Value);
         if (deviceId.HasValue) query = query.Where(alert => alert.DeviceId == deviceId.Value);
-        if (from.HasValue) query = query.Where(alert => alert.RaisedAt >= from.Value);
-        if (to.HasValue) query = query.Where(alert => alert.RaisedAt <= to.Value);
+        if (from.HasValue) query = query.Where(alert => alert.LastOccurredAt >= from.Value);
+        if (to.HasValue) query = query.Where(alert => alert.LastOccurredAt <= to.Value);
 
         if (!isSystemAdmin)
         {

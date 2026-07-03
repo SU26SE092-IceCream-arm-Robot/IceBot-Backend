@@ -92,7 +92,8 @@ namespace Infrastructure
                         options.HeartbeatTimeoutSeconds > 0 &&
                         options.ConnectivityReconciliationIntervalSeconds > 0 &&
                         options.ConnectivityReconciliationBatchSize > 0 &&
-                        options.MaxBatchEventCount > 0,
+                        options.MaxBatchEventCount > 0 &&
+                        options.AlertCorrelationWindowMinutes > 0,
                     "Edge telemetry clock skew and connectivity reconciliation settings are invalid.")
                 .ValidateOnStart();
             services.AddHostedService<Devices.Jobs.KioskConnectivityReconciliationJob>();
