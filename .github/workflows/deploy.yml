@@ -25,9 +25,9 @@ jobs:
           script: |
             # LƯU Ý: Nhớ đổi đường dẫn dưới đây thành đường dẫn thật trên VPS của bạn
             cd /opt/apps/IceBot-Backend
-            
+
             # Cấp quyền thực thi cho file deploy (đề phòng bị mất quyền)
-            chmod +x deploy.sh
-            
+            chmod +x ./docker/deploy.sh
+
             # Chạy file deploy
-            ./deploy.sh
+            ./docker/deploy.sh
