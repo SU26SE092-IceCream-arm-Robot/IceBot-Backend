@@ -39,7 +39,7 @@ services:
   icebot-backend-api:
     build:
       context: ..
-      dockerfile: Dockerfile
+      dockerfile: docker/Dockerfile
     container_name: icebot-backend-api
     restart: unless-stopped
     depends_on:
