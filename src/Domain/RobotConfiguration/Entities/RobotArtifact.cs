@@ -1,6 +1,5 @@
 using Domain.Common;
 using Domain.RobotConfiguration.Enums;
-using Domain.Tenants.Entities;
 
 namespace Domain.RobotConfiguration.Entities;
 
@@ -33,10 +32,6 @@ public class RobotArtifact : RobotConfigurationEntity
     public string? Description { get; private set; }
 
     public string? MetadataJson { get; private set; }
-
-    public virtual Organization Organization { get; private set; } = null!;
-
-    public virtual RobotArtifactTemplate? SourceRobotArtifactTemplate { get; private set; }
 
     private RobotArtifact()
     {

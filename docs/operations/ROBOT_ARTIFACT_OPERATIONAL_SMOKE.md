@@ -24,7 +24,7 @@ Secret key: minioadmin
 
 Override `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET_NAME`, and `MINIO_DOWNLOAD_ENDPOINT` outside source control when defaults are unsuitable. `MINIO_DOWNLOAD_ENDPOINT` must be reachable by the actual Edge/controller, not only by the backend container.
 
-The backend creates the private bucket on the first object write. PostgreSQL stores artifact metadata only.
+Development configuration and the local backend compose set `AutoCreateBucket=true`, so backend startup creates the private bucket when it is absent. Production defaults to `false`: infrastructure must provision the bucket before the API starts. PostgreSQL stores artifact metadata only.
 
 ## Apply Migrations To A Test Database
 

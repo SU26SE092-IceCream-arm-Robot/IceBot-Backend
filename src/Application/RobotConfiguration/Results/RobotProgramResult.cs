@@ -1,4 +1,5 @@
 using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Manifests;
 
 namespace Application.RobotConfiguration.Results;
 
@@ -20,8 +21,12 @@ public sealed class RobotProgramResult
     public DateTimeOffset? PublishedAt { get; init; }
     public IReadOnlyCollection<RobotProgramArtifactResult> Artifacts { get; init; } = Array.Empty<RobotProgramArtifactResult>();
 
-    public static RobotProgramResult FromEntity(RobotProgram program)
+    public static RobotProgramResult FromEntity(
+        RobotProgram program,
+        IReadOnlyCollection<RobotArtifactManifestSnapshot>? artifactSnapshots = null)
     {
+        var snapshotsById = artifactSnapshots?.ToDictionary(item => item.RobotArtifactId)
+            ?? new Dictionary<Guid, RobotArtifactManifestSnapshot>();
         return new RobotProgramResult
         {
             Id = program.Id,
@@ -40,18 +45,22 @@ public sealed class RobotProgramResult
             PublishedAt = program.PublishedAt,
             Artifacts = program.RobotProgramArtifacts
                 .OrderBy(artifact => artifact.RunOrder)
-                .Select(artifact => new RobotProgramArtifactResult
+                .Select(artifact =>
                 {
-                    Id = artifact.Id,
-                    RobotArtifactId = artifact.RobotArtifactId,
-                    RunOrder = artifact.RunOrder,
-                    ParametersSchemaVersion = artifact.ParametersSchemaVersion,
-                    ParametersJson = artifact.ParametersJson,
-                    ArtifactCode = artifact.RobotArtifact?.ArtifactCode,
-                    ArtifactName = artifact.RobotArtifact?.ArtifactName,
-                    FileName = artifact.RobotArtifact?.FileName,
-                    Checksum = artifact.RobotArtifact?.Checksum,
-                    ArtifactStatus = artifact.RobotArtifact?.Status.ToString()
+                    snapshotsById.TryGetValue(artifact.RobotArtifactId, out var snapshot);
+                    return new RobotProgramArtifactResult
+                    {
+                        Id = artifact.Id,
+                        RobotArtifactId = artifact.RobotArtifactId,
+                        RunOrder = artifact.RunOrder,
+                        ParametersSchemaVersion = artifact.ParametersSchemaVersion,
+                        ParametersJson = artifact.ParametersJson,
+                        ArtifactCode = snapshot?.ArtifactCode,
+                        ArtifactName = snapshot?.ArtifactName,
+                        FileName = snapshot?.FileName,
+                        Checksum = snapshot?.Checksum,
+                        ArtifactStatus = snapshot?.Status.ToString()
+                    };
                 })
                 .ToArray()
         };

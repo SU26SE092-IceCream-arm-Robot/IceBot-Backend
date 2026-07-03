@@ -2,6 +2,8 @@ namespace Application.RobotConfiguration.Abstractions;
 
 public interface IArtifactObjectStorage
 {
+    Task EnsureReadyAsync(CancellationToken cancellationToken = default);
+
     Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken = default);
 
     Task<ArtifactObjectWriteResult> WriteImmutableAsync(

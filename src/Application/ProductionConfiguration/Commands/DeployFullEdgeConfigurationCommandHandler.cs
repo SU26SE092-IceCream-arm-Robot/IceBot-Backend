@@ -8,6 +8,7 @@ using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
+using Domain.RobotConfiguration.Manifests;
 
 namespace Application.ProductionConfiguration.Commands;
 
@@ -161,9 +162,13 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     {
         var artifacts = release.ExecutionRoutes
             .SelectMany(route => route.RobotBindings)
-            .SelectMany(binding => binding.RobotProgram.RobotProgramArtifacts)
-            .GroupBy(programArtifact => programArtifact.RobotArtifactId)
-            .Select(group => group.First().RobotArtifact)
+            .SelectMany(binding => RobotProgramManifestBuilder.Parse(
+                binding.RobotProgram.ProgramManifestJson
+                    ?? throw new DomainRuleException("Published robot program manifest is missing."))
+                .Artifacts)
+            .Select(programArtifact => programArtifact.RobotArtifact)
+            .GroupBy(artifact => artifact.Id)
+            .Select(group => group.First())
             .OrderBy(artifact => artifact.Id)
             .Select(artifact => new
             {

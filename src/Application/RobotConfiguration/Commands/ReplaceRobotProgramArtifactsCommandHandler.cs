@@ -4,6 +4,7 @@ using Application.RobotConfiguration.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
+using Application.RobotConfiguration.Mapping;
 
 namespace Application.RobotConfiguration.Commands;
 
@@ -83,7 +84,8 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
                 ?? throw new InvalidOperationException("Robot program disappeared after artifact replacement.");
 
             return ApiResult<RobotProgramResult>.Success(
-                RobotProgramResult.FromEntity(updatedProgram),
+                await RobotProgramResultMapper.ToResultAsync(
+                    _robotConfigurationStore, updatedProgram, cancellationToken),
                 "Robot program artifact order replaced successfully.");
         }
         catch (DomainRuleException ex)

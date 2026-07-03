@@ -2,6 +2,7 @@ using Application.RobotConfiguration.Abstractions;
 using Application.RobotConfiguration.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
+using Application.RobotConfiguration.Mapping;
 
 namespace Application.RobotConfiguration.Queries;
 
@@ -26,6 +27,7 @@ public sealed class GetRobotProgramQueryHandler
             return ApiResult<RobotProgramResult>.Fail("Robot program not found.", 404);
         }
 
-        return ApiResult<RobotProgramResult>.Success(RobotProgramResult.FromEntity(program));
+        return ApiResult<RobotProgramResult>.Success(
+            await RobotProgramResultMapper.ToResultAsync(_store, program, cancellationToken));
     }
 }

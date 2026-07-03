@@ -136,6 +136,10 @@ Aggregate roots: `RobotProgram`, `RobotArtifact`.
 
 Aggregate child: `RobotProgramArtifact`, owned only by `RobotProgram`.
 
+`RobotProgramArtifact` keeps `RobotArtifactId` but does not hold a live `RobotArtifact` navigation because `RobotArtifact` is an independent aggregate root. Program publication receives explicit published-artifact snapshots and writes immutable `ProgramManifestJson`; release publication, deployment, and execution dispatch consume that manifest instead of traversing a live artifact graph.
+
+Robot configuration entities keep tenant/template provenance ids without exposing cross-context or cross-aggregate navigation properties. Infrastructure preserves database foreign keys and uses explicit projections for management reads.
+
 This context is configuration-time. It should not own runtime execution state.
 
 `RobotProgramArtifact` represents ordered artifact membership. `RobotArtifact` does not own an inverse membership collection. This context does not persist Blockly trees, teaching points, calibration, motion coordinates or live runtime work.

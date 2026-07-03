@@ -5,6 +5,7 @@ using Application.Tenants;
 using Domain.Common;
 using Domain.ProductionConfiguration.ValueObjects;
 using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.Manifests;
 
 namespace Application.ProductionConfiguration.Commands;
 
@@ -60,8 +61,13 @@ public sealed class PublishConfigurationReleaseCommandHandler
     {
         if (program.Status != RobotProgramStatus.Published ||
             program.OrganizationId != organizationId ||
-            string.IsNullOrWhiteSpace(program.ProgramManifestChecksum))
+            string.IsNullOrWhiteSpace(program.ProgramManifestChecksum) ||
+            string.IsNullOrWhiteSpace(program.ProgramManifestJson))
             throw new DomainRuleException("Configuration release requires published organization-owned robot programs.");
+
+        var manifest = RobotProgramManifestBuilder.Parse(program.ProgramManifestJson);
+        if (manifest.Id != program.Id || manifest.SchemaVersion != program.ProgramManifestSchemaVersion)
+            throw new DomainRuleException("Robot program manifest identity does not match the published program.");
 
         return new PublishedRobotProgramSnapshot(
             program.Id,
@@ -69,15 +75,16 @@ public sealed class PublishConfigurationReleaseCommandHandler
             organizationId,
             program.ProgramManifestSchemaVersion,
             program.ProgramManifestChecksum,
-            program.RobotProgramArtifacts.Select(item =>
-            {
-                var artifact = item.RobotArtifact ?? throw new DomainRuleException("Robot artifact snapshot data is missing.");
-                if (artifact.Status != RobotArtifactStatus.Published || artifact.OrganizationId != organizationId)
-                    throw new DomainRuleException("Configuration release requires published organization-owned robot artifacts.");
-                return new PublishedRobotArtifactSnapshot(
-                    item.Id, artifact.Id, item.RunOrder, item.ParametersSchemaVersion, item.ParametersJson,
-                    artifact.Checksum, artifact.StorageKey, artifact.RuntimeTargetCode,
-                    artifact.MachineModelCode, artifact.ContentLengthBytes);
-            }).ToArray());
+            manifest.Artifacts.Select(item => new PublishedRobotArtifactSnapshot(
+                item.Id,
+                item.RobotArtifact.Id,
+                item.RunOrder,
+                item.ParametersSchemaVersion,
+                item.Parameters?.ToJsonString(),
+                item.RobotArtifact.Checksum,
+                item.RobotArtifact.StorageKey,
+                item.RobotArtifact.RuntimeTargetCode,
+                item.RobotArtifact.MachineModelCode,
+                item.RobotArtifact.ContentLengthBytes)).ToArray());
     }
 }

@@ -63,6 +63,7 @@ services:
       RobotArtifacts__ObjectStorage__BucketName: "${MINIO_BUCKET_NAME:-icebot-robot-artifacts}"
       RobotArtifacts__ObjectStorage__UseSsl: "false"
       RobotArtifacts__ObjectStorage__DownloadUseSsl: "false"
+      RobotArtifacts__ObjectStorage__AutoCreateBucket: "true"
 
       # --- CẤU HÌNH OBSERVABILITY ĐỂ GỬI LOG VỀ ASPIRE DASHBOARD ---
       Observability__OpenTelemetry__OtlpExporterEnabled: "true"

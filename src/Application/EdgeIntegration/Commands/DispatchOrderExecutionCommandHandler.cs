@@ -13,6 +13,7 @@ using Domain.ProductionConfiguration.Entities;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
+using Domain.RobotConfiguration.Manifests;
 
 namespace Application.EdgeIntegration.Commands;
 
@@ -396,14 +397,17 @@ public sealed class DispatchOrderExecutionCommandHandler
                         RobotProgramId = binding.RobotProgram.Id,
                         binding.RobotProgram.ProgramManifestSchemaVersion,
                         binding.RobotProgram.ProgramManifestChecksum,
-                        Artifacts = binding.RobotProgram.RobotProgramArtifacts
+                        Artifacts = RobotProgramManifestBuilder.Parse(
+                                binding.RobotProgram.ProgramManifestJson
+                                    ?? throw new DomainRuleException("Published robot program manifest is missing."))
+                            .Artifacts
                             .OrderBy(programArtifact => programArtifact.RunOrder)
                             .Select(programArtifact => new
                             {
-                                programArtifact.RobotArtifactId,
+                                RobotArtifactId = programArtifact.RobotArtifact.Id,
                                 programArtifact.RunOrder,
                                 programArtifact.ParametersSchemaVersion,
-                                programArtifact.ParametersJson,
+                                ParametersJson = programArtifact.Parameters?.ToJsonString(),
                                 ArtifactChecksum = programArtifact.RobotArtifact.Checksum,
                                 programArtifact.RobotArtifact.RuntimeTargetCode,
                                 programArtifact.RobotArtifact.MachineModelCode

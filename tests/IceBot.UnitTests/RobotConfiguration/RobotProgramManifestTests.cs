@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Domain.RobotConfiguration.Entities;
 using Domain.Tenants.Enums;
+using Domain.RobotConfiguration.Manifests;
 using IceBot.UnitTests.TestSupport;
 
 namespace IceBot.UnitTests.RobotConfiguration;
@@ -20,12 +21,14 @@ public sealed class RobotProgramManifestTests
             "Make ice cream",
             TenantScopeType.Organization,
             organizationId);
-        var secondStep = program.AddArtifact(secondArtifact.Id, 20, "{\"speed\":2}");
-        var firstStep = program.AddArtifact(firstArtifact.Id, 10, "{\"speed\":1}");
-        TestData.SetProperty(secondStep, nameof(RobotProgramArtifact.RobotArtifact), secondArtifact);
-        TestData.SetProperty(firstStep, nameof(RobotProgramArtifact.RobotArtifact), firstArtifact);
+        program.AddArtifact(secondArtifact.Id, 20, "{\"speed\":2}");
+        program.AddArtifact(firstArtifact.Id, 10, "{\"speed\":1}");
 
-        program.Publish(DateTimeOffset.UtcNow);
+        program.Publish(DateTimeOffset.UtcNow,
+        [
+            Snapshot(firstArtifact),
+            Snapshot(secondArtifact)
+        ]);
 
         using var manifest = JsonDocument.Parse(program.ProgramManifestJson!);
         var artifacts = manifest.RootElement.GetProperty("Artifacts").EnumerateArray().ToArray();
@@ -36,4 +39,58 @@ public sealed class RobotProgramManifestTests
             SHA256.HashData(Encoding.UTF8.GetBytes(program.ProgramManifestJson!))).ToLowerInvariant();
         Assert.Equal(expectedChecksum, program.ProgramManifestChecksum);
     }
+
+    [Fact]
+    public void Publish_RejectsSnapshotThatDoesNotMatchProgramMembership()
+    {
+        var organizationId = Guid.NewGuid();
+        var assignedArtifact = TestData.PublishedArtifact(organizationId, "ASSIGNED", "assigned.lua", 'a');
+        var unrelatedArtifact = TestData.PublishedArtifact(organizationId, "OTHER", "other.lua", 'b');
+        var program = RobotProgram.CreateDraft(
+            "MAKE_ICE_CREAM",
+            "Make ice cream",
+            TenantScopeType.Organization,
+            organizationId);
+        program.AddArtifact(assignedArtifact.Id, 10);
+
+        var exception = Assert.Throws<Domain.Common.DomainRuleException>(() =>
+            program.Publish(DateTimeOffset.UtcNow, [Snapshot(unrelatedArtifact)]));
+
+        Assert.Equal(
+            "Robot program publication requires published robot artifact snapshots.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void Parse_ReturnsTypedPublishedManifest()
+    {
+        var organizationId = Guid.NewGuid();
+        var artifact = TestData.PublishedArtifact(organizationId, "ARTIFACT", "artifact.lua", 'c');
+        var program = RobotProgram.CreateDraft(
+            "MAKE_ICE_CREAM",
+            "Make ice cream",
+            TenantScopeType.Organization,
+            organizationId);
+        program.AddArtifact(artifact.Id, 10, "{\"speed\":2}");
+        program.Publish(DateTimeOffset.UtcNow, [Snapshot(artifact)]);
+
+        var manifest = RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!);
+
+        Assert.Equal(program.Id, manifest.Id);
+        var item = Assert.Single(manifest.Artifacts);
+        Assert.Equal(artifact.Id, item.RobotArtifact.Id);
+        Assert.Equal(artifact.Checksum, item.RobotArtifact.Checksum);
+    }
+
+    private static RobotArtifactManifestSnapshot Snapshot(RobotArtifact artifact) => new(
+        artifact.Id,
+        artifact.ArtifactCode,
+        artifact.ArtifactName,
+        artifact.FileName,
+        artifact.Status,
+        artifact.Checksum,
+        artifact.StorageKey,
+        artifact.RuntimeTargetCode,
+        artifact.MachineModelCode,
+        artifact.ContentLengthBytes);
 }

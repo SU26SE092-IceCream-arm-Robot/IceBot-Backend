@@ -4,6 +4,7 @@ using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Tenants.Entities;
 using Domain.ProductionConfiguration.ValueObjects;
+using Domain.RobotConfiguration.Manifests;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -217,13 +218,11 @@ public class ConfigurationRelease : BusinessEntity
                     endpoint.Kiosk,
                     "Robot program");
 
-                foreach (var programArtifact in binding.RobotProgram.RobotProgramArtifacts)
+                var programManifest = RobotProgramManifestBuilder.Parse(
+                    binding.RobotProgram.ProgramManifestJson
+                        ?? throw new DomainRuleException("Published robot program manifest is missing."));
+                foreach (var programArtifact in programManifest.Artifacts)
                 {
-                    if (programArtifact.RobotArtifact is null)
-                    {
-                        throw new DomainRuleException("Robot program artifacts must be loaded before validating deployment compatibility.");
-                    }
-
                     if (!endpoint.SupportsRobotTarget(
                             programArtifact.RobotArtifact.RuntimeTargetCode,
                             programArtifact.RobotArtifact.MachineModelCode,

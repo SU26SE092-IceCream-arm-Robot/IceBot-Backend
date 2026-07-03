@@ -9,6 +9,7 @@ using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.ValueObjects;
+using Domain.RobotConfiguration.Manifests;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
@@ -278,10 +279,10 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 !AppliesToKiosk(program.OrganizationId, program.StoreId, program.KioskId, endpoint.Kiosk))
                 throw new DomainRuleException("Selected route, recipe, and robot program must apply to the target kiosk scope.");
 
-            if (program.RobotProgramArtifacts.Count == 0)
-                throw new DomainRuleException("Selected robot program has no published artifact sequence.");
-
-            foreach (var programArtifact in program.RobotProgramArtifacts.OrderBy(item => item.RunOrder))
+            var programManifest = RobotProgramManifestBuilder.Parse(
+                program.ProgramManifestJson
+                    ?? throw new DomainRuleException("Selected robot program has no published artifact manifest."));
+            foreach (var programArtifact in programManifest.Artifacts.OrderBy(item => item.RunOrder))
             {
                 var artifact = programArtifact.RobotArtifact;
                 if (!endpoint.SupportsRobotTarget(artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId))
@@ -291,7 +292,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                     route.Id, program.Id, program.ProgramManifestChecksum!, artifact.Id, artifact.Checksum,
                     artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId,
                     artifact.ContentLengthBytes, programArtifact.RunOrder, programArtifact.ParametersSchemaVersion,
-                    programArtifact.ParametersJson));
+                    programArtifact.Parameters?.ToJsonString()));
             }
         }
         return items;
