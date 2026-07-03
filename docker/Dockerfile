@@ -1,14 +1,20 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY . .
-
 # 1. Cài đặt công cụ dotnet-ef
 RUN dotnet tool install --global dotnet-ef
 ENV PATH="$PATH:/root/.dotnet/tools"
 
+COPY ["IceBot.slnx", "./"]
+COPY ["src/Domain/Domain.csproj", "src/Domain/"]
+COPY ["src/Application/Application.csproj", "src/Application/"]
+COPY ["src/Infrastructure/Infrastructure.csproj", "src/Infrastructure/"]
+COPY ["src/WebAPI/WebAPI.csproj", "src/WebAPI/"]
+
 # 1.1 Restore
 RUN dotnet restore "src/WebAPI/WebAPI.csproj"
+
+COPY . .
 
 # 2. Tạo Migration Bundle thành một file thực thi tên là 'efbundle'
 RUN dotnet ef migrations bundle \
@@ -18,7 +24,6 @@ RUN dotnet ef migrations bundle \
     -o /app/publish/efbundle
 
 # 3. Publish code như cũ
-
 RUN dotnet publish "src/WebAPI/WebAPI.csproj" \
     -c Release \
     -o /app/publish \

@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-
 echo "Starting deployment for IceBot-Backend..."
 
 # 1. Kéo code chuẩn xác 100% từ GitHub (Combo xe tăng)
@@ -8,6 +7,7 @@ git fetch origin
 git checkout main
 git reset --hard origin/main
 
+cd docker
 # 2. Build lại các Docker images
 docker compose build
 
