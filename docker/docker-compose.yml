@@ -49,6 +49,9 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
+    networks:
+      - default # Giữ lại mạng mặc định để API kết nối được với postgres và minio
+      - icebot_network # Nối thêm vào mạng chung để API nhìn thấy Aspire Dashboard
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -61,6 +64,16 @@ services:
       RobotArtifacts__ObjectStorage__UseSsl: "false"
       RobotArtifacts__ObjectStorage__DownloadUseSsl: "false"
 
+      # --- CẤU HÌNH OBSERVABILITY ĐỂ GỬI LOG VỀ ASPIRE DASHBOARD ---
+      Observability__OpenTelemetry__OtlpExporterEnabled: "true"
+      Observability__Serilog__OtlpSinkEnabled: "true"
+      Observability__OpenTelemetry__OtlpEndpoint: "http://IceBot-tools-aspire-dashboard:18889"
+
 volumes:
   icebot_postgres_data:
   icebot_minio_data:
+
+# --- KHAI BÁO MẠNG DÙNG CHUNG ---
+networks:
+  icebot_network:
+    external: true
