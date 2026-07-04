@@ -26,6 +26,12 @@ public sealed class RobotArtifactObjectStorageOptions
 
     public bool AutoCreateBucket { get; init; }
 
+    [Range(0, 5)]
+    public int ReadRetryCount { get; init; } = 2;
+
+    [Range(1, 10000)]
+    public int ReadRetryDelayMilliseconds { get; init; } = 200;
+
     [Range(60, 604800)]
     public int DownloadUrlExpirySeconds { get; init; } = 900;
 

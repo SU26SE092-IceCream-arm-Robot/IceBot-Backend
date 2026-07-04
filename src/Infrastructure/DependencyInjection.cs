@@ -54,10 +54,14 @@ namespace Infrastructure
 
             services.AddScoped(typeof(IBaseRepository<>), typeof(BaseRepository<>));
             services.AddScoped<Concurrency.PostgresAdvisoryLockManager>();
-            services.Configure<EmailOptions>(config.GetSection(EmailOptions.SectionName));
+            services.AddOptions<EmailOptions>()
+                .Bind(config.GetSection(EmailOptions.SectionName))
+                .Validate(options => options.OperationTimeoutSeconds is >= 1 and <= 300,
+                    "SMTP operation timeout must be between 1 and 300 seconds.")
+                .ValidateOnStart();
             services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();
-            services.AddIdentityInfrastructure();
+            services.AddIdentityInfrastructure(config);
             services.AddOrdersInfrastructure();
             services.AddPaymentsInfrastructure(config);
             services.AddSalesCatalogInfrastructure();
@@ -110,6 +114,8 @@ namespace Infrastructure
                         !string.IsNullOrWhiteSpace(options.SecretKey) &&
                         !string.IsNullOrWhiteSpace(options.BucketName) &&
                         options.DownloadUrlExpirySeconds is >= 60 and <= 604800 &&
+                        options.ReadRetryCount is >= 0 and <= 5 &&
+                        options.ReadRetryDelayMilliseconds is >= 1 and <= 10000 &&
                         options.OrphanGracePeriodHours is >= 1 and <= 720 &&
                         options.OrphanCleanupIntervalHours is >= 1 and <= 168 &&
                         options.OrphanCleanupMaxDeletesPerRun is >= 1 and <= 10000,
@@ -143,9 +149,13 @@ namespace Infrastructure
                          options.Port is > 0 and <= 65535 &&
                          !string.IsNullOrWhiteSpace(options.ClientId) &&
                          !string.IsNullOrWhiteSpace(options.TopicPrefix) &&
-                         options.ConnectTimeoutSeconds > 0),
+                         options.ConnectTimeoutSeconds > 0 &&
+                         options.PublishTimeoutSeconds >= options.ConnectTimeoutSeconds &&
+                         options.PublishRetryCount is >= 0 and <= 3 &&
+                         options.PublishRetryDelayMilliseconds >= 0),
                     "Enabled MQTT command wake-up settings are incomplete or invalid.")
                 .ValidateOnStart();
+            services.AddSingleton<IMqttEdgeCommandTransport, MqttNetEdgeCommandTransport>();
             services.AddSingleton<IEdgeCommandWakeUpPublisher, MqttEdgeCommandWakeUpPublisher>();
             services.AddOptions<MqttCredentialProvisioningOptions>()
                 .Bind(config.GetSection(MqttCredentialProvisioningOptions.SectionName))
@@ -154,7 +164,8 @@ namespace Infrastructure
                      !string.IsNullOrWhiteSpace(options.AdminUsername) &&
                      !string.IsNullOrWhiteSpace(options.AdminPassword) &&
                      !string.IsNullOrWhiteSpace(options.SubscriberRole) &&
-                     !string.IsNullOrWhiteSpace(options.TopicPrefix) && options.TimeoutSeconds > 0),
+                     !string.IsNullOrWhiteSpace(options.TopicPrefix) && options.TimeoutSeconds > 0 &&
+                     options.RetryCount is >= 0 and <= 3 && options.RetryDelayMilliseconds >= 0),
                     "Enabled MQTT credential provisioning settings are incomplete or invalid.")
                 .ValidateOnStart();
             services.AddScoped<IMqttEndpointCredentialProvisioner, MosquittoDynamicSecurityCredentialProvisioner>();

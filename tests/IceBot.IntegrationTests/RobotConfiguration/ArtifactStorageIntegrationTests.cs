@@ -18,7 +18,7 @@ public sealed class ArtifactStorageIntegrationTests
     [IntegrationFact]
     public async Task PresignedReadUrl_ReturnsUploadedLuaBytes()
     {
-        var storage = _fixture.CreateObjectStorage(downloadUrlExpirySeconds: 60);
+        var storage = _fixture.CreateObjectStorage(downloadUrlExpirySeconds: 60, autoCreateBucket: true);
         var bytes = Encoding.UTF8.GetBytes("print('presigned')");
         var checksum = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
         var key = $"robot-artifacts/integration/{Guid.NewGuid():N}/{checksum}.lua";
@@ -35,4 +35,5 @@ public sealed class ArtifactStorageIntegrationTests
         Assert.Equal(bytes, await response.Content.ReadAsByteArrayAsync());
         Assert.True(readUrl.ExpiresAt > DateTimeOffset.UtcNow);
     }
+
 }

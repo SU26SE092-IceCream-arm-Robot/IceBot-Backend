@@ -18,6 +18,8 @@ public sealed class EmailOptions
 
     public bool EnableSsl { get; set; } = true;
 
+    public int OperationTimeoutSeconds { get; set; } = 30;
+
     public string? PasswordResetBaseUrl { get; set; }
 
     public string? InvitationBaseUrl { get; set; }

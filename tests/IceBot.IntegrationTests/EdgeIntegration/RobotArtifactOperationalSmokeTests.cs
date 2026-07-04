@@ -665,7 +665,7 @@ public sealed class RobotArtifactOperationalSmokeTests
 
         var orderId = await CreatePaidOrderAsync(graph);
         await using var dispatchContext = _fixture.CreateDbContext();
-        var dispatchWakeUpPublisher = new NoOpEdgeCommandWakeUpPublisher();
+        var dispatchWakeUpPublisher = new NoOpEdgeCommandWakeUpPublisher { PublishResult = false };
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             new OrderExecutionDispatchStore(dispatchContext),
             Options.Create(new OrderExecutionDispatchOptions()),
@@ -694,6 +694,7 @@ public sealed class RobotArtifactOperationalSmokeTests
         Assert.Equal(EdgeCommandType.ExecuteOrder, command.CommandType);
         Assert.Equal(graph.EndpointId, command.TargetExecutionEndpointId);
         Assert.Equal(1, command.DispatchAttemptNo);
+        Assert.False(dispatchWakeUpPublisher.PublishResult);
 
         await PullAndAcknowledgeAsync(graph, command.Id, "Accepted");
         await using (var acceptedContext = _fixture.CreateDbContext())

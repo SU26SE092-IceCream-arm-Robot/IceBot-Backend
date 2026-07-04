@@ -37,18 +37,29 @@ namespace Infrastructure.Email
 
             try
             {
+                using var operationTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                operationTimeout.CancelAfter(TimeSpan.FromSeconds(_options.OperationTimeoutSeconds));
+                var operationToken = operationTimeout.Token;
                 using var client = new SmtpClient();
                 var secureOption = ResolveSecureSocketOption();
-                await client.ConnectAsync(_options.Host, _options.Port, secureOption, cancellationToken);
+                await client.ConnectAsync(_options.Host, _options.Port, secureOption, operationToken);
 
                 if (!string.IsNullOrWhiteSpace(_options.UserName) &&
                     !string.IsNullOrWhiteSpace(_options.Password))
                 {
-                    await client.AuthenticateAsync(_options.UserName, _options.Password, cancellationToken);
+                    await client.AuthenticateAsync(_options.UserName, _options.Password, operationToken);
                 }
 
-                await client.SendAsync(message, cancellationToken);
-                await client.DisconnectAsync(true, cancellationToken);
+                await client.SendAsync(message, operationToken);
+                await client.DisconnectAsync(true, operationToken);
+            }
+            catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                var timeout = new TimeoutException(
+                    $"SMTP delivery exceeded the {_options.OperationTimeoutSeconds}-second operation timeout.",
+                    ex);
+                _logger.LogError(timeout, "SMTP delivery timed out for {Recipient}", to);
+                throw timeout;
             }
             catch (Exception ex)
             {

@@ -26,10 +26,15 @@ public class FirebaseClient : IFirebaseClient
         _logger = logger;
     }
 
-    public FirebaseAuth GetAuth()
-    {
-        return FirebaseAuth.GetAuth(GetOrCreateApp());
-    }
+    public Task<FirebaseToken> VerifyIdTokenAsync(
+        string idToken,
+        CancellationToken cancellationToken = default) =>
+        FirebaseAuth.GetAuth(GetOrCreateApp()).VerifyIdTokenAsync(idToken, cancellationToken);
+
+    public Task<UserRecord> GetUserAsync(
+        string uid,
+        CancellationToken cancellationToken = default) =>
+        FirebaseAuth.GetAuth(GetOrCreateApp()).GetUserAsync(uid, cancellationToken);
 
     public FirebaseMessaging GetMessaging()
     {

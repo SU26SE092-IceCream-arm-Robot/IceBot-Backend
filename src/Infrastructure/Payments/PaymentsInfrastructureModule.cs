@@ -4,7 +4,6 @@ using Infrastructure.Payments.Persistence;
 using Infrastructure.Payments.Providers.PayOS;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
 
 namespace Infrastructure.Payments;
@@ -14,6 +13,20 @@ public static class PaymentsInfrastructureModule
     public static IServiceCollection AddPaymentsInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         services.Configure<PayOsOptions>(config.GetSection(PayOsOptions.SectionName));
+        var resilienceSettings = config.GetSection(PayOsResilienceOptions.SectionName)
+            .Get<PayOsResilienceOptions>() ?? new PayOsResilienceOptions();
+        services.AddOptions<PayOsResilienceOptions>()
+            .Bind(config.GetSection(PayOsResilienceOptions.SectionName))
+            .Validate(options =>
+                    options.AttemptTimeoutSeconds is >= 1 and <= 120 &&
+                    options.TotalTimeoutSeconds >= options.AttemptTimeoutSeconds &&
+                    options.TotalTimeoutSeconds <= 300 &&
+                    options.CircuitBreakerFailureRatio is > 0 and <= 1 &&
+                    options.CircuitBreakerMinimumThroughput >= 2 &&
+                    options.CircuitBreakerSamplingDurationSeconds >= options.AttemptTimeoutSeconds * 2 &&
+                    options.CircuitBreakerBreakDurationSeconds >= 1,
+                "PayOS resilience settings are invalid.")
+            .ValidateOnStart();
 
         services.AddHttpClient<PayOsPaymentGateway>((serviceProvider, client) =>
             {
@@ -22,12 +35,7 @@ public static class PaymentsInfrastructureModule
                 client.DefaultRequestHeaders.Add("x-client-id", options.ClientId);
                 client.DefaultRequestHeaders.Add("x-api-key", options.ApiKey);
             })
-            .AddStandardResilienceHandler(options =>
-            {
-                options.Retry.DisableForUnsafeHttpMethods();
-                options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(10);
-                options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(20);
-            });
+            .AddPayOsResilience(resilienceSettings);
 
         services.AddScoped<IPaymentStore, PaymentStore>();
         services.AddScoped<IPaymentGateway>(provider => provider.GetRequiredService<PayOsPaymentGateway>());
