@@ -10,19 +10,30 @@
 Edge submits DeviceEvent
 -> Backend authenticates endpoint and validates device/kiosk scope
 -> Warning: store evidence only
--> Error or Critical: store DeviceEvent + Open Alert in one transaction
+-> Error or Critical: create or correlate an actionable Alert in one transaction
 -> Commit
 -> Publish DeviceEventCreated and AlertChanged
 ```
 
 Rules:
 
-- Only newly accepted `Error` and `Critical` device events create alerts automatically.
+- Only newly accepted `Error` and `Critical` device events create or update alerts automatically.
 - `Warning` remains searchable evidence and does not create alert noise by default.
 - `Alert.SourceType = DeviceEvent` and `Alert.SourceId` points to the persisted `DeviceEvent.Id`.
 - Device-event retry uses the existing `eventId` idempotency boundary and creates neither a duplicate event nor a duplicate alert.
 - Alert creation fails atomically with device-event ingestion; the system does not commit one without the other.
 - Raw `PayloadJson` remains evidence-only and is not copied into the Alert response.
+
+## Correlation And Deduplication
+
+Repeated events are grouped by `KioskId + DeviceId + normalized AlertCode` within the configured rolling correlation window (`EdgeTelemetryIngestion:AlertCorrelationWindowMinutes`, default 15 minutes).
+
+- An `Open` or `Acknowledged` alert inside the window receives another occurrence instead of creating a new row.
+- `OccurrenceCount` increments and `LastOccurredAt` advances; `RaisedAt` remains the first occurrence.
+- `SourceId`, title, and message describe the latest occurrence. Severity may increase but does not decrease.
+- `Resolved` and `Suppressed` alerts are terminal and are never reopened by correlation. A later event creates a new alert.
+- Correlation is serialized with a PostgreSQL advisory transaction lock, so concurrent repeated events cannot create parallel alerts for the same key.
+- An event outside the rolling window creates a new alert even when an older non-terminal alert exists.
 
 ## Lifecycle
 
@@ -50,7 +61,7 @@ PATCH /api/v1/management/alerts/{alertId}/acknowledge
 PATCH /api/v1/management/alerts/{alertId}/resolve
 ```
 
-List filters: `status`, `severity`, `organizationId`, `storeId`, `kioskId`, `deviceId`, `from`, `to`, `pageNumber`, and `pageSize`.
+List filters: `status`, `severity`, `organizationId`, `storeId`, `kioskId`, `deviceId`, `from`, `to`, `pageNumber`, and `pageSize`. Date filters and default descending order use `LastOccurredAt`, so a correlated active alert returns to the top of the operational queue.
 
 Creation is intentionally part of authenticated device-event ingestion rather than a general management `POST /alerts`. V1 does not allow operators to fabricate telemetry alerts manually.
 
@@ -63,12 +74,11 @@ Creation is intentionally part of authenticated device-event ingestion rather th
 
 ## Realtime
 
-`AlertChanged` is sent to `kiosk:{kioskId}` after creation, acknowledgement, or resolution commits. It contains the alert identity, scope, device, severity, old/new status, timestamp, and version. Clients use REST for initial state/history and SignalR for committed deltas.
+`AlertChanged` is sent to `kiosk:{kioskId}` after creation, correlated occurrence, acknowledgement, or resolution commits. It contains the alert identity, scope, device, severity, old/new status, occurrence count, last occurrence timestamp, update timestamp, and version. Clients use REST for initial state/history and SignalR for committed deltas.
 
 ## Excluded From V1
 
 - configurable alert rules or thresholds;
 - alert assignment, escalation, snooze, or suppression API;
 - automatic MaintenanceTicket creation;
-- alert grouping/correlation across repeated failures;
 - automatic resolution from a later healthy telemetry event.

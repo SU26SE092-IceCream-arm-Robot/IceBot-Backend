@@ -97,7 +97,9 @@ public sealed class AcknowledgeAlertCommandHandler
             OldStatus = oldStatus,
             NewStatus = alert.Status.ToString(),
             UpdatedAt = updatedAt,
-            Version = checked((int)alert.Version)
+            Version = checked((int)alert.Version),
+            OccurrenceCount = alert.OccurrenceCount,
+            LastOccurredAt = alert.LastOccurredAt
         };
 
     private sealed record LifecycleOutcome(ApiResult<AlertResult> Result, AlertChangedEvent? Notification);

@@ -86,7 +86,9 @@ public sealed class ResolveAlertCommandHandler
                     OldStatus = oldStatus.ToString(),
                     NewStatus = alert.Status.ToString(),
                     UpdatedAt = now,
-                    Version = checked((int)alert.Version)
+                    Version = checked((int)alert.Version),
+                    OccurrenceCount = alert.OccurrenceCount,
+                    LastOccurredAt = alert.LastOccurredAt
                 };
             }
         }

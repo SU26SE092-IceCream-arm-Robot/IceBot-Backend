@@ -91,9 +91,12 @@ Dashboard and OTel act as your "radar" (showing what failed and where). Debug bo
 
 The `IceBot.EdgeIntegration` meter is registered with the existing OpenTelemetry metrics pipeline. These metrics describe machine-integration latency and failure; ASP.NET instrumentation continues to own ordinary HTTP duration/error metrics.
 
+The `IceBot.Payments.PayOS` meter adds provider-specific failure classification on top of ordinary HTTP client metrics. Payment identifiers are intentionally excluded from metric tags.
+
 | Metric | Type | Meaning | Bounded tags |
 | --- | --- | --- | --- |
 | `icebot.mqtt.wakeup.publish.attempts` | Counter | MQTT wake-up outcomes, including disabled/succeeded/failed | `outcome`, `command.type` |
+| `icebot.payos.request.failures` | Counter | Final PayOS timeout, open-circuit, or transient failures | `provider`, `operation`, `failure.kind` |
 | `icebot.edge.command.pull.latency` | Histogram (seconds) | Durable command creation until it is returned by command pull | `command.type` |
 | `icebot.edge.command.ack.latency` | Histogram (seconds) | Command delivery until Cloud receives the first state-changing ACK | `command.type`, `ack.status` |
 | `icebot.edge.execution.report.lag` | Histogram (seconds) | Executor-reported timestamp until Cloud receives a new report | `report.type` |
@@ -107,6 +110,7 @@ Rules:
 - Duplicate ACKs and duplicate execution reports do not add latency/transition measurements.
 - The stale/unreachable gauge is refreshed from PostgreSQL every 30 seconds; it is not an in-memory lifecycle counter.
 - IDs such as command, order, kiosk, endpoint, or device must never be metric tags. Use traces/logs for entity-level investigation.
+- PayOS `failure.kind` is bounded to `timeout`, `circuit_open`, and `transient`; HTTP payment-creation `POST` requests are not retried.
 - MQTT disabled is an explicit outcome, not a publish failure. Alert only on `outcome=failed` when MQTT is expected to be enabled.
 
 Suggested initial alerts:

@@ -4,6 +4,7 @@ using Application.Shared.Exceptions;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using Infrastructure.Payments.Options;
+using Infrastructure.Payments.Observability;
 using Infrastructure.Payments.Providers.PayOS.DTOs;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,6 +12,8 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Polly.CircuitBreaker;
+using Polly.Timeout;
 
 namespace Infrastructure.Payments.Providers.PayOS;
 
@@ -19,16 +22,16 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly PayOsOptions _options;
-    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly HttpClient _httpClient;
     private readonly ILogger<PayOsPaymentGateway> _logger;
 
     public PayOsPaymentGateway(
         IOptions<PayOsOptions> options,
-        IHttpClientFactory httpClientFactory,
+        HttpClient httpClient,
         ILogger<PayOsPaymentGateway> logger)
     {
         _options = options.Value;
-        _httpClientFactory = httpClientFactory;
+        _httpClient = httpClient;
         _logger = logger;
     }
 
@@ -72,16 +75,38 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         var requestJson = JsonSerializer.Serialize(request, JsonOptions);
         using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
 
-        var httpClient = _httpClientFactory.CreateClient();
-        httpClient.DefaultRequestHeaders.Add("x-client-id", _options.ClientId);
-        httpClient.DefaultRequestHeaders.Add("x-api-key", _options.ApiKey);
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.PostAsync("v2/payment-requests", content, cancellationToken);
+        }
+        catch (TimeoutRejectedException)
+        {
+            PayOsResilienceMetrics.RecordTimeout();
+            throw;
+        }
+        catch (BrokenCircuitException)
+        {
+            PayOsResilienceMetrics.RecordCircuitOpen();
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            PayOsResilienceMetrics.RecordTransientFailure();
+            throw;
+        }
 
-        var url = $"{_options.BaseUrl.TrimEnd('/')}/v2/payment-requests";
-        var response = await httpClient.PostAsync(url, content, cancellationToken);
+        using (response)
+        {
         var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
         {
+            if ((int)response.StatusCode is 408 or 429 or >= 500)
+            {
+                PayOsResilienceMetrics.RecordTransientFailure();
+            }
+
             _logger.LogError("PayOS create payment link failed. Status={StatusCode}, Body={Body}", response.StatusCode, responseJson);
             throw new InvalidOperationException("PayOS create payment link failed.");
         }
@@ -104,6 +129,7 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             ProviderStatus = apiResponse.Data.Status,
             RawResponseJson = responseJson
         };
+        }
     }
 
     public Task<ProviderPaymentNotification> ParseAndVerifyNotificationAsync(

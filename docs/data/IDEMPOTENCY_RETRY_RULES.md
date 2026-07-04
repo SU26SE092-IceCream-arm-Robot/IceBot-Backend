@@ -331,6 +331,31 @@ Notes:
 - The unique `OrganizationId + ReleaseNumber` index remains the final integrity boundary.
 - `RobotArtifactOrphanCleanupJob` uses a PostgreSQL session advisory lock. At most one backend instance scans/deletes orphans per run; another instance skips when the lock is held. A crashed instance releases the lock when its database connection closes.
 
+## External Dependency Resilience
+
+HTTP integrations use `Microsoft.Extensions.Http.Resilience`, which integrates Polly resilience pipelines with `IHttpClientFactory`. Do not construct ad hoc Polly pipelines inside handlers or gateways when the operation is HTTP-based.
+
+- Configure resilience per named or typed dependency client, not as one global backend policy.
+- Use timeout, circuit breaker, telemetry, and transient-response handling at the HTTP adapter boundary.
+- Retry only when the operation is proven idempotent through a provider idempotency key or equivalent durable identity.
+- Unsafe HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`) are not retried by default.
+- Validation/authentication failures and ordinary `4xx` responses are not transient failures.
+- Non-HTTP boundaries such as MQTT operations or custom background processing may use Polly `ResiliencePipeline` directly when their retry semantics are explicit.
+
+PayOS is the first adopted HTTP resilience boundary. Its typed client uses the standard resilience handler with per-attempt and total timeouts, while retry remains disabled for payment-creation `POST` requests. A future retry policy requires an explicitly verified PayOS idempotency guarantee; deterministic local order-code generation alone is not assumed to prove provider-side idempotency.
+
+MQTT command wake-up uses a direct Polly pipeline because it is not an HTTP operation. It permits one short retry with exponential backoff and jitter. Duplicate wake-up messages are safe because they contain the same committed `EdgeCommand.Id`, use QoS 1, and only tell Edge to pull; command pull and Edge-side command deduplication remain authoritative. Exhausted retries do not roll back the committed command.
+
+SMTP delivery has one operation timeout covering connect, authenticate, send, and disconnect. It does not retry because a timeout can occur after the SMTP server accepted the message. Safe retry requires a durable email outbox and a delivery identity before another attempt is allowed.
+
+Robot artifact object storage retries only transport failures for read-only/control-plane operations: object stat/existence checks, bucket existence checks, and presigned read URL generation. Upload stream, server-side copy, delete, and list/orphan scan are not automatically retried. Retrying upload requires a rewindable stream or staged file together with an immutable object key.
+
+Firebase token verification does not retry invalid, expired, or revoked tokens. It retries only explicit SDK service failures (`Unavailable`, `Internal`, `Unknown`, or `DeadlineExceeded`) and transport/operation-timeout failures. Invalid tokens remain authentication failures, not provider-unavailability failures.
+
+Resilience configuration is owned by each dependency boundary. Do not create one global timeout/retry/circuit-breaker section because payment creation, token verification, SMTP delivery, object storage, and MQTT have different idempotency and failure semantics. Configurable ranges are validated during application startup.
+
+Mosquitto dynamic-security credential commands also use a direct Polly pipeline for transport failures. Provisioning operations are designed as idempotent upserts: a repeated `createClient` enters the existing-client update path, password replacement is deterministic, role assignment tolerates an already-assigned result, and disable is repeatable. Broker business-error responses are not retried; only an exception or command timeout triggers the single short retry.
+
 ## Do Not Soft Delete Event Tables
 
 Event, callback, retry, and append-only evidence tables should not use soft delete as a normal lifecycle.

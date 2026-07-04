@@ -11,10 +11,12 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
     private readonly RobotArtifactObjectStorageOptions _options;
     private readonly IMinioClient _client;
     private readonly IMinioClient _downloadClient;
+    private readonly ObjectStorageReadResiliencePipeline _readResilience;
 
     public MinioArtifactObjectStorage(IOptions<RobotArtifactObjectStorageOptions> options)
     {
         _options = options.Value;
+        _readResilience = new ObjectStorageReadResiliencePipeline(_options);
         if (string.IsNullOrWhiteSpace(_options.Endpoint) ||
             string.IsNullOrWhiteSpace(_options.AccessKey) ||
             string.IsNullOrWhiteSpace(_options.SecretKey) ||
@@ -33,11 +35,14 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
     {
         try
         {
-            await _client.StatObjectAsync(
-                new StatObjectArgs()
-                    .WithBucket(_options.BucketName)
-                    .WithObject(storageKey),
-                cancellationToken);
+            await _readResilience.ExecuteAsync(async token =>
+            {
+                await _client.StatObjectAsync(
+                    new StatObjectArgs()
+                        .WithBucket(_options.BucketName)
+                        .WithObject(storageKey),
+                    token);
+            }, cancellationToken);
             return true;
         }
         catch (ObjectNotFoundException)
@@ -87,11 +92,13 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
 
         var expirySeconds = Math.Clamp(_options.DownloadUrlExpirySeconds, 60, 604800);
         var expiresAt = DateTimeOffset.UtcNow.AddSeconds(expirySeconds);
-        var url = await _downloadClient.PresignedGetObjectAsync(
-            new PresignedGetObjectArgs()
-                .WithBucket(_options.BucketName)
-                .WithObject(storageKey)
-                .WithExpiry(expirySeconds));
+        var url = await _readResilience.ExecuteAsync(async _ =>
+            await _downloadClient.PresignedGetObjectAsync(
+                new PresignedGetObjectArgs()
+                    .WithBucket(_options.BucketName)
+                    .WithObject(storageKey)
+                    .WithExpiry(expirySeconds)),
+            cancellationToken);
 
         return new ArtifactObjectReadUrlResult(url, expiresAt);
     }
@@ -172,9 +179,7 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
 
     public async Task EnsureReadyAsync(CancellationToken cancellationToken = default)
     {
-        var exists = await _client.BucketExistsAsync(
-            new BucketExistsArgs().WithBucket(_options.BucketName),
-            cancellationToken);
+        var exists = await BucketExistsAsync(cancellationToken);
 
         if (exists)
         {
@@ -196,12 +201,19 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         catch (MinioException)
         {
             // Another backend instance may have created the bucket after the existence check.
-            if (!await _client.BucketExistsAsync(
-                    new BucketExistsArgs().WithBucket(_options.BucketName),
-                    cancellationToken))
+            if (!await BucketExistsAsync(cancellationToken))
             {
                 throw;
             }
         }
+    }
+
+    private async Task<bool> BucketExistsAsync(CancellationToken cancellationToken)
+    {
+        return await _readResilience.ExecuteAsync(async token =>
+            await _client.BucketExistsAsync(
+                new BucketExistsArgs().WithBucket(_options.BucketName),
+                token),
+            cancellationToken);
     }
 }

@@ -79,9 +79,11 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Invitation frontend URL | `Email__InvitationBaseUrl` | **P0 Feature** | Required before invitation links are issued. |
 | Email port | `Email__Port` | **P1** | Review for the SMTP provider; appsettings defaults to `587`. |
 | Email TLS mode | `Email__EnableSsl` | **P1** | Review with the selected SMTP port/provider. |
+| SMTP operation timeout | `Email__OperationTimeoutSeconds` | **P2** | Defaults to `30` seconds for connect/authenticate/send/disconnect. Email delivery is not retried without an outbox delivery identity. |
 | Email display name | `Email__DisplayName` | **P2** | Use appsettings default or override branding. |
 | Firebase enabled flag | `Firebase__Enabled` | **P1** | Explicitly set `false` when Google/Firebase login is not deployed. |
 | Firebase credentials path | `Firebase__CredentialsPath` | **P0 Feature** | **Secret-mounted path required** when Firebase is enabled outside an environment that supplies application-default credentials. |
+| Firebase auth resilience | `Firebase__Resilience__OperationTimeoutSeconds`, `__RetryCount`, `__RetryDelayMilliseconds`, `__CircuitBreakerFailureRatio`, `__CircuitBreakerMinimumThroughput`, `__CircuitBreakerSamplingDurationSeconds`, `__CircuitBreakerBreakDurationSeconds` | **P2** | Defaults are suitable initially. Only transport and explicit Firebase service failures retry; invalid/expired/revoked tokens never retry. Settings are startup-validated. |
 
 ## Payment Provider
 
@@ -93,6 +95,7 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | PayOS return URL | `PayOS__ReturnUrl` | **P0 Feature** | Environment-specific public URL required for checkout. |
 | PayOS cancel URL | `PayOS__CancelUrl` | **P0 Feature** | Environment-specific public URL required for checkout cancellation. |
 | PayOS base URL | `PayOS__BaseUrl` | **P2** | Use the appsettings provider URL unless PayOS changes the endpoint or a test stub is used. |
+| PayOS resilience | `PayOS__Resilience__AttemptTimeoutSeconds`, `__TotalTimeoutSeconds`, `__CircuitBreakerFailureRatio`, `__CircuitBreakerMinimumThroughput`, `__CircuitBreakerSamplingDurationSeconds`, `__CircuitBreakerBreakDurationSeconds` | **P2** | Dependency-specific timeout and circuit settings. Payment-creation `POST` retry remains disabled. Settings are startup-validated. |
 
 ## Robot Artifact Storage
 
@@ -104,6 +107,7 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Object-storage secret key | `RobotArtifacts__ObjectStorage__SecretKey` | **P0 Feature** | **Secret/env required.** Do not deploy `minioadmin`. |
 | Object-storage bucket | `RobotArtifacts__ObjectStorage__BucketName` | **P1** | Appsettings default is acceptable only when the deployment uses the same private bucket name. |
 | Auto-create bucket | `RobotArtifacts__ObjectStorage__AutoCreateBucket` | **P0 Feature** | Keep `false` in production and provision the bucket through infrastructure. Development and the local backend compose may set `true`. |
+| Read-only storage resilience | `RobotArtifacts__ObjectStorage__ReadRetryCount`, `__ReadRetryDelayMilliseconds` | **P2** | Defaults to two retries with 200 ms base delay for stat, bucket check, and presigned URL only. Upload streams are not retried. |
 | Storage TLS toggle | `RobotArtifacts__ObjectStorage__UseSsl` | **P1** | Review for the internal storage endpoint; production usually requires TLS. |
 | Download TLS toggle | `RobotArtifacts__ObjectStorage__DownloadUseSsl` | **P1** | Review for the Edge-facing endpoint; production should use TLS. |
 | Presigned URL lifetime | `RobotArtifacts__ObjectStorage__DownloadUrlExpirySeconds` | **P2** | Use appsettings default `900` seconds unless deployment latency requires tuning. |
@@ -156,9 +160,11 @@ Object storage is validated before background jobs start. Connection failure, in
 | MQTT TLS | `EdgeCommandMqtt__UseTls` | **P0 Secret/Security** | Enable for production broker connections. Certificate trust uses the host OS trust store. |
 | MQTT credentials | `EdgeCommandMqtt__Username`, `EdgeCommandMqtt__Password` | **P0 Secret** | Supply through deployment secrets when broker authentication is enabled; do not commit values. |
 | MQTT client/topic | `EdgeCommandMqtt__ClientId`, `EdgeCommandMqtt__TopicPrefix` | **P1** | Client id must be unique per backend instance; topic prefix defaults to `icebot`. |
+| MQTT publish resilience | `EdgeCommandMqtt__ConnectTimeoutSeconds`, `EdgeCommandMqtt__PublishTimeoutSeconds`, `EdgeCommandMqtt__PublishRetryCount`, `EdgeCommandMqtt__PublishRetryDelayMilliseconds` | **P2** | Defaults to 5-second connect timeout, 6-second attempt timeout, one retry, and 250 ms base delay. Keep retries low because periodic pull is authoritative. |
 | MQTT credential provisioning | `MqttCredentialProvisioning__Enabled`, `__Provider`, `__Host`, `__Port`, `__UseTls` | **P0 Feature/Security** | Enables execution-endpoint subscriber provisioning through Mosquitto Dynamic Security. Disabled by default. Production requires TLS. |
 | MQTT dynsec administrator | `MqttCredentialProvisioning__AdminUsername`, `__AdminPassword` | **P0 Secret** | Broker-control identity used only for client credential lifecycle. Supply from secret manager; never reuse backend publisher or endpoint credentials. |
 | MQTT endpoint subscriber role | `MqttCredentialProvisioning__SubscriberRole` | **P1** | Must exist on the broker and restrict `%u` to `icebot/execution-endpoints/%u/commands/available`. Local bootstrap creates `icebot-endpoint-subscriber`. |
+| MQTT credential resilience | `MqttCredentialProvisioning__TimeoutSeconds`, `__RetryCount`, `__RetryDelayMilliseconds` | **P2** | Defaults to 10-second command timeout, one retry, and 500 ms base delay. Retry covers transport failure only; broker business errors are returned without retry. |
 
 Broker startup, endpoint-scoped ACL provisioning, Edge subscription behavior, and production TLS rules are defined in [MQTT Operations](MQTT_OPERATIONS.md).
 

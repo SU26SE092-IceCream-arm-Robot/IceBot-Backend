@@ -34,6 +34,8 @@ Enable backend credential administration without committing the dynsec admin sec
 ```powershell
 $env:MqttCredentialProvisioning__Enabled = "true"
 $env:MqttCredentialProvisioning__AdminPassword = $env:MQTT_DYNSEC_ADMIN_PASSWORD
+$env:MqttCredentialProvisioning__RetryCount = "1"
+$env:MqttCredentialProvisioning__RetryDelayMilliseconds = "500"
 ```
 
 Provision one MQTT subscriber after its execution endpoint is active:
@@ -52,6 +54,9 @@ $env:EdgeCommandMqtt__Host = "localhost"
 $env:EdgeCommandMqtt__Port = "1883"
 $env:EdgeCommandMqtt__Username = "icebot-backend"
 $env:EdgeCommandMqtt__Password = "local-backend-secret"
+$env:EdgeCommandMqtt__PublishTimeoutSeconds = "6"
+$env:EdgeCommandMqtt__PublishRetryCount = "1"
+$env:EdgeCommandMqtt__PublishRetryDelayMilliseconds = "250"
 dotnet run --project .\src\WebAPI\WebAPI.csproj
 ```
 

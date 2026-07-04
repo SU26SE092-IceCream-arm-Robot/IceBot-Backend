@@ -20,6 +20,8 @@ public static class AlertResultMapper
         SourceType = alert.SourceType,
         SourceId = alert.SourceId,
         RaisedAt = alert.RaisedAt,
+        LastOccurredAt = alert.LastOccurredAt,
+        OccurrenceCount = alert.OccurrenceCount,
         AcknowledgedByAccountId = alert.AcknowledgedByAccountId,
         AcknowledgedAt = alert.AcknowledgedAt,
         ResolvedAt = alert.ResolvedAt,

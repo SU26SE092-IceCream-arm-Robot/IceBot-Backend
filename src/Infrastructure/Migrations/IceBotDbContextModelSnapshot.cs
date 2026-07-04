@@ -2180,6 +2180,11 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("CorrelationKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2198,9 +2203,15 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("KioskId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset>("LastOccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Message")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<int>("OccurrenceCount")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("OriginNodeId")
                         .HasColumnType("uuid");
@@ -2254,6 +2265,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.HasIndex("KioskId", "Status", "RaisedAt");
+
+                    b.HasIndex("KioskId", "DeviceId", "CorrelationKey", "Status", "LastOccurredAt");
 
                     b.ToTable("Alerts", (string)null);
                 });

@@ -4,6 +4,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Sinks.OpenTelemetry;
 using Application.EdgeIntegration.Observability;
+using Infrastructure.Payments.Observability;
 
 namespace WebAPI.Configuration.Observability;
 
@@ -101,6 +102,7 @@ public static class ObservabilityExtensions
             {
                 metrics
                     .AddMeter(IceBotEdgeMetrics.MeterName)
+                    .AddMeter(PayOsResilienceMetrics.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();
