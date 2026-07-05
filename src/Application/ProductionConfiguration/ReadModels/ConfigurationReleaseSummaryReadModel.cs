@@ -6,7 +6,6 @@ public sealed class ConfigurationReleaseSummaryReadModel
     public Guid OrganizationId { get; init; }
     public long ReleaseNumber { get; init; }
     public string Status { get; init; } = string.Empty;
-    public int ReleaseManifestSchemaVersion { get; init; }
     public string? ReleaseChecksum { get; init; }
     public DateTimeOffset? PublishedAt { get; init; }
     public Guid? PublishedByAccountId { get; init; }

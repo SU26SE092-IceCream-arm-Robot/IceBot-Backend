@@ -43,10 +43,6 @@ public partial class OrderItem : BusinessEntity
 
     public OrderItemStatus Status { get; set; } = OrderItemStatus.Pending;
 
-    public int OptionsSchemaVersion { get; set; } = 1;
-
-    public string? OptionsJson { get; set; }
-
     public int RecipeSnapshotSchemaVersion { get; set; } = 1;
 
     public string? RecipeSnapshotJson { get; set; }
@@ -61,7 +57,7 @@ public partial class OrderItem : BusinessEntity
 
     public virtual Recipe? Recipe { get; set; }
 
-    public virtual ICollection<ProductOption> ProductOptions { get; set; } = new List<ProductOption>();
+    public virtual ICollection<OrderItemOption> Options { get; set; } = new List<OrderItemOption>();
 
     public static OrderItem Create(
         Guid menuItemId,
@@ -79,7 +75,6 @@ public partial class OrderItem : BusinessEntity
         decimal unitPrice,
         decimal discountAmount = 0,
         string? clientLineId = null,
-        string? optionsJson = null,
         string? recipeSnapshotJson = null)
     {
         if (menuItemId == Guid.Empty)
@@ -159,7 +154,6 @@ public partial class OrderItem : BusinessEntity
             Quantity = quantity,
             UnitPrice = unitPrice,
             DiscountAmount = discountAmount,
-            OptionsJson = optionsJson,
             RecipeSnapshotJson = recipeSnapshotJson
         };
 

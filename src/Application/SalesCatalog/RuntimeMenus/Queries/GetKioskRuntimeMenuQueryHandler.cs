@@ -4,6 +4,7 @@ using Application.SalesCatalog.RuntimeMenus.Results;
 using Application.SalesCatalog.RuntimeMenus.Rules;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
+using Application.SalesCatalog.Rules;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
 
@@ -46,6 +47,11 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             .SelectMany(menu => menu.MenuItems.Select(item => new { Menu = menu, Item = item }))
             .ToList();
 
+        var optionRows = await _menus.ListMenuItemProductOptionsAsync(
+            candidates.Select(candidate => candidate.Item.Id).Distinct().ToArray(),
+            cancellationToken);
+        var optionsByMenuItem = optionRows.ToLookup(option => option.MenuItemId);
+
         var routeReadiness = new Dictionary<(Guid ProductVariantId, Guid RecipeId), bool>();
         foreach (var candidate in candidates.Where(candidate => candidate.Item.RecipeId.HasValue))
         {
@@ -66,12 +72,13 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             {
                 var hasActiveProductionRoute = entry.Item.RecipeId.HasValue &&
                                                routeReadiness.GetValueOrDefault((entry.Item.ProductVariantId, entry.Item.RecipeId.Value));
-                return RuntimeMenuSellabilityRules.IsSellable(entry.Item, now, hasActiveProductionRoute);
+                return RuntimeMenuSellabilityRules.IsSellable(entry.Item, now, hasActiveProductionRoute) &&
+                       ProductOptionSelectionRules.IsSatisfiable(optionsByMenuItem[entry.Item.Id].ToArray());
             })
             .OrderBy(entry => entry.Menu.DisplayOrder)
             .ThenBy(entry => entry.Item.DisplayOrder)
             .ThenBy(entry => entry.Item.DisplayName)
-            .Select(entry => RuntimeMenuResultMapper.ToResult(entry.Item))
+            .Select(entry => RuntimeMenuResultMapper.ToResult(entry.Item, optionsByMenuItem[entry.Item.Id].ToArray()))
             .ToList();
 
         var result = new RuntimeMenuResult
@@ -80,7 +87,6 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             KioskId = kiosk.Id,
             GeneratedAt = now,
             ExpiresAt = now.Add(SnapshotTtl),
-            ContainsMachineRuntimeState = false,
             Items = items
         };
 

@@ -3,7 +3,6 @@ using Application.Devices.Mapping;
 using Application.Devices.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks;
-using System.Text.Json;
 
 namespace Application.Devices.Commands;
 
@@ -65,11 +64,6 @@ public sealed class UpdateDeviceCommandHandler
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(request.MetadataJson) && !IsValidJson(request.MetadataJson))
-        {
-            return ApiResult<DeviceResult>.Fail("MetadataJson must be a valid JSON string.", 400);
-        }
-
         device.DeviceTypeId = request.DeviceTypeId;
         device.DeviceModelId = request.DeviceModelId;
         device.Name = request.Name.Trim();
@@ -77,7 +71,6 @@ public sealed class UpdateDeviceCommandHandler
         device.PositionLabel = request.PositionLabel?.Trim();
         device.FirmwareVersion = request.FirmwareVersion?.Trim();
         device.InstalledAt = request.InstalledAt;
-        device.MetadataJson = request.MetadataJson?.Trim();
         device.UpdatedAt = DateTimeOffset.UtcNow;
         device.UpdatedByAccountId = userContext.AccountId;
 
@@ -90,18 +83,5 @@ public sealed class UpdateDeviceCommandHandler
         }
 
         return ApiResult<DeviceResult>.Success(DeviceResultMapper.ToResult(updatedDevice), "Device updated successfully.");
-    }
-
-    private static bool IsValidJson(string json)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
     }
 }

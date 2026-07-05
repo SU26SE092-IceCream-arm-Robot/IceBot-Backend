@@ -82,7 +82,6 @@ public partial class Order : BusinessEntity, IStoreScoped
         decimal unitPrice,
         decimal discountAmount = 0,
         string? clientLineId = null,
-        string? optionsJson = null,
         string? recipeSnapshotJson = null)
     {
         EnsureEditable();
@@ -109,7 +108,6 @@ public partial class Order : BusinessEntity, IStoreScoped
             unitPrice,
             discountAmount,
             clientLineId,
-            optionsJson,
             recipeSnapshotJson);
 
         OrderItems.Add(orderItem);

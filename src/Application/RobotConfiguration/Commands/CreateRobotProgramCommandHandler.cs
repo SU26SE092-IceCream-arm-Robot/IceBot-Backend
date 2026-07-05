@@ -26,13 +26,10 @@ public sealed class CreateRobotProgramCommandHandler
             return ApiResult<RobotProgramResult>.Fail("Access denied.", 403);
         }
 
-        if (command.ScopeType == TenantScopeType.Global)
-        {
-            return ApiResult<RobotProgramResult>.Fail("Global robot programs are not supported because robot artifacts are organization-owned.", 400);
-        }
+        var scopeType = TenantScopeResolver.Resolve(command.StoreId, command.KioskId, command.DeviceId);
 
         if (!await _robotConfigurationStore.ProgramScopeExistsAsync(
-                command.ScopeType,
+                scopeType,
                 command.OrganizationId,
                 command.StoreId,
                 command.KioskId,
@@ -59,7 +56,7 @@ public sealed class CreateRobotProgramCommandHandler
             var program = RobotProgram.CreateDraft(
                 normalizedCode,
                 command.Name,
-                command.ScopeType,
+                scopeType,
                 command.OrganizationId,
                 command.StoreId,
                 command.KioskId,

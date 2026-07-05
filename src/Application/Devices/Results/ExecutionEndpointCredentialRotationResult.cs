@@ -10,7 +10,6 @@ public sealed class ExecutionEndpointCredentialRotationResult
     public string ExecutionProfile { get; init; } = null!;
     public string AuthenticationMode { get; init; } = null!;
     public string Status { get; init; } = null!;
-    public Guid? CredentialBindingId { get; init; }
 
     public static ExecutionEndpointCredentialRotationResult FromEndpoint(KioskExecutionEndpoint endpoint)
     {
@@ -20,8 +19,7 @@ public sealed class ExecutionEndpointCredentialRotationResult
             KioskId = endpoint.KioskId,
             ExecutionProfile = endpoint.ExecutionProfile.ToString(),
             AuthenticationMode = endpoint.AuthenticationMode.ToString(),
-            Status = endpoint.Status.ToString(),
-            CredentialBindingId = endpoint.CredentialBindingId
+            Status = endpoint.Status.ToString()
         };
     }
 }

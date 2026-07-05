@@ -112,7 +112,6 @@ public sealed class AcceptInvitationCommandHandler
 
         return ApiResult<AcceptInvitationResult>.Success(new AcceptInvitationResult
         {
-            Accepted = true,
             LocalLoginEnabled = account.LocalLoginEnabled,
             GoogleLoginEnabled = account.GoogleLoginEnabled
         }, "Invitation accepted and account activated.");

@@ -20,7 +20,6 @@ public sealed class OrganizationResult
 
     public string Status { get; set; } = null!;
 
-    public string? MetadataJson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 

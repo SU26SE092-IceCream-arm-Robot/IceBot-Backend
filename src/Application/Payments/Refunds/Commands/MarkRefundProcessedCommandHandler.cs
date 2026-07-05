@@ -76,12 +76,19 @@ public sealed class MarkRefundProcessedCommandHandler
 
             var now = DateTimeOffset.UtcNow;
 
-            // Mark refund as processed
-            refund.MarkProcessed(command.ProviderRefundId, now);
-
             // Parse refund method from serialized metadata in Reason
             var parsed = Mapping.RefundResultMapper.ParseReason(refund.Reason);
             var method = parsed.Method;
+
+            if (!string.Equals(method, "Voucher", StringComparison.OrdinalIgnoreCase) &&
+                !command.MoneyWasRefunded.HasValue)
+            {
+                return ApiResult<RefundResult>.Fail(
+                    "MoneyWasRefunded must be explicitly confirmed for a full money refund.",
+                    400);
+            }
+
+            refund.MarkProcessed(command.ProviderRefundId, now);
 
             var previousStatus = order.Status;
             var newStatus = OrderStatus.Refunded;
@@ -96,8 +103,7 @@ public sealed class MarkRefundProcessedCommandHandler
             {
                 newStatus = OrderStatus.Refunded;
                 order.MarkRefunded();
-                var moneyWasRefunded = command.MoneyWasRefunded ?? true;
-                if (moneyWasRefunded)
+                if (command.MoneyWasRefunded is true)
                 {
                     order.PaymentStatus = PaymentStatus.Refunded;
                     transaction.Status = PaymentTransactionStatus.Refunded;

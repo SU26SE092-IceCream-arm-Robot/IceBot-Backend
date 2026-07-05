@@ -68,8 +68,7 @@ public sealed class CreateKioskCommandHandler
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             SupportsOfflineMode = request.SupportsOfflineMode,
-            SettingsSchemaVersion = request.SettingsSchemaVersion,
-            SettingsJson = request.SettingsJson,
+            SettingsSchemaVersion = 1,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = userContext.AccountId
         };

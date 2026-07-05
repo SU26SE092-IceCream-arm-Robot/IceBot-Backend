@@ -126,7 +126,6 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
                 ScopeType = program.ScopeType.ToString(),
                 Status = program.Status.ToString(),
                 Description = program.Description,
-                ProgramManifestSchemaVersion = program.ProgramManifestSchemaVersion,
                 ProgramManifestChecksum = program.ProgramManifestChecksum,
                 PublishedAt = program.PublishedAt,
                 ArtifactCount = program.RobotProgramArtifacts.Count

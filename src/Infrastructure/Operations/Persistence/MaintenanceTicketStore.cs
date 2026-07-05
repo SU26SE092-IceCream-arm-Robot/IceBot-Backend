@@ -186,9 +186,12 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
         return _dbContext.MaintenanceTickets.AnyAsync(t => t.TicketNumber == ticketNumber, cancellationToken);
     }
 
-    public Task<bool> ValidateKioskScopeAsync(Guid organizationId, Guid storeId, Guid kioskId, CancellationToken cancellationToken = default)
+    public Task<MaintenanceKioskScope?> GetKioskScopeAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks.AnyAsync(k => k.Id == kioskId && k.StoreId == storeId && k.OrganizationId == organizationId, cancellationToken);
+        return _dbContext.Kiosks.AsNoTracking()
+            .Where(kiosk => kiosk.Id == kioskId)
+            .Select(kiosk => new MaintenanceKioskScope(kiosk.OrganizationId, kiosk.StoreId, kiosk.Id))
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public Task<bool> DeviceBelongsToKioskAsync(Guid deviceId, Guid kioskId, CancellationToken cancellationToken = default)

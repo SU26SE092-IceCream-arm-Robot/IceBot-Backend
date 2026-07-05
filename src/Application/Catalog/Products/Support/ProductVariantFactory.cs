@@ -8,8 +8,10 @@ internal static class ProductVariantFactory
     public static ProductVariant CreateVariant(
         UpsertProductVariantRequest request,
         Guid productId,
+        string currency,
         DateTimeOffset now,
-        Guid? createdByAccountId)
+        Guid? createdByAccountId,
+        string? metadataJson = null)
     {
         return new ProductVariant
         {
@@ -22,12 +24,12 @@ internal static class ProductVariantFactory
             FulfillmentType = request.FulfillmentType,
             SizeCode = ProductNormalizer.NormalizeNullableCode(request.SizeCode),
             BasePrice = request.BasePrice,
-            Currency = ProductNormalizer.NormalizeOptionalCode(request.Currency, "VND"),
-            IsAvailable = request.IsAvailable,
+            Currency = ProductNormalizer.NormalizeCode(currency),
+            IsAvailable = false,
             DisplayOrder = request.DisplayOrder,
             PreparationTimeSeconds = request.PreparationTimeSeconds,
             ImageUrl = ProductNormalizer.TrimToNull(request.ImageUrl),
-            MetadataJson = ProductNormalizer.TrimToNull(request.MetadataJson),
+            MetadataJson = ProductNormalizer.TrimToNull(metadataJson),
             CreatedAt = now,
             CreatedByAccountId = createdByAccountId
         };

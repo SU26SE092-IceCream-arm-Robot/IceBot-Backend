@@ -59,6 +59,8 @@ namespace Infrastructure
                 .Bind(config.GetSection(EmailOptions.SectionName))
                 .Validate(options => options.OperationTimeoutSeconds is >= 1 and <= 300,
                     "SMTP operation timeout must be between 1 and 300 seconds.")
+                .Validate(options => Uri.TryCreate(options.InvitationBaseUrl, UriKind.Absolute, out _),
+                    "Email invitation base URL must be an absolute URL.")
                 .ValidateOnStart();
             services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();

@@ -82,6 +82,8 @@ Entities:
 - `RecipeItem`
 - `Ingredient`
 
+`Product` owns `OptionGroup`, and `OptionGroup` owns `ProductOption`. Options inherit Product tenant scope and currency. `MenuItem` stores only selected option ids as Sales Catalog membership; placed orders store immutable `OrderItemOption` snapshots rather than live Catalog references.
+
 ### Sales Catalog
 
 Namespace: `Domain.SalesCatalog`

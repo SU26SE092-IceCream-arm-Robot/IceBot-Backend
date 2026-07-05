@@ -52,6 +52,7 @@ internal static class ProductVariantRequestValidator
         IProductStore products,
         Guid productId,
         UpsertProductVariantRequest request,
+        string currency,
         Guid? excludedVariantId,
         CancellationToken cancellationToken)
     {
@@ -59,7 +60,7 @@ internal static class ProductVariantRequestValidator
             request.Code,
             request.Name,
             request.BasePrice,
-            request.Currency,
+            currency,
             request.PreparationTimeSeconds,
             request.FulfillmentType);
 

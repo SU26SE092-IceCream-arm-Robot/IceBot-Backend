@@ -7,6 +7,7 @@ using Application.Catalog.Products.Support;
 using Application.Shared.Wrappers;
 using Domain.Catalog.Entities;
 using Domain.Tenants.Enums;
+using Application.Tenants;
 
 namespace Application.Catalog.Products.Commands;
 
@@ -24,8 +25,9 @@ public sealed class CloneProductTemplateCommandHandler
         CancellationToken cancellationToken = default)
     {
         var request = command.Request;
+        var scopeType = TenantScopeResolver.Resolve(request.StoreId, request.KioskId);
         var accessError = ProductManagementCommandRules.ValidateCreate<ProductResult>(
-            command.Scope, request.ScopeType, request.StoreId, request.KioskId);
+            command.Scope, scopeType, request.StoreId, request.KioskId);
         if (accessError is not null)
         {
             return accessError;
@@ -56,11 +58,8 @@ public sealed class CloneProductTemplateCommandHandler
             ProductType = template.ProductType,
             BasePrice = template.BasePrice,
             Currency = template.Currency,
-            IsAvailable = template.IsAvailable,
             PreparationTimeSeconds = template.PreparationTimeSeconds,
             ImageUrl = template.ImageUrl,
-            MetadataJson = template.MetadataJson,
-            ScopeType = request.ScopeType,
             Variants = template.ProductVariants.Select(variant => new UpsertProductVariantRequest
             {
                 Code = variant.Code,
@@ -71,17 +70,14 @@ public sealed class CloneProductTemplateCommandHandler
                 FulfillmentType = variant.FulfillmentType,
                 SizeCode = variant.SizeCode,
                 BasePrice = variant.BasePrice,
-                Currency = variant.Currency,
-                IsAvailable = variant.IsAvailable,
                 DisplayOrder = variant.DisplayOrder,
                 PreparationTimeSeconds = variant.PreparationTimeSeconds,
-                ImageUrl = variant.ImageUrl,
-                MetadataJson = variant.MetadataJson
+                ImageUrl = variant.ImageUrl
             }).ToList()
         };
 
         var validationError = await ProductRequestValidator.ValidateCreateRequestAsync(
-            _products, createRequest, organizationId, cancellationToken);
+            _products, createRequest, organizationId, scopeType, cancellationToken);
         if (validationError is not null)
         {
             return ApiResult<ProductResult>.Fail(validationError);
@@ -102,19 +98,66 @@ public sealed class CloneProductTemplateCommandHandler
             ProductType = createRequest.ProductType,
             BasePrice = createRequest.BasePrice,
             Currency = createRequest.Currency,
-            IsAvailable = createRequest.IsAvailable,
+            IsAvailable = false,
             PreparationTimeSeconds = createRequest.PreparationTimeSeconds,
             ImageUrl = createRequest.ImageUrl,
-            MetadataJson = createRequest.MetadataJson,
-            ScopeType = createRequest.ScopeType,
+            MetadataJson = template.MetadataJson,
+            ScopeType = scopeType,
             CreatedAt = now,
             CreatedByAccountId = command.Scope.UserContext.AccountId
         };
 
+        var templateVariantsByCode = template.ProductVariants.ToDictionary(
+            variant => variant.Code,
+            StringComparer.OrdinalIgnoreCase);
         foreach (var variantRequest in createRequest.Variants)
         {
+            var sourceVariant = templateVariantsByCode[variantRequest.Code];
             product.ProductVariants.Add(ProductVariantFactory.CreateVariant(
-                variantRequest, product.Id, now, command.Scope.UserContext.AccountId));
+                variantRequest,
+                product.Id,
+                product.Currency,
+                now,
+                command.Scope.UserContext.AccountId,
+                sourceVariant.MetadataJson));
+        }
+
+        foreach (var sourceGroup in template.OptionGroups.OrderBy(group => group.DisplayOrder))
+        {
+            var clonedGroup = new OptionGroup
+            {
+                ProductId = product.Id,
+                Code = sourceGroup.Code,
+                Name = sourceGroup.Name,
+                Description = sourceGroup.Description,
+                SelectionType = sourceGroup.SelectionType,
+                MinSelections = sourceGroup.MinSelections,
+                MaxSelections = sourceGroup.MaxSelections,
+                IsRequired = sourceGroup.IsRequired,
+                IsActive = sourceGroup.IsActive,
+                DisplayOrder = sourceGroup.DisplayOrder,
+                CreatedAt = now,
+                CreatedByAccountId = command.Scope.UserContext.AccountId
+            };
+            foreach (var sourceOption in sourceGroup.ProductOptions.Where(option => option.DeletedAt == null))
+            {
+                clonedGroup.ProductOptions.Add(new ProductOption
+                {
+                    OptionGroupId = clonedGroup.Id,
+                    TemplateProductOptionId = sourceOption.Id,
+                    Code = sourceOption.Code,
+                    Name = sourceOption.Name,
+                    Description = sourceOption.Description,
+                    PriceDelta = sourceOption.PriceDelta,
+                    IsDefault = sourceOption.IsDefault,
+                    IsAvailable = false,
+                    DisplayOrder = sourceOption.DisplayOrder,
+                    MetadataJson = sourceOption.MetadataJson,
+                    CreatedAt = now,
+                    CreatedByAccountId = command.Scope.UserContext.AccountId
+                });
+            }
+            product.OptionGroups.Add(clonedGroup);
         }
 
         await _products.AddProductAsync(product, cancellationToken);

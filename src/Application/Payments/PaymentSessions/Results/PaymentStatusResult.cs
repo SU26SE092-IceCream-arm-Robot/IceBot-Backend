@@ -1,5 +1,6 @@
 using Domain.Orders.Enums;
 using Domain.Payments.Enums;
+using System.Text.Json.Serialization;
 
 namespace Application.Payments.PaymentSessions.Results;
 
@@ -11,10 +12,13 @@ public sealed class PaymentStatusResult
 
     public string Provider { get; set; } = null!;
 
+    [JsonIgnore]
     public PaymentTransactionStatus PaymentTransactionStatus { get; set; }
 
+    [JsonIgnore]
     public PaymentStatus OrderPaymentStatus { get; set; }
 
+    [JsonIgnore]
     public OrderStatus OrderStatus { get; set; }
 
     public decimal Amount { get; set; }

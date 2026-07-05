@@ -40,6 +40,7 @@ public sealed class AddProductVariantCommandHandler
             _products,
             productId,
             request,
+            product.Currency,
             null,
             cancellationToken);
 
@@ -48,7 +49,8 @@ public sealed class AddProductVariantCommandHandler
             return ApiResult<ProductVariantResult>.Fail(validationError);
         }
 
-        var variant = ProductVariantFactory.CreateVariant(request, product.Id, DateTimeOffset.UtcNow, createdByAccountId);
+        var variant = ProductVariantFactory.CreateVariant(
+            request, product.Id, product.Currency, DateTimeOffset.UtcNow, createdByAccountId);
         await _products.AddProductVariantAsync(variant, cancellationToken);
         await _products.SaveChangesAsync(cancellationToken);
 

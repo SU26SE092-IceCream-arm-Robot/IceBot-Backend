@@ -28,5 +28,4 @@ public sealed class CreateDeviceRequest
 
     public DateTimeOffset? InstalledAt { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

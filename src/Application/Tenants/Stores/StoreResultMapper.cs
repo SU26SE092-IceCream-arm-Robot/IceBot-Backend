@@ -24,8 +24,7 @@ internal static class StoreResultMapper
             Longitude = store.Longitude,
             PhoneNumber = store.PhoneNumber,
             Email = store.Email,
-            OpeningHoursSchemaVersion = store.OpeningHoursSchemaVersion,
-            OpeningHoursJson = store.OpeningHoursJson,
+            OpeningHours = StoreOpeningHoursContract.Deserialize(store.OpeningHoursJson),
             CreatedAt = store.CreatedAt,
             UpdatedAt = store.UpdatedAt
         };

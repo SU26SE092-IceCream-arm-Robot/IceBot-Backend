@@ -47,7 +47,18 @@ public sealed class ExecuteOrderCommandPayloadTests
                     ProductCodeSnapshot = "P",
                     ProductVariantCodeSnapshot = "V",
                     RecipeSnapshotSchemaVersion = 1,
-                    OptionsSchemaVersion = 1,
+                    SelectedOptions =
+                    [
+                        new ExecuteOrderLineOptionPayload
+                        {
+                            ProductOptionId = Guid.NewGuid(),
+                            OptionGroupId = 1,
+                            OptionGroupCode = "TOPPING",
+                            Code = "OREO",
+                            Name = "Oreo",
+                            UnitPriceDelta = 5000
+                        }
+                    ],
                     ExecutionRouteId = Guid.NewGuid(),
                     RouteCode = "ROUTE",
                     RobotPrograms =

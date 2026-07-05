@@ -10,7 +10,6 @@ public sealed class ExecutionEndpointResult
     public string AuthenticationMode { get; init; } = null!;
     public string Status { get; init; } = null!;
     public Guid? ProfileIdentity { get; init; }
-    public Guid? CredentialBindingId { get; init; }
     public string? CredentialStatus { get; init; }
     public string? MqttUsername { get; init; }
     public string? MqttCredentialStatus { get; init; }

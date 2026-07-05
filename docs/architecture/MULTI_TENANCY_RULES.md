@@ -278,15 +278,12 @@ Recommended uniqueness:
 
 ### ProductOption
 
-`ProductOption` is scoped at global or organization level for now.
+`OptionGroup` and `ProductOption` are owned by a Product. They inherit tenant scope and currency from that Product rather than declaring independent scope or currency.
 
-Use:
-
-- `ScopeType`
-- `OrganizationId`
-- `TemplateProductOptionId`
-
-Avoid store/kiosk option overrides unless there is a real pricing or availability need.
+- `Product -> OptionGroup -> ProductOption` is the authoring aggregate.
+- Global product templates own their template groups/options. Cloning a Product creates new tenant-owned groups/options and records `TemplateProductOptionId` lineage on cloned options.
+- Store/kiosk behavior follows the owning Product scope. Do not add independent option overrides unless a concrete pricing or availability use case requires them.
+- A MenuItem chooses the subset of its Product's options that it offers.
 
 ### RobotProgram
 

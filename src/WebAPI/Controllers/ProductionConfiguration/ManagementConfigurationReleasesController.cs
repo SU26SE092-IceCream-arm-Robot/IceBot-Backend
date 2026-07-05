@@ -124,7 +124,6 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
             OrganizationId = organizationId,
             ReleaseId = releaseId,
             Routes = request.Routes.Select(route => new ConfigurationReleaseRouteInput(
-                route.ProductVariantId,
                 route.RecipeId,
                 route.RouteCode,
                 route.Priority,
@@ -193,7 +192,6 @@ public sealed class ReplaceConfigurationReleaseRoutesRequest
 
 public sealed class ConfigurationReleaseRouteRequest
 {
-    public Guid ProductVariantId { get; init; }
     public Guid RecipeId { get; init; }
 
     [Required, StringLength(100)]

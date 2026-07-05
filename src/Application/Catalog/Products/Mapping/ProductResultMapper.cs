@@ -25,7 +25,6 @@ internal static class ProductResultMapper
             IsAvailable = product.IsAvailable,
             PreparationTimeSeconds = product.PreparationTimeSeconds,
             ImageUrl = product.ImageUrl,
-            MetadataJson = product.MetadataJson,
             ScopeType = product.ScopeType,
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt,
@@ -33,9 +32,51 @@ internal static class ProductResultMapper
                 .OrderBy(variant => variant.DisplayOrder)
                 .ThenBy(variant => variant.Name)
                 .Select(ToVariantResult)
+                .ToList(),
+            OptionGroups = product.OptionGroups
+                .OrderBy(group => group.DisplayOrder)
+                .ThenBy(group => group.Name)
+                .Select(group => ToOptionGroupResult(group, product.Currency))
                 .ToList()
         };
     }
+
+    public static OptionGroupResult ToOptionGroupResult(OptionGroup group, string currency)
+    {
+        return new OptionGroupResult
+        {
+            Id = group.Id,
+            ProductId = group.ProductId,
+            Code = group.Code,
+            Name = group.Name,
+            Description = group.Description,
+            SelectionType = group.SelectionType,
+            MinSelections = group.MinSelections,
+            MaxSelections = group.MaxSelections,
+            IsRequired = group.IsRequired,
+            IsActive = group.IsActive,
+            DisplayOrder = group.DisplayOrder,
+            Options = group.ProductOptions.Where(option => option.DeletedAt == null)
+                .OrderBy(option => option.DisplayOrder)
+                .ThenBy(option => option.Name)
+                .Select(option => ToProductOptionResult(option, currency))
+                .ToList()
+        };
+    }
+
+    public static ProductOptionResult ToProductOptionResult(ProductOption option, string currency) => new()
+    {
+        Id = option.Id,
+        OptionGroupId = option.OptionGroupId,
+        Code = option.Code,
+        Name = option.Name,
+        Description = option.Description,
+        PriceDelta = option.PriceDelta,
+        Currency = currency,
+        IsDefault = option.IsDefault,
+        IsAvailable = option.IsAvailable,
+        DisplayOrder = option.DisplayOrder
+    };
 
     public static ProductVariantResult ToVariantResult(ProductVariant variant)
     {
@@ -56,7 +97,6 @@ internal static class ProductResultMapper
             DisplayOrder = variant.DisplayOrder,
             PreparationTimeSeconds = variant.PreparationTimeSeconds,
             ImageUrl = variant.ImageUrl,
-            MetadataJson = variant.MetadataJson,
             CreatedAt = variant.CreatedAt,
             UpdatedAt = variant.UpdatedAt
         };

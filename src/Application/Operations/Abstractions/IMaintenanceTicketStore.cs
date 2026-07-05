@@ -45,7 +45,7 @@ public interface IMaintenanceTicketStore
 
     Task<bool> TicketNumberExistsAsync(string ticketNumber, CancellationToken cancellationToken = default);
 
-    Task<bool> ValidateKioskScopeAsync(Guid organizationId, Guid storeId, Guid kioskId, CancellationToken cancellationToken = default);
+    Task<MaintenanceKioskScope?> GetKioskScopeAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<bool> DeviceBelongsToKioskAsync(Guid deviceId, Guid kioskId, CancellationToken cancellationToken = default);
 
@@ -57,3 +57,5 @@ public interface IMaintenanceTicketStore
 
     Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
 }
+
+public sealed record MaintenanceKioskScope(Guid OrganizationId, Guid StoreId, Guid KioskId);

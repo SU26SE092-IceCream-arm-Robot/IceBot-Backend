@@ -47,6 +47,12 @@ public sealed class UpdateStoreCommandHandler
             return ApiResult<StoreResult>.Fail("Longitude must be between -180 and 180.", 400);
         }
 
+        var openingHoursError = StoreOpeningHoursContract.Validate(request.OpeningHours);
+        if (openingHoursError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(openingHoursError, 400);
+        }
+
         store.Name = request.Name.Trim();
         store.StoreType = string.IsNullOrWhiteSpace(request.StoreType) ? "Retail" : request.StoreType.Trim();
         store.Address = request.Address?.Trim();
@@ -58,8 +64,7 @@ public sealed class UpdateStoreCommandHandler
         store.Longitude = request.Longitude;
         store.PhoneNumber = request.PhoneNumber?.Trim();
         store.Email = request.Email?.Trim().ToLowerInvariant();
-        store.OpeningHoursSchemaVersion = request.OpeningHoursSchemaVersion;
-        store.OpeningHoursJson = request.OpeningHoursJson;
+        store.OpeningHoursJson = StoreOpeningHoursContract.Serialize(request.OpeningHours);
         store.UpdatedAt = DateTimeOffset.UtcNow;
         store.UpdatedByAccountId = userContext.AccountId;
 

@@ -12,7 +12,6 @@ public sealed class RobotProgramSummaryReadModel
     public string ScopeType { get; init; } = string.Empty;
     public string Status { get; init; } = string.Empty;
     public string? Description { get; init; }
-    public int ProgramManifestSchemaVersion { get; init; }
     public string? ProgramManifestChecksum { get; init; }
     public DateTimeOffset? PublishedAt { get; init; }
     public int ArtifactCount { get; init; }

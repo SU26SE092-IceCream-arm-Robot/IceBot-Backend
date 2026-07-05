@@ -17,8 +17,15 @@ public sealed class StoreResult
     public decimal? Longitude { get; set; }
     public string? PhoneNumber { get; set; }
     public string? Email { get; set; }
-    public int OpeningHoursSchemaVersion { get; set; }
-    public string? OpeningHoursJson { get; set; }
+    public IReadOnlyList<StoreOpeningHoursDayResult> OpeningHours { get; set; } = [];
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
+}
+
+public sealed class StoreOpeningHoursDayResult
+{
+    public DayOfWeek DayOfWeek { get; set; }
+    public bool IsClosed { get; set; }
+    public TimeOnly? OpensAt { get; set; }
+    public TimeOnly? ClosesAt { get; set; }
 }

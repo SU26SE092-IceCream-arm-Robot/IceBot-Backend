@@ -1,5 +1,3 @@
-using Domain.Tenants.Enums;
-
 namespace Application.Catalog.Products.Requests;
 
 public sealed class CreateProductRequest
@@ -24,15 +22,9 @@ public sealed class CreateProductRequest
 
     public string Currency { get; set; } = "VND";
 
-    public bool IsAvailable { get; set; } = true;
-
     public int? PreparationTimeSeconds { get; set; }
 
     public string? ImageUrl { get; set; }
-
-    public string? MetadataJson { get; set; }
-
-    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Organization;
 
     public List<UpsertProductVariantRequest> Variants { get; set; } = new();
 }

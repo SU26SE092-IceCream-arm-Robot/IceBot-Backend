@@ -51,12 +51,7 @@ public sealed class OrdersController : ControllerBase
     {
         request ??= new PlaceOrderRequest();
 
-        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) && !string.IsNullOrWhiteSpace(idempotencyKey))
-        {
-            request.IdempotencyKey = idempotencyKey;
-        }
-
-        var command = new PlaceOrderCommand { Request = request };
+        var command = new PlaceOrderCommand { Request = request, IdempotencyKey = idempotencyKey };
         var result = await _placeOrderHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -74,7 +69,7 @@ public sealed class OrdersController : ControllerBase
     /// Creates a payment session for an order.
     /// </summary>
     /// <param name="orderId">The ID of the order.</param>
-    /// <param name="request">The payment session request details.</param>
+    /// <param name="request">The selected payment method and client-displayed total.</param>
     /// <param name="idempotencyKey">A unique key to prevent duplicate payment session creations.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The created payment session details.</returns>
@@ -86,14 +81,12 @@ public sealed class OrdersController : ControllerBase
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
         CancellationToken cancellationToken)
     {
-        request ??= new CreatePaymentSessionRequest();
-
-        if (string.IsNullOrWhiteSpace(request.IdempotencyKey) && !string.IsNullOrWhiteSpace(idempotencyKey))
+        var command = new CreatePaymentSessionCommand
         {
-            request.IdempotencyKey = idempotencyKey;
-        }
-
-        var command = new CreatePaymentSessionCommand { OrderId = orderId, Request = request };
+            OrderId = orderId,
+            IdempotencyKey = idempotencyKey,
+            Request = request
+        };
         var result = await _createPaymentSessionHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

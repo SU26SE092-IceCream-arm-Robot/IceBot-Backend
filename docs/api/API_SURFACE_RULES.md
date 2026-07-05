@@ -49,7 +49,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Sync dead-letter operations | `/api/v1/management/sync-dead-letters` | SystemAdmin inspection, typed retry, retry audit, resolve, and ignore |
 | Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
-| Edge integration | `/api/v1/iot/...` | command pull, command ack, execution reports, future event batch sync, heartbeat, configuration sync |
+| Edge integration | `/api/v1/iot/...` | command pull, command ack, execution reports, event replay, heartbeat, configuration sync |
 | Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
 
 ## Tablet / Customer APIs
@@ -85,8 +85,17 @@ Current examples:
 
 ```text
 GET /api/v1/management/product-templates
+POST/PUT/PATCH/DELETE /api/v1/management/product-templates/{productId}/option-groups/*
 GET /api/v1/management/organizations/{organizationId}/products
 POST /api/v1/management/organizations/{organizationId}/products/from-template
+POST /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups
+PUT /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}
+PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/status
+DELETE /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}
+POST /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options
+PUT /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}
+PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}/availability
+DELETE /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}
 GET /api/v1/management/organizations/{organizationId}/menus
 GET /api/v1/management/accounts
 GET /api/v1/management/accounts/{accountId}/effective-access
@@ -214,7 +223,7 @@ Rules:
 - Back-office order operations are manual support workflows. Paid orders should be marked `RefundRequired`; they are not cancelled directly.
 - Order status history is a back-office audit read model. It exposes order status transitions and a small actor snapshot (`changedByAccountId`, `changedByName`, `changedByEmail`), not full account objects, raw payment callback bodies, or robot telemetry.
 - Execution-attempt reads use durable `ExecuteOrder` commands as the list authority, so pending or rejected attempts remain visible before an execution projection exists. Detail combines the optional order-summary projection with job/unit `ProductionExecutionRecord` rows, ordered delivery-attempt history, timeout provenance, redispatch actor/reason, and previous/next dispatch references. It excludes command payload JSON, raw sync events, and stock payloads. Both routes use `orders.view` and enforce scope through the owning Order.
-- The per-order execution-attempt list remains paging-only in v1. Dispatch attempts are bounded by `OrderExecutionDispatch__MaxDispatchAttempts` (default `3`), so status/endpoint/time filters are not added until a real UI or operational query requires them.
+- The per-order execution-attempt list is paging-only and has no status, endpoint, or time filters. Dispatch attempts are bounded by `OrderExecutionDispatch__MaxDispatchAttempts` (default `3`).
 - Accepted commands create a provisional order-execution projection with sequence `0`. Management reads may show it before the first Edge order-summary report. Timeout reconciliation changes only observation/customer projection to `Stale/Delayed`, `Unreachable/PendingRecovery`, or prolonged `Unreachable/SupportRequired`; it must not infer `OrderStatus.Failed` from silence. Customer order/payment polling reads the latest dispatch attempt projection.
 - `POST /management/orders/{orderId}/execution-attempts` is the explicit operator redispatch command. Backend allocates `latest DispatchAttemptNo + 1` under the order advisory lock; clients do not choose attempt numbers. It requires `orders.manage`, an authenticated account, and a reason of at most 500 characters.
 - Redispatch is allowed only when the latest execute-order command is `DeliveryFailed`, or `Rejected` while the Order is `ExecutionRejected` (rejection before physical output). `RefundRequired`, `Failed`, active attempts, and possible physical-output cases are not redispatched automatically.
@@ -223,8 +232,27 @@ Rules:
 - Full money refund sets `PaymentStatus = Refunded` only when staff confirms the money was actually refunded. Voucher compensation does not reverse payment status.
 - Rejecting or cancelling a refund keeps `OrderStatus = RefundRequired`; staff may create another refund/compensation record later.
 - `POST /api/v1/management/orders/{orderId}/refunds` should use `Idempotency-Key` for safe manual retries.
+- Payment-session creation selects `paymentMethodCode` and submits the amount/currency currently displayed by the client. Backend remains authoritative from the stored Order and returns `409` without creating a provider session when the values differ.
+- Full-money refund completion requires staff to explicitly submit `moneyWasRefunded`; omission must not be interpreted as a successful money reversal.
+- Menu and menu-item creation always starts in `Draft`; lifecycle changes use the dedicated status commands. Menu-item currency is inherited from its parent menu, and product-variant currency is inherited from its parent product.
+- Changing a menu currency updates all current menu-item currencies in the same unit of work. Historical orders keep their sale-time snapshots.
+- Normal management contracts do not expose generic `MetadataJson` fields for organizations, products, variants, menus, or menu items. Add typed request/read-model fields when a concrete UI use case exists.
+- Product and variant creation always starts unavailable; availability changes use the dedicated commands.
+- Product options are authored as `Product -> OptionGroup -> ProductOption` and inherit Product tenant scope and currency. Group status and option availability use dedicated endpoints; metadata updates cannot change lifecycle state. Product cloning creates new groups/options. A MenuItem exposes only its configured subset through `productOptionIds`. Runtime menu returns typed active groups and available options. Checkout submits unique `selectedOptions[].productOptionId` values; backend validates group cardinality, availability, menu membership, and price deltas before storing immutable `OrderItemOption` snapshots. Raw option JSON from clients is not accepted or forwarded to Edge.
+- Deleting a ProductOption or OptionGroup is rejected while any MenuItem membership still references it. Setting an option unavailable keeps authoring membership but removes it from runtime-menu output; if an active required group no longer has enough available choices, the MenuItem is not sellable. Catalog edits never rewrite placed-order option snapshots.
+- Cloning a Product creates new OptionGroup and ProductOption identities. Cloned options retain `TemplateProductOptionId` lineage, start unavailable, and can be selected only by MenuItems whose Product is that clone.
+- Organization-owned Product, Menu, and cloned Product create contracts do not accept `ScopeType`. Backend derives it from the most-specific supplied scope id: Kiosk, Store, then Organization.
+- Organization-owned RobotProgram create contracts also do not accept `ScopeType`; RobotProgram additionally supports Device scope, so backend derives its scope from Device, Kiosk, Store, then Organization.
+- Execution endpoint authentication mode is derived from the selected profile: `FullEdge -> MutualTls`, `LowCostController -> SignedCommandTls`.
+- Normal device and kiosk management contracts do not expose raw `MetadataJson` or `SettingsJson`. Store opening hours use a typed per-day schedule while persistence continues to serialize schema-versioned JSON internally.
+- Configuration-release route authoring accepts `RecipeId` and derives `ProductVariantId` from the recipe before storing both route identities.
+- Setting an internal-account password changes credential material only. Enabling local login remains a separate account-policy update.
+- Authentication responses contain tokens, minimal identity, role scopes, and enabled login methods. Full profile fields belong to `/me`.
+- Kiosk order creation derives `OrderChannel = Tablet` from the endpoint contract. Anonymous clients cannot choose an analytics/audit channel value.
+- Deployment command identifiers are internal transport coordination data. Management responses expose deployment identity and status, not `EdgeCommandId`.
 - Inventory management in v1 is reporting/operations only. It does not decide runtime menu sellability or robot execution availability.
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
+- Normal telemetry reads also exclude source node ids, heartbeat sequence numbers, and correlation/causation ids. Those ingestion identities remain available to machine contracts.
 - `DeviceEvent` is immutable log/evidence, not mutable alert state. Newly accepted Error/Critical telemetry creates a separate Open Alert in the same transaction; Warning remains evidence only.
 - Alert management uses `/api/v1/management/alerts`: scoped list/get plus acknowledge/resolve. V1 has no general manual create endpoint; alert creation belongs to authenticated telemetry ingestion.
 - Maintenance ticket V1 is a manual operations/support workflow. Tickets are kiosk-scoped work items with optional evidence links to device, order, or device event. V1 does not include auto-generated tickets, alert engine, chat, reopen, or GraphQL maintenance aggregate.
@@ -284,6 +312,8 @@ Rules:
 ## Authentication And Password Recovery APIs
 
 Search keywords: `authentication`, `auth`, `local login`, `username password login`, `Firebase Google login`, `external login`, `refresh token`, `revoke refresh token`, `forgot password`, `reset password`, `change password`, `accept invitation`, `invitation link`, `current account password`, `management accounts`.
+
+Management owns the allowed authentication methods for an internal account. Google login resolves and validates the verified provider email against the configured `GoogleEmail`, then binds `GoogleSubjectId` on first successful login. It must not fall back to `Account.Email` or overwrite the configured Google email from token claims.
 
 Current examples:
 
@@ -396,7 +426,7 @@ To ensure stability, performance, and security, read-model endpoints are strictl
 * **Purpose:** Administrative layout navigation and validation of scopes when creating/assigning user roles.
 * **Includes:** Hierarchy structural identifiers (Organization -> Store -> Kiosk) and scope codes.
 * **EXCLUDES:** Revenue metrics, active alerts, device health, inventory levels, or machine runtime logs.
-* **Ownership:** Excluded metrics must be served by future dashboard or reporting-specific APIs.
+* **Ownership:** Excluded metrics belong to dashboard or reporting-specific APIs.
 
 ### 2. Kiosk Sales Menu Boundaries
 * **Endpoint:** `GET /api/v1/kiosks/{kioskId}/runtime-menu`
@@ -410,92 +440,8 @@ To ensure stability, performance, and security, read-model endpoints are strictl
   - `GET /api/v1/orders/{orderId}`
   - `GET /api/v1/orders/{orderId}/payment-status`
 * **Purpose:** Real-time customer receipt and preparation status tracking.
-* **Includes:** Quantity, item status, billing totals, payment confirmation, preparation state, and tablet-friendly status projections (CustomerStatus, CustomerStatusMessage, CanRetryPayment, RequiresStaffSupport).
-* **EXCLUDES:** Raw payment provider callback bodies, device error codes, robot joint telemetry.
-* **Ownership:** System error analytics are scoped to maintenance/operations portals, not client order details.
-
-## API Result And Error Handling
-
-Controller-facing Application handlers return `ApiResult<T>` or `PagedResult<T>`, and controllers should preserve the wrapper status code:
-
-```csharp
-return StatusCode(result.StatusCode, result);
-```
-
-Rules:
-
-- `ApiResult<T>.StatusCode` must match the HTTP response status code.
-- `InternalResult<T>` is not an API response contract and must not be returned directly by controllers.
-- `AppException` subclasses must preserve their intended HTTP status through `GlobalExceptionMiddleware`.
-- Middleware must not collapse `NotFoundException`, `ForbiddenException`, or `ConflictException` into `400 Bad Request`.
-- Provider/system failures may include `SystemError` for diagnostics, but public responses must not expose secrets or sensitive config.
-
-Recommended status use:
-
-| Case | Status |
-| --- | --- |
-| Read/update success | `200 OK` |
-| Created success | `201 Created` |
-| Validation failure | `400 Bad Request` |
-| Unauthorized | `401 Unauthorized` |
-| Forbidden/scoped denied | `403 Forbidden` |
-| Resource not found | `404 Not Found` |
-| Business conflict/duplicate | `409 Conflict` |
-| Provider/system failure | `500 Internal Server Error` unless a more specific application status is intentionally returned |
-
-## Validation Strategy
-
-Current v1 validation convention:
-
-- Do not introduce FluentValidation yet.
-- **Request DTO / DataAnnotations (Format & Syntax):** Use DataAnnotations for simple request DTO shape validation, such as required fields, string length, numeric range, and basic format.
-- **Enum Inputs:** Send enum values as strings. JSON request bodies do not accept integer enum values.
-- **Application Validators / Rule Helpers (Cross-Field / Request-Level):** Use static `RequestValidator` / rule helper classes for cross-field or request-level rules that do not need database access.
-- **Handlers & Stores (Business constraints & Database-dependent):** Use handlers and stores for database-dependent validation, such as uniqueness, parent existence, active parent checks, and tenant-scope ownership.
-- **Domain Methods (Invariants):** Use domain methods for entity invariants and state transitions.
-- **Failure Returns & Exceptions:**
-  - Handlers should return `ApiResult<T>.Fail(..., 400)` (or `409 Conflict` / `404 Not Found` as appropriate) for business rule / database-dependent validation failures, rather than throwing exceptions, to preserve clean control flow.
-  - `ValidationException` is strictly reserved for automatic request DTO binding and DataAnnotations validation failures caught at the controller level before the handler is invoked.
-  - Domain entities throw `DomainRuleException` if invariants are violated during processing.
-- **Controller Cleanup:** Gradually remove repeated controller `EnsureValidModel()` helpers by relying on `[ApiController]` plus centralized `InvalidModelStateResponseFactory`.
-- **Response Shape:** Keep the current validation response shape unless a separate API contract decision changes it.
-
-Do not move business validation into controllers. Controllers should validate transport/request shape and then call Application handlers.
-
-## GraphQL Management Reads
-
-GraphQL is exposed at `/graphql` as an internal read/query surface for frontend UI aggregation.
-
-- **Scope:** Read/query only. No mutations are implemented in this phase.
-- **REST Surface:** REST remains the existing contract for commands, tablet actions, payment integrations, webhooks, and IoT edge communication.
-
-## Read Model API Boundaries
-
-To ensure stability, performance, and security, read-model endpoints are strictly scoped to their intended UI or integration workflows. They must not be expanded to aggregate cross-cutting operational or reporting details.
-
-### 1. Tenant Navigation & Scope Selection Boundaries
-* **Endpoints:** 
-  - GraphQL `tenantTree`
-  - `GET /api/v1/management/role-scope-options`
-* **Purpose:** Administrative layout navigation and validation of scopes when creating/assigning user roles.
-* **Includes:** Hierarchy structural identifiers (Organization -> Store -> Kiosk) and scope codes.
-* **EXCLUDES:** Revenue metrics, active alerts, device health, inventory levels, or machine runtime logs.
-* **Ownership:** Excluded metrics must be served by future dashboard or reporting-specific APIs.
-
-### 2. Kiosk Sales Menu Boundaries
-* **Endpoint:** `GET /api/v1/kiosks/{kioskId}/runtime-menu`
-* **Purpose:** Rendering customer-facing catalog pricing and availability on the order tablet.
-* **Includes:** Product name, variant codes, prices, discount figures, images, and recipe versions.
-* **EXCLUDES:** Recipe preparation details (coordinates, Fairino robot points), manufacturing cost margin data, and live dispenser levels.
-* **Ownership:** Deep robot configuration lives in IoT sync profiles, while cost metrics belong to product inventory reporting.
-
-### 3. Customer Order Tracking Boundaries
-* **Endpoints:**
-  - `GET /api/v1/orders/{orderId}`
-  - `GET /api/v1/orders/{orderId}/payment-status`
-* **Purpose:** Real-time customer receipt and preparation status tracking.
-* **Includes:** Quantity, item status, billing totals, payment confirmation, preparation state, and tablet-friendly status projections (CustomerStatus, CustomerStatusMessage, CanRetryPayment, RequiresStaffSupport).
-* **EXCLUDES:** Raw payment provider callback bodies, device error codes, robot joint telemetry.
+* **Includes:** Quantity, billing totals, payment confirmation, preparation state, and tablet-friendly status projections (`CustomerStatus`, `CustomerStatusMessage`, `CanRetryPayment`, `RequiresStaffSupport`).
+* **EXCLUDES:** Internal order-item, order-payment, payment-transaction, and order state-machine enums; raw payment provider callback bodies; device error codes; robot joint telemetry.
 * **Ownership:** System error analytics are scoped to maintenance/operations portals, not client order details.
 
 ## API Result And Error Handling

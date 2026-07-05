@@ -4,6 +4,7 @@ using Application.SalesCatalog.Menus.Results;
 using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
+using Domain.Catalog.Entities;
 
 namespace Application.SalesCatalog.Menus.Commands;
 
@@ -43,14 +44,19 @@ public sealed class UpdateMenuItemCommandHandler
             return ApiResult<MenuItemResult>.Fail("Menu item not found.", 404);
         }
 
-        var newProductId = request.ProductId ?? item.ProductId;
         var newProductVariantId = request.ProductVariantId ?? item.ProductVariantId;
+        var productVariant = await _menus.GetProductVariantByIdAsync(newProductVariantId, cancellationToken);
+        if (productVariant is null)
+        {
+            return ApiResult<MenuItemResult>.Fail("Product variant does not exist.", 400);
+        }
+        var newProductId = productVariant.ProductId;
         var newRecipeId = request.RecipeId ?? item.RecipeId;
         var newCode = string.IsNullOrWhiteSpace(request.Code) ? item.Code : MenuNormalizer.NormalizeCode(request.Code);
         var newDisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? item.DisplayName : request.DisplayName;
         var newPrice = request.Price ?? item.Price;
         var newDiscount = request.DiscountAmount ?? item.DiscountAmount;
-        var newCurrency = string.IsNullOrWhiteSpace(request.Currency) ? item.Currency : request.Currency;
+        var newCurrency = menu.Currency;
         var newPreparationTime = request.PreparationTimeSeconds ?? item.PreparationTimeSeconds;
         var newEffectiveFrom = request.EffectiveFrom ?? item.EffectiveFrom;
         var newEffectiveTo = request.EffectiveTo ?? item.EffectiveTo;
@@ -78,13 +84,29 @@ public sealed class UpdateMenuItemCommandHandler
             return ApiResult<MenuItemResult>.Fail(validationError);
         }
 
+        ProductOption[]? replacementOptions = null;
+        if (request.ProductOptionIds is not null)
+        {
+            var optionIds = request.ProductOptionIds.Distinct().ToArray();
+            if (optionIds.Length != request.ProductOptionIds.Count)
+            {
+                return ApiResult<MenuItemResult>.Fail("Product option ids must be unique.");
+            }
+
+            replacementOptions = (await _menus.ListProductOptionsAsync(newProductId, optionIds, cancellationToken)).ToArray();
+            if (replacementOptions.Length != optionIds.Length)
+            {
+                return ApiResult<MenuItemResult>.Fail("Every product option must belong to the selected product.", 409);
+            }
+
+        }
+
         item.ProductId = newProductId;
         item.ProductVariantId = newProductVariantId;
         item.RecipeId = newRecipeId;
         item.Code = newCode;
         item.DisplayName = newDisplayName.Trim();
         item.Description = request.Description is null ? item.Description : MenuNormalizer.TrimToNull(request.Description);
-        item.Status = request.Status ?? item.Status;
         item.Price = newPrice;
         item.DiscountAmount = newDiscount;
         item.Currency = MenuNormalizer.NormalizeCode(newCurrency);
@@ -93,12 +115,21 @@ public sealed class UpdateMenuItemCommandHandler
         item.ImageUrl = request.ImageUrl is null ? item.ImageUrl : MenuNormalizer.TrimToNull(request.ImageUrl);
         item.EffectiveFrom = newEffectiveFrom;
         item.EffectiveTo = newEffectiveTo;
-        item.MetadataSchemaVersion = request.MetadataSchemaVersion.HasValue
-            ? Math.Max(request.MetadataSchemaVersion.Value, 1)
-            : item.MetadataSchemaVersion;
-        item.MetadataJson = request.MetadataJson is null ? item.MetadataJson : MenuNormalizer.TrimToNull(request.MetadataJson);
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByAccountId = updatedByAccountId;
+
+        if (request.ProductOptionIds is not null)
+        {
+            var replacements = replacementOptions!
+                .Select(option => new Domain.SalesCatalog.Entities.MenuItemProductOption
+                {
+                    ProductOptionId = option.Id,
+                    CreatedAt = item.UpdatedAt.Value,
+                    CreatedByAccountId = updatedByAccountId
+                })
+                .ToArray();
+            _menus.ReplaceMenuItemProductOptions(item, replacements);
+        }
 
         await _menus.SaveChangesAsync(cancellationToken);
         return ApiResult<MenuItemResult>.Success(MenuResultMapper.ToItemResult(item), "Menu item updated.");

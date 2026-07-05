@@ -43,6 +43,12 @@ public sealed class CreateStoreCommandHandler
             return ApiResult<StoreResult>.Fail($"Store with code '{code}' already exists in this organization.", 409);
         }
 
+        var openingHoursError = StoreOpeningHoursContract.Validate(request.OpeningHours);
+        if (openingHoursError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(openingHoursError, 400);
+        }
+
         var store = new Store
         {
             Id = Guid.NewGuid(),
@@ -60,8 +66,8 @@ public sealed class CreateStoreCommandHandler
             Longitude = request.Longitude,
             PhoneNumber = request.PhoneNumber?.Trim(),
             Email = request.Email?.Trim().ToLowerInvariant(),
-            OpeningHoursSchemaVersion = request.OpeningHoursSchemaVersion,
-            OpeningHoursJson = request.OpeningHoursJson,
+            OpeningHoursSchemaVersion = 1,
+            OpeningHoursJson = StoreOpeningHoursContract.Serialize(request.OpeningHours),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = userContext.AccountId
         };

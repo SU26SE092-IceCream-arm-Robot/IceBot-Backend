@@ -1,4 +1,5 @@
 using Domain.Orders.Enums;
+using System.Text.Json.Serialization;
 
 namespace Application.Orders.PlaceOrder.Results;
 
@@ -8,22 +9,14 @@ public sealed class OrderResult
 
     public Guid KioskId { get; set; }
 
-    public Guid? StoreId { get; set; }
-
-    public Guid? OrganizationId { get; set; }
-
     public string OrderNumber { get; set; } = null!;
 
     public string? ClientOrderId { get; set; }
 
-    public Guid? RuntimeSnapshotId { get; set; }
-
-    public DateTimeOffset? RuntimeSnapshotGeneratedAt { get; set; }
-
-    public OrderChannel Channel { get; set; }
-
+    [JsonIgnore]
     public OrderStatus Status { get; set; }
 
+    [JsonIgnore]
     public PaymentStatus PaymentStatus { get; set; }
 
     public string Currency { get; set; } = "VND";

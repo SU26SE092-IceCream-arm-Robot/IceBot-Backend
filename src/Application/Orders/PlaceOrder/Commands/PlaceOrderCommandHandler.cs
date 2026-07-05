@@ -10,6 +10,7 @@ using Application.Tenants.Kiosks.Rules;
 using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Enums;
+using Application.SalesCatalog.Rules;
 
 namespace Application.Orders.PlaceOrder.Commands;
 
@@ -37,7 +38,7 @@ public sealed class PlaceOrderCommandHandler
             return ApiResult<OrderResult>.Fail(validationError);
         }
 
-        var idempotencyKey = NormalizeOptional(request.IdempotencyKey);
+        var idempotencyKey = NormalizeOptional(command.IdempotencyKey);
         if (idempotencyKey is not null)
         {
             var existing = await _orderStore.GetOrderByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
@@ -57,6 +58,7 @@ public sealed class PlaceOrderCommandHandler
             }
         }
 
+        OrderStatusChangedEvent? statusChangedEvent = null;
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
             var kiosk = await _orderStore.GetKioskByIdAsync(request.KioskId, ct);
@@ -80,10 +82,7 @@ public sealed class PlaceOrderCommandHandler
                 OrderNumber = OrderNumberGenerator.GenerateOrderNumber(now),
                 IdempotencyKey = idempotencyKey,
                 ClientOrderId = clientOrderId,
-                CorrelationId = request.RuntimeSnapshotId,
-                RuntimeSnapshotId = request.RuntimeSnapshotId,
-                RuntimeSnapshotGeneratedAt = request.RuntimeSnapshotGeneratedAt,
-                Channel = request.Channel,
+                Channel = Domain.Orders.Enums.OrderChannel.Tablet,
                 Currency = DefaultCurrency,
                 CustomerName = NormalizeOptional(request.CustomerName),
                 CustomerPhoneNumber = NormalizeOptional(request.CustomerPhoneNumber),
@@ -180,6 +179,25 @@ public sealed class PlaceOrderCommandHandler
                     }
                 }
 
+                var selectableOptions = await _orderStore.ListMenuItemProductOptionsAsync(menuItem.Id, ct);
+                var selectedOptionIds = itemRequest.SelectedOptions
+                    .Select(option => option.ProductOptionId)
+                    .ToArray();
+                var optionValidationError = ProductOptionSelectionRules.Validate(
+                    selectableOptions,
+                    selectedOptionIds);
+                if (optionValidationError is not null)
+                {
+                    return ApiResult<OrderResult>.Fail(optionValidationError, 409);
+                }
+
+                var selectedOptions = selectableOptions
+                    .Where(option => selectedOptionIds.Contains(option.ProductOptionId))
+                    .OrderBy(option => option.OptionGroupId)
+                    .ThenBy(option => option.DisplayOrder)
+                    .ToArray();
+                var optionUnitPriceDelta = selectedOptions.Sum(option => option.PriceDelta);
+
                 var orderItem = order.AddItem(
                     menuItem.Id,
                     product.Id,
@@ -193,13 +211,25 @@ public sealed class PlaceOrderCommandHandler
                     productVariant.DisplayName ?? productVariant.Name,
                     recipe?.Version,
                     itemRequest.Quantity,
-                    menuItem.Price,
+                    menuItem.Price + optionUnitPriceDelta,
                     menuItem.DiscountAmount,
                     NormalizeOptional(itemRequest.ClientLineId),
-                    optionsJson: itemRequest.OptionsJson,
                     recipeSnapshotJson: recipe is null ? null : RecipeSnapshotBuilder.BuildRecipeSnapshotJson(recipe));
 
                 orderItem.CreatedAt = now;
+                foreach (var selectedOption in selectedOptions)
+                {
+                    var snapshot = OrderItemOption.Create(
+                        selectedOption.ProductOptionId,
+                        selectedOption.OptionGroupId,
+                        selectedOption.OptionGroupCode,
+                        selectedOption.Code,
+                        selectedOption.Name,
+                        selectedOption.PriceDelta);
+                    snapshot.OrderItemId = orderItem.Id;
+                    snapshot.CreatedAt = now;
+                    orderItem.Options.Add(snapshot);
+                }
             }
 
             order.Place(now);
@@ -226,28 +256,31 @@ public sealed class PlaceOrderCommandHandler
 
             await _orderStore.SaveChangesAsync(ct);
 
-            return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order), "Order created.", 201);
+            var orderResult = OrderResultMapper.ToResult(order);
+            statusChangedEvent = new OrderStatusChangedEvent
+            {
+                OrderId = order.Id,
+                OrderNumber = order.OrderNumber,
+                KioskId = order.KioskId,
+                OrganizationId = order.OrganizationId,
+                StoreId = order.StoreId,
+                OldStatus = "None",
+                NewStatus = orderResult.Status.ToString(),
+                PaymentStatus = orderResult.PaymentStatus.ToString(),
+                CustomerStatus = orderResult.CustomerStatus,
+                CustomerStatusMessage = orderResult.CustomerStatusMessage,
+                CanRetryPayment = orderResult.CanRetryPayment,
+                RequiresStaffSupport = orderResult.RequiresStaffSupport,
+                UpdatedAt = orderResult.PlacedAt,
+                Version = 1
+            };
+
+            return ApiResult<OrderResult>.Success(orderResult, "Order created.", 201);
         }, cancellationToken);
 
-        if (result.Succeeded && result.Data is not null)
+        if (result.Succeeded && statusChangedEvent is not null)
         {
-            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
-            {
-                OrderId = result.Data.Id,
-                OrderNumber = result.Data.OrderNumber,
-                KioskId = result.Data.KioskId,
-                OrganizationId = result.Data.OrganizationId,
-                StoreId = result.Data.StoreId,
-                OldStatus = "None",
-                NewStatus = result.Data.Status.ToString(),
-                PaymentStatus = result.Data.PaymentStatus.ToString(),
-                CustomerStatus = result.Data.CustomerStatus,
-                CustomerStatusMessage = result.Data.CustomerStatusMessage,
-                CanRetryPayment = result.Data.CanRetryPayment,
-                RequiresStaffSupport = result.Data.RequiresStaffSupport,
-                UpdatedAt = result.Data.PlacedAt,
-                Version = 1
-            }, cancellationToken);
+            await _publisher.PublishOrderStatusChangedAsync(statusChangedEvent, cancellationToken);
         }
 
         return result;

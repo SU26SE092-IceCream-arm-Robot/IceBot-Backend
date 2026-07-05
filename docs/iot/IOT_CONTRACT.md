@@ -83,7 +83,7 @@ Use current domain states where possible.
 
 Current enum: `Domain.Orders.Enums.OrderStatus`
 
-Recommended v1 mapping:
+Current mapping:
 
 | Business state | Current enum |
 | --- | --- |
@@ -255,7 +255,7 @@ Rules:
 - `KioskStatus.Offline` is a connectivity/availability signal, not permission to create new online sales.
 - Offline-created orders may be synchronized later only if they were created under a valid offline sales session issued while the kiosk was active and offline sales was enabled.
 - For final runtime availability before checkout, the tablet should still prefer the Local Edge runtime projection when the edge service is available.
-- The returned `snapshotId` can be sent to `POST /api/v1/orders` as `runtimeSnapshotId`, but Cloud still recalculates prices from `MenuItem.Price`.
+- `snapshotId` identifies the runtime-menu response for client cache/debug purposes. Order creation does not accept it as authority; Cloud always reloads the selected menu items and recalculates prices.
 
 ### Create Order
 
@@ -266,7 +266,7 @@ POST /api/v1/orders
 Headers:
 
 ```text
-X-Idempotency-Key: create-order:{tabletSessionId}
+Idempotency-Key: create-order:{clientOrderId}
 X-Correlation-Id: {correlationId}
 ```
 
@@ -275,19 +275,24 @@ Request:
 ```json
 {
   "kioskId": "uuid",
-  "tabletSessionId": "uuid",
-  "runtimeSnapshotId": "uuid",
-  "runtimeSnapshotGeneratedAt": "2026-05-21T10:00:00Z",
+  "clientOrderId": "tablet-order-uuid",
   "items": [
     {
       "clientLineId": "uuid",
       "menuItemId": "uuid",
-      "quantity": 1
+      "quantity": 1,
+      "selectedOptions": [
+        {
+          "productOptionId": "uuid"
+        }
+      ]
     }
   ],
   "clientTotalAmount": 25000
 }
 ```
+
+`selectedOptions` contains IDs returned by that runtime menu item. Each option may appear at most once in V1. Cloud validates required groups, single/multiple cardinality, availability, menu membership, currency, and price delta. Cloud stores immutable option snapshots and sends typed selected-option snapshots to Edge; arbitrary client JSON is never forwarded.
 
 Response:
 
@@ -295,8 +300,10 @@ Response:
 {
   "orderId": "uuid",
   "orderNumber": "ORD-20260521-0001",
-  "status": "PendingPayment",
-  "paymentStatus": "Unpaid",
+  "customerStatus": "WaitingForPayment",
+  "customerStatusMessage": "Waiting for payment. Please scan the QR code.",
+  "canRetryPayment": true,
+  "requiresStaffSupport": false,
   "totalAmount": 25000,
   "currency": "VND"
 }
@@ -318,7 +325,7 @@ POST /api/v1/orders/{orderId}/payment-sessions
 Headers:
 
 ```text
-X-Idempotency-Key: payment-session:{orderId}
+Idempotency-Key: payment-session:{orderId}
 X-Correlation-Id: {correlationId}
 ```
 
@@ -326,8 +333,9 @@ Request:
 
 ```json
 {
-  "idempotencyKey": "payment-session:{orderId}",
-  "description": "IceBot order ORD-20260521-0001"
+  "paymentMethodCode": "payos",
+  "expectedAmount": 25000,
+  "expectedCurrency": "VND"
 }
 ```
 
@@ -388,7 +396,7 @@ The command identity is `(OrderId, DispatchAttemptNo)`. Repeating the same attem
 
 Tablet needs fast feedback after the customer pays. Cloud supports this through polling `GET /api/v1/orders/{orderId}` or `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds.
 
-Rather than parsing raw database enums, the tablet client should consume the following projected fields on `OrderResult` and `PaymentStatusResult`:
+Raw order/payment state-machine enums are not serialized by the customer polling contracts. The tablet client consumes the following projected fields on `OrderResult` and `PaymentStatusResult`:
 
 - `CustomerStatus` (string code)
 - `CustomerStatusMessage` (client-facing fallback message; frontend may localize by `CustomerStatus`)
@@ -441,7 +449,7 @@ Rules:
 - The message uses QoS 1 and is not retained. Duplicate delivery is expected.
 - MQTT publish failure does not roll back or fail the already committed command.
 - Duplicate MQTT messages are expected and must be harmless.
-- Missing MQTT messages are acceptable because Edge also pulls periodically.
+- MQTT notification is best-effort; periodic Edge pull is the delivery authority.
 - Broker ACLs bind each MQTT subscriber to its own execution-endpoint topic. Edge calls command pull after every wake-up and also after reconnect/on its polling interval. Operational setup is defined in [MQTT Operations](../operations/MQTT_OPERATIONS.md).
 - MQTT subscriber identity is provisioned separately from HTTPS execution authentication. Username and client id equal `executionEndpointId`; the generated password is returned once, held by the broker/Edge secret stores, and never persisted in the application database. Rotation immediately invalidates the old password; revoke disables and disconnects the broker client.
 
@@ -954,7 +962,7 @@ Required unique keys:
 
 | Boundary | Key |
 | --- | --- |
-| Tablet checkout to Cloud | `X-Idempotency-Key` |
+| Tablet checkout to Cloud | `Idempotency-Key` |
 | Provider callback | provider event id |
 | Cloud executable command | `commandId`, `idempotencyKey` |
 | Edge local job creation | `commandId` or `orderId` unique |
@@ -976,25 +984,23 @@ Contract-level rules:
 
 - Payment success and robot execution are separate concerns.
 - Payment webhook handling must not wait for Edge acceptance.
-- Duplicate MQTT notifications are harmless because Edge always pulls and deduplicates commands.
-- Current phase uses manual cash refund only when paid execution fails.
-- Do not call provider refund or auto payout APIs in the default flow yet.
+- Edge deduplicates commands returned after duplicate MQTT notifications.
+- Paid execution failures use the staff-managed refund or voucher compensation workflow.
+- The default flow does not call provider refund or automatic payout APIs.
 
 ## Security
 
 Do not use admin/internal account JWT for kiosk runtime.
 
-Recommended v1 security:
+Current security contract:
 
 - Tablet to Edge: local network trust plus short-lived local token if needed.
 - Tablet to Cloud: public checkout endpoint with idempotency and validation.
-- Edge to Cloud: kiosk/device credential.
+- Edge to Cloud: execution-endpoint credentials; `FullEdge` uses mutual TLS and `LowCostController` uses signed-command TLS.
 - MQTT: per-kiosk credential/topic authorization.
 
 Future hardening:
 
-- mTLS for Edge to Cloud.
-- Signed edge messages.
 - Per-device key rotation.
 - Command payload checksum/signature.
 

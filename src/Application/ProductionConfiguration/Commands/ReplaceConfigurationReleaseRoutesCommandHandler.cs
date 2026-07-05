@@ -36,13 +36,13 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
             return ApiResult<ConfigurationReleaseResult>.Fail("Access denied.", 403);
         }
 
-        var variantIds = command.Routes.Select(route => route.ProductVariantId).Distinct().ToArray();
         var recipeIds = command.Routes.Select(route => route.RecipeId).Distinct().ToArray();
         var programIds = command.Routes.SelectMany(route => route.RobotBindings)
             .Select(binding => binding.RobotProgramId).Distinct().ToArray();
 
-        var variants = await _store.ListProductVariantsByIdsAsync(variantIds, cancellationToken);
         var recipes = await _store.ListRecipesByIdsAsync(recipeIds, cancellationToken);
+        var variantIds = recipes.Select(recipe => recipe.ProductVariantId).Distinct().ToArray();
+        var variants = await _store.ListProductVariantsByIdsAsync(variantIds, cancellationToken);
         var programs = await _store.ListRobotProgramsByIdsAsync(programIds, cancellationToken);
         if (variants.Count != variantIds.Length || recipes.Count != recipeIds.Length || programs.Count != programIds.Length)
         {
@@ -54,17 +54,12 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
         var programsById = programs.ToDictionary(program => program.Id);
         foreach (var route in command.Routes)
         {
-            var variant = variantsById[route.ProductVariantId];
             var recipe = recipesById[route.RecipeId];
+            var variant = variantsById[recipe.ProductVariantId];
             if (variant.FulfillmentType != FulfillmentType.MachineProduced)
             {
                 return ApiResult<ConfigurationReleaseResult>.Fail(
                     "Execution routes require machine-produced product variants.", 400);
-            }
-
-            if (recipe.ProductVariantId != variant.Id)
-            {
-                return ApiResult<ConfigurationReleaseResult>.Fail("Every execution route recipe must belong to its product variant.", 400);
             }
 
             if (recipe.Status != RecipeStatus.Published && recipe.Status != RecipeStatus.Active)
@@ -94,7 +89,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
             var removedRoutes = release.ReplaceRoutes(command.Routes
                 .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
                 .Select(route => (
-                    route.ProductVariantId,
+                    recipesById[route.RecipeId].ProductVariantId,
                     route.RecipeId,
                     route.RouteCode.Trim().ToUpperInvariant(),
                     route.Priority,
@@ -127,10 +122,10 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
             return "At least one execution route is required.";
         }
 
-        if (routes.Any(route => route.ProductVariantId == Guid.Empty || route.RecipeId == Guid.Empty ||
+        if (routes.Any(route => route.RecipeId == Guid.Empty ||
             string.IsNullOrWhiteSpace(route.RouteCode) || route.Priority < 0 || route.RobotBindings.Count == 0))
         {
-            return "Every route requires product variant, recipe, route code, non-negative priority, and at least one robot binding.";
+            return "Every route requires a recipe, route code, non-negative priority, and at least one robot binding.";
         }
 
         if (routes.GroupBy(route => route.RouteCode.Trim(), StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))

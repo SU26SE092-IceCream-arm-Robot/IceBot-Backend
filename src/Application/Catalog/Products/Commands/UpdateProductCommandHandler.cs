@@ -70,10 +70,12 @@ public sealed class UpdateProductCommandHandler
         product.Currency = string.IsNullOrWhiteSpace(request.Currency)
             ? product.Currency
             : ProductNormalizer.NormalizeCode(request.Currency);
-        product.IsAvailable = request.IsAvailable ?? product.IsAvailable;
+        foreach (var variant in product.ProductVariants)
+        {
+            variant.Currency = product.Currency;
+        }
         product.PreparationTimeSeconds = request.PreparationTimeSeconds ?? product.PreparationTimeSeconds;
         product.ImageUrl = request.ImageUrl is null ? product.ImageUrl : ProductNormalizer.TrimToNull(request.ImageUrl);
-        product.MetadataJson = request.MetadataJson is null ? product.MetadataJson : ProductNormalizer.TrimToNull(request.MetadataJson);
         product.UpdatedAt = DateTimeOffset.UtcNow;
         product.UpdatedByAccountId = updatedByAccountId;
 

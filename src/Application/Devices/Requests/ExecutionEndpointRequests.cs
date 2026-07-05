@@ -9,7 +9,6 @@ public sealed class CreateExecutionEndpointRequest
     public string EndpointCode { get; init; } = null!;
 
     public KioskExecutionProfile ExecutionProfile { get; init; }
-    public ExecutionEndpointAuthenticationMode AuthenticationMode { get; init; }
 }
 
 public sealed class ReplaceExecutionEndpointRobotTargetsRequest

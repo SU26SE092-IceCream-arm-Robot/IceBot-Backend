@@ -1,6 +1,7 @@
 using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
+using Application.SalesCatalog.ReadModels;
 
 namespace Application.SalesCatalog.Abstractions;
 
@@ -59,6 +60,15 @@ public interface IMenuStore
 
     Task<Recipe?> GetRecipeByIdAsync(Guid recipeId, CancellationToken cancellationToken = default);
 
+    Task<List<ProductOption>> ListProductOptionsAsync(
+        Guid productId,
+        IReadOnlyCollection<Guid> optionIds,
+        CancellationToken cancellationToken = default);
+
+    Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default);
+
     Task<bool> MenuCodeExistsAsync(
         Guid? organizationId,
         Guid? storeId,
@@ -82,6 +92,10 @@ public interface IMenuStore
     Task AddMenuAsync(Menu menu, CancellationToken cancellationToken = default);
 
     Task AddMenuItemAsync(MenuItem menuItem, CancellationToken cancellationToken = default);
+
+    void ReplaceMenuItemProductOptions(
+        MenuItem menuItem,
+        IReadOnlyCollection<MenuItemProductOption> replacements);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

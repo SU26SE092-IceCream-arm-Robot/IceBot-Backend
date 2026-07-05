@@ -18,8 +18,6 @@ public sealed class MenuResult
     public DateTimeOffset? EffectiveFrom { get; set; }
     public DateTimeOffset? EffectiveTo { get; set; }
     public int DisplayOrder { get; set; }
-    public int MetadataSchemaVersion { get; set; }
-    public string? MetadataJson { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
     public List<MenuItemResult> Items { get; set; } = new();

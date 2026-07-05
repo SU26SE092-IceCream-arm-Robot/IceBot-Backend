@@ -26,6 +26,16 @@ internal static class PlaceOrderRequestValidator
             return "Order item quantity must be greater than zero.";
         }
 
+        if (request.Items.Any(item => item.SelectedOptions.Any(option => option.ProductOptionId == Guid.Empty)))
+        {
+            return "Every selected product option must have a valid id.";
+        }
+
+        if (request.Items.Any(item => item.SelectedOptions.Select(option => option.ProductOptionId).Distinct().Count() != item.SelectedOptions.Count))
+        {
+            return "Selected product options must be unique within an order item.";
+        }
+
         var duplicateClientLineId = request.Items
             .Where(item => !string.IsNullOrWhiteSpace(item.ClientLineId))
             .GroupBy(item => item.ClientLineId!.Trim(), StringComparer.OrdinalIgnoreCase)

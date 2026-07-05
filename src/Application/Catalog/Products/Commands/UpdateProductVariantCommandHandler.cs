@@ -63,14 +63,10 @@ public sealed class UpdateProductVariantCommandHandler
         variant.FulfillmentType = request.FulfillmentType ?? variant.FulfillmentType;
         variant.SizeCode = request.SizeCode is null ? variant.SizeCode : ProductNormalizer.NormalizeNullableCode(request.SizeCode);
         variant.BasePrice = request.BasePrice ?? variant.BasePrice;
-        variant.Currency = string.IsNullOrWhiteSpace(request.Currency)
-            ? variant.Currency
-            : ProductNormalizer.NormalizeCode(request.Currency);
-        variant.IsAvailable = request.IsAvailable ?? variant.IsAvailable;
+        variant.Currency = product.Currency;
         variant.DisplayOrder = request.DisplayOrder ?? variant.DisplayOrder;
         variant.PreparationTimeSeconds = request.PreparationTimeSeconds ?? variant.PreparationTimeSeconds;
         variant.ImageUrl = request.ImageUrl is null ? variant.ImageUrl : ProductNormalizer.TrimToNull(request.ImageUrl);
-        variant.MetadataJson = request.MetadataJson is null ? variant.MetadataJson : ProductNormalizer.TrimToNull(request.MetadataJson);
         variant.UpdatedAt = DateTimeOffset.UtcNow;
         variant.UpdatedByAccountId = updatedByAccountId;
 

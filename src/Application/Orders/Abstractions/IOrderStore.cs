@@ -4,6 +4,7 @@ using Domain.ProductionExecution.Projections;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
+using Application.SalesCatalog.ReadModels;
 
 namespace Application.Orders.Abstractions;
 
@@ -24,6 +25,10 @@ public interface IOrderStore
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default);
+
+    Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
+        Guid menuItemId,
+        CancellationToken cancellationToken = default);
 
     Task<bool> HasActiveProductionRouteAsync(
         Guid kioskId,

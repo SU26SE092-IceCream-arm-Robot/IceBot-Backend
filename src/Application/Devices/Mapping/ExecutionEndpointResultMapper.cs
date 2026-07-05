@@ -24,7 +24,6 @@ public static class ExecutionEndpointResultMapper
             ProfileIdentity = endpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
                 ? endpoint.FullEdgeRuntimeId
                 : endpoint.ControllerId,
-            CredentialBindingId = endpoint.CredentialBindingId,
             CredentialStatus = endpoint.CredentialBinding?.Status.ToString(),
             MqttUsername = endpoint.MqttCredential?.Username,
             MqttCredentialStatus = endpoint.MqttCredential?.Status.ToString(),

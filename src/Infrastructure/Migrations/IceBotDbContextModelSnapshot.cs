@@ -153,6 +153,9 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("SelectionType")
                         .HasColumnType("integer");
 
@@ -164,7 +167,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
+                    b.HasIndex("ProductId", "Code")
                         .IsUnique();
 
                     b.ToTable("OptionGroups", (string)null);
@@ -354,11 +357,6 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("CreatedByAccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -390,15 +388,9 @@ namespace Infrastructure.Migrations
                     b.Property<long>("OptionGroupId")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid?>("OrganizationId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("PriceDelta")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
-
-                    b.Property<int>("ScopeType")
-                        .HasColumnType("integer");
 
                     b.Property<Guid?>("TemplateProductOptionId")
                         .HasColumnType("uuid");
@@ -411,13 +403,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OptionGroupId");
-
-                    b.HasIndex("OrganizationId");
-
-                    b.HasIndex("TemplateProductOptionId");
-
-                    b.HasIndex("OrganizationId", "OptionGroupId", "Code")
+                    b.HasIndex("OptionGroupId", "Code")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
@@ -2677,13 +2663,6 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("OptionsJson")
-                        .HasMaxLength(500)
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("OptionsSchemaVersion")
-                        .HasColumnType("integer");
-
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
 
@@ -2761,6 +2740,75 @@ namespace Infrastructure.Migrations
                         .HasFilter("\"ClientLineId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("OrderItems", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("NameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("OptionGroupCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("OptionGroupId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalPriceDelta")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("UnitPriceDelta")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemId", "OptionGroupId");
+
+                    b.HasIndex("OrderItemId", "ProductOptionId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("OrderItemOptions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Orders.Entities.OrderStatusHistory", b =>
@@ -4448,6 +4496,46 @@ namespace Infrastructure.Migrations
                     b.ToTable("MenuItems", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItemProductOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductOptionId");
+
+                    b.HasIndex("MenuItemId", "ProductOptionId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("MenuItemProductOptions", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Sync.DeadLetters.SyncDeadLetter", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5184,36 +5272,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("Stores", (string)null);
                 });
 
-            modelBuilder.Entity("OrderItemProductOptions", b =>
-                {
-                    b.Property<Guid>("OrderItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProductOptionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("OrderItemId", "ProductOptionId");
-
-                    b.HasIndex("ProductOptionId");
-
-                    b.ToTable("OrderItemProductOptions", (string)null);
-                });
-
-            modelBuilder.Entity("ProductProductOptions", b =>
-                {
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProductOptionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("ProductId", "ProductOptionId");
-
-                    b.HasIndex("ProductOptionId");
-
-                    b.ToTable("ProductProductOptions", (string)null);
-                });
-
             modelBuilder.Entity("AccountStores", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", null)
@@ -5227,6 +5285,17 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("StoreId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Catalog.Entities.OptionGroup", b =>
+                {
+                    b.HasOne("Domain.Catalog.Entities.Product", "Product")
+                        .WithMany("OptionGroups")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.Product", b =>
@@ -5285,21 +5354,7 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
-                        .WithMany()
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Domain.Catalog.Entities.ProductOption", "TemplateProductOption")
-                        .WithMany()
-                        .HasForeignKey("TemplateProductOptionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("OptionGroup");
-
-                    b.Navigation("Organization");
-
-                    b.Navigation("TemplateProductOption");
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
@@ -5909,6 +5964,17 @@ namespace Infrastructure.Migrations
                     b.Navigation("Recipe");
                 });
 
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemOption", b =>
+                {
+                    b.HasOne("Domain.Orders.Entities.OrderItem", "OrderItem")
+                        .WithMany("Options")
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OrderItem");
+                });
+
             modelBuilder.Entity("Domain.Orders.Entities.OrderStatusHistory", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "ChangedByAccount")
@@ -6264,6 +6330,23 @@ namespace Infrastructure.Migrations
                     b.Navigation("Recipe");
                 });
 
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItemProductOption", b =>
+                {
+                    b.HasOne("Domain.SalesCatalog.Entities.MenuItem", "MenuItem")
+                        .WithMany("ProductOptions")
+                        .HasForeignKey("MenuItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.ProductOption", null)
+                        .WithMany()
+                        .HasForeignKey("ProductOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("MenuItem");
+                });
+
             modelBuilder.Entity("Domain.Sync.DeadLetters.SyncDeadLetter", b =>
                 {
                     b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
@@ -6410,36 +6493,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("Organization");
                 });
 
-            modelBuilder.Entity("OrderItemProductOptions", b =>
-                {
-                    b.HasOne("Domain.Orders.Entities.OrderItem", null)
-                        .WithMany()
-                        .HasForeignKey("OrderItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Catalog.Entities.ProductOption", null)
-                        .WithMany()
-                        .HasForeignKey("ProductOptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("ProductProductOptions", b =>
-                {
-                    b.HasOne("Domain.Catalog.Entities.Product", null)
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Catalog.Entities.ProductOption", null)
-                        .WithMany()
-                        .HasForeignKey("ProductOptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Domain.Catalog.Entities.OptionGroup", b =>
                 {
                     b.Navigation("ProductOptions");
@@ -6447,6 +6500,8 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Catalog.Entities.Product", b =>
                 {
+                    b.Navigation("OptionGroups");
+
                     b.Navigation("ProductVariants");
                 });
 
@@ -6508,6 +6563,11 @@ namespace Infrastructure.Migrations
                     b.Navigation("OrderItems");
                 });
 
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItem", b =>
+                {
+                    b.Navigation("Options");
+                });
+
             modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ConfigurationRelease", b =>
                 {
                     b.Navigation("ExecutionRoutes");
@@ -6531,6 +6591,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>
                 {
                     b.Navigation("MenuItems");
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItem", b =>
+                {
+                    b.Navigation("ProductOptions");
                 });
 
             modelBuilder.Entity("Domain.Sync.DeadLetters.SyncDeadLetter", b =>

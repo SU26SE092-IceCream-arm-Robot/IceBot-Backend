@@ -27,8 +27,11 @@ public sealed class CreateExecutionEndpointCommandHandler
 
         try
         {
+            var authenticationMode = command.Request.ExecutionProfile == Domain.Devices.Enums.KioskExecutionProfile.FullEdge
+                ? Domain.Devices.Enums.ExecutionEndpointAuthenticationMode.MutualTls
+                : Domain.Devices.Enums.ExecutionEndpointAuthenticationMode.SignedCommandTls;
             var endpoint = KioskExecutionEndpoint.CreateProvisioning(
-                kiosk.Id, code, command.Request.ExecutionProfile, command.Request.AuthenticationMode);
+                kiosk.Id, code, command.Request.ExecutionProfile, authenticationMode);
             endpoint.CreatedByAccountId = command.UserContext.AccountId;
             await _store.AddAsync(endpoint, cancellationToken);
             await _store.SaveChangesAsync(cancellationToken);

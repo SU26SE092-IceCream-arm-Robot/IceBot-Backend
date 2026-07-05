@@ -8,7 +8,17 @@ This document defines how backend docs should be written so humans and RAG tools
 
 ## Purpose
 
-Keep docs small, routed, and searchable.
+Keep backend docs small, current, routed, and searchable.
+
+Backend docs are operational source of truth. They prioritize information needed to implement, integrate, operate, or verify the behavior that runs now:
+
+- current contracts, invariants, routes, payloads, states, and ownership boundaries
+- commands and procedures a developer or operator must execute
+- current failure, retry, security, and verification behavior
+
+Keep concise rationale, examples, future constraints, and implementation guidance when readers need them to apply the contract correctly or avoid a known unsafe interpretation. Move extended discussion history, option comparison, rejected alternatives, and standalone decision records to the smallest owning `Vault/Decisions`, `Vault/Discussions`, or `Vault/Evolution` note. Backend docs may link to that note, but must remain understandable without reading Vault.
+
+Do not document implementation work merely because it was performed. Add documentation only when readers need the resulting contract or procedure.
 
 Each doc should answer one ownership question:
 
@@ -97,7 +107,21 @@ Do not copy full route maps, entity lists, or rules from the linked doc unless t
 - Use precise section headings.
 - Prefer tables for lookup data.
 - Prefer specific lookup sections and metadata-friendly terms over generic overview prose.
-- Keep rejected/future ideas out of source-of-truth docs unless clearly marked.
+- Keep extended decision history, rejected alternatives, and unrelated proposals out of backend source-of-truth docs.
+- Describe the current rule directly. Keep “because”, examples, and future constraints when removing them would make the rule ambiguous or easier to misuse.
+- Remove stale behavior when the implementation changes; do not preserve it as history in the contract document.
+- Avoid duplicating the same section or rule. Keep one owner and link to it.
+
+## Change Workflow
+
+When backend behavior changes:
+
+1. Update only the owning contract or procedure.
+2. Remove superseded behavior from backend docs.
+3. Keep locally necessary rationale with the contract; record broader decision history and trade-offs in Vault when worth preserving.
+4. Check headings, links, duplicated rules, stale future language, and `git diff --check`.
+
+For a documentation cleanup or restructure, preserve the current uncommitted version before editing and compare content coverage afterward. Intentional removals are allowed when the user explicitly requests cleanup, condensation, or deletion; report what was removed or moved.
 
 ## Retrieval Priority
 

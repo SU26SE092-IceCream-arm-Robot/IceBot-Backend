@@ -37,18 +37,24 @@ public sealed class AddMenuItemCommandHandler
             return accessError;
         }
 
+        var productVariant = await _menus.GetProductVariantByIdAsync(request.ProductVariantId, cancellationToken);
+        if (productVariant is null)
+        {
+            return ApiResult<MenuItemResult>.Fail("Product variant does not exist.", 400);
+        }
+
         var validationError = await MenuItemRequestValidator.ValidateMenuItemFieldsAsync(
             _menus,
             menu.Id,
             command.Scope.OrganizationId,
-            request.ProductId,
+            productVariant.ProductId,
             request.ProductVariantId,
             request.RecipeId,
             request.Code,
             request.DisplayName,
             request.Price,
             request.DiscountAmount,
-            request.Currency,
+            menu.Currency,
             request.PreparationTimeSeconds,
             request.EffectiveFrom,
             request.EffectiveTo,
@@ -60,29 +66,50 @@ public sealed class AddMenuItemCommandHandler
             return ApiResult<MenuItemResult>.Fail(validationError);
         }
 
+        var optionIds = request.ProductOptionIds.Distinct().ToArray();
+        if (optionIds.Length != request.ProductOptionIds.Count)
+        {
+            return ApiResult<MenuItemResult>.Fail("Product option ids must be unique.");
+        }
+
+        var options = await _menus.ListProductOptionsAsync(productVariant.ProductId, optionIds, cancellationToken);
+        if (options.Count != optionIds.Length)
+        {
+            return ApiResult<MenuItemResult>.Fail("Every product option must belong to the selected product.", 409);
+        }
+
         var item = new MenuItem
         {
             MenuId = menu.Id,
-            ProductId = request.ProductId,
+            ProductId = productVariant.ProductId,
             ProductVariantId = request.ProductVariantId,
             RecipeId = request.RecipeId,
             Code = MenuNormalizer.NormalizeCode(request.Code),
             DisplayName = request.DisplayName.Trim(),
             Description = MenuNormalizer.TrimToNull(request.Description),
-            Status = request.Status,
+            Status = Domain.SalesCatalog.Enums.MenuItemStatus.Draft,
             Price = request.Price,
             DiscountAmount = request.DiscountAmount,
-            Currency = MenuNormalizer.NormalizeCode(request.Currency),
+            Currency = menu.Currency,
             DisplayOrder = request.DisplayOrder,
             PreparationTimeSeconds = request.PreparationTimeSeconds,
             ImageUrl = MenuNormalizer.TrimToNull(request.ImageUrl),
             EffectiveFrom = request.EffectiveFrom,
             EffectiveTo = request.EffectiveTo,
-            MetadataSchemaVersion = Math.Max(request.MetadataSchemaVersion, 1),
-            MetadataJson = MenuNormalizer.TrimToNull(request.MetadataJson),
+            MetadataSchemaVersion = 1,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
+
+        foreach (var optionId in optionIds)
+        {
+            item.ProductOptions.Add(new MenuItemProductOption
+            {
+                ProductOptionId = optionId,
+                CreatedAt = item.CreatedAt,
+                CreatedByAccountId = createdByAccountId
+            });
+        }
 
         await _menus.AddMenuItemAsync(item, cancellationToken);
         await _menus.SaveChangesAsync(cancellationToken);

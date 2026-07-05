@@ -43,17 +43,19 @@ public sealed class CreateMaintenanceTicketCommandHandler
             return ApiResult<MaintenanceTicketResult>.Fail("Title is required.", 400);
         }
 
-        // 1. Authorization Access Check
-        if (!MaintenanceTicketAccessRules.CanCreate(user, req.OrganizationId, req.StoreId, req.KioskId))
+        var kioskScope = await _ticketStore.GetKioskScopeAsync(req.KioskId, cancellationToken);
+        if (kioskScope is null)
         {
-            return ApiResult<MaintenanceTicketResult>.Fail("Access denied.", 403);
+            return ApiResult<MaintenanceTicketResult>.Fail("Kiosk not found.", 404);
         }
 
-        // 2. Validate Kiosk belongs to the Organization & Store
-        var isValidKiosk = await _ticketStore.ValidateKioskScopeAsync(req.OrganizationId, req.StoreId, req.KioskId, cancellationToken);
-        if (!isValidKiosk)
+        if (!MaintenanceTicketAccessRules.CanCreate(
+                user,
+                kioskScope.OrganizationId,
+                kioskScope.StoreId,
+                kioskScope.KioskId))
         {
-            return ApiResult<MaintenanceTicketResult>.Fail("Kiosk does not exist within the specified organization and store.", 400);
+            return ApiResult<MaintenanceTicketResult>.Fail("Access denied.", 403);
         }
 
         // 3. Validate optional DeviceId
@@ -69,7 +71,12 @@ public sealed class CreateMaintenanceTicketCommandHandler
         // 4. Validate optional OrderId
         if (req.OrderId.HasValue)
         {
-            var isOrderValid = await _ticketStore.OrderBelongsToScopeAsync(req.OrderId.Value, req.OrganizationId, req.StoreId, req.KioskId, cancellationToken);
+            var isOrderValid = await _ticketStore.OrderBelongsToScopeAsync(
+                req.OrderId.Value,
+                kioskScope.OrganizationId,
+                kioskScope.StoreId,
+                kioskScope.KioskId,
+                cancellationToken);
             if (!isOrderValid)
             {
                 return ApiResult<MaintenanceTicketResult>.Fail("The specified order does not belong to this kiosk scope.", 400);
@@ -93,9 +100,9 @@ public sealed class CreateMaintenanceTicketCommandHandler
         var ticket = new MaintenanceTicket
         {
             Id = Guid.NewGuid(),
-            OrganizationId = req.OrganizationId,
-            StoreId = req.StoreId,
-            KioskId = req.KioskId,
+            OrganizationId = kioskScope.OrganizationId,
+            StoreId = kioskScope.StoreId,
+            KioskId = kioskScope.KioskId,
             DeviceId = req.DeviceId,
             OrderId = req.OrderId,
             DeviceEventId = req.DeviceEventId,
