@@ -80,7 +80,6 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             KioskId = kiosk.Id,
             GeneratedAt = now,
             ExpiresAt = now.Add(SnapshotTtl),
-            ContainsMachineRuntimeState = false,
             Items = items
         };
 

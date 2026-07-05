@@ -70,7 +70,6 @@ public sealed class UpdateProductCommandHandler
         product.Currency = string.IsNullOrWhiteSpace(request.Currency)
             ? product.Currency
             : ProductNormalizer.NormalizeCode(request.Currency);
-        product.IsAvailable = request.IsAvailable ?? product.IsAvailable;
         product.PreparationTimeSeconds = request.PreparationTimeSeconds ?? product.PreparationTimeSeconds;
         product.ImageUrl = request.ImageUrl is null ? product.ImageUrl : ProductNormalizer.TrimToNull(request.ImageUrl);
         product.MetadataJson = request.MetadataJson is null ? product.MetadataJson : ProductNormalizer.TrimToNull(request.MetadataJson);

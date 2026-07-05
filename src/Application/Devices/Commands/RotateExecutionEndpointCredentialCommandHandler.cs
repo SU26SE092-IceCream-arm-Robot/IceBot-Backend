@@ -57,11 +57,6 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Credential reference already exists.", 409);
         }
 
-        if (command.AuthenticationMode.HasValue && command.AuthenticationMode.Value != endpoint.AuthenticationMode)
-        {
-            return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Credential authentication mode does not match the endpoint.", 400);
-        }
-
         try
         {
             var now = DateTimeOffset.UtcNow;

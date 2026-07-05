@@ -33,7 +33,5 @@ public sealed class UpdateStoreRequest
     [EmailAddress]
     public string? Email { get; set; }
 
-    public int OpeningHoursSchemaVersion { get; set; } = 1;
-
     public string? OpeningHoursJson { get; set; }
 }

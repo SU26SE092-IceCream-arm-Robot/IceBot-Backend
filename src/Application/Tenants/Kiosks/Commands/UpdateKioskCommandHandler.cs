@@ -55,7 +55,6 @@ public sealed class UpdateKioskCommandHandler
         kiosk.Latitude = request.Latitude;
         kiosk.Longitude = request.Longitude;
         kiosk.SupportsOfflineMode = request.SupportsOfflineMode;
-        kiosk.SettingsSchemaVersion = request.SettingsSchemaVersion;
         kiosk.SettingsJson = request.SettingsJson;
         kiosk.UpdatedAt = DateTimeOffset.UtcNow;
         kiosk.UpdatedByAccountId = userContext.AccountId;

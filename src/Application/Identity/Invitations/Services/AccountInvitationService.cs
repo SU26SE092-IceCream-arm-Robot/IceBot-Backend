@@ -77,7 +77,7 @@ public sealed class AccountInvitationService
                 await _emailSender.SendAsync(
                     account.Email,
                     "Complete your IceBot account setup",
-                    AccountInvitationEmailBuilder.BuildInvitationEmail(account.FullName, rawToken, invitationUrl),
+                    AccountInvitationEmailBuilder.BuildInvitationEmail(account.FullName, invitationUrl),
                     cancellationToken);
 
                 emailSent = true;
@@ -94,7 +94,6 @@ public sealed class AccountInvitationService
         var result = new AccountInvitationResult
         {
             AccountId = account.Id,
-            InvitationToken = rawToken,
             InvitationUrl = invitationUrl,
             ExpiresAt = invitation.ExpiresAt,
             EmailSentAt = invitation.EmailSentAt,

@@ -1,4 +1,3 @@
-using Domain.Common.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace Application.Tenants.Organizations.Requests;
@@ -19,8 +18,6 @@ public sealed class UpdateOrganizationRequest
     public string? PhoneNumber { get; set; }
 
     public string? Address { get; set; }
-
-    public EntityStatus? Status { get; set; }
 
     public string? MetadataJson { get; set; }
 }

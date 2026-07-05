@@ -171,8 +171,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
             UserContext = User.GetUserContext(),
             EndpointId = endpointId,
             ClientCertificateSha256Fingerprint = request.ClientCertificateSha256Fingerprint,
-            EcdsaPublicKeyPem = request.EcdsaPublicKeyPem,
-            AuthenticationMode = request.AuthenticationMode
+            EcdsaPublicKeyPem = request.EcdsaPublicKeyPem
         };
 
         var result = await _rotateCredentialHandler.HandleAsync(command, cancellationToken);
@@ -220,5 +219,4 @@ public sealed class RotateExecutionEndpointCredentialRequest
 
     public string? EcdsaPublicKeyPem { get; init; }
 
-    public ExecutionEndpointAuthenticationMode? AuthenticationMode { get; init; }
 }

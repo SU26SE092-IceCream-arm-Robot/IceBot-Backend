@@ -43,8 +43,13 @@ public sealed class UpdateMenuItemCommandHandler
             return ApiResult<MenuItemResult>.Fail("Menu item not found.", 404);
         }
 
-        var newProductId = request.ProductId ?? item.ProductId;
         var newProductVariantId = request.ProductVariantId ?? item.ProductVariantId;
+        var productVariant = await _menus.GetProductVariantByIdAsync(newProductVariantId, cancellationToken);
+        if (productVariant is null)
+        {
+            return ApiResult<MenuItemResult>.Fail("Product variant does not exist.", 400);
+        }
+        var newProductId = productVariant.ProductId;
         var newRecipeId = request.RecipeId ?? item.RecipeId;
         var newCode = string.IsNullOrWhiteSpace(request.Code) ? item.Code : MenuNormalizer.NormalizeCode(request.Code);
         var newDisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? item.DisplayName : request.DisplayName;
@@ -84,7 +89,6 @@ public sealed class UpdateMenuItemCommandHandler
         item.Code = newCode;
         item.DisplayName = newDisplayName.Trim();
         item.Description = request.Description is null ? item.Description : MenuNormalizer.TrimToNull(request.Description);
-        item.Status = request.Status ?? item.Status;
         item.Price = newPrice;
         item.DiscountAmount = newDiscount;
         item.Currency = MenuNormalizer.NormalizeCode(newCurrency);
@@ -93,9 +97,6 @@ public sealed class UpdateMenuItemCommandHandler
         item.ImageUrl = request.ImageUrl is null ? item.ImageUrl : MenuNormalizer.TrimToNull(request.ImageUrl);
         item.EffectiveFrom = newEffectiveFrom;
         item.EffectiveTo = newEffectiveTo;
-        item.MetadataSchemaVersion = request.MetadataSchemaVersion.HasValue
-            ? Math.Max(request.MetadataSchemaVersion.Value, 1)
-            : item.MetadataSchemaVersion;
         item.MetadataJson = request.MetadataJson is null ? item.MetadataJson : MenuNormalizer.TrimToNull(request.MetadataJson);
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByAccountId = updatedByAccountId;

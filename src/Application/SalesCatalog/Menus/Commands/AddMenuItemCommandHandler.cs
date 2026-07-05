@@ -37,11 +37,17 @@ public sealed class AddMenuItemCommandHandler
             return accessError;
         }
 
+        var productVariant = await _menus.GetProductVariantByIdAsync(request.ProductVariantId, cancellationToken);
+        if (productVariant is null)
+        {
+            return ApiResult<MenuItemResult>.Fail("Product variant does not exist.", 400);
+        }
+
         var validationError = await MenuItemRequestValidator.ValidateMenuItemFieldsAsync(
             _menus,
             menu.Id,
             command.Scope.OrganizationId,
-            request.ProductId,
+            productVariant.ProductId,
             request.ProductVariantId,
             request.RecipeId,
             request.Code,
@@ -63,7 +69,7 @@ public sealed class AddMenuItemCommandHandler
         var item = new MenuItem
         {
             MenuId = menu.Id,
-            ProductId = request.ProductId,
+            ProductId = productVariant.ProductId,
             ProductVariantId = request.ProductVariantId,
             RecipeId = request.RecipeId,
             Code = MenuNormalizer.NormalizeCode(request.Code),
@@ -78,7 +84,7 @@ public sealed class AddMenuItemCommandHandler
             ImageUrl = MenuNormalizer.TrimToNull(request.ImageUrl),
             EffectiveFrom = request.EffectiveFrom,
             EffectiveTo = request.EffectiveTo,
-            MetadataSchemaVersion = Math.Max(request.MetadataSchemaVersion, 1),
+            MetadataSchemaVersion = 1,
             MetadataJson = MenuNormalizer.TrimToNull(request.MetadataJson),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = createdByAccountId

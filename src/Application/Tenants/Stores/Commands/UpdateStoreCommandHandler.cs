@@ -58,7 +58,6 @@ public sealed class UpdateStoreCommandHandler
         store.Longitude = request.Longitude;
         store.PhoneNumber = request.PhoneNumber?.Trim();
         store.Email = request.Email?.Trim().ToLowerInvariant();
-        store.OpeningHoursSchemaVersion = request.OpeningHoursSchemaVersion;
         store.OpeningHoursJson = request.OpeningHoursJson;
         store.UpdatedAt = DateTimeOffset.UtcNow;
         store.UpdatedByAccountId = userContext.AccountId;

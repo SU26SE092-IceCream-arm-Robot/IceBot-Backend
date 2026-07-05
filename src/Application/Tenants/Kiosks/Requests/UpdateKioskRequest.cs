@@ -25,7 +25,5 @@ public sealed class UpdateKioskRequest
 
     public bool SupportsOfflineMode { get; set; } = true;
 
-    public int SettingsSchemaVersion { get; set; } = 1;
-
     public string? SettingsJson { get; set; }
 }

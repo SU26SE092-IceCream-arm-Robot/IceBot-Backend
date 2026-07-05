@@ -21,7 +21,6 @@ internal static class InternalAccountResultMapper
                 ? null
                 : new InternalAccountInvitationResult
                 {
-                    InvitationToken = invitation.InvitationToken,
                     InvitationUrl = invitation.InvitationUrl,
                     ExpiresAt = invitation.ExpiresAt,
                     EmailSentAt = invitation.EmailSentAt,

@@ -14,13 +14,8 @@ internal static class OrderResultMapper
         {
             Id = order.Id,
             KioskId = order.KioskId,
-            StoreId = order.StoreId,
-            OrganizationId = order.OrganizationId,
             OrderNumber = order.OrderNumber,
             ClientOrderId = order.ClientOrderId,
-            RuntimeSnapshotId = order.RuntimeSnapshotId,
-            RuntimeSnapshotGeneratedAt = order.RuntimeSnapshotGeneratedAt,
-            Channel = order.Channel,
             Status = order.Status,
             PaymentStatus = order.PaymentStatus,
             Currency = order.Currency,

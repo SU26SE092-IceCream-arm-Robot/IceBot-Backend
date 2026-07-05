@@ -66,7 +66,6 @@ public sealed class UpdateProductVariantCommandHandler
         variant.Currency = string.IsNullOrWhiteSpace(request.Currency)
             ? variant.Currency
             : ProductNormalizer.NormalizeCode(request.Currency);
-        variant.IsAvailable = request.IsAvailable ?? variant.IsAvailable;
         variant.DisplayOrder = request.DisplayOrder ?? variant.DisplayOrder;
         variant.PreparationTimeSeconds = request.PreparationTimeSeconds ?? variant.PreparationTimeSeconds;
         variant.ImageUrl = request.ImageUrl is null ? variant.ImageUrl : ProductNormalizer.TrimToNull(request.ImageUrl);

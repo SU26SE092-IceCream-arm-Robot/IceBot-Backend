@@ -28,15 +28,36 @@ public sealed class CreatePaymentSessionCommandHandler
     {
         var orderId = command.OrderId;
         var request = command.Request;
+        var idempotencyKey = string.IsNullOrWhiteSpace(command.IdempotencyKey)
+            ? null
+            : command.IdempotencyKey.Trim();
+        var paymentMethodCode = request.PaymentMethodCode.Trim().ToLowerInvariant();
+        var expectedCurrency = request.ExpectedCurrency.Trim().ToUpperInvariant();
 
-        if (!string.IsNullOrWhiteSpace(request.IdempotencyKey))
+        if (!string.Equals(paymentMethodCode, PayOsPaymentMethodResolver.MethodCode, StringComparison.Ordinal))
+        {
+            return ApiResult<PaymentSessionResult>.Fail("Payment method is not supported.", 400);
+        }
+
+        if (idempotencyKey is not null)
         {
             var existing = await _paymentStore.GetPaymentTransactionByIdempotencyKeyAsync(
-                request.IdempotencyKey.Trim(),
+                idempotencyKey,
                 cancellationToken);
 
             if (existing is not null)
             {
+                if (existing.OrderId != orderId ||
+                    !string.Equals(existing.PaymentMethod.Code, paymentMethodCode, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(existing.Provider, _paymentGateway.ProviderCode, StringComparison.OrdinalIgnoreCase) ||
+                    existing.Amount != request.ExpectedAmount ||
+                    !string.Equals(existing.Currency, expectedCurrency, StringComparison.OrdinalIgnoreCase))
+                {
+                    return ApiResult<PaymentSessionResult>.Fail(
+                        "Idempotency key was already used for a different payment request.",
+                        409);
+                }
+
                 return ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(existing));
             }
         }
@@ -70,6 +91,18 @@ public sealed class CreatePaymentSessionCommandHandler
                 return ApiResult<PaymentSessionResult>.Fail("Order amount must be greater than zero.", 400);
             }
 
+            if (request.ExpectedAmount != order.TotalAmount ||
+                !string.Equals(expectedCurrency, order.Currency, StringComparison.OrdinalIgnoreCase))
+            {
+                return ApiResult<PaymentSessionResult>.Fail(
+                        "Displayed payment amount no longer matches the order total.",
+                        409)
+                    .AddDetail("expectedAmount", request.ExpectedAmount)
+                    .AddDetail("orderAmount", order.TotalAmount)
+                    .AddDetail("expectedCurrency", expectedCurrency)
+                    .AddDetail("orderCurrency", order.Currency);
+            }
+
             var paymentMethod = await PayOsPaymentMethodResolver.EnsurePayOsPaymentMethodAsync(_paymentStore, _paymentGateway.ProviderCode, ct);
             if (!paymentMethod.IsActive)
             {
@@ -82,7 +115,7 @@ public sealed class CreatePaymentSessionCommandHandler
                 OrderId = order.Id,
                 PaymentMethodId = paymentMethod.Id,
                 TransactionNumber = PaymentTransactionNumberGenerator.GenerateTransactionNumber(now),
-                IdempotencyKey = string.IsNullOrWhiteSpace(request.IdempotencyKey) ? null : request.IdempotencyKey.Trim(),
+                IdempotencyKey = idempotencyKey,
                 CorrelationId = order.CorrelationId,
                 Provider = _paymentGateway.ProviderCode,
                 Amount = order.TotalAmount,
@@ -92,8 +125,9 @@ public sealed class CreatePaymentSessionCommandHandler
                 RawRequestJson = JsonSerializer.Serialize(new
                 {
                     orderId,
-                    request.Description,
-                    request.IdempotencyKey
+                    orderNumber = order.OrderNumber,
+                    paymentMethodCode,
+                    idempotencyKey
                 })
             };
 

@@ -123,12 +123,10 @@ Content-Type: application/json
   "kioskId": "{{sampleGuid}}",
   "items": [
     {
-      "productId": "{{sampleGuid}}",
-      "quantity": 1,
-      "price": 35000
+      "menuItemId": "{{sampleGuid}}",
+      "quantity": 1
     }
   ],
-  "paymentMethod": "PayOS",
   "notes": "No sprinkles please"
 }
 
@@ -138,9 +136,9 @@ Idempotency-Key: PaymentSession_Unique_Idempotency_Key
 Content-Type: application/json
 
 {
-  "paymentMethod": "PayOS",
-  "returnUrl": "http://localhost:3000/payment-success",
-  "cancelUrl": "http://localhost:3000/payment-cancelled"
+  "paymentMethodCode": "payos",
+  "expectedAmount": 35000,
+  "expectedCurrency": "VND"
 }
 
 ### Request Refund (Management Support Flow)

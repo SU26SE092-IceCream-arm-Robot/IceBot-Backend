@@ -60,7 +60,7 @@ public sealed class CreateStoreCommandHandler
             Longitude = request.Longitude,
             PhoneNumber = request.PhoneNumber?.Trim(),
             Email = request.Email?.Trim().ToLowerInvariant(),
-            OpeningHoursSchemaVersion = request.OpeningHoursSchemaVersion,
+            OpeningHoursSchemaVersion = 1,
             OpeningHoursJson = request.OpeningHoursJson,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = userContext.AccountId

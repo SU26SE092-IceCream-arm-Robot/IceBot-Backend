@@ -64,14 +64,10 @@ public sealed class UpdateMenuCommandHandler
         menu.Code = newCode;
         menu.Name = newName.Trim();
         menu.Description = request.Description is null ? menu.Description : MenuNormalizer.TrimToNull(request.Description);
-        menu.Status = request.Status ?? menu.Status;
         menu.Currency = MenuNormalizer.NormalizeCode(newCurrency);
         menu.EffectiveFrom = newEffectiveFrom;
         menu.EffectiveTo = newEffectiveTo;
         menu.DisplayOrder = request.DisplayOrder ?? menu.DisplayOrder;
-        menu.MetadataSchemaVersion = request.MetadataSchemaVersion.HasValue
-            ? Math.Max(request.MetadataSchemaVersion.Value, 1)
-            : menu.MetadataSchemaVersion;
         menu.MetadataJson = request.MetadataJson is null ? menu.MetadataJson : MenuNormalizer.TrimToNull(request.MetadataJson);
         menu.UpdatedAt = DateTimeOffset.UtcNow;
         menu.UpdatedByAccountId = updatedByAccountId;

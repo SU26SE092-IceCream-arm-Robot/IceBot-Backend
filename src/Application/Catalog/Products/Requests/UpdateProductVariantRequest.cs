@@ -22,8 +22,6 @@ public sealed class UpdateProductVariantRequest
 
     public string? Currency { get; set; }
 
-    public bool? IsAvailable { get; set; }
-
     public int? DisplayOrder { get; set; }
 
     public int? PreparationTimeSeconds { get; set; }

@@ -10,9 +10,5 @@ public sealed class RuntimeMenuResult
 
     public DateTimeOffset ExpiresAt { get; set; }
 
-    public string AvailabilitySource { get; set; } = "CloudSalesCatalog";
-
-    public bool ContainsMachineRuntimeState { get; set; }
-
     public List<RuntimeMenuItemResult> Items { get; set; } = new();
 }

@@ -37,7 +37,7 @@ public sealed class PlaceOrderCommandHandler
             return ApiResult<OrderResult>.Fail(validationError);
         }
 
-        var idempotencyKey = NormalizeOptional(request.IdempotencyKey);
+        var idempotencyKey = NormalizeOptional(command.IdempotencyKey);
         if (idempotencyKey is not null)
         {
             var existing = await _orderStore.GetOrderByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
@@ -57,6 +57,7 @@ public sealed class PlaceOrderCommandHandler
             }
         }
 
+        OrderStatusChangedEvent? statusChangedEvent = null;
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
             var kiosk = await _orderStore.GetKioskByIdAsync(request.KioskId, ct);
@@ -80,9 +81,6 @@ public sealed class PlaceOrderCommandHandler
                 OrderNumber = OrderNumberGenerator.GenerateOrderNumber(now),
                 IdempotencyKey = idempotencyKey,
                 ClientOrderId = clientOrderId,
-                CorrelationId = request.RuntimeSnapshotId,
-                RuntimeSnapshotId = request.RuntimeSnapshotId,
-                RuntimeSnapshotGeneratedAt = request.RuntimeSnapshotGeneratedAt,
                 Channel = request.Channel,
                 Currency = DefaultCurrency,
                 CustomerName = NormalizeOptional(request.CustomerName),
@@ -226,28 +224,31 @@ public sealed class PlaceOrderCommandHandler
 
             await _orderStore.SaveChangesAsync(ct);
 
-            return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order), "Order created.", 201);
+            var orderResult = OrderResultMapper.ToResult(order);
+            statusChangedEvent = new OrderStatusChangedEvent
+            {
+                OrderId = order.Id,
+                OrderNumber = order.OrderNumber,
+                KioskId = order.KioskId,
+                OrganizationId = order.OrganizationId,
+                StoreId = order.StoreId,
+                OldStatus = "None",
+                NewStatus = orderResult.Status.ToString(),
+                PaymentStatus = orderResult.PaymentStatus.ToString(),
+                CustomerStatus = orderResult.CustomerStatus,
+                CustomerStatusMessage = orderResult.CustomerStatusMessage,
+                CanRetryPayment = orderResult.CanRetryPayment,
+                RequiresStaffSupport = orderResult.RequiresStaffSupport,
+                UpdatedAt = orderResult.PlacedAt,
+                Version = 1
+            };
+
+            return ApiResult<OrderResult>.Success(orderResult, "Order created.", 201);
         }, cancellationToken);
 
-        if (result.Succeeded && result.Data is not null)
+        if (result.Succeeded && statusChangedEvent is not null)
         {
-            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
-            {
-                OrderId = result.Data.Id,
-                OrderNumber = result.Data.OrderNumber,
-                KioskId = result.Data.KioskId,
-                OrganizationId = result.Data.OrganizationId,
-                StoreId = result.Data.StoreId,
-                OldStatus = "None",
-                NewStatus = result.Data.Status.ToString(),
-                PaymentStatus = result.Data.PaymentStatus.ToString(),
-                CustomerStatus = result.Data.CustomerStatus,
-                CustomerStatusMessage = result.Data.CustomerStatusMessage,
-                CanRetryPayment = result.Data.CanRetryPayment,
-                RequiresStaffSupport = result.Data.RequiresStaffSupport,
-                UpdatedAt = result.Data.PlacedAt,
-                Version = 1
-            }, cancellationToken);
+            await _publisher.PublishOrderStatusChangedAsync(statusChangedEvent, cancellationToken);
         }
 
         return result;

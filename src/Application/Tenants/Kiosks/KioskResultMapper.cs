@@ -25,7 +25,6 @@ internal static class KioskResultMapper
             LastOnlineAt = kiosk.LastOnlineAt,
             SupportsOfflineMode = kiosk.SupportsOfflineMode,
             ConfigurationVersion = kiosk.ConfigurationVersion,
-            SettingsSchemaVersion = kiosk.SettingsSchemaVersion,
             SettingsJson = kiosk.SettingsJson,
             CreatedAt = kiosk.CreatedAt,
             UpdatedAt = kiosk.UpdatedAt

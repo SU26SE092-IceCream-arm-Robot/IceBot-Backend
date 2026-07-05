@@ -27,7 +27,5 @@ public sealed class CreateMenuRequest
 
     public int DisplayOrder { get; set; }
 
-    public int MetadataSchemaVersion { get; set; } = 1;
-
     public string? MetadataJson { get; set; }
 }

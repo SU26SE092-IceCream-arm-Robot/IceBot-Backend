@@ -13,8 +13,6 @@ internal static class PaymentSessionResultMapper
             OrderId = paymentTransaction.OrderId,
             TransactionNumber = paymentTransaction.TransactionNumber,
             Provider = paymentTransaction.Provider,
-            ProviderOrderCode = paymentTransaction.ProviderOrderCode,
-            ProviderPaymentLinkId = paymentTransaction.ProviderPaymentLinkId,
             CheckoutUrl = paymentTransaction.CheckoutUrl,
             QrCodePayload = paymentTransaction.QrCodePayload,
             Amount = paymentTransaction.Amount,

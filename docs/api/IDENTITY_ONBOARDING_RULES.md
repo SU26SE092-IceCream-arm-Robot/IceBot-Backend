@@ -4,7 +4,7 @@ This document is the backend source of truth for internal account onboarding, in
 
 ## Search Keywords
 
-`identity onboarding`, `account onboarding`, `admin creates account`, `internal account invitation`, `invitation link`, `accept invitation`, `email confirmed`, `EmailConfirmedAt`, `email ownership proof`, `CreateInvitation`, `SendInvitationEmail`, `InitialPassword`, `temporary password`, `Invited account`, `Active account`, `/api/v1/management/accounts`, `/api/v1/authentication/accept-invitation`
+`identity onboarding`, `account onboarding`, `admin creates account`, `internal account invitation`, `invitation link`, `accept invitation`, `GoogleEmail`, `GoogleSubjectId`, `Google login policy`, `email confirmed`, `EmailConfirmedAt`, `email ownership proof`, `CreateInvitation`, `SendInvitationEmail`, `InitialPassword`, `temporary password`, `Invited account`, `Active account`, `/api/v1/management/accounts`, `/api/v1/authentication/accept-invitation`
 
 ## Purpose
 
@@ -16,11 +16,25 @@ The default onboarding method is:
 admin creates account
   -> backend creates invitation link
   -> user accepts invitation
-  -> user sets password
+  -> user completes credential setup required by the admin-enabled login methods
   -> account becomes Active
 ```
 
 Do not use username + password delivery as the default onboarding flow.
+
+## Authentication Method Ownership
+
+Management chooses which authentication methods an account is allowed to use through `LocalLoginEnabled` and `GoogleLoginEnabled`. Invitation acceptance does not let the invited user enable an authentication method that management did not authorize.
+
+For Google login, `GoogleEmail` is the management-configured identity allowlist value:
+
+- the verified email from Firebase must match `GoogleEmail`;
+- first login binds the verified Google subject to `GoogleSubjectId`;
+- later logins must match both the configured email and the bound subject;
+- authentication must not overwrite `GoogleEmail` from token claims;
+- changing `GoogleEmail` through account management clears the old subject binding so the newly authorized identity can bind on its first successful login.
+
+The invited user only supplies credential material for an enabled method, such as choosing a password when local login is enabled. The user does not choose the account's allowed login policy.
 
 ## Default Flow
 
@@ -38,20 +52,19 @@ POST /api/v1/management/accounts
   -> create Account
   -> Status = Invited
   -> create AccountInvitation
-  -> return invitation token/link
+  -> return invitation link
   -> optionally send invitation email
 ```
 
 The management response should include invitation details when an invitation is created:
 
 ```text
-invitationToken
 invitationUrl
 expiresAt
 emailSent
 ```
 
-`invitationUrl` is available only when `Email:InvitationBaseUrl` is configured. If the URL is not configured, the token can still be returned and the frontend may construct the route when it owns the accept-invitation URL.
+`Email:InvitationBaseUrl` is required at startup. Management responses return the complete invitation URL and never expose the raw bearer token as a separate field.
 
 ## Invitation Generation Vs Delivery
 
@@ -109,7 +122,7 @@ The same tenant may contain company email, Gmail, Yahoo, contractors, or externa
 Valid email ownership proof can come from:
 
 - a separate verify-email link
-- Firebase/Google token with `email_verified = true` and email matching the account
+- Firebase/Google token with `email_verified = true` and email matching the management-configured `GoogleEmail`
 - an invitation link sent by the backend to the same mailbox and accepted from that email delivery path
 
 Manual invitation delivery is not email ownership proof.
@@ -119,9 +132,9 @@ Examples:
 | Case | Result |
 | --- | --- |
 | Backend sends invitation email to `user@gmail.com`, user clicks and accepts | `Active`, `EmailConfirmedAt` can be set |
-| Firebase returns verified `employee@corp.com` matching the account | `Active`, `EmailConfirmedAt` can be set |
+| Firebase returns verified `employee@corp.com` matching `GoogleEmail` | `Active`, `EmailConfirmedAt` can be set |
 | Admin copies invitation link and sends through Zalo/Messenger/QR/paper | `Active`, `EmailConfirmedAt` remains null |
-| Google login invitation where Firebase verified email matches account email | `Active`, `EmailConfirmedAt` can be set |
+| Google login invitation where Firebase verified email matches `GoogleEmail` | `Active`, `EmailConfirmedAt` can be set |
 
 ## Email Failure
 
@@ -132,7 +145,7 @@ If invitation email delivery fails:
 ```text
 account remains Invited
 invitation remains usable
-response includes invitation link/token
+response includes invitation link
 emailSent = false
 EmailSentAt remains null
 ```

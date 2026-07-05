@@ -17,7 +17,6 @@ public sealed class StoreResult
     public decimal? Longitude { get; set; }
     public string? PhoneNumber { get; set; }
     public string? Email { get; set; }
-    public int OpeningHoursSchemaVersion { get; set; }
     public string? OpeningHoursJson { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }

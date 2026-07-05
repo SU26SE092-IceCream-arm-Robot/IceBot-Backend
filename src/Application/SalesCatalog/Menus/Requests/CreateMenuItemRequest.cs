@@ -4,8 +4,6 @@ namespace Application.SalesCatalog.Menus.Requests;
 
 public sealed class CreateMenuItemRequest
 {
-    public Guid ProductId { get; set; }
-
     public Guid ProductVariantId { get; set; }
 
     public Guid? RecipeId { get; set; }
@@ -33,8 +31,6 @@ public sealed class CreateMenuItemRequest
     public DateTimeOffset? EffectiveFrom { get; set; }
 
     public DateTimeOffset? EffectiveTo { get; set; }
-
-    public int MetadataSchemaVersion { get; set; } = 1;
 
     public string? MetadataJson { get; set; }
 }

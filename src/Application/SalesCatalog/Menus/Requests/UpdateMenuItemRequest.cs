@@ -1,11 +1,7 @@
-using Domain.SalesCatalog.Enums;
-
 namespace Application.SalesCatalog.Menus.Requests;
 
 public sealed class UpdateMenuItemRequest
 {
-    public Guid? ProductId { get; set; }
-
     public Guid? ProductVariantId { get; set; }
 
     public Guid? RecipeId { get; set; }
@@ -15,8 +11,6 @@ public sealed class UpdateMenuItemRequest
     public string? DisplayName { get; set; }
 
     public string? Description { get; set; }
-
-    public MenuItemStatus? Status { get; set; }
 
     public decimal? Price { get; set; }
 
@@ -33,8 +27,6 @@ public sealed class UpdateMenuItemRequest
     public DateTimeOffset? EffectiveFrom { get; set; }
 
     public DateTimeOffset? EffectiveTo { get; set; }
-
-    public int? MetadataSchemaVersion { get; set; }
 
     public string? MetadataJson { get; set; }
 }

@@ -6,6 +6,7 @@ namespace Application.Identity.Abstractions
     {
         Task<Account?> GetByIdAsync(Guid accountId, bool asNoTracking = true, CancellationToken cancellationToken = default);
         Task<Account?> GetByEmailOrUserNameAsync(string emailOrUserName, bool asNoTracking = true, CancellationToken cancellationToken = default);
+        Task<Account?> GetByGoogleEmailAsync(string googleEmail, bool asNoTracking = true, CancellationToken cancellationToken = default);
         Task<Account?> GetByGoogleSubjectIdAsync(string googleSubjectId, bool asNoTracking = true, CancellationToken cancellationToken = default);
         Task<Role?> GetRoleByCodeAsync(string code, CancellationToken cancellationToken = default);
         Task<List<Role>> ListActiveRolesAsync(CancellationToken cancellationToken = default);
@@ -30,6 +31,7 @@ namespace Application.Identity.Abstractions
             CancellationToken cancellationToken = default);
         Task<bool> ExistsByEmailOrUserNameAsync(string email, string userName, CancellationToken cancellationToken = default);
         Task<bool> EmailExistsForOtherAccountAsync(Guid accountId, string email, CancellationToken cancellationToken = default);
+        Task<bool> GoogleEmailExistsAsync(string googleEmail, Guid? excludedAccountId = null, CancellationToken cancellationToken = default);
         Task<bool> UserNameExistsAsync(string userName, CancellationToken cancellationToken = default);
         Task AddAsync(Account account, CancellationToken cancellationToken = default);
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

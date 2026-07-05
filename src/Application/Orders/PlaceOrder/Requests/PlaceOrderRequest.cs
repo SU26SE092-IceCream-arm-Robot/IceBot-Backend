@@ -6,13 +6,7 @@ public sealed class PlaceOrderRequest
 {
     public Guid KioskId { get; set; }
 
-    public string? IdempotencyKey { get; set; }
-
     public string? ClientOrderId { get; set; }
-
-    public Guid? RuntimeSnapshotId { get; set; }
-
-    public DateTimeOffset? RuntimeSnapshotGeneratedAt { get; set; }
 
     public decimal? ClientTotalAmount { get; set; }
 

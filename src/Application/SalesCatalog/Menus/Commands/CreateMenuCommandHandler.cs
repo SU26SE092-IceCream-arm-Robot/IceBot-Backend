@@ -70,7 +70,7 @@ public sealed class CreateMenuCommandHandler
             EffectiveFrom = request.EffectiveFrom,
             EffectiveTo = request.EffectiveTo,
             DisplayOrder = request.DisplayOrder,
-            MetadataSchemaVersion = Math.Max(request.MetadataSchemaVersion, 1),
+            MetadataSchemaVersion = 1,
             MetadataJson = MenuNormalizer.TrimToNull(request.MetadataJson),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = createdByAccountId

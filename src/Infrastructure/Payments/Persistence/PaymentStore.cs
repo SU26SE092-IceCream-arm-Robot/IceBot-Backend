@@ -51,6 +51,7 @@ public sealed class PaymentStore : IPaymentStore
     {
         return _dbContext.PaymentTransactions
             .Include(payment => payment.Order)
+            .Include(payment => payment.PaymentMethod)
             .FirstOrDefaultAsync(payment => payment.IdempotencyKey == idempotencyKey, cancellationToken);
     }
 

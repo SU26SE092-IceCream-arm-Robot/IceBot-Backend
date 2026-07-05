@@ -160,7 +160,6 @@ public sealed class ProductionConfigurationStore : IProductionConfigurationStore
                 OrganizationId = release.OrganizationId,
                 ReleaseNumber = release.ReleaseNumber,
                 Status = release.Status.ToString(),
-                ReleaseManifestSchemaVersion = release.ReleaseManifestSchemaVersion,
                 ReleaseChecksum = release.ReleaseChecksum,
                 PublishedAt = release.PublishedAt,
                 PublishedByAccountId = release.PublishedByAccountId,
