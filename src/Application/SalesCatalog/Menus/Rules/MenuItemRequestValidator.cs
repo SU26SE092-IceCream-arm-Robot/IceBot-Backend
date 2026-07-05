@@ -37,6 +37,8 @@ internal static class MenuItemRequestValidator
         var product = await menus.GetProductByIdAsync(productId, cancellationToken);
         if (product is null) return "Product does not exist.";
         if (product.OrganizationId != organizationId) return "Product does not belong to the menu organization.";
+        if (!string.Equals(product.Currency, currency, StringComparison.OrdinalIgnoreCase))
+            return "Product currency must match the menu currency.";
 
         var variant = await menus.GetProductVariantByIdAsync(productVariantId, cancellationToken);
         if (variant is null) return "Product variant does not exist.";

@@ -51,6 +51,8 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
     {
         return _dbContext.Orders
             .Include(order => order.OrderItems)
+                .ThenInclude(item => item.Options)
+            .Include(order => order.OrderItems)
                 .ThenInclude(item => item.ProductVariant)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     }

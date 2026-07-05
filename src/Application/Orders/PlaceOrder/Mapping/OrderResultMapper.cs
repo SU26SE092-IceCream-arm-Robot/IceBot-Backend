@@ -53,6 +53,17 @@ internal static class OrderResultMapper
                     UnitPrice = item.UnitPrice,
                     DiscountAmount = item.DiscountAmount,
                     TotalAmount = item.TotalAmount,
+                    SelectedOptions = item.Options
+                        .OrderBy(option => option.OptionGroupCodeSnapshot)
+                        .ThenBy(option => option.CodeSnapshot)
+                        .Select(option => new OrderItemOptionResult
+                        {
+                            ProductOptionId = option.ProductOptionId,
+                            OptionGroupCode = option.OptionGroupCodeSnapshot,
+                            Code = option.CodeSnapshot,
+                            Name = option.NameSnapshot,
+                            PriceDelta = option.UnitPriceDelta
+                        }).ToList(),
                     Status = item.Status
                 })
                 .ToList()

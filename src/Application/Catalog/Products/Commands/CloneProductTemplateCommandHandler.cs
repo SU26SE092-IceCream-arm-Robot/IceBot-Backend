@@ -122,6 +122,44 @@ public sealed class CloneProductTemplateCommandHandler
                 sourceVariant.MetadataJson));
         }
 
+        foreach (var sourceGroup in template.OptionGroups.OrderBy(group => group.DisplayOrder))
+        {
+            var clonedGroup = new OptionGroup
+            {
+                ProductId = product.Id,
+                Code = sourceGroup.Code,
+                Name = sourceGroup.Name,
+                Description = sourceGroup.Description,
+                SelectionType = sourceGroup.SelectionType,
+                MinSelections = sourceGroup.MinSelections,
+                MaxSelections = sourceGroup.MaxSelections,
+                IsRequired = sourceGroup.IsRequired,
+                IsActive = sourceGroup.IsActive,
+                DisplayOrder = sourceGroup.DisplayOrder,
+                CreatedAt = now,
+                CreatedByAccountId = command.Scope.UserContext.AccountId
+            };
+            foreach (var sourceOption in sourceGroup.ProductOptions.Where(option => option.DeletedAt == null))
+            {
+                clonedGroup.ProductOptions.Add(new ProductOption
+                {
+                    OptionGroupId = clonedGroup.Id,
+                    TemplateProductOptionId = sourceOption.Id,
+                    Code = sourceOption.Code,
+                    Name = sourceOption.Name,
+                    Description = sourceOption.Description,
+                    PriceDelta = sourceOption.PriceDelta,
+                    IsDefault = sourceOption.IsDefault,
+                    IsAvailable = false,
+                    DisplayOrder = sourceOption.DisplayOrder,
+                    MetadataJson = sourceOption.MetadataJson,
+                    CreatedAt = now,
+                    CreatedByAccountId = command.Scope.UserContext.AccountId
+                });
+            }
+            product.OptionGroups.Add(clonedGroup);
+        }
+
         await _products.AddProductAsync(product, cancellationToken);
         await _products.SaveChangesAsync(cancellationToken);
         return ApiResult<ProductResult>.Success(ProductResultMapper.ToResult(product), "Product template cloned.", 201);

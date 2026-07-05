@@ -38,6 +38,17 @@ public sealed class OrderItemResult
 
     public decimal TotalAmount { get; set; }
 
+    public List<OrderItemOptionResult> SelectedOptions { get; set; } = new();
+
     [System.Text.Json.Serialization.JsonIgnore]
     public OrderItemStatus Status { get; set; }
+}
+
+public sealed class OrderItemOptionResult
+{
+    public Guid ProductOptionId { get; set; }
+    public string OptionGroupCode { get; set; } = null!;
+    public string Code { get; set; } = null!;
+    public string Name { get; set; } = null!;
+    public decimal PriceDelta { get; set; }
 }

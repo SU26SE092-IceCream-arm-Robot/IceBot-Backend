@@ -15,6 +15,7 @@ using Application.Tenants.Kiosks.Requests;
 using Application.Tenants.Stores.Requests;
 using Domain.Orders.Enums;
 using Domain.Payments.Enums;
+using Application.Orders.PlaceOrder.Requests;
 
 namespace IceBot.UnitTests.ApiContracts;
 
@@ -89,6 +90,12 @@ public sealed class FrontendContractTests
         Assert.Null(typeof(CreateKioskRequest).GetProperty("SettingsJson"));
         Assert.Null(typeof(SetInternalAccountPasswordRequest).GetProperty("EnableLocalLogin"));
         Assert.Null(typeof(ConfigurationReleaseRouteInput).GetProperty("ProductVariantId"));
+        Assert.Null(typeof(CreateProductOptionRequest).GetProperty("Currency"));
+        Assert.Null(typeof(CreateProductOptionRequest).GetProperty("IsAvailable"));
+        Assert.Null(typeof(UpdateProductOptionRequest).GetProperty("Currency"));
+        Assert.Null(typeof(UpdateProductOptionRequest).GetProperty("IsAvailable"));
+        Assert.Null(typeof(PlaceOrderItemRequest).GetProperty("OptionsJson"));
+        Assert.NotNull(typeof(PlaceOrderItemRequest).GetProperty("SelectedOptions"));
     }
 
     [Fact]

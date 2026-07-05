@@ -39,7 +39,7 @@ These fields preserve the state used at the time of an order or robot job. They 
 
 Fields:
 
-- `OrderItem.OptionsJson` with `OptionsSchemaVersion`
+- Product-option selections are stored as typed `OrderItemOption` snapshots. Anonymous checkout payloads and Edge execution commands must not carry arbitrary option JSON.
 - `OrderItem.RecipeSnapshotJson` with `RecipeSnapshotSchemaVersion`
 - `OrderExecutionRecord` and `ProductionExecutionRecord` keep typed projection fields rather than raw executor payloads.
 - `PaymentTransaction.RawRequestJson`

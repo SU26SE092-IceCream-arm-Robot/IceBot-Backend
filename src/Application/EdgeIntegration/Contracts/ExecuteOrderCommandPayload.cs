@@ -35,12 +35,21 @@ public sealed record ExecuteOrderLinePayload
     public int? RecipeVersionSnapshot { get; init; }
     public int RecipeSnapshotSchemaVersion { get; init; }
     public string? RecipeSnapshotJson { get; init; }
-    public int OptionsSchemaVersion { get; init; }
-    public string? OptionsJson { get; init; }
+    public IReadOnlyList<ExecuteOrderLineOptionPayload> SelectedOptions { get; init; } = [];
     public Guid ExecutionRouteId { get; init; }
     public string RouteCode { get; init; } = string.Empty;
     public string? RequiredCapabilitiesJson { get; init; }
     public IReadOnlyList<ExecuteOrderRobotProgramPayload> RobotPrograms { get; init; } = [];
+}
+
+public sealed record ExecuteOrderLineOptionPayload
+{
+    public Guid ProductOptionId { get; init; }
+    public long OptionGroupId { get; init; }
+    public string OptionGroupCode { get; init; } = string.Empty;
+    public string Code { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public decimal UnitPriceDelta { get; init; }
 }
 
 public sealed record ExecuteOrderRobotProgramPayload
@@ -123,6 +132,10 @@ public static class ExecuteOrderCommandPayloadCodec
 
         if (payload.OrderLines.Any(line => line.OrderItemId == Guid.Empty || line.ProductId == Guid.Empty ||
                 line.ProductVariantId == Guid.Empty || line.Quantity <= 0 || line.ExecutionRouteId == Guid.Empty ||
+                line.SelectedOptions.Select(option => option.ProductOptionId).Distinct().Count() != line.SelectedOptions.Count ||
+                line.SelectedOptions.Any(option => option.ProductOptionId == Guid.Empty || option.OptionGroupId <= 0 ||
+                    string.IsNullOrWhiteSpace(option.OptionGroupCode) || string.IsNullOrWhiteSpace(option.Code) ||
+                    string.IsNullOrWhiteSpace(option.Name) || option.UnitPriceDelta < 0) ||
                 line.RobotPrograms.Count == 0 || line.RobotPrograms.Any(program =>
                     program.RobotProgramId == Guid.Empty || program.BindingOrder <= 0 || program.Artifacts.Count == 0 ||
                     program.Artifacts.Any(artifact => artifact.RobotArtifactId == Guid.Empty || artifact.RunOrder <= 0 ||

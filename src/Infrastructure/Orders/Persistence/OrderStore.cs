@@ -11,6 +11,7 @@ using Domain.Sync.Enums;
 using Domain.Tenants.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.SalesCatalog.ReadModels;
 
 namespace Infrastructure.Orders.Persistence;
 
@@ -135,6 +136,35 @@ public sealed class OrderStore : IOrderStore
             .FirstOrDefaultAsync(menuItem => menuItem.Id == menuItemId, cancellationToken);
     }
 
+    public Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
+        Guid menuItemId,
+        CancellationToken cancellationToken = default)
+    {
+        return (from membership in _dbContext.MenuItemProductOptions.AsNoTracking()
+                join option in _dbContext.ProductOptions.AsNoTracking() on membership.ProductOptionId equals option.Id
+                join optionGroup in _dbContext.OptionGroups.AsNoTracking() on option.OptionGroupId equals optionGroup.Id
+                where membership.MenuItemId == menuItemId && membership.DeletedAt == null &&
+                      option.DeletedAt == null && optionGroup.IsActive
+                select new MenuItemProductOptionReadModel(
+                    membership.MenuItemId,
+                    option.Id,
+                    optionGroup.Id,
+                    optionGroup.Code,
+                    optionGroup.Name,
+                    optionGroup.SelectionType,
+                    optionGroup.MinSelections,
+                    optionGroup.MaxSelections,
+                    optionGroup.IsRequired,
+                    option.Code,
+                    option.Name,
+                    option.Description,
+                    option.PriceDelta,
+                    option.IsAvailable,
+                    option.IsDefault,
+                    option.DisplayOrder))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> HasActiveProductionRouteAsync(
         Guid kioskId,
         Guid productVariantId,
@@ -162,6 +192,7 @@ public sealed class OrderStore : IOrderStore
     {
         return _dbContext.Orders
             .Include(order => order.OrderItems)
+                .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     }
 
@@ -433,6 +464,7 @@ public sealed class OrderStore : IOrderStore
     {
         return _dbContext.Orders
             .Include(order => order.OrderItems)
+                .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(order => order.IdempotencyKey == idempotencyKey, cancellationToken);
     }
 
@@ -440,6 +472,7 @@ public sealed class OrderStore : IOrderStore
     {
         return _dbContext.Orders
             .Include(order => order.OrderItems)
+                .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(
                 order => order.KioskId == kioskId && order.ClientOrderId == clientOrderId,
                 cancellationToken);

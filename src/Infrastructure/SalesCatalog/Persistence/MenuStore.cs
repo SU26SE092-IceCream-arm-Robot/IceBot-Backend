@@ -9,6 +9,7 @@ using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.SalesCatalog.ReadModels;
 
 namespace Infrastructure.SalesCatalog.Persistence;
 
@@ -70,7 +71,8 @@ public sealed class MenuStore : IMenuStore
         return ApplyMenuFilters(
                 _dbContext.Menus
                     .AsNoTracking()
-                    .Include(menu => menu.MenuItems),
+                    .Include(menu => menu.MenuItems)
+                        .ThenInclude(item => item.ProductOptions),
                 search,
                 organizationId,
                 storeId,
@@ -154,6 +156,7 @@ public sealed class MenuStore : IMenuStore
     {
         var query = _dbContext.Menus
             .Include(menu => menu.MenuItems)
+                .ThenInclude(item => item.ProductOptions)
             .Where(menu => menu.Id == menuId);
 
         if (asNoTracking)
@@ -171,6 +174,7 @@ public sealed class MenuStore : IMenuStore
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.MenuItems
+            .Include(item => item.ProductOptions)
             .Where(item => item.MenuId == menuId && item.Id == menuItemId);
 
         if (asNoTracking)
@@ -200,6 +204,63 @@ public sealed class MenuStore : IMenuStore
         return _dbContext.Recipes
             .AsNoTracking()
             .FirstOrDefaultAsync(recipe => recipe.Id == recipeId, cancellationToken);
+    }
+
+    public Task<List<ProductOption>> ListProductOptionsAsync(
+        Guid productId,
+        IReadOnlyCollection<Guid> optionIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (optionIds.Count == 0)
+        {
+            return Task.FromResult(new List<ProductOption>());
+        }
+
+        return _dbContext.Products
+            .AsNoTracking()
+            .Where(product => product.Id == productId)
+            .SelectMany(product => product.OptionGroups)
+            .SelectMany(group => group.ProductOptions)
+            .Where(option => optionIds.Contains(option.Id) && option.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (menuItemIds.Count == 0)
+        {
+            return Task.FromResult(new List<MenuItemProductOptionReadModel>());
+        }
+
+        return ProjectMenuItemOptions(menuItemIds).ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<MenuItemProductOptionReadModel> ProjectMenuItemOptions(IReadOnlyCollection<Guid> menuItemIds)
+    {
+        return from membership in _dbContext.MenuItemProductOptions.AsNoTracking()
+               join option in _dbContext.ProductOptions.AsNoTracking() on membership.ProductOptionId equals option.Id
+               join optionGroup in _dbContext.OptionGroups.AsNoTracking() on option.OptionGroupId equals optionGroup.Id
+               where menuItemIds.Contains(membership.MenuItemId) && membership.DeletedAt == null &&
+                     option.DeletedAt == null && optionGroup.IsActive
+               select new MenuItemProductOptionReadModel(
+                   membership.MenuItemId,
+                   option.Id,
+                   optionGroup.Id,
+                   optionGroup.Code,
+                   optionGroup.Name,
+                   optionGroup.SelectionType,
+                   optionGroup.MinSelections,
+                   optionGroup.MaxSelections,
+                   optionGroup.IsRequired,
+                   option.Code,
+                   option.Name,
+                   option.Description,
+                   option.PriceDelta,
+                   option.IsAvailable,
+                   option.IsDefault,
+                   option.DisplayOrder);
     }
 
     public Task<bool> MenuCodeExistsAsync(
@@ -264,6 +325,18 @@ public sealed class MenuStore : IMenuStore
     public Task AddMenuItemAsync(MenuItem menuItem, CancellationToken cancellationToken = default)
     {
         return _dbContext.MenuItems.AddAsync(menuItem, cancellationToken).AsTask();
+    }
+
+    public void ReplaceMenuItemProductOptions(
+        MenuItem menuItem,
+        IReadOnlyCollection<MenuItemProductOption> replacements)
+    {
+        _dbContext.MenuItemProductOptions.RemoveRange(menuItem.ProductOptions);
+        menuItem.ProductOptions.Clear();
+        foreach (var replacement in replacements)
+        {
+            menuItem.ProductOptions.Add(replacement);
+        }
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

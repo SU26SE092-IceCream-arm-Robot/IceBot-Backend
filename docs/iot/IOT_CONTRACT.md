@@ -280,12 +280,19 @@ Request:
     {
       "clientLineId": "uuid",
       "menuItemId": "uuid",
-      "quantity": 1
+      "quantity": 1,
+      "selectedOptions": [
+        {
+          "productOptionId": "uuid"
+        }
+      ]
     }
   ],
   "clientTotalAmount": 25000
 }
 ```
+
+`selectedOptions` contains IDs returned by that runtime menu item. Each option may appear at most once in V1. Cloud validates required groups, single/multiple cardinality, availability, menu membership, currency, and price delta. Cloud stores immutable option snapshots and sends typed selected-option snapshots to Edge; arbitrary client JSON is never forwarded.
 
 Response:
 

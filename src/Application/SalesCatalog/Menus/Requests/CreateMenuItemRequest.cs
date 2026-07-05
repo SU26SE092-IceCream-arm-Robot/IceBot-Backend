@@ -28,4 +28,5 @@ public sealed class CreateMenuItemRequest
 
     public DateTimeOffset? EffectiveTo { get; set; }
 
+    public List<Guid> ProductOptionIds { get; set; } = new();
 }

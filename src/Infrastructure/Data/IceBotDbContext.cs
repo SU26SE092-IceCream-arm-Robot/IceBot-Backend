@@ -109,9 +109,11 @@ public class IceBotDbContext : DbContext
 
     public DbSet<Menu> Menus => Set<Menu>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
+    public DbSet<MenuItemProductOption> MenuItemProductOptions => Set<MenuItemProductOption>();
 
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
+    public DbSet<OrderItemOption> OrderItemOptions => Set<OrderItemOption>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
 
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
@@ -472,17 +474,7 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.TemplateProduct).WithMany().HasForeignKey(x => x.TemplateProductId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasMany(x => x.ProductOptions)
-                .WithMany()
-                .UsingEntity<Dictionary<string, object>>(
-                    "ProductProductOptions",
-                    right => right.HasOne<ProductOption>().WithMany().HasForeignKey("ProductOptionId").OnDelete(DeleteBehavior.Restrict),
-                    left => left.HasOne<Product>().WithMany().HasForeignKey("ProductId").OnDelete(DeleteBehavior.Restrict),
-                    join =>
-                    {
-                        join.ToTable("ProductProductOptions");
-                        join.HasKey("ProductId", "ProductOptionId");
-                    });
+            entity.HasMany(x => x.OptionGroups).WithOne(x => x.Product).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ProductVariant>(entity =>
@@ -496,15 +488,13 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<OptionGroup>(entity =>
         {
             entity.ToTable("OptionGroups");
-            entity.HasIndex(x => x.Code).IsUnique();
+            entity.HasIndex(x => new { x.ProductId, x.Code }).IsUnique();
         });
 
         modelBuilder.Entity<ProductOption>(entity =>
         {
             entity.ToTable("ProductOptions");
-            entity.HasIndex(x => new { x.OrganizationId, x.OptionGroupId, x.Code }).IsUnique().HasFilter(ActiveRowFilter);
-            entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(x => x.TemplateProductOption).WithMany().HasForeignKey(x => x.TemplateProductOptionId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(x => new { x.OptionGroupId, x.Code }).IsUnique().HasFilter(ActiveRowFilter);
             entity.HasOne(x => x.OptionGroup).WithMany(x => x.ProductOptions).HasForeignKey(x => x.OptionGroupId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -580,17 +570,14 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasMany(x => x.ProductOptions)
-                .WithMany()
-                .UsingEntity<Dictionary<string, object>>(
-                    "OrderItemProductOptions",
-                    right => right.HasOne<ProductOption>().WithMany().HasForeignKey("ProductOptionId").OnDelete(DeleteBehavior.Restrict),
-                    left => left.HasOne<OrderItem>().WithMany().HasForeignKey("OrderItemId").OnDelete(DeleteBehavior.Restrict),
-                    join =>
-                    {
-                        join.ToTable("OrderItemProductOptions");
-                        join.HasKey("OrderItemId", "ProductOptionId");
-                    });
+            entity.HasMany(x => x.Options).WithOne(x => x.OrderItem).HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<OrderItemOption>(entity =>
+        {
+            entity.ToTable("OrderItemOptions");
+            entity.HasIndex(x => new { x.OrderItemId, x.ProductOptionId }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.OrderItemId, x.OptionGroupId });
         });
 
         modelBuilder.Entity<OrderStatusHistory>(entity =>
@@ -662,6 +649,14 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(x => x.ProductOptions).WithOne(x => x.MenuItem).HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<MenuItemProductOption>(entity =>
+        {
+            entity.ToTable("MenuItemProductOptions");
+            entity.HasIndex(x => new { x.MenuItemId, x.ProductOptionId }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasOne<ProductOption>().WithMany().HasForeignKey(x => x.ProductOptionId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

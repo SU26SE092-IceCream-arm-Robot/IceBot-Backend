@@ -19,6 +19,14 @@ public static class CatalogModule
         services.AddScoped<UpdateProductVariantCommandHandler>();
         services.AddScoped<SetProductVariantAvailabilityCommandHandler>();
         services.AddScoped<DeleteProductVariantCommandHandler>();
+        services.AddScoped<CreateOptionGroupCommandHandler>();
+        services.AddScoped<UpdateOptionGroupCommandHandler>();
+        services.AddScoped<SetOptionGroupStatusCommandHandler>();
+        services.AddScoped<DeleteOptionGroupCommandHandler>();
+        services.AddScoped<CreateProductOptionCommandHandler>();
+        services.AddScoped<UpdateProductOptionCommandHandler>();
+        services.AddScoped<SetProductOptionAvailabilityCommandHandler>();
+        services.AddScoped<DeleteProductOptionCommandHandler>();
 
         return services;
     }

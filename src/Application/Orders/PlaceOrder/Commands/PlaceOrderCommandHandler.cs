@@ -10,6 +10,7 @@ using Application.Tenants.Kiosks.Rules;
 using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Enums;
+using Application.SalesCatalog.Rules;
 
 namespace Application.Orders.PlaceOrder.Commands;
 
@@ -178,6 +179,25 @@ public sealed class PlaceOrderCommandHandler
                     }
                 }
 
+                var selectableOptions = await _orderStore.ListMenuItemProductOptionsAsync(menuItem.Id, ct);
+                var selectedOptionIds = itemRequest.SelectedOptions
+                    .Select(option => option.ProductOptionId)
+                    .ToArray();
+                var optionValidationError = ProductOptionSelectionRules.Validate(
+                    selectableOptions,
+                    selectedOptionIds);
+                if (optionValidationError is not null)
+                {
+                    return ApiResult<OrderResult>.Fail(optionValidationError, 409);
+                }
+
+                var selectedOptions = selectableOptions
+                    .Where(option => selectedOptionIds.Contains(option.ProductOptionId))
+                    .OrderBy(option => option.OptionGroupId)
+                    .ThenBy(option => option.DisplayOrder)
+                    .ToArray();
+                var optionUnitPriceDelta = selectedOptions.Sum(option => option.PriceDelta);
+
                 var orderItem = order.AddItem(
                     menuItem.Id,
                     product.Id,
@@ -191,13 +211,25 @@ public sealed class PlaceOrderCommandHandler
                     productVariant.DisplayName ?? productVariant.Name,
                     recipe?.Version,
                     itemRequest.Quantity,
-                    menuItem.Price,
+                    menuItem.Price + optionUnitPriceDelta,
                     menuItem.DiscountAmount,
                     NormalizeOptional(itemRequest.ClientLineId),
-                    optionsJson: itemRequest.OptionsJson,
                     recipeSnapshotJson: recipe is null ? null : RecipeSnapshotBuilder.BuildRecipeSnapshotJson(recipe));
 
                 orderItem.CreatedAt = now;
+                foreach (var selectedOption in selectedOptions)
+                {
+                    var snapshot = OrderItemOption.Create(
+                        selectedOption.ProductOptionId,
+                        selectedOption.OptionGroupId,
+                        selectedOption.OptionGroupCode,
+                        selectedOption.Code,
+                        selectedOption.Name,
+                        selectedOption.PriceDelta);
+                    snapshot.OrderItemId = orderItem.Id;
+                    snapshot.CreatedAt = now;
+                    orderItem.Options.Add(snapshot);
+                }
             }
 
             order.Place(now);

@@ -52,5 +52,5 @@ public partial class Product : BusinessEntity, IKioskScoped
 
     public virtual ICollection<ProductVariant> ProductVariants { get; set; } = new List<ProductVariant>();
 
-    public virtual ICollection<ProductOption> ProductOptions { get; set; } = new List<ProductOption>();
+    public virtual ICollection<OptionGroup> OptionGroups { get; set; } = new List<OptionGroup>();
 }

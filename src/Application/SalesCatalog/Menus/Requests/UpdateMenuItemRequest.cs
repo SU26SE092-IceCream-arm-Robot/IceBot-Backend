@@ -26,4 +26,5 @@ public sealed class UpdateMenuItemRequest
 
     public DateTimeOffset? EffectiveTo { get; set; }
 
+    public List<Guid>? ProductOptionIds { get; set; }
 }

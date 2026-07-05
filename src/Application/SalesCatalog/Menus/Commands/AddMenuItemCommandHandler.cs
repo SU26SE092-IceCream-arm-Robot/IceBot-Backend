@@ -66,6 +66,18 @@ public sealed class AddMenuItemCommandHandler
             return ApiResult<MenuItemResult>.Fail(validationError);
         }
 
+        var optionIds = request.ProductOptionIds.Distinct().ToArray();
+        if (optionIds.Length != request.ProductOptionIds.Count)
+        {
+            return ApiResult<MenuItemResult>.Fail("Product option ids must be unique.");
+        }
+
+        var options = await _menus.ListProductOptionsAsync(productVariant.ProductId, optionIds, cancellationToken);
+        if (options.Count != optionIds.Length)
+        {
+            return ApiResult<MenuItemResult>.Fail("Every product option must belong to the selected product.", 409);
+        }
+
         var item = new MenuItem
         {
             MenuId = menu.Id,
@@ -88,6 +100,16 @@ public sealed class AddMenuItemCommandHandler
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = createdByAccountId
         };
+
+        foreach (var optionId in optionIds)
+        {
+            item.ProductOptions.Add(new MenuItemProductOption
+            {
+                ProductOptionId = optionId,
+                CreatedAt = item.CreatedAt,
+                CreatedByAccountId = createdByAccountId
+            });
+        }
 
         await _menus.AddMenuItemAsync(item, cancellationToken);
         await _menus.SaveChangesAsync(cancellationToken);

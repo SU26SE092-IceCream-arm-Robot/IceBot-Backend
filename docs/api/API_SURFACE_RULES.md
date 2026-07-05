@@ -85,8 +85,17 @@ Current examples:
 
 ```text
 GET /api/v1/management/product-templates
+POST/PUT/PATCH/DELETE /api/v1/management/product-templates/{productId}/option-groups/*
 GET /api/v1/management/organizations/{organizationId}/products
 POST /api/v1/management/organizations/{organizationId}/products/from-template
+POST /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups
+PUT /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}
+PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/status
+DELETE /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}
+POST /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options
+PUT /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}
+PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}/availability
+DELETE /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}
 GET /api/v1/management/organizations/{organizationId}/menus
 GET /api/v1/management/accounts
 GET /api/v1/management/accounts/{accountId}/effective-access
@@ -229,6 +238,9 @@ Rules:
 - Changing a menu currency updates all current menu-item currencies in the same unit of work. Historical orders keep their sale-time snapshots.
 - Normal management contracts do not expose generic `MetadataJson` fields for organizations, products, variants, menus, or menu items. Add typed request/read-model fields when a concrete UI use case exists.
 - Product and variant creation always starts unavailable; availability changes use the dedicated commands.
+- Product options are authored as `Product -> OptionGroup -> ProductOption` and inherit Product tenant scope and currency. Group status and option availability use dedicated endpoints; metadata updates cannot change lifecycle state. Product cloning creates new groups/options. A MenuItem exposes only its configured subset through `productOptionIds`. Runtime menu returns typed active groups and available options. Checkout submits unique `selectedOptions[].productOptionId` values; backend validates group cardinality, availability, menu membership, and price deltas before storing immutable `OrderItemOption` snapshots. Raw option JSON from clients is not accepted or forwarded to Edge.
+- Deleting a ProductOption or OptionGroup is rejected while any MenuItem membership still references it. Setting an option unavailable keeps authoring membership but removes it from runtime-menu output; if an active required group no longer has enough available choices, the MenuItem is not sellable. Catalog edits never rewrite placed-order option snapshots.
+- Cloning a Product creates new OptionGroup and ProductOption identities. Cloned options retain `TemplateProductOptionId` lineage, start unavailable, and can be selected only by MenuItems whose Product is that clone.
 - Organization-owned Product, Menu, and cloned Product create contracts do not accept `ScopeType`. Backend derives it from the most-specific supplied scope id: Kiosk, Store, then Organization.
 - Organization-owned RobotProgram create contracts also do not accept `ScopeType`; RobotProgram additionally supports Device scope, so backend derives its scope from Device, Kiosk, Store, then Organization.
 - Execution endpoint authentication mode is derived from the selected profile: `FullEdge -> MutualTls`, `LowCostController -> SignedCommandTls`.

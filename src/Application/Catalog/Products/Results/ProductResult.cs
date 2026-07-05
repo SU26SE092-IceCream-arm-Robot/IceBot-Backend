@@ -43,4 +43,6 @@ public sealed class ProductResult
     public DateTimeOffset? UpdatedAt { get; set; }
 
     public List<ProductVariantResult> Variants { get; set; } = new();
+
+    public List<OptionGroupResult> OptionGroups { get; set; } = new();
 }

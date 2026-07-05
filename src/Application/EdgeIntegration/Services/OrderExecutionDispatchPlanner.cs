@@ -115,8 +115,18 @@ internal static class OrderExecutionDispatchPlanner
         RecipeVersionSnapshot = item.RecipeVersionSnapshot,
         RecipeSnapshotSchemaVersion = item.RecipeSnapshotSchemaVersion,
         RecipeSnapshotJson = item.RecipeSnapshotJson,
-        OptionsSchemaVersion = item.OptionsSchemaVersion,
-        OptionsJson = item.OptionsJson,
+        SelectedOptions = item.Options
+            .OrderBy(option => option.OptionGroupCodeSnapshot)
+            .ThenBy(option => option.CodeSnapshot)
+            .Select(option => new ExecuteOrderLineOptionPayload
+            {
+                ProductOptionId = option.ProductOptionId,
+                OptionGroupId = option.OptionGroupId,
+                OptionGroupCode = option.OptionGroupCodeSnapshot,
+                Code = option.CodeSnapshot,
+                Name = option.NameSnapshot,
+                UnitPriceDelta = option.UnitPriceDelta
+            }).ToArray(),
         ExecutionRouteId = selected.Route.Id,
         RouteCode = selected.Route.RouteCode,
         RequiredCapabilitiesJson = selected.Route.RequiredCapabilitiesJson,

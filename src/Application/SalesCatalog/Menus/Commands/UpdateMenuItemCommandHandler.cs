@@ -4,6 +4,7 @@ using Application.SalesCatalog.Menus.Results;
 using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
+using Domain.Catalog.Entities;
 
 namespace Application.SalesCatalog.Menus.Commands;
 
@@ -83,6 +84,23 @@ public sealed class UpdateMenuItemCommandHandler
             return ApiResult<MenuItemResult>.Fail(validationError);
         }
 
+        ProductOption[]? replacementOptions = null;
+        if (request.ProductOptionIds is not null)
+        {
+            var optionIds = request.ProductOptionIds.Distinct().ToArray();
+            if (optionIds.Length != request.ProductOptionIds.Count)
+            {
+                return ApiResult<MenuItemResult>.Fail("Product option ids must be unique.");
+            }
+
+            replacementOptions = (await _menus.ListProductOptionsAsync(newProductId, optionIds, cancellationToken)).ToArray();
+            if (replacementOptions.Length != optionIds.Length)
+            {
+                return ApiResult<MenuItemResult>.Fail("Every product option must belong to the selected product.", 409);
+            }
+
+        }
+
         item.ProductId = newProductId;
         item.ProductVariantId = newProductVariantId;
         item.RecipeId = newRecipeId;
@@ -99,6 +117,19 @@ public sealed class UpdateMenuItemCommandHandler
         item.EffectiveTo = newEffectiveTo;
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByAccountId = updatedByAccountId;
+
+        if (request.ProductOptionIds is not null)
+        {
+            var replacements = replacementOptions!
+                .Select(option => new Domain.SalesCatalog.Entities.MenuItemProductOption
+                {
+                    ProductOptionId = option.Id,
+                    CreatedAt = item.UpdatedAt.Value,
+                    CreatedByAccountId = updatedByAccountId
+                })
+                .ToArray();
+            _menus.ReplaceMenuItemProductOptions(item, replacements);
+        }
 
         await _menus.SaveChangesAsync(cancellationToken);
         return ApiResult<MenuItemResult>.Success(MenuResultMapper.ToItemResult(item), "Menu item updated.");

@@ -54,7 +54,8 @@ internal static class MenuResultMapper
             EffectiveFrom = item.EffectiveFrom,
             EffectiveTo = item.EffectiveTo,
             CreatedAt = item.CreatedAt,
-            UpdatedAt = item.UpdatedAt
+            UpdatedAt = item.UpdatedAt,
+            ProductOptionIds = item.ProductOptions.Select(option => option.ProductOptionId).ToList()
         };
     }
 }
