@@ -304,14 +304,6 @@ public sealed class RobotConfigurationStore : IRobotConfigurationStore
         }
     }
 
-    public async Task<IReadOnlyCollection<string>> ListArtifactStorageKeysAsync(
-        CancellationToken cancellationToken = default)
-    {
-        return await _dbContext.RobotArtifacts.AsNoTracking()
-            .Select(artifact => artifact.StorageKey)
-            .ToArrayAsync(cancellationToken);
-    }
-
     public async Task<RobotArtifactInsertResult> InsertArtifactOrGetExistingAsync(
         RobotArtifact artifact,
         CancellationToken cancellationToken = default)

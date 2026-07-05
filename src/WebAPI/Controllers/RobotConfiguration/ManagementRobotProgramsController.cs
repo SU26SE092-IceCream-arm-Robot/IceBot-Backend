@@ -134,7 +134,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
             OrganizationId = organizationId,
             ProgramId = programId,
             Artifacts = request.Artifacts.Select(item => new RobotProgramArtifactInput(
-                item.RobotArtifactId, item.RunOrder, item.ParametersSchemaVersion, item.ParametersJson)).ToArray()
+                item.RobotArtifactId, item.RunOrder, 1, item.ParametersJson)).ToArray()
         };
         var result = await _replaceArtifactsHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -224,9 +224,6 @@ public sealed class RobotProgramArtifactRequest
 
     [Range(1, int.MaxValue)]
     public int RunOrder { get; init; }
-
-    [Range(1, int.MaxValue)]
-    public int ParametersSchemaVersion { get; init; } = 1;
 
     public string? ParametersJson { get; init; }
 }

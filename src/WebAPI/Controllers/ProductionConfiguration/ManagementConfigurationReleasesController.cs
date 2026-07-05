@@ -99,14 +99,12 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
     [Authorize(Policy = "release.publish")]
     public async Task<IActionResult> CreateConfigurationRelease(
         Guid organizationId,
-        [FromBody] CreateConfigurationReleaseRequest request,
         CancellationToken cancellationToken)
     {
         var command = new CreateConfigurationReleaseCommand
         {
             UserContext = User.GetUserContext(),
-            OrganizationId = organizationId,
-            ReleaseManifestSchemaVersion = request.ReleaseManifestSchemaVersion
+            OrganizationId = organizationId
         };
         var result = await _createConfigurationReleaseHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -185,12 +183,6 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-}
-
-public sealed class CreateConfigurationReleaseRequest
-{
-    [Range(1, int.MaxValue)]
-    public int ReleaseManifestSchemaVersion { get; init; } = 1;
 }
 
 public sealed class ReplaceConfigurationReleaseRoutesRequest

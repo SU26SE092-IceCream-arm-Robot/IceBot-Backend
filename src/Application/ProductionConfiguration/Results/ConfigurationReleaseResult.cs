@@ -8,12 +8,10 @@ public sealed class ConfigurationReleaseResult
     public Guid OrganizationId { get; init; }
     public long ReleaseNumber { get; init; }
     public string Status { get; init; } = null!;
-    public int ReleaseManifestSchemaVersion { get; init; }
     public string? ReleaseChecksum { get; init; }
     public DateTimeOffset? PublishedAt { get; init; }
     public Guid? PublishedByAccountId { get; init; }
     public int RouteCount { get; init; }
-    public string? ManifestJson { get; init; }
     public IReadOnlyCollection<ExecutionRouteResult> Routes { get; init; } = Array.Empty<ExecutionRouteResult>();
 
     public static ConfigurationReleaseResult FromEntity(ConfigurationRelease release)
@@ -24,12 +22,10 @@ public sealed class ConfigurationReleaseResult
             OrganizationId = release.OrganizationId,
             ReleaseNumber = release.ReleaseNumber,
             Status = release.Status.ToString(),
-            ReleaseManifestSchemaVersion = release.ReleaseManifestSchemaVersion,
             ReleaseChecksum = release.ReleaseChecksum,
             PublishedAt = release.PublishedAt,
             PublishedByAccountId = release.PublishedByAccountId,
             RouteCount = release.ExecutionRoutes.Count,
-            ManifestJson = release.ManifestJson,
             Routes = release.ExecutionRoutes
                 .OrderBy(route => route.Priority)
                 .ThenBy(route => route.RouteCode)

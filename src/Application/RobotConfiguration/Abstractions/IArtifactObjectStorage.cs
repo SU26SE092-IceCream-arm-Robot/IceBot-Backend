@@ -15,6 +15,11 @@ public interface IArtifactObjectStorage
         string storageKey,
         CancellationToken cancellationToken = default);
 
+    Task<byte[]> ReadBytesAsync(
+        string storageKey,
+        long maximumBytes,
+        CancellationToken cancellationToken = default);
+
     Task<ArtifactObjectWriteResult> CopyImmutableAsync(
         string sourceStorageKey,
         ArtifactObjectWriteRequest destination,
@@ -48,4 +53,42 @@ public sealed class ArtifactObjectAlreadyExistsException : Exception
     }
 
     public string StorageKey { get; }
+}
+
+public sealed class ArtifactObjectSizeLimitExceededException : Exception
+{
+    public ArtifactObjectSizeLimitExceededException(string storageKey, long maximumBytes)
+        : base($"Artifact object '{storageKey}' exceeds the {maximumBytes}-byte read limit.")
+    {
+    }
+}
+
+public sealed class ArtifactObjectNotFoundException : Exception
+{
+    public ArtifactObjectNotFoundException(string storageKey, Exception? innerException = null)
+        : base($"Artifact object was not found: {storageKey}", innerException)
+    {
+        StorageKey = storageKey;
+    }
+
+    public string StorageKey { get; }
+}
+
+public sealed class ArtifactObjectIntegrityException : Exception
+{
+    public ArtifactObjectIntegrityException(string storageKey, string message)
+        : base(message)
+    {
+        StorageKey = storageKey;
+    }
+
+    public string StorageKey { get; }
+}
+
+public sealed class ArtifactObjectStorageUnavailableException : Exception
+{
+    public ArtifactObjectStorageUnavailableException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
 }

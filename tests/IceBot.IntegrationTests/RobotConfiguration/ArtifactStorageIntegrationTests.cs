@@ -36,4 +36,20 @@ public sealed class ArtifactStorageIntegrationTests
         Assert.True(readUrl.ExpiresAt > DateTimeOffset.UtcNow);
     }
 
+    [IntegrationFact]
+    public async Task BoundedReadRejectsObjectLargerThanDeclaredLimit()
+    {
+        var storage = _fixture.CreateObjectStorage(autoCreateBucket: true);
+        var bytes = Encoding.UTF8.GetBytes(new string('x', 2048));
+        var checksum = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+        var key = $"robot-artifacts/integration/{Guid.NewGuid():N}/{checksum}.lua";
+        await using var content = new MemoryStream(bytes);
+        await storage.WriteImmutableAsync(
+            new ArtifactObjectWriteRequest(key, "text/plain", bytes.Length, checksum),
+            content);
+
+        await Assert.ThrowsAsync<ArtifactObjectSizeLimitExceededException>(() =>
+            storage.ReadBytesAsync(key, 1024));
+    }
+
 }

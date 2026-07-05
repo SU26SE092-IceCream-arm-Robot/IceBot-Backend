@@ -19,12 +19,9 @@ public sealed class ConfigurationDeploymentResult
     public Guid? RequestedByAccountId { get; init; }
     public DateTimeOffset? ExecutorReportedAt { get; init; }
     public DateTimeOffset? CloudReceivedAt { get; init; }
-    public Guid? LastReportId { get; init; }
     public string? FailureCode { get; init; }
     public string? FailureReason { get; init; }
     public int? AttemptNo { get; init; }
-    public Guid? EdgeRuntimeId { get; init; }
-    public Guid? ControllerId { get; init; }
     public long? ActiveSetVersion { get; init; }
     public string? ActiveSetChecksum { get; init; }
     public int? RequestedArtifactCount { get; init; }
@@ -51,12 +48,9 @@ public sealed class ConfigurationDeploymentResult
             RequestedByAccountId = deployment.RequestedByAccountId,
             ExecutorReportedAt = deployment.ExecutorReportedAt,
             CloudReceivedAt = deployment.CloudReceivedAt,
-            LastReportId = deployment.LastReportId,
             FailureCode = deployment.FailureCode,
             FailureReason = deployment.FailureReason,
             AttemptNo = deployment.AttemptNo,
-            EdgeRuntimeId = deployment.EdgeRuntimeId,
-            ControllerId = deployment.ControllerId,
             ActiveSetVersion = deployment.ActiveSetVersion,
             ActiveSetChecksum = deployment.ActiveSetChecksum,
             RequestedArtifactCount = deployment.RequestedArtifactCount,

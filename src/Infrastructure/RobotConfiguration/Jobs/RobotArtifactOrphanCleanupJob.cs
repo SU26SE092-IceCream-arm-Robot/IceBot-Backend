@@ -72,11 +72,12 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
         }
 
         var storage = scope.ServiceProvider.GetRequiredService<IArtifactObjectStorage>();
-        var store = scope.ServiceProvider.GetRequiredService<IRobotConfigurationStore>();
-        var templateStore = scope.ServiceProvider.GetRequiredService<IRobotArtifactTemplateStore>();
-        var referencedKeys = (await store.ListArtifactStorageKeysAsync(cancellationToken))
-            .Concat(await templateStore.ListStorageKeysAsync(cancellationToken))
-            .ToHashSet(StringComparer.Ordinal);
+        var referenceSources = scope.ServiceProvider.GetServices<IArtifactObjectReferenceSource>();
+        var referencedKeys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var referenceSource in referenceSources)
+        {
+            referencedKeys.UnionWith(await referenceSource.ListReferencedStorageKeysAsync(cancellationToken));
+        }
         var threshold = DateTimeOffset.UtcNow.AddHours(-_options.OrphanGracePeriodHours);
         var deletedCount = 0;
 

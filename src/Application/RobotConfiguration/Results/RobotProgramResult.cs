@@ -15,8 +15,6 @@ public sealed class RobotProgramResult
     public string ScopeType { get; init; } = null!;
     public string Status { get; init; } = null!;
     public string? Description { get; init; }
-    public int ProgramManifestSchemaVersion { get; init; }
-    public string? ProgramManifestJson { get; init; }
     public string? ProgramManifestChecksum { get; init; }
     public DateTimeOffset? PublishedAt { get; init; }
     public IReadOnlyCollection<RobotProgramArtifactResult> Artifacts { get; init; } = Array.Empty<RobotProgramArtifactResult>();
@@ -39,8 +37,6 @@ public sealed class RobotProgramResult
             ScopeType = program.ScopeType.ToString(),
             Status = program.Status.ToString(),
             Description = program.Description,
-            ProgramManifestSchemaVersion = program.ProgramManifestSchemaVersion,
-            ProgramManifestJson = program.ProgramManifestJson,
             ProgramManifestChecksum = program.ProgramManifestChecksum,
             PublishedAt = program.PublishedAt,
             Artifacts = program.RobotProgramArtifacts
@@ -53,7 +49,6 @@ public sealed class RobotProgramResult
                         Id = artifact.Id,
                         RobotArtifactId = artifact.RobotArtifactId,
                         RunOrder = artifact.RunOrder,
-                        ParametersSchemaVersion = artifact.ParametersSchemaVersion,
                         ParametersJson = artifact.ParametersJson,
                         ArtifactCode = snapshot?.ArtifactCode,
                         ArtifactName = snapshot?.ArtifactName,
@@ -72,7 +67,6 @@ public sealed class RobotProgramArtifactResult
     public Guid Id { get; init; }
     public Guid RobotArtifactId { get; init; }
     public int RunOrder { get; init; }
-    public int ParametersSchemaVersion { get; init; }
     public string? ParametersJson { get; init; }
     public string? ArtifactCode { get; init; }
     public string? ArtifactName { get; init; }

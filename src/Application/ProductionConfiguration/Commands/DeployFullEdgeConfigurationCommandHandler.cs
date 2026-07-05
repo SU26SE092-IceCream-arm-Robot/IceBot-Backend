@@ -160,6 +160,13 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         Guid? rollbackTargetDeploymentId,
         DateTimeOffset? requestedCommandExpiryAt)
     {
+        using var releaseManifest = JsonDocument.Parse(
+            release.ManifestJson ?? throw new DomainRuleException("Published release manifest is missing."));
+        if (!releaseManifest.RootElement.TryGetProperty("FullEdgeBundle", out var fullEdgeBundle))
+        {
+            throw new DomainRuleException("Published release Full Edge bundle descriptor is missing.");
+        }
+
         var artifacts = release.ExecutionRoutes
             .SelectMany(route => route.RobotBindings)
             .SelectMany(binding => RobotProgramManifestBuilder.Parse(
@@ -193,6 +200,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             RequestedCommandExpiryAt = requestedCommandExpiryAt,
             release.ReleaseManifestSchemaVersion,
             release.ManifestJson,
+            FullEdgeBundle = JsonSerializer.Deserialize<JsonElement>(fullEdgeBundle.GetRawText()),
             Artifacts = artifacts
         };
 

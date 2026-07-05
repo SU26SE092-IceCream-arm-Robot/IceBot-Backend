@@ -20,6 +20,7 @@ using Infrastructure.Operations.Persistence;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
 using Infrastructure.ProductionConfiguration.Persistence;
+using Infrastructure.ProductionConfiguration.ObjectStorage;
 using Infrastructure.RobotConfiguration.ObjectStorage;
 using Infrastructure.RobotConfiguration.Persistence;
 using Infrastructure.Persistence.Repositories;
@@ -122,6 +123,8 @@ namespace Infrastructure
                     "Robot artifact object storage settings are invalid.")
                 .ValidateOnStart();
             services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
+            services.AddScoped<IArtifactObjectReferenceSource, RobotConfigurationObjectReferenceSource>();
+            services.AddScoped<IArtifactObjectReferenceSource, ConfigurationReleaseBundleReferenceSource>();
             services.AddHostedService<RobotArtifactObjectStorageStartupValidator>();
             services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();

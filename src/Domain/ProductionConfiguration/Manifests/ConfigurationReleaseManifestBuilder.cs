@@ -10,7 +10,7 @@ namespace Domain.ProductionConfiguration.Manifests;
 
 public static class ConfigurationReleaseManifestBuilder
 {
-    public static ConfigurationReleaseManifest Create(
+    public static ConfigurationReleaseManifest CreateContent(
         ConfigurationRelease release,
         IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
@@ -48,6 +48,18 @@ public static class ConfigurationReleaseManifestBuilder
         return new ConfigurationReleaseManifest(json, checksum);
     }
 
+    public static ConfigurationReleaseManifest AttachFullEdgeBundle(
+        ConfigurationReleaseManifest contentManifest,
+        FullEdgeReleaseBundleDescriptor fullEdgeBundle)
+    {
+        var root = JsonNode.Parse(contentManifest.Json) as JsonObject
+            ?? throw new DomainRuleException("Configuration release content manifest must be a JSON object.");
+        root["FullEdgeBundle"] = JsonSerializer.SerializeToNode(fullEdgeBundle);
+        var json = root.ToJsonString();
+        var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
+        return new ConfigurationReleaseManifest(json, checksum);
+    }
+
     private static object CreateBinding(
         Guid organizationId,
         ExecutionRouteRobotBinding binding,
@@ -77,7 +89,9 @@ public static class ConfigurationReleaseManifestBuilder
                         artifact.Checksum,
                         artifact.StorageKey,
                         artifact.RuntimeTargetCode,
-                        artifact.MachineModelCode
+                        artifact.MachineModelCode,
+                        artifact.ContentLengthBytes,
+                        BundleEntryName = $"artifacts/{artifact.RobotArtifactId:D}.lua"
                     }
                 };
             })

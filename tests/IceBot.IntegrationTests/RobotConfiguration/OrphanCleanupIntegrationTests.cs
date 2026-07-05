@@ -1,5 +1,6 @@
 using System.Text;
 using Application.RobotConfiguration.Abstractions;
+using Application.ProductionConfiguration.Abstractions;
 using Domain.Common.Enums;
 using Domain.RobotConfiguration.Entities;
 using Domain.Tenants.Entities;
@@ -9,6 +10,8 @@ using Infrastructure.Data;
 using Infrastructure.RobotConfiguration.Jobs;
 using Infrastructure.RobotConfiguration.ObjectStorage;
 using Infrastructure.RobotConfiguration.Persistence;
+using Infrastructure.ProductionConfiguration.Persistence;
+using Infrastructure.ProductionConfiguration.ObjectStorage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,7 +33,7 @@ public sealed class OrphanCleanupIntegrationTests
     [IntegrationFact]
     public async Task Cleanup_RemovesUnreferencedObjectAndKeepsReferencedObject()
     {
-        var storage = _fixture.CreateObjectStorage();
+        var storage = _fixture.CreateObjectStorage(autoCreateBucket: true);
         var orphanKey = $"robot-artifacts/orphan/{Guid.NewGuid():N}.lua";
         var referencedKey = $"robot-artifacts/referenced/{Guid.NewGuid():N}.lua";
         await WriteAsync(storage, orphanKey, "orphan");
@@ -63,6 +66,9 @@ public sealed class OrphanCleanupIntegrationTests
         services.AddScoped(_ => _fixture.CreateDbContext());
         services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
         services.AddScoped<IRobotArtifactTemplateStore, RobotArtifactTemplateStore>();
+        services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
+        services.AddScoped<IArtifactObjectReferenceSource, RobotConfigurationObjectReferenceSource>();
+        services.AddScoped<IArtifactObjectReferenceSource, ConfigurationReleaseBundleReferenceSource>();
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {

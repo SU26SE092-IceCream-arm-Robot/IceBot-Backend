@@ -113,6 +113,29 @@ public class ConfigurationRelease : BusinessEntity
     public void Publish(
         DateTimeOffset publishedAt,
         Guid publishedByAccountId,
+        IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots,
+        FullEdgeReleaseBundleDescriptor fullEdgeBundle)
+    {
+        var contentManifest = PreparePublication(publishedByAccountId, programSnapshots);
+
+        if (fullEdgeBundle.ContentLengthBytes <= 0 ||
+            fullEdgeBundle.ArtifactCount <= 0 ||
+            string.IsNullOrWhiteSpace(fullEdgeBundle.StorageKey) ||
+            string.IsNullOrWhiteSpace(fullEdgeBundle.Checksum))
+        {
+            throw new DomainRuleException("A valid Full Edge release bundle is required before publication.");
+        }
+
+        var manifest = ConfigurationReleaseManifestBuilder.AttachFullEdgeBundle(contentManifest, fullEdgeBundle);
+        ManifestJson = manifest.Json;
+        ReleaseChecksum = manifest.Checksum;
+        PublishedAt = publishedAt;
+        PublishedByAccountId = publishedByAccountId;
+        Status = ConfigurationReleaseStatus.Published;
+    }
+
+    public ConfigurationReleaseManifest PreparePublication(
+        Guid publishedByAccountId,
         IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
         EnsureDraft();
@@ -132,12 +155,7 @@ public class ConfigurationRelease : BusinessEntity
             throw new DomainRuleException("Configuration release publisher account id is required.");
         }
 
-        var manifest = ConfigurationReleaseManifestBuilder.Create(this, programSnapshots);
-        ManifestJson = manifest.Json;
-        ReleaseChecksum = manifest.Checksum;
-        PublishedAt = publishedAt;
-        PublishedByAccountId = publishedByAccountId;
-        Status = ConfigurationReleaseStatus.Published;
+        return ConfigurationReleaseManifestBuilder.CreateContent(this, programSnapshots);
     }
 
     public void Retire(DateTimeOffset retiredAt)

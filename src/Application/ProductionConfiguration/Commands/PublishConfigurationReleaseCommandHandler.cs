@@ -1,21 +1,27 @@
 using Application.ProductionConfiguration.Abstractions;
 using Application.ProductionConfiguration.Results;
+using Application.RobotConfiguration.Abstractions;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.ProductionConfiguration.ValueObjects;
 using Domain.RobotConfiguration.Enums;
 using Domain.RobotConfiguration.Manifests;
+using Application.ProductionConfiguration.Services;
 
 namespace Application.ProductionConfiguration.Commands;
 
 public sealed class PublishConfigurationReleaseCommandHandler
 {
     private readonly IProductionConfigurationStore _productionConfigurationStore;
+    private readonly FullEdgeReleaseBundleService _bundleService;
 
-    public PublishConfigurationReleaseCommandHandler(IProductionConfigurationStore productionConfigurationStore)
+    public PublishConfigurationReleaseCommandHandler(
+        IProductionConfigurationStore productionConfigurationStore,
+        FullEdgeReleaseBundleService bundleService)
     {
         _productionConfigurationStore = productionConfigurationStore;
+        _bundleService = bundleService;
     }
 
     public async Task<ApiResult<ConfigurationReleaseResult>> HandleAsync(
@@ -42,7 +48,13 @@ public sealed class PublishConfigurationReleaseCommandHandler
                 .ToDictionary(
                     program => program.Id,
                     program => CreateSnapshot(program, release.OrganizationId));
-            release.Publish(DateTimeOffset.UtcNow, command.UserContext.AccountId, snapshots);
+            var contentManifest = release.PreparePublication(command.UserContext.AccountId, snapshots);
+            var bundle = await _bundleService.BuildAndStoreAsync(
+                release,
+                snapshots,
+                contentManifest.Json,
+                cancellationToken);
+            release.Publish(DateTimeOffset.UtcNow, command.UserContext.AccountId, snapshots, bundle);
             release.UpdatedByAccountId = command.UserContext.AccountId;
             await _productionConfigurationStore.SaveChangesAsync(cancellationToken);
             return ApiResult<ConfigurationReleaseResult>.Success(
@@ -52,6 +64,24 @@ public sealed class PublishConfigurationReleaseCommandHandler
         catch (DomainRuleException ex)
         {
             return ApiResult<ConfigurationReleaseResult>.Fail(ex.Message, 400);
+        }
+        catch (ArtifactObjectNotFoundException ex)
+        {
+            return ApiResult<ConfigurationReleaseResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectIntegrityException ex)
+        {
+            return ApiResult<ConfigurationReleaseResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectSizeLimitExceededException ex)
+        {
+            return ApiResult<ConfigurationReleaseResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectStorageUnavailableException)
+        {
+            return ApiResult<ConfigurationReleaseResult>.Fail(
+                "Artifact object storage is temporarily unavailable.",
+                503);
         }
     }
 
