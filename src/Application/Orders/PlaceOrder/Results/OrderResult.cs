@@ -1,4 +1,5 @@
 using Domain.Orders.Enums;
+using System.Text.Json.Serialization;
 
 namespace Application.Orders.PlaceOrder.Results;
 
@@ -12,8 +13,10 @@ public sealed class OrderResult
 
     public string? ClientOrderId { get; set; }
 
+    [JsonIgnore]
     public OrderStatus Status { get; set; }
 
+    [JsonIgnore]
     public PaymentStatus PaymentStatus { get; set; }
 
     public string Currency { get; set; } = "VND";

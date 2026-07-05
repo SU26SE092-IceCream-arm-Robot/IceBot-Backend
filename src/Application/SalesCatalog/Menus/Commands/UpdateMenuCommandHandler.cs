@@ -65,10 +65,15 @@ public sealed class UpdateMenuCommandHandler
         menu.Name = newName.Trim();
         menu.Description = request.Description is null ? menu.Description : MenuNormalizer.TrimToNull(request.Description);
         menu.Currency = MenuNormalizer.NormalizeCode(newCurrency);
+        foreach (var item in menu.MenuItems)
+        {
+            item.Currency = menu.Currency;
+            item.UpdatedAt = DateTimeOffset.UtcNow;
+            item.UpdatedByAccountId = updatedByAccountId;
+        }
         menu.EffectiveFrom = newEffectiveFrom;
         menu.EffectiveTo = newEffectiveTo;
         menu.DisplayOrder = request.DisplayOrder ?? menu.DisplayOrder;
-        menu.MetadataJson = request.MetadataJson is null ? menu.MetadataJson : MenuNormalizer.TrimToNull(request.MetadataJson);
         menu.UpdatedAt = DateTimeOffset.UtcNow;
         menu.UpdatedByAccountId = updatedByAccountId;
 

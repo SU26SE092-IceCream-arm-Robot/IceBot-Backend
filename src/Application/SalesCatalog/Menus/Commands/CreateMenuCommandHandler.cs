@@ -5,6 +5,7 @@ using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
 using Domain.SalesCatalog.Entities;
+using Application.Tenants;
 
 namespace Application.SalesCatalog.Menus.Commands;
 
@@ -24,8 +25,9 @@ public sealed class CreateMenuCommandHandler
         var request = command.Request;
         var createdByAccountId = command.CreatedByAccountId;
 
+        var scopeType = TenantScopeResolver.Resolve(request.StoreId, request.KioskId);
         var accessError = MenuManagementCommandRules.ValidateCreate<MenuResult>(
-            command.Scope, request.ScopeType, request.StoreId, request.KioskId);
+            command.Scope, scopeType, request.StoreId, request.KioskId);
         if (accessError is not null)
         {
             return accessError;
@@ -42,7 +44,7 @@ public sealed class CreateMenuCommandHandler
             request.Code,
             request.Name,
             request.Currency,
-            request.ScopeType,
+            scopeType,
             command.Scope.OrganizationId,
             request.StoreId,
             request.KioskId,
@@ -64,14 +66,13 @@ public sealed class CreateMenuCommandHandler
             Code = MenuNormalizer.NormalizeCode(request.Code),
             Name = request.Name.Trim(),
             Description = MenuNormalizer.TrimToNull(request.Description),
-            Status = request.Status,
-            ScopeType = request.ScopeType,
+            Status = Domain.SalesCatalog.Enums.MenuStatus.Draft,
+            ScopeType = scopeType,
             Currency = MenuNormalizer.NormalizeCode(request.Currency),
             EffectiveFrom = request.EffectiveFrom,
             EffectiveTo = request.EffectiveTo,
             DisplayOrder = request.DisplayOrder,
             MetadataSchemaVersion = 1,
-            MetadataJson = MenuNormalizer.TrimToNull(request.MetadataJson),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = createdByAccountId
         };

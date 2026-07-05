@@ -25,7 +25,6 @@ internal static class ProductResultMapper
             IsAvailable = product.IsAvailable,
             PreparationTimeSeconds = product.PreparationTimeSeconds,
             ImageUrl = product.ImageUrl,
-            MetadataJson = product.MetadataJson,
             ScopeType = product.ScopeType,
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt,
@@ -56,7 +55,6 @@ internal static class ProductResultMapper
             DisplayOrder = variant.DisplayOrder,
             PreparationTimeSeconds = variant.PreparationTimeSeconds,
             ImageUrl = variant.ImageUrl,
-            MetadataJson = variant.MetadataJson,
             CreatedAt = variant.CreatedAt,
             UpdatedAt = variant.UpdatedAt
         };

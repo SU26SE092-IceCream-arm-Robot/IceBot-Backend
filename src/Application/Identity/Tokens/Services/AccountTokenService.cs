@@ -86,7 +86,6 @@ namespace Application.Identity.Tokens.Services
                 FullName = account.FullName ?? string.Empty,
                 Email = account.Email,
                 ImageUrl = account.ImageUrl,
-                Address = account.Address,
                 Roles = roles.Select(role => new AuthenticatedAccountRoleResult
                 {
                     RoleCode = role.RoleCode,
@@ -94,10 +93,8 @@ namespace Application.Identity.Tokens.Services
                     StoreId = role.StoreId,
                     KioskId = role.KioskId
                 }).ToList(),
-                Status = account.Status.ToString(),
                 LocalLoginEnabled = account.LocalLoginEnabled,
-                GoogleLoginEnabled = account.GoogleLoginEnabled,
-                Gender = account.Gender
+                GoogleLoginEnabled = account.GoogleLoginEnabled
             };
         }
 

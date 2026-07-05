@@ -90,7 +90,6 @@ public sealed class ManagementRobotProgramsController : ControllerBase
             StoreId = request.StoreId,
             KioskId = request.KioskId,
             DeviceId = request.DeviceId,
-            ScopeType = request.ScopeType,
             Code = request.Code,
             Name = request.Name,
             Description = request.Description
@@ -188,9 +187,6 @@ public sealed class CreateRobotProgramRequest
 
     [Required, StringLength(200)]
     public string Name { get; init; } = string.Empty;
-
-    [EnumDataType(typeof(TenantScopeType))]
-    public TenantScopeType ScopeType { get; init; } = TenantScopeType.Organization;
 
     public Guid? StoreId { get; init; }
     public Guid? KioskId { get; init; }

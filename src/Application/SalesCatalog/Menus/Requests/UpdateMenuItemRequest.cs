@@ -16,8 +16,6 @@ public sealed class UpdateMenuItemRequest
 
     public decimal? DiscountAmount { get; set; }
 
-    public string? Currency { get; set; }
-
     public int? DisplayOrder { get; set; }
 
     public int? PreparationTimeSeconds { get; set; }
@@ -28,5 +26,4 @@ public sealed class UpdateMenuItemRequest
 
     public DateTimeOffset? EffectiveTo { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

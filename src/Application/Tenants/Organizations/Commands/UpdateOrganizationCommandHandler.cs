@@ -45,7 +45,6 @@ public sealed class UpdateOrganizationCommandHandler
             org.Email = request.Email?.Trim().ToLowerInvariant() ?? org.Email;
             org.PhoneNumber = request.PhoneNumber?.Trim() ?? org.PhoneNumber;
             org.Address = request.Address?.Trim() ?? org.Address;
-            org.MetadataJson = request.MetadataJson ?? org.MetadataJson;
         }
         else
         {

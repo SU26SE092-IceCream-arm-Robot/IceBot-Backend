@@ -22,6 +22,4 @@ public sealed class UpdateProductRequest
 
     public string? ImageUrl { get; set; }
 
-    public string? MetadataJson { get; set; }
-
 }

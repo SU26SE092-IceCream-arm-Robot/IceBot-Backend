@@ -11,7 +11,6 @@ public sealed class ReplaceConfigurationReleaseRoutesCommand
 }
 
 public sealed record ConfigurationReleaseRouteInput(
-    Guid ProductVariantId,
     Guid RecipeId,
     string RouteCode,
     int Priority,

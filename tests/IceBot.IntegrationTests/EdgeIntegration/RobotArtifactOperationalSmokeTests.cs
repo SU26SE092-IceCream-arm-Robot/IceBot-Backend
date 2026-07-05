@@ -562,7 +562,6 @@ public sealed class RobotArtifactOperationalSmokeTests
                 {
                     UserContext = user,
                     OrganizationId = graph.OrganizationId,
-                    ScopeType = TenantScopeType.Organization,
                     Code = $"SMOKE-{Guid.NewGuid():N}",
                     Name = "Operational smoke program"
                 });
@@ -613,7 +612,6 @@ public sealed class RobotArtifactOperationalSmokeTests
                     Routes =
                     [
                         new ConfigurationReleaseRouteInput(
-                            graph.ProductVariantId,
                             graph.RecipeId,
                             "DEFAULT",
                             0,

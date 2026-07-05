@@ -4,6 +4,7 @@ using Application.Catalog.Products.Results;
 using Application.Catalog.Products.Rules;
 using Application.Catalog.Products.Support;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Domain.Catalog.Entities;
 
 namespace Application.Catalog.Products.Commands;
@@ -24,8 +25,11 @@ public sealed class CreateProductCommandHandler
         var request = command.Request;
         var createdByAccountId = command.CreatedByAccountId;
 
+        var scopeType = command.Scope.IsGlobalTemplate
+            ? Domain.Tenants.Enums.TenantScopeType.Global
+            : TenantScopeResolver.Resolve(request.StoreId, request.KioskId);
         var accessError = ProductManagementCommandRules.ValidateCreate<ProductResult>(
-            command.Scope, request.ScopeType, request.StoreId, request.KioskId);
+            command.Scope, scopeType, request.StoreId, request.KioskId);
         if (accessError is not null)
         {
             return accessError;
@@ -40,7 +44,6 @@ public sealed class CreateProductCommandHandler
 
         if (command.Scope.IsGlobalTemplate)
         {
-            request.ScopeType = Domain.Tenants.Enums.TenantScopeType.Global;
             request.StoreId = null;
             request.KioskId = null;
         }
@@ -49,6 +52,7 @@ public sealed class CreateProductCommandHandler
             _products,
             request,
             command.Scope.IsGlobalTemplate ? null : command.Scope.OrganizationId,
+            scopeType,
             cancellationToken);
         if (validationError is not null)
         {
@@ -70,18 +74,18 @@ public sealed class CreateProductCommandHandler
             ProductType = ProductNormalizer.NormalizeOptionalCode(request.ProductType, "IceCream"),
             BasePrice = request.BasePrice,
             Currency = ProductNormalizer.NormalizeOptionalCode(request.Currency, "VND"),
-            IsAvailable = request.IsAvailable,
+            IsAvailable = false,
             PreparationTimeSeconds = request.PreparationTimeSeconds,
             ImageUrl = ProductNormalizer.TrimToNull(request.ImageUrl),
-            MetadataJson = ProductNormalizer.TrimToNull(request.MetadataJson),
-            ScopeType = request.ScopeType,
+            ScopeType = scopeType,
             CreatedAt = now,
             CreatedByAccountId = createdByAccountId
         };
 
         foreach (var variantRequest in request.Variants)
         {
-            product.ProductVariants.Add(ProductVariantFactory.CreateVariant(variantRequest, product.Id, now, createdByAccountId));
+            product.ProductVariants.Add(ProductVariantFactory.CreateVariant(
+                variantRequest, product.Id, product.Currency, now, createdByAccountId));
         }
 
         await _products.AddProductAsync(product, cancellationToken);

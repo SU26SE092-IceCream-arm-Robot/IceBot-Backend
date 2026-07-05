@@ -36,8 +36,6 @@ public sealed class ProductResult
 
     public string? ImageUrl { get; set; }
 
-    public string? MetadataJson { get; set; }
-
     public TenantScopeType ScopeType { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }

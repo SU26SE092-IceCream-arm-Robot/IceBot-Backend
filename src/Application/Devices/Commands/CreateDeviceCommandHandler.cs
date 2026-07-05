@@ -5,7 +5,6 @@ using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks;
 using Domain.Devices.Entities;
 using Domain.Devices.Enums;
-using System.Text.Json;
 
 namespace Application.Devices.Commands;
 
@@ -69,11 +68,6 @@ public sealed class CreateDeviceCommandHandler
             }
         }
 
-        if (!string.IsNullOrWhiteSpace(request.MetadataJson) && !IsValidJson(request.MetadataJson))
-        {
-            return ApiResult<DeviceResult>.Fail("MetadataJson must be a valid JSON string.", 400);
-        }
-
         var device = new Device
         {
             Id = Guid.NewGuid(),
@@ -87,7 +81,6 @@ public sealed class CreateDeviceCommandHandler
             PositionLabel = request.PositionLabel?.Trim(),
             FirmwareVersion = request.FirmwareVersion?.Trim(),
             InstalledAt = request.InstalledAt,
-            MetadataJson = request.MetadataJson?.Trim(),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = userContext.AccountId
         };
@@ -103,18 +96,5 @@ public sealed class CreateDeviceCommandHandler
         }
 
         return ApiResult<DeviceResult>.Success(DeviceResultMapper.ToResult(createdDevice), "Device created successfully.", 201);
-    }
-
-    private static bool IsValidJson(string json)
-    {
-        try
-        {
-            using var doc = JsonDocument.Parse(json);
-            return true;
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
     }
 }

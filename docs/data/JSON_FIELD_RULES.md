@@ -99,6 +99,8 @@ Rules:
 - `*SnapshotJson`: immutable historical copy.
 - `PayloadJson`, `HeadersJson`, `Raw*Json`: external evidence/debug payload.
 - `MetadataJson`: optional extension data only.
+- Generic metadata columns are persistence extension points, not default frontend editing contracts. Normal organization, catalog, and menu APIs expose typed fields only; technical artifact authoring may expose metadata when the artifact workflow owns a concrete use case.
+- `Kiosk.SettingsJson` and `Device.MetadataJson` remain persistence extension points but are not exposed through normal management CRUD until a typed use case exists. `Store.OpeningHoursJson` is an internal serialized representation; frontend contracts use typed day/open/close fields.
 
 ## Sync Boundary
 

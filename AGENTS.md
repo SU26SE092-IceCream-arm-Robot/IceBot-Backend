@@ -66,6 +66,10 @@ This is the main implementation repository for IceBot backend work.
 - Compare headings and content coverage before removing the original; report intentional omissions and replacement decisions first.
 - Write user-chosen architecture as Confirmed Decision. Keep agent proposals as Recommendation and unresolved choices as Open Design Choice.
 - Do not turn a recommended entity name, split, migration, or ownership boundary into a final architecture decision without explicit user approval.
+- Backend docs prioritize current implementation contracts and procedures needed to build, integrate, operate, or verify the system.
+- Preserve concise rationale, examples, future constraints, and implementation guidance when they are necessary to apply a contract correctly. Route extended discussion history, option comparisons, and rejected designs to the smallest owning Vault note; route standalone migration direction to `Vault/Evolution`.
+- Do not document a completed implementation step unless it changes a contract or creates an operation readers must perform.
+- When the user explicitly requests documentation cleanup, remove stale, duplicate, historical, or non-operational content after preserving the pre-cleanup version. Do not retain obsolete text merely to make the restructure lossless.
 
 ## Decision Traceability
 

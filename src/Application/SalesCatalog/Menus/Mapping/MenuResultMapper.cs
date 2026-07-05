@@ -22,7 +22,6 @@ internal static class MenuResultMapper
             EffectiveFrom = menu.EffectiveFrom,
             EffectiveTo = menu.EffectiveTo,
             DisplayOrder = menu.DisplayOrder,
-            MetadataJson = menu.MetadataJson,
             CreatedAt = menu.CreatedAt,
             UpdatedAt = menu.UpdatedAt,
             Items = menu.MenuItems
@@ -54,7 +53,6 @@ internal static class MenuResultMapper
             ImageUrl = item.ImageUrl,
             EffectiveFrom = item.EffectiveFrom,
             EffectiveTo = item.EffectiveTo,
-            MetadataJson = item.MetadataJson,
             CreatedAt = item.CreatedAt,
             UpdatedAt = item.UpdatedAt
         };

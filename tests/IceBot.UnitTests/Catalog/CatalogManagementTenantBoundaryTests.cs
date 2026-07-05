@@ -70,7 +70,6 @@ public sealed class CatalogManagementTenantBoundaryTests
             Request = new CreateProductRequest
             {
                 StoreId = storeId,
-                ScopeType = TenantScopeType.Store,
                 Code = "COFFEE",
                 Name = "Coffee",
                 BasePrice = 10_000

@@ -36,6 +36,8 @@ For Google login, `GoogleEmail` is the management-configured identity allowlist 
 
 The invited user only supplies credential material for an enabled method, such as choosing a password when local login is enabled. The user does not choose the account's allowed login policy.
 
+The management password-reset/set-password command also changes credential material only. It does not implicitly enable local login; management must change `LocalLoginEnabled` through the account policy update contract.
+
 ## Default Flow
 
 Default request behavior:
@@ -61,7 +63,7 @@ The management response should include invitation details when an invitation is 
 ```text
 invitationUrl
 expiresAt
-emailSent
+emailSentAt
 ```
 
 `Email:InvitationBaseUrl` is required at startup. Management responses return the complete invitation URL and never expose the raw bearer token as a separate field.
@@ -146,7 +148,6 @@ If invitation email delivery fails:
 account remains Invited
 invitation remains usable
 response includes invitation link
-emailSent = false
 EmailSentAt remains null
 ```
 
@@ -188,7 +189,7 @@ Expired invitations are not extended or revived. Create a new invitation instead
 
 ## Accept Invitation
 
-Accept invitation is public because the invited user may not be logged in.
+Invitation acceptance is a public endpoint and does not require an existing login.
 
 Route direction:
 
@@ -222,7 +223,7 @@ Acceptance is not idempotent. If a token has already been accepted, return an ex
 
 If a token is expired or revoked, return an explicit error and require management to create a new invitation.
 
-Current implementation uses:
+Email delivery proof uses:
 
 ```text
 AccountInvitation.EmailSentAt

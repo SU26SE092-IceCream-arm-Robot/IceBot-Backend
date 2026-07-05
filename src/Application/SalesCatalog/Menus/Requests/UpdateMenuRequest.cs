@@ -16,5 +16,4 @@ public sealed class UpdateMenuRequest
 
     public int? DisplayOrder { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

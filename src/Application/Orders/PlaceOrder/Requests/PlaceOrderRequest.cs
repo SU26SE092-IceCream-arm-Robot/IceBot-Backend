@@ -1,5 +1,3 @@
-using Domain.Orders.Enums;
-
 namespace Application.Orders.PlaceOrder.Requests;
 
 public sealed class PlaceOrderRequest
@@ -9,8 +7,6 @@ public sealed class PlaceOrderRequest
     public string? ClientOrderId { get; set; }
 
     public decimal? ClientTotalAmount { get; set; }
-
-    public OrderChannel Channel { get; set; } = OrderChannel.Tablet;
 
     public string? CustomerName { get; set; }
 

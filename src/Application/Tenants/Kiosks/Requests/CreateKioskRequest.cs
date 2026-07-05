@@ -29,5 +29,4 @@ public sealed class CreateKioskRequest
 
     public bool SupportsOfflineMode { get; set; } = true;
 
-    public string? SettingsJson { get; set; }
 }

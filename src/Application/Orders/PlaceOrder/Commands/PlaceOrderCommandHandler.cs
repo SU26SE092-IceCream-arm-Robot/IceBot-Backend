@@ -81,7 +81,7 @@ public sealed class PlaceOrderCommandHandler
                 OrderNumber = OrderNumberGenerator.GenerateOrderNumber(now),
                 IdempotencyKey = idempotencyKey,
                 ClientOrderId = clientOrderId,
-                Channel = request.Channel,
+                Channel = Domain.Orders.Enums.OrderChannel.Tablet,
                 Currency = DefaultCurrency,
                 CustomerName = NormalizeOptional(request.CustomerName),
                 CustomerPhoneNumber = NormalizeOptional(request.CustomerPhoneNumber),

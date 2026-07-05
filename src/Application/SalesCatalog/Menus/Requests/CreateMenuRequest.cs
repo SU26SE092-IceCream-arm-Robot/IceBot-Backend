@@ -1,5 +1,4 @@
 using Domain.SalesCatalog.Enums;
-using Domain.Tenants.Enums;
 
 namespace Application.SalesCatalog.Menus.Requests;
 
@@ -15,10 +14,6 @@ public sealed class CreateMenuRequest
 
     public string? Description { get; set; }
 
-    public MenuStatus Status { get; set; } = MenuStatus.Draft;
-
-    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Organization;
-
     public string Currency { get; set; } = "VND";
 
     public DateTimeOffset? EffectiveFrom { get; set; }
@@ -27,5 +22,4 @@ public sealed class CreateMenuRequest
 
     public int DisplayOrder { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

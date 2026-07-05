@@ -10,11 +10,6 @@ internal static class KioskTelemetryResultMapper
     {
         return new KioskHeartbeatResult
         {
-            Id = heartbeat.Id,
-            KioskId = heartbeat.KioskId,
-            NodeId = heartbeat.NodeId,
-            OriginNodeId = heartbeat.OriginNodeId,
-            HeartbeatSequence = heartbeat.HeartbeatSequence,
             ReportedAt = heartbeat.ReportedAt,
             ReceivedAt = heartbeat.ReceivedAt,
             Status = heartbeat.Status,
@@ -36,10 +31,6 @@ internal static class KioskTelemetryResultMapper
             Id = deviceEvent.Id,
             DeviceId = deviceEvent.DeviceId,
             KioskId = deviceEvent.KioskId,
-            EventId = deviceEvent.EventId,
-            OriginNodeId = deviceEvent.OriginNodeId,
-            CorrelationId = deviceEvent.CorrelationId,
-            CausationId = deviceEvent.CausationId,
             EventType = deviceEvent.EventType,
             Severity = deviceEvent.Severity,
             Message = deviceEvent.Message,

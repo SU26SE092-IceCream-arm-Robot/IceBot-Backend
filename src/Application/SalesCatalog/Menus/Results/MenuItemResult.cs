@@ -21,7 +21,6 @@ public sealed class MenuItemResult
     public string? ImageUrl { get; set; }
     public DateTimeOffset? EffectiveFrom { get; set; }
     public DateTimeOffset? EffectiveTo { get; set; }
-    public string? MetadataJson { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 }

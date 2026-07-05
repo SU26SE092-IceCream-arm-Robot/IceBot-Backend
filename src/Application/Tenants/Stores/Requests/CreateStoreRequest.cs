@@ -37,5 +37,5 @@ public sealed class CreateStoreRequest
     [EmailAddress]
     public string? Email { get; set; }
 
-    public string? OpeningHoursJson { get; set; }
+    public IReadOnlyList<StoreOpeningHoursDayRequest> OpeningHours { get; set; } = [];
 }

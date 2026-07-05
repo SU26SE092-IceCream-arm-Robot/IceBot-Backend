@@ -55,7 +55,7 @@ public sealed class UpdateMenuItemCommandHandler
         var newDisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? item.DisplayName : request.DisplayName;
         var newPrice = request.Price ?? item.Price;
         var newDiscount = request.DiscountAmount ?? item.DiscountAmount;
-        var newCurrency = string.IsNullOrWhiteSpace(request.Currency) ? item.Currency : request.Currency;
+        var newCurrency = menu.Currency;
         var newPreparationTime = request.PreparationTimeSeconds ?? item.PreparationTimeSeconds;
         var newEffectiveFrom = request.EffectiveFrom ?? item.EffectiveFrom;
         var newEffectiveTo = request.EffectiveTo ?? item.EffectiveTo;
@@ -97,7 +97,6 @@ public sealed class UpdateMenuItemCommandHandler
         item.ImageUrl = request.ImageUrl is null ? item.ImageUrl : MenuNormalizer.TrimToNull(request.ImageUrl);
         item.EffectiveFrom = newEffectiveFrom;
         item.EffectiveTo = newEffectiveTo;
-        item.MetadataJson = request.MetadataJson is null ? item.MetadataJson : MenuNormalizer.TrimToNull(request.MetadataJson);
         item.UpdatedAt = DateTimeOffset.UtcNow;
         item.UpdatedByAccountId = updatedByAccountId;
 

@@ -14,13 +14,9 @@ public sealed class CreateMenuItemRequest
 
     public string? Description { get; set; }
 
-    public MenuItemStatus Status { get; set; } = MenuItemStatus.Draft;
-
     public decimal Price { get; set; }
 
     public decimal DiscountAmount { get; set; }
-
-    public string Currency { get; set; } = "VND";
 
     public int DisplayOrder { get; set; }
 
@@ -32,5 +28,4 @@ public sealed class CreateMenuItemRequest
 
     public DateTimeOffset? EffectiveTo { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

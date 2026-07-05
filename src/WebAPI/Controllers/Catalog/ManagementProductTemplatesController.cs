@@ -84,7 +84,6 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     [Authorize(Policy = "product-templates.manage")]
     public async Task<IActionResult> Create([FromBody] CreateProductRequest request, CancellationToken cancellationToken)
     {
-        request.ScopeType = TenantScopeType.Global;
         request.StoreId = null;
         request.KioskId = null;
         var result = await _create.HandleAsync(new CreateProductCommand

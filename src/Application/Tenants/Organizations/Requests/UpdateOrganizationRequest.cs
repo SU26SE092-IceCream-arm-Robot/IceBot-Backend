@@ -19,5 +19,4 @@ public sealed class UpdateOrganizationRequest
 
     public string? Address { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

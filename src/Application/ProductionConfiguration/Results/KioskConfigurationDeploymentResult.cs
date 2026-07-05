@@ -1,5 +1,7 @@
 using Domain.ProductionConfiguration.Entities;
 
+using System.Text.Json.Serialization;
+
 namespace Application.ProductionConfiguration.Results;
 
 public sealed class KioskConfigurationDeploymentResult
@@ -13,6 +15,7 @@ public sealed class KioskConfigurationDeploymentResult
     public string Status { get; init; } = null!;
     public DateTimeOffset RequestedAt { get; init; }
     public Guid? RequestedByAccountId { get; init; }
+    [JsonIgnore]
     public Guid? EdgeCommandId { get; init; }
 
     public static KioskConfigurationDeploymentResult FromEntity(

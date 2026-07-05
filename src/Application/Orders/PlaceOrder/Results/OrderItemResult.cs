@@ -16,19 +16,19 @@ public sealed class OrderItemResult
 
     public string? ClientLineId { get; set; }
 
-    public string MenuItemCodeSnapshot { get; set; } = null!;
+    public string MenuItemCode { get; set; } = null!;
 
-    public string MenuItemNameSnapshot { get; set; } = null!;
+    public string MenuItemName { get; set; } = null!;
 
-    public string ProductCodeSnapshot { get; set; } = null!;
+    public string ProductCode { get; set; } = null!;
 
-    public string ProductNameSnapshot { get; set; } = null!;
+    public string ProductName { get; set; } = null!;
 
-    public string ProductVariantCodeSnapshot { get; set; } = null!;
+    public string ProductVariantCode { get; set; } = null!;
 
-    public string ProductVariantNameSnapshot { get; set; } = null!;
+    public string ProductVariantName { get; set; } = null!;
 
-    public int? RecipeVersionSnapshot { get; set; }
+    public int? RecipeVersion { get; set; }
 
     public int Quantity { get; set; }
 
@@ -38,5 +38,6 @@ public sealed class OrderItemResult
 
     public decimal TotalAmount { get; set; }
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public OrderItemStatus Status { get; set; }
 }

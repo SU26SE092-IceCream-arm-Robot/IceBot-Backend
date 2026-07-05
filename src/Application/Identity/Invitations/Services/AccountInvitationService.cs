@@ -96,8 +96,7 @@ public sealed class AccountInvitationService
             AccountId = account.Id,
             InvitationUrl = invitationUrl,
             ExpiresAt = invitation.ExpiresAt,
-            EmailSentAt = invitation.EmailSentAt,
-            EmailSent = emailSent
+            EmailSentAt = invitation.EmailSentAt
         };
 
         if (sendEmail && !emailSent)

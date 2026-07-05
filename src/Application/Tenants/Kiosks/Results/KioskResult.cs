@@ -17,8 +17,6 @@ public sealed class KioskResult
     public DateTimeOffset? InstalledAt { get; set; }
     public DateTimeOffset? LastOnlineAt { get; set; }
     public bool SupportsOfflineMode { get; set; }
-    public long ConfigurationVersion { get; set; }
-    public string? SettingsJson { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 }
