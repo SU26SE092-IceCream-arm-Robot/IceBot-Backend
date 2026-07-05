@@ -102,8 +102,6 @@ public interface IRobotConfigurationStore
         IReadOnlyCollection<Guid> artifactIds,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<string>> ListArtifactStorageKeysAsync(CancellationToken cancellationToken = default);
-
     Task<RobotArtifactInsertResult> InsertArtifactOrGetExistingAsync(
         RobotArtifact artifact,
         CancellationToken cancellationToken = default);

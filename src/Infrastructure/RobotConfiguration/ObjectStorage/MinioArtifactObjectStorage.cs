@@ -53,6 +53,16 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
         {
             return false;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (IsStorageFailure(exception))
+        {
+            throw new ArtifactObjectStorageUnavailableException(
+                $"Artifact object storage could not check '{storageKey}'.",
+                exception);
+        }
     }
 
     public async Task<ArtifactObjectWriteResult> WriteImmutableAsync(
@@ -67,14 +77,27 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
             throw new ArtifactObjectAlreadyExistsException(request.StorageKey);
         }
 
-        await _client.PutObjectAsync(
-            new PutObjectArgs()
-                .WithBucket(_options.BucketName)
-                .WithObject(request.StorageKey)
-                .WithStreamData(content)
-                .WithObjectSize(request.ContentLengthBytes)
-                .WithContentType(request.ContentType),
-            cancellationToken);
+        try
+        {
+            await _client.PutObjectAsync(
+                new PutObjectArgs()
+                    .WithBucket(_options.BucketName)
+                    .WithObject(request.StorageKey)
+                    .WithStreamData(content)
+                    .WithObjectSize(request.ContentLengthBytes)
+                    .WithContentType(request.ContentType),
+                cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (IsStorageFailure(exception))
+        {
+            throw new ArtifactObjectStorageUnavailableException(
+                $"Artifact object storage could not write '{request.StorageKey}'.",
+                exception);
+        }
 
         return new ArtifactObjectWriteResult(request.StorageKey, request.Checksum, request.ContentLengthBytes);
     }
@@ -102,6 +125,92 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
 
         return new ArtifactObjectReadUrlResult(url, expiresAt);
     }
+
+    public async Task<byte[]> ReadBytesAsync(
+        string storageKey,
+        long maximumBytes,
+        CancellationToken cancellationToken = default)
+    {
+        if (maximumBytes <= 0 || maximumBytes > int.MaxValue)
+        {
+            throw new ArgumentOutOfRangeException(nameof(maximumBytes));
+        }
+
+        try
+        {
+            return await _readResilience.ExecuteAsync(async token =>
+            {
+                await using var content = new MemoryStream((int)maximumBytes);
+                await _client.GetObjectAsync(
+                    new GetObjectArgs()
+                        .WithBucket(_options.BucketName)
+                        .WithObject(storageKey)
+                        .WithCallbackStream(stream => CopyWithLimit(
+                            stream,
+                            content,
+                            storageKey,
+                            maximumBytes,
+                            token)),
+                    token);
+                return content.ToArray();
+            }, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (ArtifactObjectSizeLimitExceededException)
+        {
+            throw;
+        }
+        catch (ObjectNotFoundException exception)
+        {
+            throw new ArtifactObjectNotFoundException(storageKey, exception);
+        }
+        catch (BucketNotFoundException exception)
+        {
+            throw new ArtifactObjectNotFoundException(storageKey, exception);
+        }
+        catch (Exception exception) when (IsStorageFailure(exception))
+        {
+            throw new ArtifactObjectStorageUnavailableException(
+                $"Artifact object storage could not read '{storageKey}'.",
+                exception);
+        }
+    }
+
+    private static void CopyWithLimit(
+        Stream source,
+        Stream destination,
+        string storageKey,
+        long maximumBytes,
+        CancellationToken cancellationToken)
+    {
+        var buffer = new byte[81920];
+        long totalBytes = 0;
+        while (true)
+        {
+            var read = source.ReadAsync(buffer.AsMemory(), cancellationToken)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+            if (read == 0)
+            {
+                break;
+            }
+
+            totalBytes += read;
+            if (totalBytes > maximumBytes)
+            {
+                throw new ArtifactObjectSizeLimitExceededException(storageKey, maximumBytes);
+            }
+
+            destination.Write(buffer, 0, read);
+        }
+    }
+
+    private static bool IsStorageFailure(Exception exception) =>
+        exception is MinioException or HttpRequestException or IOException or TimeoutException;
 
     public async Task<ArtifactObjectWriteResult> CopyImmutableAsync(
         string sourceStorageKey,

@@ -64,12 +64,12 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     [Authorize(Policy = "release.rollback")]
     public async Task<IActionResult> Rollback(
         Guid deploymentId, [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
-        [FromBody] RollbackConfigurationDeploymentRequest request, CancellationToken cancellationToken)
+        CancellationToken cancellationToken)
     {
         var result = await _rollbackHandler.HandleAsync(new RollbackConfigurationDeploymentCommand
         {
             UserContext = User.GetUserContext(), TargetDeploymentId = deploymentId,
-            IdempotencyKey = idempotencyKey, CommandExpiryAt = request.CommandExpiryAt
+            IdempotencyKey = idempotencyKey
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -85,7 +85,7 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             UserContext = User.GetUserContext(), KioskId = kioskId,
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
-            IdempotencyKey = idempotencyKey, CommandExpiryAt = request.CommandExpiryAt
+            IdempotencyKey = idempotencyKey
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -103,16 +103,10 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
             Selections = request.Selections.Select(item => new DeployLowCostArtifactSelection(
-                item.ExecutionRouteId, item.RobotProgramId)).ToArray(),
-            CommandExpiryAt = request.CommandExpiryAt
+                item.ExecutionRouteId, item.RobotProgramId)).ToArray()
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
-}
-
-public sealed class RollbackConfigurationDeploymentRequest
-{
-    public DateTimeOffset? CommandExpiryAt { get; init; }
 }
 
 public sealed class DeployFullEdgeConfigurationRequest
@@ -123,7 +117,6 @@ public sealed class DeployFullEdgeConfigurationRequest
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
 
-    public DateTimeOffset? CommandExpiryAt { get; init; }
 }
 
 public sealed class DeployLowCostArtifactSetRequest
@@ -137,7 +130,6 @@ public sealed class DeployLowCostArtifactSetRequest
     [Required, MinLength(1)]
     public IReadOnlyCollection<DeployLowCostArtifactSetSelectionRequest> Selections { get; init; } = [];
 
-    public DateTimeOffset? CommandExpiryAt { get; init; }
 }
 
 public sealed class DeployLowCostArtifactSetSelectionRequest

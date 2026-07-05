@@ -7,10 +7,8 @@ public sealed class ControllerArtifactSetDeploymentResult
     public Guid Id { get; init; }
     public Guid KioskId { get; init; }
     public Guid KioskExecutionEndpointId { get; init; }
-    public Guid ControllerId { get; init; }
     public Guid SourceConfigurationReleaseId { get; init; }
     public string ReleaseChecksum { get; init; } = null!;
-    public string IdempotencyKey { get; init; } = null!;
     public long ActiveSetVersion { get; init; }
     public string ActiveSetChecksum { get; init; } = null!;
     public int RequestedArtifactCount { get; init; }
@@ -29,10 +27,8 @@ public sealed class ControllerArtifactSetDeploymentResult
             Id = deployment.Id,
             KioskId = deployment.KioskId,
             KioskExecutionEndpointId = deployment.KioskExecutionEndpointId,
-            ControllerId = deployment.ControllerId,
             SourceConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
             ReleaseChecksum = deployment.ReleaseChecksum,
-            IdempotencyKey = deployment.IdempotencyKey,
             ActiveSetVersion = deployment.ActiveSetVersion,
             ActiveSetChecksum = deployment.ActiveSetChecksum,
             RequestedArtifactCount = deployment.RequestedArtifactCount,

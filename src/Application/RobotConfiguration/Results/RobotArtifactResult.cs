@@ -9,7 +9,6 @@ public sealed class RobotArtifactResult
     public Guid? SourceRobotArtifactTemplateId { get; init; }
     public string ArtifactCode { get; init; } = null!;
     public string ArtifactName { get; init; } = null!;
-    public string StorageKey { get; init; } = null!;
     public string FileName { get; init; } = null!;
     public string Checksum { get; init; } = null!;
     public string RuntimeTargetCode { get; init; } = null!;
@@ -29,7 +28,6 @@ public sealed class RobotArtifactResult
             SourceRobotArtifactTemplateId = artifact.SourceRobotArtifactTemplateId,
             ArtifactCode = artifact.ArtifactCode,
             ArtifactName = artifact.ArtifactName,
-            StorageKey = artifact.StorageKey,
             FileName = artifact.FileName,
             Checksum = artifact.Checksum,
             RuntimeTargetCode = artifact.RuntimeTargetCode,

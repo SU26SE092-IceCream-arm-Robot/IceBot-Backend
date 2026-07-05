@@ -31,8 +31,6 @@ public interface IRobotArtifactTemplateStore
         RobotArtifactTemplate template,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyCollection<string>> ListStorageKeysAsync(CancellationToken cancellationToken = default);
-
     Task<RobotArtifactTemplateDiscardOutcome> DiscardDraftAsync(
         RobotArtifactTemplate template,
         CancellationToken cancellationToken = default);

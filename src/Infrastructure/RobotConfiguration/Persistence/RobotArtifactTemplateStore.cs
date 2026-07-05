@@ -79,11 +79,6 @@ public sealed class RobotArtifactTemplateStore : IRobotArtifactTemplateStore
         }
     }
 
-    public async Task<IReadOnlyCollection<string>> ListStorageKeysAsync(CancellationToken cancellationToken = default) =>
-        await _dbContext.RobotArtifactTemplates.AsNoTracking()
-            .Select(template => template.StorageKey)
-            .ToArrayAsync(cancellationToken);
-
     public async Task<RobotArtifactTemplateDiscardOutcome> DiscardDraftAsync(
         RobotArtifactTemplate template,
         CancellationToken cancellationToken = default)

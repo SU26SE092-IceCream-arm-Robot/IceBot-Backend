@@ -2,6 +2,7 @@ using Domain.Sync.Ingestion;
 using Domain.Devices.Telemetry;
 using Domain.Devices.ExecutionEndpoints;
 using System.Text;
+using System.Text.Json;
 using Application.EdgeIntegration;
 using Application.EdgeIntegration.Commands;
 using Application.EdgeIntegration.Services;
@@ -12,6 +13,7 @@ using Application.Orders.Management.Queries;
 using Application.Orders.Management.Commands;
 using Application.Orders.PlaceOrder.Queries;
 using Application.ProductionConfiguration.Commands;
+using Application.ProductionConfiguration.Services;
 using Application.RobotConfiguration.Commands;
 using Application.RobotConfiguration.Services;
 using Domain.Catalog.Entities;
@@ -520,7 +522,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             var upload = new UploadRobotArtifactCommandHandler(
                 robotStore,
                 new ArtifactUploadContentService(
-                    _fixture.CreateObjectStorage(),
+                    _fixture.CreateObjectStorage(autoCreateBucket: true),
                     NullLogger<ArtifactUploadContentService>.Instance));
             var bulkUpload = new BulkUploadRobotArtifactsCommandHandler(upload);
             await using var lua = new MemoryStream(luaBytes);
@@ -621,7 +623,9 @@ public sealed class RobotArtifactOperationalSmokeTests
                 });
             Assert.True(routed.Succeeded, routed.Message);
 
-            var publishedRelease = await new PublishConfigurationReleaseCommandHandler(productionStore).HandleAsync(
+            var publishedRelease = await new PublishConfigurationReleaseCommandHandler(
+                productionStore,
+                new FullEdgeReleaseBundleService(_fixture.CreateObjectStorage(autoCreateBucket: true))).HandleAsync(
                 new PublishConfigurationReleaseCommand
                 {
                     UserContext = user,
@@ -1298,7 +1302,16 @@ public sealed class RobotArtifactOperationalSmokeTests
                     MaxCommands = 10
                 });
             Assert.True(pulled.Succeeded, pulled.Message);
-            Assert.Contains(pulled.Data!.Commands, command => command.CommandId == commandId);
+            var pulledCommand = Assert.Single(pulled.Data!.Commands, command => command.CommandId == commandId);
+            if (pulledCommand.CommandType == EdgeCommandType.DeployConfiguration.ToString())
+            {
+                using var payload = JsonDocument.Parse(pulledCommand.PayloadJson);
+                var bundle = payload.RootElement.GetProperty("FullEdgeBundle");
+                Assert.EndsWith(".zip", bundle.GetProperty("StorageKey").GetString());
+                Assert.False(string.IsNullOrWhiteSpace(bundle.GetProperty("DownloadUrl").GetString()));
+                Assert.All(payload.RootElement.GetProperty("Artifacts").EnumerateArray(), artifact =>
+                    Assert.False(string.IsNullOrWhiteSpace(artifact.GetProperty("DownloadUrl").GetString())));
+            }
         }
 
         await using (var dbContext = _fixture.CreateDbContext())
