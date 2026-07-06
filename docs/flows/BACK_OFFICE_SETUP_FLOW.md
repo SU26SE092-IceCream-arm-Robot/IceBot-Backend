@@ -30,8 +30,12 @@ This document describes the setup flow that prepares a tenant, kiosk, users, cat
    - menu items
    - prices
    - availability windows
-10. Robot `.lua` artifacts and ordered robot programs are prepared.
-11. Kiosk/edge configuration release is prepared for runtime deployment.
+10. Inventory topology is provisioned:
+   - device and container
+   - active ingredient
+   - capacity, unit, and level-to-quantity profile
+11. Robot `.lua` artifacts and ordered robot programs are prepared.
+12. Kiosk/edge configuration release is prepared for runtime deployment.
 ```
 
 ## Rules

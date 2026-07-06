@@ -198,6 +198,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "inventory.configure",
+            Description = "Provision, configure, activate/retire, and safely delete kiosk dispenser topology.",
+            Roles = new[] { "SystemAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "maintenance.view",
             Description = "View maintenance tickets within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },

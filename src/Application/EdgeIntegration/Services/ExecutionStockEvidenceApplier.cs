@@ -26,6 +26,8 @@ internal static class ExecutionStockEvidenceApplier
                 ?? throw new DomainRuleException("Stock movement dispenser state was not found.");
             if (state.KioskId != endpoint.KioskId || state.Kiosk is null)
                 throw new DomainRuleException("Stock movement dispenser state does not belong to the reporting kiosk.");
+            if (!state.IsActive)
+                throw new DomainRuleException("Stock movement dispenser state is retired.");
 
             var occurredAt = evidence.OccurredAt ?? command.EdgeCreatedAt;
             if (evidence.BalanceAfter.HasValue)

@@ -196,14 +196,14 @@ Entities:
 
 Namespace: `Domain.Inventory`
 
-Owns ingredient dispenser state and stock movement reporting.
+Owns Cloud ingredient-dispenser topology, current dispenser state, and stock movement reporting.
 
 Entities:
 
 - `IngredientDispenserState`
 - `StockMovement`
 
-`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory owns runtime state and quantity movement.
+`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory binds a kiosk device/container to one ingredient, owns that binding lifecycle, and preserves movement history. Configuration Release does not create or rebind Cloud dispenser topology in V1.
 
 ### Operations
 

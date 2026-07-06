@@ -44,7 +44,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/organizations/{organizationId}/robot-programs/*`, `/api/v1/management/organizations/{organizationId}/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments/{profile}` | upload immutable robot Lua artifacts, publish robot programs, publish immutable configuration releases, and request Full Edge or low-cost controller deployment |
 | Global robot artifact templates | `/api/v1/management/robot-artifact-templates/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts/from-template` | manage reusable global Lua templates and clone a Published template into an organization-owned Draft artifact |
 | Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/execution-attempts`, `/api/v1/management/refunds` | internal order search, execution-attempt inspection, unpaid cancellation, refund-required marking, manual refund tracking |
-| Inventory management | `/api/v1/management/inventory/*` | dispenser states, stock movement history, refill, estimate adjustment |
+| Inventory management | `/api/v1/management/inventory/*`, `/api/v1/management/kiosks/{kioskId}/inventory/*` | dispenser topology, state, stock movement history, refill, estimate adjustment |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/device-events` | kiosk connectivity history and device warnings/errors |
 | Sync dead-letter operations | `/api/v1/management/sync-dead-letters` | SystemAdmin inspection, typed retry, retry audit, resolve, and ignore |
 | Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues |
@@ -205,6 +205,10 @@ PATCH /api/v1/management/refunds/{refundId}/reject
 PATCH /api/v1/management/refunds/{refundId}/cancel
 GET /api/v1/management/inventory/dispenser-states
 GET /api/v1/management/inventory/stock-movements
+POST /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states
+PUT /api/v1/management/inventory/dispenser-states/{dispenserStateId}
+PATCH /api/v1/management/inventory/dispenser-states/{dispenserStateId}/status
+DELETE /api/v1/management/inventory/dispenser-states/{dispenserStateId}
 POST /api/v1/management/inventory/dispenser-states/{id}/refill
 POST /api/v1/management/inventory/dispenser-states/{id}/adjust-estimate
 GET /api/v1/management/kiosks/{kioskId}/heartbeats
@@ -276,7 +280,10 @@ Rules:
 - Authentication responses contain tokens, minimal identity, role scopes, and enabled login methods. Full profile fields belong to `/me`.
 - Kiosk order creation derives `OrderChannel = Tablet` from the endpoint contract. Anonymous clients cannot choose an analytics/audit channel value.
 - Deployment command identifiers are internal transport coordination data. Management responses expose deployment identity and status, not `EdgeCommandId`.
-- Inventory management in v1 is reporting/operations only. It does not decide runtime menu sellability or robot execution availability.
+- Inventory owns Cloud dispenser topology in V1. Create binds an immutable `Kiosk + Device + Ingredient + ContainerCode` identity; update changes only capacity, unit, and the typed level-to-quantity profile. Unit cannot change after an estimate or stock history exists. Ingredient/device rebinding requires retiring the old state and creating a new one.
+- Dispenser topology is authored directly through Inventory management APIs, not materialized by Configuration Release. `inventory.configure` excludes Staff and owns create/update/status/delete; `inventory.manage` continues to own refill and estimate adjustment.
+- A dispenser state with stock movement history cannot be deleted and must be retired. Retired states reject sensor updates, refill, estimate adjustment, and execution stock evidence. Reactivation requires a non-retired device and active ingredient.
+- Inventory estimates still do not decide runtime menu sellability or robot execution availability in V1.
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
 - Normal telemetry reads also exclude source node ids, heartbeat sequence numbers, and correlation/causation ids. Those ingestion identities remain available to machine contracts.
 - `DeviceEvent` is immutable log/evidence, not mutable alert state. Newly accepted Error/Critical telemetry creates a separate Open Alert in the same transaction; Warning remains evidence only.

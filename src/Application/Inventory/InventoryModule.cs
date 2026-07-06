@@ -13,6 +13,10 @@ public static class InventoryModule
         services.AddScoped<GetInventorySummaryQueryHandler>();
         services.AddScoped<RefillDispenserCommandHandler>();
         services.AddScoped<AdjustDispenserEstimateCommandHandler>();
+        services.AddScoped<CreateDispenserStateCommandHandler>();
+        services.AddScoped<UpdateDispenserStateCommandHandler>();
+        services.AddScoped<SetDispenserStateStatusCommandHandler>();
+        services.AddScoped<DeleteDispenserStateCommandHandler>();
 
         return services;
     }

@@ -37,6 +37,7 @@ public sealed class ManagementInventoryController : ControllerBase
         [FromQuery] Guid? organizationId,
         [FromQuery] Guid? storeId,
         [FromQuery] Guid? kioskId,
+        [FromQuery] bool? isActive,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -47,6 +48,7 @@ public sealed class ManagementInventoryController : ControllerBase
             OrganizationId = organizationId,
             StoreId = storeId,
             KioskId = kioskId,
+            IsActive = isActive,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
