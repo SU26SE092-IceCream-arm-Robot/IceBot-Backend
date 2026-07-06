@@ -10,10 +10,6 @@ namespace Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropIndex(
-                name: "IX_ProductOptions_OptionGroupId",
-                table: "ProductOptions");
-
             migrationBuilder.CreateIndex(
                 name: "IX_ProductOptions_OptionGroupId",
                 table: "ProductOptions",
