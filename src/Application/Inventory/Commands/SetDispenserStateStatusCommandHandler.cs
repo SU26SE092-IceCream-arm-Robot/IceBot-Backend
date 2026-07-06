@@ -4,6 +4,7 @@ using Application.Inventory.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Devices.Enums;
+using Application.Inventory.Support;
 
 namespace Application.Inventory.Commands;
 
@@ -24,6 +25,11 @@ public sealed class SetDispenserStateStatusCommandHandler(IInventoryStore invent
                 return ApiResult<DispenserStateResult>.Fail("Dispenser state cannot be reactivated on a retired device.", 409);
             if (!state.Ingredient.IsActive)
                 return ApiResult<DispenserStateResult>.Fail("Dispenser state cannot be reactivated with an inactive ingredient.", 409);
+            var capabilityError = DispenserDeviceCapabilityRules.Validate(
+                state.Device.DeviceModel,
+                state.LevelToQuantityProfileJson is not null);
+            if (capabilityError is not null)
+                return ApiResult<DispenserStateResult>.Fail(capabilityError, 409);
             state.Reactivate(command.UserContext.AccountId, now);
         }
         else state.Retire(command.UserContext.AccountId, now);

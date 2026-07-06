@@ -247,6 +247,20 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "device-catalog.read",
+            Description = "Read the global device type and model catalog.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "device-catalog.manage",
+            Description = "Manage the global device type and model catalog.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "alerts.view",
             Description = "View actionable telemetry alerts within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },

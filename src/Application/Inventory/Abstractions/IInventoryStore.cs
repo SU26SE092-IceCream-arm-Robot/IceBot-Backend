@@ -2,6 +2,7 @@ using Application.Inventory.Results;
 using Domain.Inventory.Entities;
 using Domain.Catalog.Entities;
 using Domain.Devices.Entities;
+using Domain.Tenants.Entities;
 
 namespace Application.Inventory.Abstractions;
 
@@ -19,6 +20,9 @@ public interface IInventoryStore
     Task<IngredientDispenserState?> GetDispenserStateByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<Device?> GetDeviceForTopologyAsync(Guid kioskId, Guid deviceId, CancellationToken cancellationToken = default);
     Task<Ingredient?> GetIngredientForTopologyAsync(Guid ingredientId, CancellationToken cancellationToken = default);
+    Task<Kiosk?> GetKioskForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<List<Device>> ListDevicesForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<List<IngredientDispenserState>> ListStatesForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default);
     Task<bool> DispenserIdentityExistsAsync(Guid deviceId, string containerCode, Guid? excludedId = null, CancellationToken cancellationToken = default);
     Task<bool> HasStockMovementsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task AddDispenserStateAsync(IngredientDispenserState state, CancellationToken cancellationToken = default);

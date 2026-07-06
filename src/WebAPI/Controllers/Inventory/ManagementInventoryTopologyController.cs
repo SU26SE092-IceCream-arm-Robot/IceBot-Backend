@@ -1,5 +1,6 @@
 using Application.Inventory.Commands;
 using Application.Inventory.Requests;
+using Application.Inventory.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -10,14 +11,25 @@ namespace WebAPI.Controllers.Inventory;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/management")]
-[Authorize(Policy = "inventory.configure")]
+[Authorize]
 public sealed class ManagementInventoryTopologyController(
+    GetKioskInventoryTopologyQueryHandler getTopologyHandler,
     CreateDispenserStateCommandHandler createHandler,
     UpdateDispenserStateCommandHandler updateHandler,
     SetDispenserStateStatusCommandHandler setStatusHandler,
     DeleteDispenserStateCommandHandler deleteHandler) : ControllerBase
 {
+    [HttpGet("kiosks/{kioskId:guid}/inventory/topology")]
+    [Authorize(Policy = "inventory.view")]
+    public async Task<IActionResult> GetTopology(Guid kioskId, CancellationToken cancellationToken)
+    {
+        var result = await getTopologyHandler.HandleAsync(
+            new GetKioskInventoryTopologyQuery(kioskId, User.GetUserContext()), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("kiosks/{kioskId:guid}/inventory/dispenser-states")]
+    [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> Create(
         Guid kioskId,
         [FromBody] CreateDispenserStateRequest request,
@@ -29,6 +41,7 @@ public sealed class ManagementInventoryTopologyController(
     }
 
     [HttpPut("inventory/dispenser-states/{dispenserStateId:guid}")]
+    [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> Update(
         Guid dispenserStateId,
         [FromBody] UpdateDispenserStateRequest request,
@@ -40,6 +53,7 @@ public sealed class ManagementInventoryTopologyController(
     }
 
     [HttpPatch("inventory/dispenser-states/{dispenserStateId:guid}/status")]
+    [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> SetStatus(
         Guid dispenserStateId,
         [FromBody] SetDispenserStateStatusRequest request,
@@ -51,6 +65,7 @@ public sealed class ManagementInventoryTopologyController(
     }
 
     [HttpDelete("inventory/dispenser-states/{dispenserStateId:guid}")]
+    [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> Delete(Guid dispenserStateId, CancellationToken cancellationToken)
     {
         var result = await deleteHandler.HandleAsync(

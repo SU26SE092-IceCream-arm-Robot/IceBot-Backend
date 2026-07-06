@@ -37,6 +37,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
 | Device management | `/api/v1/management/devices/*`, `/api/v1/management/kiosks/*/devices` | create/update/set management status/retire devices, list and view devices |
+| Device catalog | `/api/v1/management/device-types/*`, `/api/v1/management/device-models/*` | lookup device type/model IDs; SystemAdmin authors the global hardware catalog |
 | Execution endpoint management | `/api/v1/management/execution-endpoints/*`, `/api/v1/management/kiosks/{kioskId}/execution-endpoints` | create, provision, inspect, configure compatibility, disable/reactivate, rotate credentials, and retire Full Edge or low-cost execution endpoints |
 | Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
 | Global product templates | `/api/v1/management/product-templates/*` | SystemAdmin-only platform template authoring |
@@ -233,6 +234,12 @@ Device management rules:
 - `DELETE /api/v1/management/devices/{deviceId}` is a soft retire operation. It sets `DeviceStatus.Retired` and soft-deletes the row; it does not physically delete the device record.
 - `PATCH /api/v1/management/devices/{deviceId}/status` must not set `Retired`; use the retire endpoint instead.
 - `Device.Status` is a management/operations state for configured hardware. Runtime connectivity and error evidence still come from heartbeat and device-event telemetry.
+- Device types and models are a global technical catalog, not tenant-owned records. Authenticated device-management users may read the catalog; only `SystemAdmin` may author it.
+- Device catalog routes are `GET/POST /management/device-types`, `GET/PUT /management/device-types/{id}`, `PATCH /management/device-types/{id}/status`, `GET/POST /management/device-types/{id}/models`, and `GET/PUT/DELETE /management/device-models/{id}`.
+- Device type codes and device model codes are immutable after creation. A model code is unique within its type. Model delete is a soft retire operation so installed devices retain historical identity.
+- New or updated devices may reference only an active DeviceType and a non-retired DeviceModel belonging to that type. Deactivation/retirement prevents future assignments but does not rewrite existing devices.
+- Device model capabilities use a typed string list at the API boundary. JSON and capability schema version remain persistence details and are not supplied by FE.
+- A capability required by active dispenser topology cannot be removed from its DeviceModel. A DeviceModel cannot be retired while assigned to a non-retired Device.
 
 Rules:
 
@@ -282,6 +289,8 @@ Rules:
 - Deployment command identifiers are internal transport coordination data. Management responses expose deployment identity and status, not `EdgeCommandId`.
 - Inventory owns Cloud dispenser topology in V1. Create binds an immutable `Kiosk + Device + Ingredient + ContainerCode` identity; update changes only capacity, unit, and the typed level-to-quantity profile. Unit cannot change after an estimate or stock history exists. Ingredient/device rebinding requires retiring the old state and creating a new one.
 - Dispenser topology is authored directly through Inventory management APIs, not materialized by Configuration Release. `inventory.configure` excludes Staff and owns create/update/status/delete; `inventory.manage` continues to own refill and estimate adjustment.
+- `GET /api/v1/management/kiosks/{kioskId}/inventory/topology` returns the kiosk Device -> containers -> Ingredient configuration, including devices with no configured containers. `CanHostDispenser` distinguishes valid unconfigured dispenser hardware from unrelated devices.
+- Creating, updating, or reactivating a dispenser binding requires a DeviceModel with `IngredientDispenser`. A non-empty level-to-quantity profile additionally requires `LevelSensor`. Devices without a model or with unrelated capabilities cannot own dispenser topology.
 - A dispenser state with stock movement history cannot be deleted and must be retired. Retired states reject sensor updates, refill, estimate adjustment, and execution stock evidence. Reactivation requires a non-retired device and active ingredient.
 - Inventory estimates still do not decide runtime menu sellability or robot execution availability in V1.
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.

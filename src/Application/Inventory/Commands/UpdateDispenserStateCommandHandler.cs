@@ -21,6 +21,11 @@ public sealed class UpdateDispenserStateCommandHandler(IInventoryStore inventory
         var profileError = DispenserLevelQuantityProfileContract.Validate(
             command.Request.LevelToQuantityProfile, command.Request.CapacityQuantity);
         if (profileError is not null) return ApiResult<DispenserStateResult>.Fail(profileError);
+        var capabilityError = DispenserDeviceCapabilityRules.Validate(
+            state.Device.DeviceModel,
+            command.Request.LevelToQuantityProfile.Count > 0);
+        if (capabilityError is not null)
+            return ApiResult<DispenserStateResult>.Fail(capabilityError, 409);
         if (!string.Equals(state.Unit, command.Request.Unit.Trim(), StringComparison.OrdinalIgnoreCase) &&
             (state.EstimatedQuantity.HasValue || await inventory.HasStockMovementsAsync(state.Id, ct)))
             return ApiResult<DispenserStateResult>.Fail(

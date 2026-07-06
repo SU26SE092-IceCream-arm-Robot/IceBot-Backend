@@ -22,6 +22,11 @@ public sealed class CreateDispenserStateCommandHandler(IInventoryStore inventory
         if (device?.Kiosk is null) return ApiResult<DispenserStateResult>.Fail("Device not found in the route kiosk.", 404);
         if (device.Status == DeviceStatus.Retired)
             return ApiResult<DispenserStateResult>.Fail("Retired device cannot own a dispenser state.", 409);
+        var capabilityError = DispenserDeviceCapabilityRules.Validate(
+            device.DeviceModel,
+            request.LevelToQuantityProfile.Count > 0);
+        if (capabilityError is not null)
+            return ApiResult<DispenserStateResult>.Fail(capabilityError, 409);
         if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryConfigure, command.UserContext,
                 device.Kiosk.OrganizationId, device.Kiosk.StoreId, device.KioskId))
             return ApiResult<DispenserStateResult>.Fail("Access denied.", 403);

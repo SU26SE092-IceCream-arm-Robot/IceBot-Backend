@@ -181,6 +181,8 @@ Namespace: `Domain.Devices`
 
 Owns physical device catalog, installed devices, device events, and edge telemetry.
 
+`DeviceType` and `DeviceModel` form a global technical catalog owned by Devices. They are not tenant-scoped. Tenant-scoped `Device` records reference the catalog by ID; catalog lifecycle changes prevent future assignment without rewriting installed-device history.
+
 Entities:
 
 - `DeviceType`

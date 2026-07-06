@@ -5,6 +5,7 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Catalog.Entities;
 using Domain.Devices.Entities;
+using Domain.Tenants.Entities;
 using Npgsql;
 
 namespace Infrastructure.Inventory.Persistence;
@@ -81,6 +82,7 @@ public sealed class InventoryStore : IInventoryStore
         return _dbContext.IngredientDispenserStates
             .Include(x => x.Kiosk)
             .Include(x => x.Device)
+                .ThenInclude(x => x.DeviceModel)
             .Include(x => x.Ingredient)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
@@ -88,11 +90,35 @@ public sealed class InventoryStore : IInventoryStore
     public Task<Device?> GetDeviceForTopologyAsync(Guid kioskId, Guid deviceId, CancellationToken cancellationToken = default) =>
         _dbContext.Devices.AsNoTracking()
             .Include(device => device.Kiosk)
+            .Include(device => device.DeviceType)
+            .Include(device => device.DeviceModel)
             .FirstOrDefaultAsync(device => device.Id == deviceId && device.KioskId == kioskId, cancellationToken);
 
     public Task<Ingredient?> GetIngredientForTopologyAsync(Guid ingredientId, CancellationToken cancellationToken = default) =>
         _dbContext.Ingredients.AsNoTracking()
             .FirstOrDefaultAsync(ingredient => ingredient.Id == ingredientId, cancellationToken);
+
+    public Task<Kiosk?> GetKioskForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
+        _dbContext.Kiosks.AsNoTracking().FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
+
+    public Task<List<Device>> ListDevicesForInventoryTopologyAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Devices.AsNoTracking()
+            .Include(device => device.DeviceType)
+            .Include(device => device.DeviceModel)
+            .Where(device => device.KioskId == kioskId)
+            .OrderBy(device => device.Code)
+            .ToListAsync(cancellationToken);
+
+    public Task<List<IngredientDispenserState>> ListStatesForInventoryTopologyAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.AsNoTracking()
+            .Include(state => state.Ingredient)
+            .Where(state => state.KioskId == kioskId)
+            .OrderBy(state => state.ContainerCode)
+            .ToListAsync(cancellationToken);
 
     public Task<bool> DispenserIdentityExistsAsync(
         Guid deviceId,
