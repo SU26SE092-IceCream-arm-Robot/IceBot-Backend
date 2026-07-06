@@ -107,6 +107,20 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "ingredients.read",
+            Description = "Browse the global ingredient reference catalog used by recipe authoring.",
+            Roles = new[] { "SystemAdmin", "Manager" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "ingredients.manage",
+            Description = "Create, update, activate/deactivate, and safely delete unreferenced ingredient definitions.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "product-templates.read",
             Description = "Browse global product templates for tenant cloning.",
             Roles = new[] { "SystemAdmin", "Manager" },
@@ -184,6 +198,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "inventory.configure",
+            Description = "Provision, configure, activate/retire, and safely delete kiosk dispenser topology.",
+            Roles = new[] { "SystemAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "maintenance.view",
             Description = "View maintenance tickets within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
@@ -223,6 +244,20 @@ internal static class PermissionMatrixRules
             Description = "Create, update, status-change, or retire devices/hardware within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "device-catalog.read",
+            Description = "Read the global device type and model catalog.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "device-catalog.manage",
+            Description = "Manage the global device type and model catalog.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
         },
         new()
         {

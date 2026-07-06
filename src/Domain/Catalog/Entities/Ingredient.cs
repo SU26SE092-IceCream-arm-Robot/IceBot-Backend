@@ -23,4 +23,6 @@ public partial class Ingredient : BusinessEntity
     public int? ShelfLifeDays { get; set; }
 
     public string? MetadataJson { get; set; }
+
+    public bool IsActive { get; set; } = true;
 }

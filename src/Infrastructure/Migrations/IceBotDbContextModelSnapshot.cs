@@ -68,6 +68,11 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsAllergen")
                         .HasColumnType("boolean");
 
@@ -403,6 +408,10 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OptionGroupId")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\" = TRUE AND \"DeletedAt\" IS NULL");
+
                     b.HasIndex("OptionGroupId", "Code")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
@@ -603,6 +612,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "ProductVariantId", "Code", "Version")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex(new[] { "ProductVariantId" }, "IX_Recipes_ProductVariantId_Default")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\" = TRUE AND \"Status\" <> 4 AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("Recipes", (string)null);
                 });
@@ -1975,6 +1988,11 @@ namespace Infrastructure.Migrations
 
                     b.Property<Guid>("IngredientId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<Guid?>("KioskId")
                         .HasColumnType("uuid");

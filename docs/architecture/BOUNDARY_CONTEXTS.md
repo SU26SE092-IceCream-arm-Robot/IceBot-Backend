@@ -84,6 +84,8 @@ Entities:
 
 `Product` owns `OptionGroup`, and `OptionGroup` owns `ProductOption`. Options inherit Product tenant scope and currency. `MenuItem` stores only selected option ids as Sales Catalog membership; placed orders store immutable `OrderItemOption` snapshots rather than live Catalog references.
 
+`Recipe` belongs to one `ProductVariant` and inherits the owning Product tenant scope. `RecipeItem` declares ingredient requirements and ordering for recipe data; it is not robot motion or artifact execution orchestration. Ingredients are global reference definitions in V1, while Inventory owns kiosk/device dispenser state and stock movement.
+
 ### Sales Catalog
 
 Namespace: `Domain.SalesCatalog`
@@ -179,6 +181,8 @@ Namespace: `Domain.Devices`
 
 Owns physical device catalog, installed devices, device events, and edge telemetry.
 
+`DeviceType` and `DeviceModel` form a global technical catalog owned by Devices. They are not tenant-scoped. Tenant-scoped `Device` records reference the catalog by ID; catalog lifecycle changes prevent future assignment without rewriting installed-device history.
+
 Entities:
 
 - `DeviceType`
@@ -194,14 +198,14 @@ Entities:
 
 Namespace: `Domain.Inventory`
 
-Owns ingredient dispenser state and stock movement reporting.
+Owns Cloud ingredient-dispenser topology, current dispenser state, and stock movement reporting.
 
 Entities:
 
 - `IngredientDispenserState`
 - `StockMovement`
 
-`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory owns runtime state and quantity movement.
+`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory binds a kiosk device/container to one ingredient, owns that binding lifecycle, and preserves movement history. Configuration Release does not create or rebind Cloud dispenser topology in V1.
 
 ### Operations
 

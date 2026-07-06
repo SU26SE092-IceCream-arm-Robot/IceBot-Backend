@@ -3,6 +3,10 @@ using Application.Inventory.Results;
 using Domain.Inventory.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Domain.Catalog.Entities;
+using Domain.Devices.Entities;
+using Domain.Tenants.Entities;
+using Npgsql;
 
 namespace Infrastructure.Inventory.Persistence;
 
@@ -28,6 +32,7 @@ public sealed class InventoryStore : IInventoryStore
             null,
             storeId,
             kioskId,
+            true,
             isSystemAdmin,
             allowedOrganizationIds,
             allowedStoreIds,
@@ -77,9 +82,62 @@ public sealed class InventoryStore : IInventoryStore
         return _dbContext.IngredientDispenserStates
             .Include(x => x.Kiosk)
             .Include(x => x.Device)
+                .ThenInclude(x => x.DeviceModel)
             .Include(x => x.Ingredient)
             .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
     }
+
+    public Task<Device?> GetDeviceForTopologyAsync(Guid kioskId, Guid deviceId, CancellationToken cancellationToken = default) =>
+        _dbContext.Devices.AsNoTracking()
+            .Include(device => device.Kiosk)
+            .Include(device => device.DeviceType)
+            .Include(device => device.DeviceModel)
+            .FirstOrDefaultAsync(device => device.Id == deviceId && device.KioskId == kioskId, cancellationToken);
+
+    public Task<Ingredient?> GetIngredientForTopologyAsync(Guid ingredientId, CancellationToken cancellationToken = default) =>
+        _dbContext.Ingredients.AsNoTracking()
+            .FirstOrDefaultAsync(ingredient => ingredient.Id == ingredientId, cancellationToken);
+
+    public Task<Kiosk?> GetKioskForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
+        _dbContext.Kiosks.AsNoTracking().FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
+
+    public Task<List<Device>> ListDevicesForInventoryTopologyAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Devices.AsNoTracking()
+            .Include(device => device.DeviceType)
+            .Include(device => device.DeviceModel)
+            .Where(device => device.KioskId == kioskId)
+            .OrderBy(device => device.Code)
+            .ToListAsync(cancellationToken);
+
+    public Task<List<IngredientDispenserState>> ListStatesForInventoryTopologyAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.AsNoTracking()
+            .Include(state => state.Ingredient)
+            .Where(state => state.KioskId == kioskId)
+            .OrderBy(state => state.ContainerCode)
+            .ToListAsync(cancellationToken);
+
+    public Task<bool> DispenserIdentityExistsAsync(
+        Guid deviceId,
+        string containerCode,
+        Guid? excludedId = null,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.AnyAsync(state =>
+            state.DeviceId == deviceId && state.ContainerCode == containerCode &&
+            (!excludedId.HasValue || state.Id != excludedId), cancellationToken);
+
+    public Task<bool> HasStockMovementsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default) =>
+        _dbContext.StockMovements.IgnoreQueryFilters()
+            .AnyAsync(movement => movement.IngredientDispenserStateId == dispenserStateId, cancellationToken);
+
+    public Task AddDispenserStateAsync(IngredientDispenserState state, CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.AddAsync(state, cancellationToken).AsTask();
+
+    public void RemoveDispenserState(IngredientDispenserState state) =>
+        _dbContext.IngredientDispenserStates.Remove(state);
 
     public async Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default)
     {
@@ -90,6 +148,7 @@ public sealed class InventoryStore : IInventoryStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool? isActive,
         bool isSystemAdmin,
         IReadOnlyCollection<Guid> allowedOrganizationIds,
         IReadOnlyCollection<Guid> allowedStoreIds,
@@ -100,6 +159,7 @@ public sealed class InventoryStore : IInventoryStore
             organizationId,
             storeId,
             kioskId,
+            isActive,
             isSystemAdmin,
             allowedOrganizationIds,
             allowedStoreIds,
@@ -112,6 +172,7 @@ public sealed class InventoryStore : IInventoryStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool? isActive,
         bool isSystemAdmin,
         IReadOnlyCollection<Guid> allowedOrganizationIds,
         IReadOnlyCollection<Guid> allowedStoreIds,
@@ -124,6 +185,7 @@ public sealed class InventoryStore : IInventoryStore
             organizationId,
             storeId,
             kioskId,
+            isActive,
             isSystemAdmin,
             allowedOrganizationIds,
             allowedStoreIds,
@@ -198,6 +260,19 @@ public sealed class InventoryStore : IInventoryStore
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> TrySaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            return false;
+        }
+    }
+
     public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -219,12 +294,18 @@ public sealed class InventoryStore : IInventoryStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool? isActive,
         bool isSystemAdmin,
         IReadOnlyCollection<Guid> allowedOrganizationIds,
         IReadOnlyCollection<Guid> allowedStoreIds,
         IReadOnlyCollection<Guid> allowedKioskIds)
     {
         var query = _dbContext.IngredientDispenserStates.AsQueryable();
+
+        if (isActive.HasValue)
+        {
+            query = query.Where(x => x.IsActive == isActive.Value);
+        }
 
         if (organizationId.HasValue)
         {

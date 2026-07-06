@@ -28,6 +28,16 @@ public static class DevicesModule
         services.AddScoped<UpdateDeviceCommandHandler>();
         services.AddScoped<SetDeviceStatusCommandHandler>();
         services.AddScoped<RetireDeviceCommandHandler>();
+        services.AddScoped<ListDeviceTypesQueryHandler>();
+        services.AddScoped<GetDeviceTypeQueryHandler>();
+        services.AddScoped<ListDeviceModelsQueryHandler>();
+        services.AddScoped<GetDeviceModelQueryHandler>();
+        services.AddScoped<CreateDeviceTypeCommandHandler>();
+        services.AddScoped<UpdateDeviceTypeCommandHandler>();
+        services.AddScoped<SetDeviceTypeStatusCommandHandler>();
+        services.AddScoped<CreateDeviceModelCommandHandler>();
+        services.AddScoped<UpdateDeviceModelCommandHandler>();
+        services.AddScoped<RetireDeviceModelCommandHandler>();
         services.AddScoped<ListExecutionEndpointsQueryHandler>();
         services.AddScoped<GetExecutionEndpointQueryHandler>();
         services.AddScoped<CreateExecutionEndpointCommandHandler>();

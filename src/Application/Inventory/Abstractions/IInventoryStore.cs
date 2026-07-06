@@ -1,5 +1,8 @@
 using Application.Inventory.Results;
 using Domain.Inventory.Entities;
+using Domain.Catalog.Entities;
+using Domain.Devices.Entities;
+using Domain.Tenants.Entities;
 
 namespace Application.Inventory.Abstractions;
 
@@ -15,6 +18,15 @@ public interface IInventoryStore
         CancellationToken cancellationToken = default);
 
     Task<IngredientDispenserState?> GetDispenserStateByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Device?> GetDeviceForTopologyAsync(Guid kioskId, Guid deviceId, CancellationToken cancellationToken = default);
+    Task<Ingredient?> GetIngredientForTopologyAsync(Guid ingredientId, CancellationToken cancellationToken = default);
+    Task<Kiosk?> GetKioskForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<List<Device>> ListDevicesForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<List<IngredientDispenserState>> ListStatesForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<bool> DispenserIdentityExistsAsync(Guid deviceId, string containerCode, Guid? excludedId = null, CancellationToken cancellationToken = default);
+    Task<bool> HasStockMovementsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
+    Task AddDispenserStateAsync(IngredientDispenserState state, CancellationToken cancellationToken = default);
+    void RemoveDispenserState(IngredientDispenserState state);
 
     Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
 
@@ -22,6 +34,7 @@ public interface IInventoryStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool? isActive,
         bool isSystemAdmin,
         IReadOnlyCollection<Guid> allowedOrganizationIds,
         IReadOnlyCollection<Guid> allowedStoreIds,
@@ -32,6 +45,7 @@ public interface IInventoryStore
         Guid? organizationId,
         Guid? storeId,
         Guid? kioskId,
+        bool? isActive,
         bool isSystemAdmin,
         IReadOnlyCollection<Guid> allowedOrganizationIds,
         IReadOnlyCollection<Guid> allowedStoreIds,
@@ -63,6 +77,7 @@ public interface IInventoryStore
         CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+    Task<bool> TrySaveChangesAsync(CancellationToken cancellationToken = default);
 
     Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
 }

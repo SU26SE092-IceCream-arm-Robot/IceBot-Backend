@@ -11,6 +11,8 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("payments.manage", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("products.manage", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("ingredients.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("ingredients.manage", "SystemAdmin");
         options.AddScopedRolePolicy("product-templates.read", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("product-templates.manage", "SystemAdmin");
         options.AddScopedRolePolicy("menus.manage", "SystemAdmin", "Manager");
@@ -37,6 +39,7 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("inventory.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("inventory.manage", "SystemAdmin", "Manager", "Staff", "Technician");
+        options.AddScopedRolePolicy("inventory.configure", "SystemAdmin", "Manager", "Technician");
 
         options.AddScopedRolePolicy("maintenance.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("maintenance.create", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
@@ -50,6 +53,8 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("devices.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("devices.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
+        options.AddScopedRolePolicy("device-catalog.read", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
+        options.AddScopedRolePolicy("device-catalog.manage", "SystemAdmin");
 
         options.AddScopedRolePolicy("artifact.read", "SystemAdmin", "OrgAdmin");
         options.AddScopedRolePolicy("artifact.upload", "SystemAdmin", "OrgAdmin");

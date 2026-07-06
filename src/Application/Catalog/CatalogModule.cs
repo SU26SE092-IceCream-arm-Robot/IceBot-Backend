@@ -1,5 +1,9 @@
 using Application.Catalog.Products.Commands;
 using Application.Catalog.Products.Queries;
+using Application.Catalog.Ingredients.Commands;
+using Application.Catalog.Ingredients.Queries;
+using Application.Catalog.Recipes.Commands;
+using Application.Catalog.Recipes.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Catalog;
@@ -27,6 +31,19 @@ public static class CatalogModule
         services.AddScoped<UpdateProductOptionCommandHandler>();
         services.AddScoped<SetProductOptionAvailabilityCommandHandler>();
         services.AddScoped<DeleteProductOptionCommandHandler>();
+        services.AddScoped<ListIngredientsQueryHandler>();
+        services.AddScoped<GetIngredientQueryHandler>();
+        services.AddScoped<CreateIngredientCommandHandler>();
+        services.AddScoped<UpdateIngredientCommandHandler>();
+        services.AddScoped<SetIngredientStatusCommandHandler>();
+        services.AddScoped<DeleteIngredientCommandHandler>();
+        services.AddScoped<ListRecipesQueryHandler>();
+        services.AddScoped<GetRecipeQueryHandler>();
+        services.AddScoped<CreateRecipeCommandHandler>();
+        services.AddScoped<UpdateRecipeCommandHandler>();
+        services.AddScoped<ReplaceRecipeItemsCommandHandler>();
+        services.AddScoped<SetRecipeStatusCommandHandler>();
+        services.AddScoped<CreateRecipeVersionCommandHandler>();
 
         return services;
     }

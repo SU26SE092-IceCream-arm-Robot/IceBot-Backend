@@ -87,6 +87,8 @@ public static class ScopeRoleSets
     public static readonly string[] ProductTemplatesRead = ["SystemAdmin", "Manager"];
     public static readonly string[] MenusManage = ["SystemAdmin", "Manager"];
     public static readonly string[] InventoryManage = ["SystemAdmin", "Manager", "Staff", "Technician"];
+    public static readonly string[] InventoryView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
+    public static readonly string[] InventoryConfigure = ["SystemAdmin", "Manager", "Technician"];
     public static readonly string[] OrdersView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff"];
     public static readonly string[] OrdersManage = ["SystemAdmin", "OrgAdmin", "Manager", "Staff"];
     public static readonly string[] RefundsManage = ["SystemAdmin", "Manager", "Staff"];

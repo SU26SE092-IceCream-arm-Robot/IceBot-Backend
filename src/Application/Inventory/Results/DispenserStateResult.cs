@@ -19,4 +19,12 @@ public sealed class DispenserStateResult
     public string Unit { get; set; } = "gram";
     public DateTimeOffset LastMeasuredAt { get; set; }
     public DateTimeOffset? LastRefilledAt { get; set; }
+    public bool IsActive { get; set; }
+    public IReadOnlyList<DispenserLevelQuantityPointResult> LevelToQuantityProfile { get; set; } = [];
+}
+
+public sealed class DispenserLevelQuantityPointResult
+{
+    public IngredientLevelStatus Level { get; set; }
+    public decimal EstimatedQuantity { get; set; }
 }
