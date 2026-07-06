@@ -9,6 +9,7 @@ public static class CatalogInfrastructureModule
     public static IServiceCollection AddCatalogInfrastructure(this IServiceCollection services)
     {
         services.AddScoped<IProductStore, ProductStore>();
+        services.AddScoped<ICatalogAuthoringStore, CatalogAuthoringStore>();
         return services;
     }
 }

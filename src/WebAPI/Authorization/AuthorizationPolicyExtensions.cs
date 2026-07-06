@@ -11,6 +11,8 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("payments.manage", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("products.manage", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("ingredients.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("ingredients.manage", "SystemAdmin");
         options.AddScopedRolePolicy("product-templates.read", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("product-templates.manage", "SystemAdmin");
         options.AddScopedRolePolicy("menus.manage", "SystemAdmin", "Manager");

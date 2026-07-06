@@ -139,6 +139,26 @@ PATCH /api/v1/management/execution-endpoints/{endpointId}/retire
 GET /api/v1/management/roles
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
+GET /api/v1/management/ingredients
+GET /api/v1/management/ingredients/{ingredientId}
+POST /api/v1/management/ingredients
+PUT /api/v1/management/ingredients/{ingredientId}
+PATCH /api/v1/management/ingredients/{ingredientId}/status
+DELETE /api/v1/management/ingredients/{ingredientId}
+GET /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes
+GET /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}
+POST /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes
+PUT /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}
+PUT /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}/items
+PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}/status
+POST /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}/versions
+GET /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes
+GET /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}
+POST /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes
+PUT /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}
+PUT /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}/items
+PATCH /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}/status
+POST /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}/versions
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/publish
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/retire
 DELETE /api/v1/management/robot-artifact-templates/{templateId}
@@ -218,7 +238,7 @@ Rules:
 - It is valid for multiple roles to share the same management endpoint when policy allows it.
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
 - Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
-- Product and menu ownership comes from the organization route, never from a body-supplied `OrganizationId`. Generic updates cannot move `OrganizationId`, `ScopeType`, `StoreId`, `KioskId`, or template lineage. Global product templates are managed separately by `SystemAdmin`; `POST .../products/from-template` copies template metadata and variants into a new organization-owned product and records `TemplateProductId`.
+- Product and menu ownership comes from the organization route, never from a body-supplied `OrganizationId`. Generic updates cannot move `OrganizationId`, `ScopeType`, `StoreId`, `KioskId`, or template lineage. Global product templates are managed separately by `SystemAdmin`; `POST .../products/from-template` copies template metadata, variants, options, and the latest Published/Active recipe definitions into a new organization-owned Draft configuration while recording template lineage.
 - GraphQL `tenantTree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
 - Back-office order operations are manual support workflows. Paid orders should be marked `RefundRequired`; they are not cancelled directly.
 - Order status history is a back-office audit read model. It exposes order status transitions and a small actor snapshot (`changedByAccountId`, `changedByName`, `changedByEmail`), not full account objects, raw payment callback bodies, or robot telemetry.
@@ -241,6 +261,12 @@ Rules:
 - Product options are authored as `Product -> OptionGroup -> ProductOption` and inherit Product tenant scope and currency. Group status and option availability use dedicated endpoints; metadata updates cannot change lifecycle state. Product cloning creates new groups/options. A MenuItem exposes only its configured subset through `productOptionIds`. Runtime menu returns typed active groups and available options. Checkout submits unique `selectedOptions[].productOptionId` values; backend validates group cardinality, availability, menu membership, and price deltas before storing immutable `OrderItemOption` snapshots. Raw option JSON from clients is not accepted or forwarded to Edge.
 - Deleting a ProductOption or OptionGroup is rejected while any MenuItem membership still references it. Setting an option unavailable keeps authoring membership but removes it from runtime-menu output; if an active required group no longer has enough available choices, the MenuItem is not sellable. Catalog edits never rewrite placed-order option snapshots.
 - Cloning a Product creates new OptionGroup and ProductOption identities. Cloned options retain `TemplateProductOptionId` lineage, start unavailable, and can be selected only by MenuItems whose Product is that clone.
+- Ingredients are a global reference catalog in V1. `ingredients.read` provides paged lookup with optional active-status filtering. `ingredients.manage` creates, updates, and changes active status. Inactive ingredients cannot be added to Draft recipes. Delete is allowed only while no RecipeItem, dispenser state, or stock movement references the ingredient.
+- Recipes are authored under their owning ProductVariant. Organization/store/kiosk scope is inherited from Product and is never accepted from the request body. Recipe code is immutable within a version family; backend allocates the next version number for each variant/code.
+- Recipe metadata and ingredient membership can be changed only while status is `Draft`. `PUT .../items` atomically replaces ingredient requirements. `RecipeItem.DisplayOrder` is declaration order, not robot execution order.
+- Recipe lifecycle is `Draft -> Published -> Active -> Retired`. Publishing requires at least one non-optional ingredient. Published/Active recipe content is immutable; historical Order recipe snapshots are never rewritten.
+- `POST .../recipes/{recipeId}/versions` copies a non-Draft recipe and its ingredient requirements into the next backend-allocated version as Draft. The new version is not default automatically. Version allocation is serialized per ProductVariant; concurrent default changes return `409` and the database enforces one non-retired default recipe per ProductVariant.
+- Product-template cloning copies the latest Published/Active recipe version for each variant/code into the organization product as a new Draft recipe. It creates new recipe/item identities and retains `TemplateRecipeId` lineage.
 - Organization-owned Product, Menu, and cloned Product create contracts do not accept `ScopeType`. Backend derives it from the most-specific supplied scope id: Kiosk, Store, then Organization.
 - Organization-owned RobotProgram create contracts also do not accept `ScopeType`; RobotProgram additionally supports Device scope, so backend derives its scope from Device, Kiosk, Store, then Organization.
 - Execution endpoint authentication mode is derived from the selected profile: `FullEdge -> MutualTls`, `LowCostController -> SignedCommandTls`.

@@ -107,6 +107,20 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "ingredients.read",
+            Description = "Browse the global ingredient reference catalog used by recipe authoring.",
+            Roles = new[] { "SystemAdmin", "Manager" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "ingredients.manage",
+            Description = "Create, update, activate/deactivate, and safely delete unreferenced ingredient definitions.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "product-templates.read",
             Description = "Browse global product templates for tenant cloning.",
             Roles = new[] { "SystemAdmin", "Manager" },

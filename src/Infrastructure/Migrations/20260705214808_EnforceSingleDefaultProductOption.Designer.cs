@@ -3,6 +3,7 @@ using System;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    partial class IceBotDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260705214808_EnforceSingleDefaultProductOption")]
+    partial class EnforceSingleDefaultProductOption
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -67,11 +70,6 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
 
                     b.Property<bool>("IsAllergen")
                         .HasColumnType("boolean");
@@ -612,10 +610,6 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "ProductVariantId", "Code", "Version")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
-
-                    b.HasIndex(new[] { "ProductVariantId" }, "IX_Recipes_ProductVariantId_Default")
-                        .IsUnique()
-                        .HasFilter("\"IsDefault\" = TRUE AND \"Status\" <> 4 AND \"DeletedAt\" IS NULL");
 
                     b.ToTable("Recipes", (string)null);
                 });

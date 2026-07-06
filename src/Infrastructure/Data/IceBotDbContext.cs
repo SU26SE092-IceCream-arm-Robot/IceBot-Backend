@@ -495,6 +495,9 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("ProductOptions");
             entity.HasIndex(x => new { x.OptionGroupId, x.Code }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => x.OptionGroupId)
+                .IsUnique()
+                .HasFilter("\"IsDefault\" = TRUE AND \"DeletedAt\" IS NULL");
             entity.HasOne(x => x.OptionGroup).WithMany(x => x.ProductOptions).HasForeignKey(x => x.OptionGroupId).OnDelete(DeleteBehavior.Restrict);
         });
 
@@ -502,6 +505,10 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("Recipes");
             entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.ProductVariantId, x.Code, x.Version }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => x.ProductVariantId);
+            entity.HasIndex(x => x.ProductVariantId, "IX_Recipes_ProductVariantId_Default")
+                .IsUnique()
+                .HasFilter("\"IsDefault\" = TRUE AND \"Status\" <> 4 AND \"DeletedAt\" IS NULL");
             entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
@@ -521,6 +528,7 @@ public class IceBotDbContext : DbContext
         {
             entity.ToTable("Ingredients");
             entity.HasIndex(x => x.Code).IsUnique().HasFilter(ActiveRowFilter);
+            entity.Property(x => x.IsActive).HasDefaultValue(true);
         });
 
         modelBuilder.Entity<IngredientDispenserState>(entity =>

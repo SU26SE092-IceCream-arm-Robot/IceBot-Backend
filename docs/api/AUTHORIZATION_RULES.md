@@ -160,6 +160,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `product-templates.read` | `SystemAdmin`, `Manager` | Browse global product templates for cloning into an assigned organization |
 | `product-templates.manage` | `SystemAdmin` | Manage global product templates; tenant roles cannot author or mutate global catalog rows |
 | `products.manage` | `SystemAdmin`, `Manager` | Manage organization-owned products and variants within assigned organization/store/kiosk scope |
+| `ingredients.read` | `SystemAdmin`, `Manager` | Browse the global ingredient reference catalog used by recipe authoring |
+| `ingredients.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ingredient definitions |
 | `menus.manage` | `SystemAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
 | `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |
 | `refunds.manage` | `SystemAdmin`, `Manager`, `Staff` | Manual support/refund workflow. Auto provider refund is future work |
