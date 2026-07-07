@@ -53,13 +53,20 @@ public sealed class UpdateStoreCommandHandler
             return ApiResult<StoreResult>.Fail(openingHoursError, 400);
         }
 
+        var timeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim();
+        var timeZoneError = StoreSalesAvailabilityRules.ValidateTimeZone(timeZone);
+        if (timeZoneError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(timeZoneError, 400);
+        }
+
         store.Name = request.Name.Trim();
         store.StoreType = string.IsNullOrWhiteSpace(request.StoreType) ? "Retail" : request.StoreType.Trim();
         store.Address = request.Address?.Trim();
         store.City = request.City?.Trim();
         store.Province = request.Province?.Trim();
         store.Country = request.Country?.Trim();
-        store.TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim();
+        store.TimeZone = timeZone;
         store.Latitude = request.Latitude;
         store.Longitude = request.Longitude;
         store.PhoneNumber = request.PhoneNumber?.Trim();

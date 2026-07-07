@@ -25,6 +25,8 @@ Fields:
 - `ExecutionRoute.RequiredCapabilitiesJson`
 - `EdgeCommand.PayloadJson`
 - `IngredientDispenserState.LevelToQuantityProfileJson` with `LevelToQuantityProfileSchemaVersion`
+  - API contracts expose typed `Low`, `Medium`, and `Full` points; FE does not send JSON or schema version.
+  - This mapping is categorical and is not a numeric sensor calibration profile.
 
 Rules:
 

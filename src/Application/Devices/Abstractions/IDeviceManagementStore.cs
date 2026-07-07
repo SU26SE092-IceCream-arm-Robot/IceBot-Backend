@@ -51,7 +51,6 @@ public interface IDeviceManagementStore
 
     Task<bool> DeviceModelHasActiveDispenserStatesAsync(
         Guid deviceModelId,
-        bool requiringLevelSensor,
         CancellationToken cancellationToken = default);
 
     Task<bool> CodeExistsInKioskAsync(Guid kioskId, string code, Guid? excludeDeviceId = null, CancellationToken cancellationToken = default);

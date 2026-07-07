@@ -5,7 +5,6 @@ namespace Application.Devices.Support;
 public static class DeviceCapabilityContract
 {
     public const string IngredientDispenser = "IngredientDispenser";
-    public const string LevelSensor = "LevelSensor";
 
     public static IReadOnlyList<string> Deserialize(string? value)
     {

@@ -103,6 +103,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             throw new DomainRuleException("Refill quantity must be greater than zero.");
         }
 
+        var previousEstimate = EstimatedQuantity;
         if (EstimatedQuantity.HasValue)
         {
             var newEstimatedQuantity = EstimatedQuantity.Value + quantity;
@@ -123,7 +124,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         LastRefilledAt = occurredAt;
         LastMeasuredAt = occurredAt;
 
-        return AddMovement("REFILL", quantity, occurredAt, reasonCode, sourceEventId: sourceEventId);
+        return AddMovement("REFILL", quantity, previousEstimate, occurredAt, reasonCode, sourceEventId: sourceEventId);
     }
 
     public StockMovement Consume(
@@ -140,6 +141,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             throw new DomainRuleException("Consumed quantity must be greater than zero.");
         }
 
+        var previousEstimate = EstimatedQuantity;
         if (EstimatedQuantity.HasValue)
         {
             if (EstimatedQuantity.Value < quantity)
@@ -157,7 +159,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
         LastMeasuredAt = occurredAt;
 
-        return AddMovement("CONSUME", -quantity, occurredAt, null, referenceType, referenceId, sourceEventId);
+        return AddMovement("CONSUME", -quantity, previousEstimate, occurredAt, null, referenceType, referenceId, sourceEventId);
     }
 
     public StockMovement AdjustEstimate(
@@ -189,7 +191,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             CurrentLevelStatus = reportedLevelAfter.Value;
         }
 
-        return AddMovement("ADJUST_ESTIMATE", delta, occurredAt, reasonCode, sourceEventId: sourceEventId, isEstimated: true);
+        return AddMovement("ADJUST_ESTIMATE", delta, previousEstimate, occurredAt, reasonCode, sourceEventId: sourceEventId, isEstimated: true);
     }
 
     public bool IsLow()
@@ -230,6 +232,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
     private StockMovement AddMovement(
         string movementType,
         decimal quantity,
+        decimal? balanceBefore,
         DateTimeOffset occurredAt,
         string? reasonCode = null,
         string? referenceType = null,
@@ -246,6 +249,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             IngredientId,
             movementType,
             quantity,
+            balanceBefore,
             EstimatedQuantity,
             Unit,
             occurredAt,

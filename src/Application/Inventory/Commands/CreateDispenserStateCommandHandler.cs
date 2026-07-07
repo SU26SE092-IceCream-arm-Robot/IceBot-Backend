@@ -22,9 +22,7 @@ public sealed class CreateDispenserStateCommandHandler(IInventoryStore inventory
         if (device?.Kiosk is null) return ApiResult<DispenserStateResult>.Fail("Device not found in the route kiosk.", 404);
         if (device.Status == DeviceStatus.Retired)
             return ApiResult<DispenserStateResult>.Fail("Retired device cannot own a dispenser state.", 409);
-        var capabilityError = DispenserDeviceCapabilityRules.Validate(
-            device.DeviceModel,
-            request.LevelToQuantityProfile.Count > 0);
+        var capabilityError = DispenserDeviceCapabilityRules.Validate(device.DeviceModel);
         if (capabilityError is not null)
             return ApiResult<DispenserStateResult>.Fail(capabilityError, 409);
         if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryConfigure, command.UserContext,
@@ -59,6 +57,14 @@ public sealed class CreateDispenserStateCommandHandler(IInventoryStore inventory
         state.ConfigureContainer(request.CapacityQuantity, request.Unit,
             DispenserLevelQuantityProfileContract.Serialize(request.LevelToQuantityProfile));
         await inventory.AddDispenserStateAsync(state, ct);
+        await inventory.AddTopologyChangeRecordAsync(
+            InventoryTopologyAuditFactory.Create(
+                state,
+                InventoryTopologyChangeType.Created,
+                "INITIAL_PROVISIONING",
+                command.UserContext.AccountId,
+                now),
+            ct);
         if (!await inventory.TrySaveChangesAsync(ct))
             return ApiResult<DispenserStateResult>.Fail("Container code already exists for this device.", 409);
 

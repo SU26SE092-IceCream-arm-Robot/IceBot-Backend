@@ -30,6 +30,8 @@ public partial class StockMovement : AppendOnlySyncEntity, IStoreScoped
 
     public decimal Quantity { get; set; }
 
+    public decimal? BalanceBefore { get; set; }
+
     public decimal? BalanceAfter { get; set; }
 
     public bool IsEstimated { get; set; }
@@ -69,6 +71,7 @@ public partial class StockMovement : AppendOnlySyncEntity, IStoreScoped
         Guid? ingredientId,
         string movementType,
         decimal quantity,
+        decimal? balanceBefore,
         decimal? balanceAfter,
         string unit,
         DateTimeOffset occurredAt,
@@ -103,6 +106,7 @@ public partial class StockMovement : AppendOnlySyncEntity, IStoreScoped
             IngredientId = ingredientId,
             MovementType = movementType.Trim(),
             Quantity = quantity,
+            BalanceBefore = balanceBefore,
             BalanceAfter = balanceAfter,
             IsEstimated = isEstimated,
             Unit = string.IsNullOrWhiteSpace(unit) ? "unit" : unit.Trim(),

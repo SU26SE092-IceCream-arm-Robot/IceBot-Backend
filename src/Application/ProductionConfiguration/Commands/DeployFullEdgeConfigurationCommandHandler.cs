@@ -9,6 +9,7 @@ using Domain.ProductionConfiguration.Entities;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Domain.RobotConfiguration.Manifests;
+using Application.ProductionConfiguration.Services;
 
 namespace Application.ProductionConfiguration.Commands;
 
@@ -17,15 +18,18 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     private readonly IProductionConfigurationStore _productionConfigurationStore;
     private readonly IEdgeCommandStore _edgeCommandStore;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
+    private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
 
     public DeployFullEdgeConfigurationCommandHandler(
         IProductionConfigurationStore productionConfigurationStore,
         IEdgeCommandStore edgeCommandStore,
-        IEdgeCommandWakeUpPublisher wakeUpPublisher)
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness)
     {
         _productionConfigurationStore = productionConfigurationStore;
         _edgeCommandStore = edgeCommandStore;
         _wakeUpPublisher = wakeUpPublisher;
+        _inventoryReadiness = inventoryReadiness;
     }
 
     public async Task<ApiResult<KioskConfigurationDeploymentResult>> HandleAsync(
@@ -71,6 +75,17 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         if (commandExpiryAt <= now)
         {
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Command expiry must be later than the deployment request time.", 400);
+        }
+
+        var readiness = await _inventoryReadiness.EvaluateDeployAsync(
+            release,
+            command.KioskId,
+            cancellationToken: cancellationToken);
+        if (readiness.IsBlocked)
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>
+                .Fail("Configuration deployment blocked because kiosk inventory is not ready.", 409)
+                .AddDetail("InventoryReadiness", readiness.Results);
         }
 
         var result = await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
@@ -149,6 +164,11 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                     EdgeCommandType.DeployConfiguration,
                     DateTimeOffset.UtcNow),
                 cancellationToken);
+        }
+
+        if (result.Succeeded && readiness.HasWarnings)
+        {
+            result.AddDetail("InventoryReadinessWarnings", readiness.Results.Where(item => !item.IsReady).ToArray());
         }
 
         return result;

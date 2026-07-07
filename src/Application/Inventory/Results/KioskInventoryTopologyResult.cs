@@ -24,6 +24,7 @@ public sealed class InventoryTopologyDeviceResult
     public IReadOnlyList<string> Capabilities { get; set; } = [];
     public bool CanHostDispenser { get; set; }
     public bool HasConfiguredContainers { get; set; }
+    public IReadOnlyList<string> Warnings { get; set; } = [];
     public IReadOnlyList<InventoryTopologyContainerResult> Containers { get; set; } = [];
 }
 
@@ -39,4 +40,6 @@ public sealed class InventoryTopologyContainerResult
     public decimal? CapacityQuantity { get; set; }
     public string Unit { get; set; } = null!;
     public bool IsActive { get; set; }
+    public bool IngredientIsActive { get; set; }
+    public IReadOnlyList<string> Warnings { get; set; } = [];
 }

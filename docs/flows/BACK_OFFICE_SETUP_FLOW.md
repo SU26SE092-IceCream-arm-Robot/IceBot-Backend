@@ -31,13 +31,17 @@ This document describes the setup flow that prepares a tenant, kiosk, users, cat
    - prices
    - availability windows
 10. Inventory topology is provisioned:
-   - device model declares `IngredientDispenser`; `LevelSensor` is also required when level conversion is configured
+   - device model declares `IngredientDispenser`
    - device and container
    - active ingredient
    - capacity, unit, and level-to-quantity profile
    - kiosk topology read shows capable devices with and without configured containers
+   - identity changes use rebind: retire old state, resolve its estimate explicitly, and create an audited replacement
+   - replacing hardware transfers all mappings to an already-provisioned Device in the same kiosk, then retires the source Device
+   - retiring a Device also retires its active dispenser states; stale Device/Ingredient references remain visible as warnings
 11. Robot `.lua` artifacts and ordered robot programs are prepared.
 12. Kiosk/edge configuration release is prepared for runtime deployment.
+13. Inventory readiness compares required Recipe ingredients with the target kiosk topology before deployment.
 ```
 
 ## Rules

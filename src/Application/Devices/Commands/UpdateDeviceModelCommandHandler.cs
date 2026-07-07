@@ -30,20 +30,10 @@ public sealed class UpdateDeviceModelCommandHandler(IDeviceManagementStore store
             currentCapabilities.Contains(Application.Devices.Support.DeviceCapabilityContract.IngredientDispenser, StringComparer.OrdinalIgnoreCase) &&
             !request.Capabilities.Contains(Application.Devices.Support.DeviceCapabilityContract.IngredientDispenser, StringComparer.OrdinalIgnoreCase);
         if (removesDispenserCapability &&
-            await store.DeviceModelHasActiveDispenserStatesAsync(entity.Id, false, cancellationToken))
+            await store.DeviceModelHasActiveDispenserStatesAsync(entity.Id, cancellationToken))
         {
             return ApiResult<DeviceModelResult>.Fail(
                 "IngredientDispenser capability cannot be removed while active dispenser bindings use this model.", 409);
-        }
-
-        var removesLevelSensorCapability =
-            currentCapabilities.Contains(Application.Devices.Support.DeviceCapabilityContract.LevelSensor, StringComparer.OrdinalIgnoreCase) &&
-            !request.Capabilities.Contains(Application.Devices.Support.DeviceCapabilityContract.LevelSensor, StringComparer.OrdinalIgnoreCase);
-        if (removesLevelSensorCapability &&
-            await store.DeviceModelHasActiveDispenserStatesAsync(entity.Id, true, cancellationToken))
-        {
-            return ApiResult<DeviceModelResult>.Fail(
-                "LevelSensor capability cannot be removed while active level-profile bindings use this model.", 409);
         }
 
         entity.Name = request.Name.Trim();

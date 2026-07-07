@@ -205,7 +205,9 @@ Entities:
 - `IngredientDispenserState`
 - `StockMovement`
 
-`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory binds a kiosk device/container to one ingredient, owns that binding lifecycle, and preserves movement history. Configuration Release does not create or rebind Cloud dispenser topology in V1.
+`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory binds a kiosk device/container to one ingredient, owns that binding lifecycle, replacement/rebind audit, topology-change history, and stock movement history. Device retirement coordinates with Inventory so active bindings cannot outlive their owning hardware. Configuration Release does not create or rebind Cloud dispenser topology in V1.
+
+Inventory also owns the computed operational readiness projection used by Production Configuration. Production Configuration supplies release route/Recipe identities and consumes warnings or blocking results; ownership of dispenser topology remains in Inventory.
 
 ### Operations
 

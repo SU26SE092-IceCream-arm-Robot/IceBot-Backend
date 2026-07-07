@@ -105,6 +105,8 @@ public class IceBotDbContext : DbContext
     public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<IngredientDispenserState> IngredientDispenserStates => Set<IngredientDispenserState>();
+    public DbSet<InventoryTopologyRebindRecord> InventoryTopologyRebindRecords => Set<InventoryTopologyRebindRecord>();
+    public DbSet<InventoryTopologyChangeRecord> InventoryTopologyChangeRecords => Set<InventoryTopologyChangeRecord>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
 
     public DbSet<Menu> Menus => Set<Menu>();
@@ -534,7 +536,8 @@ public class IceBotDbContext : DbContext
         modelBuilder.Entity<IngredientDispenserState>(entity =>
         {
             entity.ToTable("IngredientDispenserStates");
-            entity.HasIndex(x => new { x.DeviceId, x.ContainerCode }).IsUnique().HasFilter(ActiveRowFilter);
+            entity.HasIndex(x => new { x.DeviceId, x.ContainerCode }).IsUnique()
+                .HasFilter("\"IsActive\" = TRUE AND \"DeletedAt\" IS NULL");
             entity.Property(x => x.IsActive).HasDefaultValue(true);
             entity.HasOne(x => x.Device).WithMany(x => x.IngredientDispenserStates).HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
@@ -580,6 +583,38 @@ public class IceBotDbContext : DbContext
             entity.HasOne(x => x.ProductVariant).WithMany().HasForeignKey(x => x.ProductVariantId).OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(x => x.Recipe).WithMany().HasForeignKey(x => x.RecipeId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(x => x.Options).WithOne(x => x.OrderItem).HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InventoryTopologyRebindRecord>(entity =>
+        {
+            entity.ToTable("InventoryTopologyRebindRecords");
+            entity.HasIndex(x => x.SourceDispenserStateId).IsUnique();
+            entity.HasIndex(x => x.ReplacementDispenserStateId).IsUnique();
+            entity.HasIndex(x => new { x.KioskId, x.CreatedAt });
+            entity.Property(x => x.SourceContainerCode).HasMaxLength(50);
+            entity.Property(x => x.ReplacementContainerCode).HasMaxLength(50);
+            entity.Property(x => x.SourceUnit).HasMaxLength(30);
+            entity.Property(x => x.ReplacementUnit).HasMaxLength(30);
+            entity.Property(x => x.Reason).HasMaxLength(500);
+            entity.HasOne<IngredientDispenserState>()
+                .WithMany()
+                .HasForeignKey(x => x.SourceDispenserStateId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<IngredientDispenserState>()
+                .WithMany()
+                .HasForeignKey(x => x.ReplacementDispenserStateId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<InventoryTopologyChangeRecord>(entity =>
+        {
+            entity.ToTable("InventoryTopologyChangeRecords");
+            entity.HasIndex(x => new { x.DispenserStateId, x.CreatedAt });
+            entity.HasIndex(x => new { x.KioskId, x.CreatedAt });
+            entity.Property(x => x.ContainerCode).HasMaxLength(50);
+            entity.Property(x => x.BeforeUnit).HasMaxLength(30);
+            entity.Property(x => x.AfterUnit).HasMaxLength(30);
+            entity.Property(x => x.Reason).HasMaxLength(500);
         });
 
         modelBuilder.Entity<OrderItemOption>(entity =>

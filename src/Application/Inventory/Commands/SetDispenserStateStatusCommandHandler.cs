@@ -5,6 +5,7 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Devices.Enums;
 using Application.Inventory.Support;
+using Domain.Inventory.Enums;
 
 namespace Application.Inventory.Commands;
 
@@ -19,20 +20,33 @@ public sealed class SetDispenserStateStatusCommandHandler(IInventoryStore invent
             return ApiResult<DispenserStateResult>.Fail("Access denied.", 403);
 
         var now = DateTimeOffset.UtcNow;
+        var beforeIsActive = state.IsActive;
         if (command.IsActive)
         {
             if (state.Device.Status == DeviceStatus.Retired)
                 return ApiResult<DispenserStateResult>.Fail("Dispenser state cannot be reactivated on a retired device.", 409);
             if (!state.Ingredient.IsActive)
                 return ApiResult<DispenserStateResult>.Fail("Dispenser state cannot be reactivated with an inactive ingredient.", 409);
-            var capabilityError = DispenserDeviceCapabilityRules.Validate(
-                state.Device.DeviceModel,
-                state.LevelToQuantityProfileJson is not null);
+            var capabilityError = DispenserDeviceCapabilityRules.Validate(state.Device.DeviceModel);
             if (capabilityError is not null)
                 return ApiResult<DispenserStateResult>.Fail(capabilityError, 409);
             state.Reactivate(command.UserContext.AccountId, now);
         }
         else state.Retire(command.UserContext.AccountId, now);
+        if (beforeIsActive != state.IsActive)
+        {
+            await inventory.AddTopologyChangeRecordAsync(
+                InventoryTopologyAuditFactory.Create(
+                    state,
+                    state.IsActive ? InventoryTopologyChangeType.Reactivated : InventoryTopologyChangeType.Retired,
+                    command.Reason,
+                    command.UserContext.AccountId,
+                    now,
+                    beforeIsActive,
+                    state.CapacityQuantity,
+                    state.Unit),
+                ct);
+        }
         await inventory.SaveChangesAsync(ct);
         return ApiResult<DispenserStateResult>.Success(DispenserStateResultMapper.ToResult(state), "Dispenser status updated.");
     }

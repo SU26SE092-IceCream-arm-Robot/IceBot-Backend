@@ -11,9 +11,13 @@ public sealed class StockMovementResult
     public string? IngredientName { get; set; }
     public string MovementType { get; set; } = null!;
     public decimal Quantity { get; set; }
+    public decimal? BalanceBefore { get; set; }
     public decimal? BalanceAfter { get; set; }
     public string Unit { get; set; } = "gram";
     public string? ReasonCode { get; set; }
     public string? Notes { get; set; }
     public DateTimeOffset OccurredAt { get; set; }
+    public Guid? ActorAccountId { get; set; }
+    public string? ActorName { get; set; }
+    public string? ActorEmail { get; set; }
 }

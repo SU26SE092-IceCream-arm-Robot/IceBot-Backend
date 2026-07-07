@@ -11,6 +11,7 @@ public static class ProductionConfigurationModule
     {
         services.AddScoped<PublishConfigurationReleaseCommandHandler>();
         services.AddScoped<FullEdgeReleaseBundleService>();
+        services.AddScoped<ProductionInventoryReadinessGuard>();
         services.AddScoped<RetireConfigurationReleaseCommandHandler>();
         services.AddScoped<DiscardDraftConfigurationReleaseCommandHandler>();
         services.AddScoped<DeployFullEdgeConfigurationCommandHandler>();
@@ -20,6 +21,7 @@ public static class ProductionConfigurationModule
         services.AddScoped<ListConfigurationReleasesQueryHandler>();
         services.AddScoped<GetConfigurationReleaseQueryHandler>();
         services.AddScoped<GetConfigurationReleaseAuthoringOptionsQueryHandler>();
+        services.AddScoped<GetConfigurationInventoryReadinessQueryHandler>();
         services.AddScoped<ListConfigurationDeploymentsQueryHandler>();
         services.AddScoped<GetConfigurationDeploymentQueryHandler>();
         services.AddScoped<RollbackConfigurationDeploymentCommandHandler>();

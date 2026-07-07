@@ -16,8 +16,14 @@ public sealed record UpdateDispenserStateCommand(
 public sealed record SetDispenserStateStatusCommand(
     Guid DispenserStateId,
     bool IsActive,
+    string Reason,
     CurrentUserContext UserContext);
 
 public sealed record DeleteDispenserStateCommand(
     Guid DispenserStateId,
+    CurrentUserContext UserContext);
+
+public sealed record RebindDispenserStateCommand(
+    Guid DispenserStateId,
+    RebindDispenserStateRequest Request,
     CurrentUserContext UserContext);

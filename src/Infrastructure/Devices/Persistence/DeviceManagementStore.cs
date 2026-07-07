@@ -267,18 +267,10 @@ public sealed class DeviceManagementStore : IDeviceManagementStore
 
     public Task<bool> DeviceModelHasActiveDispenserStatesAsync(
         Guid deviceModelId,
-        bool requiringLevelSensor,
-        CancellationToken cancellationToken = default)
-    {
-        var query = _dbContext.IngredientDispenserStates.Where(state =>
-            state.IsActive && state.Device.DeviceModelId == deviceModelId);
-        if (requiringLevelSensor)
-        {
-            query = query.Where(state => state.LevelToQuantityProfileJson != null);
-        }
-
-        return query.AnyAsync(cancellationToken);
-    }
+        CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.AnyAsync(state =>
+            state.IsActive && state.Device.DeviceModelId == deviceModelId,
+            cancellationToken);
 
     public Task<bool> CodeExistsInKioskAsync(Guid kioskId, string code, Guid? excludeDeviceId = null, CancellationToken cancellationToken = default)
     {

@@ -31,13 +31,28 @@ internal static class StoreOpeningHoursContract
     {
         if (string.IsNullOrWhiteSpace(json)) return [];
 
+        return TryDeserialize(json, out var days) ? days : [];
+    }
+
+    public static bool TryDeserialize(
+        string? json,
+        out IReadOnlyList<StoreOpeningHoursDayResult> days)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            days = [];
+            return true;
+        }
+
         try
         {
-            return JsonSerializer.Deserialize<List<StoreOpeningHoursDayResult>>(json) ?? [];
+            days = JsonSerializer.Deserialize<List<StoreOpeningHoursDayResult>>(json) ?? [];
+            return true;
         }
         catch (JsonException)
         {
-            return [];
+            days = [];
+            return false;
         }
     }
 }

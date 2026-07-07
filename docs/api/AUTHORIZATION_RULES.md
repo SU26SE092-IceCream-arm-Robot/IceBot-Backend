@@ -144,7 +144,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `kiosks.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create and change status of kiosks. Scoped to assigned organization/store/kiosk |
 | `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Update kiosk details. Scoped to assigned organization/store/kiosk |
 | `devices.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View devices/hardware details within assigned scope |
-| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, retire devices/hardware; create, configure, provision, disable/reactivate, rotate credentials, or retire execution endpoints within assigned scope |
+| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, replace, or retire devices/hardware; create, configure, provision, disable/reactivate, rotate credentials, or retire execution endpoints within assigned scope |
 | `device-catalog.read` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Read the global DeviceType/DeviceModel lookup catalog; no tenant scope is required |
 | `device-catalog.manage` | `SystemAdmin` | Create/update/deactivate DeviceType and create/update/retire DeviceModel records |
 | `artifact.read` | `SystemAdmin`, `OrgAdmin` | List and inspect metadata for organization-owned robot Lua artifacts |

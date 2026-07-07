@@ -52,7 +52,9 @@ public sealed class GetKioskInventoryTopologyQueryHandler(IInventoryStore invent
                         EstimatedQuantity = state.EstimatedQuantity,
                         CapacityQuantity = state.CapacityQuantity,
                         Unit = state.Unit,
-                        IsActive = state.IsActive
+                        IsActive = state.IsActive,
+                        IngredientIsActive = state.Ingredient.IsActive,
+                        Warnings = BuildContainerWarnings(device, state)
                     })
                     .ToList();
 
@@ -71,11 +73,32 @@ public sealed class GetKioskInventoryTopologyQueryHandler(IInventoryStore invent
                         DeviceCapabilityContract.IngredientDispenser,
                         StringComparer.OrdinalIgnoreCase),
                     HasConfiguredContainers = containers.Count > 0,
+                    Warnings = BuildDeviceWarnings(device),
                     Containers = containers
                 };
             }).ToList()
         };
 
         return ApiResult<KioskInventoryTopologyResult>.Success(result);
+    }
+
+    private static IReadOnlyList<string> BuildDeviceWarnings(Domain.Devices.Entities.Device device)
+    {
+        var warnings = new List<string>();
+        if (device.DeletedAt.HasValue || device.Status == Domain.Devices.Enums.DeviceStatus.Retired)
+            warnings.Add("DeviceInactive");
+        else if (device.Status != Domain.Devices.Enums.DeviceStatus.Online)
+            warnings.Add("DeviceUnavailable");
+        return warnings;
+    }
+
+    private static IReadOnlyList<string> BuildContainerWarnings(
+        Domain.Devices.Entities.Device device,
+        Domain.Inventory.Entities.IngredientDispenserState state)
+    {
+        var warnings = new List<string>(BuildDeviceWarnings(device));
+        if (!state.IsActive) warnings.Add("ContainerInactive");
+        if (!state.Ingredient.IsActive) warnings.Add("IngredientInactive");
+        return warnings;
     }
 }
