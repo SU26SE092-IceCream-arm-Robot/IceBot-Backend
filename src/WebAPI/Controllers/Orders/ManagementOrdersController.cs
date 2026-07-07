@@ -1,5 +1,4 @@
 using Application.Orders.Management.Commands;
-using Application.Orders.Management.Queries;
 using Application.Orders.Management.Requests;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
@@ -13,27 +12,15 @@ namespace WebAPI.Controllers.Orders;
 [Route("api/v{version:apiVersion}/management/orders")]
 public sealed class ManagementOrdersController : ControllerBase
 {
-    private readonly ListManagementOrdersQueryHandler _listHandler;
-    private readonly GetManagementOrderQueryHandler _getHandler;
-    private readonly GetOrderStatusHistoryQueryHandler _statusHistoryHandler;
-    private readonly GetOrderExecutionAttemptsQueryHandler _executionAttemptsHandler;
     private readonly CancelManagementOrderCommandHandler _cancelHandler;
     private readonly MarkOrderRefundRequiredCommandHandler _refundRequiredHandler;
     private readonly RedispatchOrderExecutionCommandHandler _redispatchHandler;
 
     public ManagementOrdersController(
-        ListManagementOrdersQueryHandler listHandler,
-        GetManagementOrderQueryHandler getHandler,
-        GetOrderStatusHistoryQueryHandler statusHistoryHandler,
-        GetOrderExecutionAttemptsQueryHandler executionAttemptsHandler,
         CancelManagementOrderCommandHandler cancelHandler,
         MarkOrderRefundRequiredCommandHandler refundRequiredHandler,
         RedispatchOrderExecutionCommandHandler redispatchHandler)
     {
-        _listHandler = listHandler;
-        _getHandler = getHandler;
-        _statusHistoryHandler = statusHistoryHandler;
-        _executionAttemptsHandler = executionAttemptsHandler;
         _cancelHandler = cancelHandler;
         _refundRequiredHandler = refundRequiredHandler;
         _redispatchHandler = redispatchHandler;
@@ -52,88 +39,6 @@ public sealed class ManagementOrdersController : ControllerBase
             UserContext = User.GetUserContext(),
             Reason = request.Reason
         }, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpGet("{orderId:guid}/execution-attempts")]
-    [Authorize(Policy = "orders.view")]
-    public async Task<IActionResult> GetOrderExecutionAttempts(
-        Guid orderId,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20,
-        CancellationToken cancellationToken = default)
-    {
-        var result = await _executionAttemptsHandler.HandleAsync(new GetOrderExecutionAttemptsQuery
-        {
-            OrderId = orderId,
-            UserContext = User.GetUserContext(),
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        }, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpGet]
-    [Authorize(Policy = "orders.view")]
-    public async Task<IActionResult> ListOrders(
-        [FromQuery] string? search,
-        [FromQuery] Domain.Orders.Enums.OrderStatus? status,
-        [FromQuery] Domain.Orders.Enums.PaymentStatus? paymentStatus,
-        [FromQuery] Guid? organizationId,
-        [FromQuery] Guid? storeId,
-        [FromQuery] Guid? kioskId,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20,
-        CancellationToken cancellationToken = default)
-    {
-        var query = new ListManagementOrdersQuery
-        {
-            UserContext = User.GetUserContext(),
-            Search = search,
-            Status = status,
-            PaymentStatus = paymentStatus,
-            OrganizationId = organizationId,
-            StoreId = storeId,
-            KioskId = kioskId,
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        };
-
-        var result = await _listHandler.HandleAsync(query, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpGet("{orderId:guid}")]
-    [Authorize(Policy = "orders.view")]
-    public async Task<IActionResult> GetOrder(Guid orderId, CancellationToken cancellationToken)
-    {
-        var query = new GetManagementOrderQuery
-        {
-            OrderId = orderId,
-            UserContext = User.GetUserContext()
-        };
-
-        var result = await _getHandler.HandleAsync(query, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpGet("{orderId:guid}/status-history")]
-    [Authorize(Policy = "orders.view")]
-    public async Task<IActionResult> GetOrderStatusHistory(
-        Guid orderId,
-        [FromQuery] int pageNumber = 1,
-        [FromQuery] int pageSize = 20,
-        CancellationToken cancellationToken = default)
-    {
-        var query = new GetOrderStatusHistoryQuery
-        {
-            OrderId = orderId,
-            UserContext = User.GetUserContext(),
-            PageNumber = pageNumber,
-            PageSize = pageSize
-        };
-
-        var result = await _statusHistoryHandler.HandleAsync(query, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

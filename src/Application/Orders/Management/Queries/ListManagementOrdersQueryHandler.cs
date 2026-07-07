@@ -1,6 +1,6 @@
 using Application.Orders.Abstractions;
-using Application.Orders.PlaceOrder.Mapping;
-using Application.Orders.PlaceOrder.Results;
+using Application.Orders.Management.Mapping;
+using Application.Orders.Management.Results;
 using Application.Shared.Wrappers;
 
 namespace Application.Orders.Management.Queries;
@@ -14,7 +14,7 @@ public sealed class ListManagementOrdersQueryHandler
         _orderStore = orderStore;
     }
 
-    public async Task<PagedResult<OrderResult>> HandleAsync(
+    public async Task<PagedResult<ManagementOrderListItemResult>> HandleAsync(
         ListManagementOrdersQuery query,
         CancellationToken cancellationToken = default)
     {
@@ -49,8 +49,8 @@ public sealed class ListManagementOrdersQueryHandler
             pageSize,
             cancellationToken);
 
-        return PagedResult<OrderResult>.Success(
-            orders.Select(order => OrderResultMapper.ToResult(order)),
+        return PagedResult<ManagementOrderListItemResult>.Success(
+            orders.Select(ManagementOrderResultMapper.ToListItem),
             totalCount,
             pageNumber,
             pageSize,

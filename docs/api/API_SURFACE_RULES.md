@@ -44,7 +44,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Organization product and menu management | `/api/v1/management/organizations/{organizationId}/products/*`, `/api/v1/management/organizations/{organizationId}/menus/*` | tenant-scoped catalog/menu/pricing operations |
 | Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/organizations/{organizationId}/robot-programs/*`, `/api/v1/management/organizations/{organizationId}/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments/{profile}` | upload immutable robot Lua artifacts, publish robot programs, publish immutable configuration releases, and request Full Edge or low-cost controller deployment |
 | Global robot artifact templates | `/api/v1/management/robot-artifact-templates/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts/from-template` | manage reusable global Lua templates and clone a Published template into an organization-owned Draft artifact |
-| Back-office order operations | `/api/v1/management/orders`, `/api/v1/management/execution-attempts`, `/api/v1/management/refunds` | internal order search, execution-attempt inspection, unpaid cancellation, refund-required marking, manual refund tracking |
+| Back-office order operations | GraphQL `orders`, `order`, `orderStatusHistory`, `orderExecutionAttempts`; REST `/api/v1/management/orders/*`, `/api/v1/management/execution-attempts/*`, `/api/v1/management/refunds/*` | scoped order reads in GraphQL; cancellation, redispatch, refund-required and manual refund commands in REST |
 | Inventory management | `/api/v1/management/inventory/*`, `/api/v1/management/kiosks/{kioskId}/inventory/*`, `/api/v1/management/kiosks/{kioskId}/configuration-releases/{releaseId}/inventory-readiness` | dispenser topology, release readiness, state, stock movement history, refill, estimate adjustment |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/device-events` | kiosk connectivity history and device warnings/errors |
 | Sync dead-letter operations | `/api/v1/management/sync-dead-letters` | SystemAdmin inspection, typed retry, retry audit, resolve, and ignore |
@@ -190,10 +190,10 @@ PUT /api/v1/management/organizations/{organizationId}/configuration-releases/{re
 GET /api/v1/management/configuration-deployments
 GET /api/v1/management/configuration-deployments/{deploymentId}
 POST /api/v1/management/configuration-deployments/{deploymentId}/rollback
-GET /api/v1/management/orders
-GET /api/v1/management/orders/{orderId}
-GET /api/v1/management/orders/{orderId}/status-history
-GET /api/v1/management/orders/{orderId}/execution-attempts
+GraphQL orders
+GraphQL order
+GraphQL orderStatusHistory
+GraphQL orderExecutionAttempts
 POST /api/v1/management/orders/{orderId}/execution-attempts
 GET /api/v1/management/execution-attempts/{sourceCommandId}
 PATCH /api/v1/management/orders/{orderId}/cancel

@@ -1,8 +1,8 @@
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.Orders.Abstractions;
-using Application.Orders.PlaceOrder.Mapping;
-using Application.Orders.PlaceOrder.Results;
+using Application.Orders.Management.Mapping;
+using Application.Orders.Management.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Orders.Entities;
@@ -21,14 +21,14 @@ public sealed class MarkOrderRefundRequiredCommandHandler
         _publisher = publisher;
     }
 
-    public async Task<ApiResult<OrderResult>> HandleAsync(
+    public async Task<ApiResult<ManagementOrderDetailResult>> HandleAsync(
         MarkOrderRefundRequiredCommand command,
         CancellationToken cancellationToken = default)
     {
         var reason = command.Reason?.Trim();
         if (string.IsNullOrWhiteSpace(reason))
         {
-            return ApiResult<OrderResult>.Fail("Reason is required to flag an order as refund required.", 400);
+            return ApiResult<ManagementOrderDetailResult>.Fail("Reason is required to flag an order as refund required.", 400);
         }
 
         OrderStatus fromStatus = OrderStatus.Draft;
@@ -39,7 +39,7 @@ public sealed class MarkOrderRefundRequiredCommandHandler
             var order = await _orderStore.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null)
             {
-                return ApiResult<OrderResult>.Fail("Order not found.", 404);
+                return ApiResult<ManagementOrderDetailResult>.Fail("Order not found.", 404);
             }
 
             fromStatus = order.Status;
@@ -50,19 +50,19 @@ public sealed class MarkOrderRefundRequiredCommandHandler
                 order.StoreId,
                 order.KioskId))
             {
-                return ApiResult<OrderResult>.Fail("Access denied.", 403);
+                return ApiResult<ManagementOrderDetailResult>.Fail("Access denied.", 403);
             }
 
             if (order.PaymentStatus != PaymentStatus.Paid)
             {
-                return ApiResult<OrderResult>.Fail(
+                return ApiResult<ManagementOrderDetailResult>.Fail(
                     "Only paid orders can require refund. For unpaid orders, please cancel them directly.",
                     409);
             }
 
             if (order.Status == OrderStatus.Completed || order.Status == OrderStatus.Cancelled)
             {
-                return ApiResult<OrderResult>.Fail(
+                return ApiResult<ManagementOrderDetailResult>.Fail(
                     $"Cannot flag completed or cancelled order as refund required.",
                     409);
             }
@@ -86,9 +86,9 @@ public sealed class MarkOrderRefundRequiredCommandHandler
 
             await _orderStore.SaveChangesAsync(ct);
 
-            var orderResult = OrderResultMapper.ToResult(order);
+            var orderResult = ManagementOrderResultMapper.ToDetail(order);
             statusChangedEvent = CreateStatusChangedEvent(order, orderResult, fromStatus);
-            return ApiResult<OrderResult>.Success(
+            return ApiResult<ManagementOrderDetailResult>.Success(
                 orderResult,
                 "Order flagged as refund required successfully.");
         }, cancellationToken);
@@ -103,7 +103,7 @@ public sealed class MarkOrderRefundRequiredCommandHandler
 
     private static OrderStatusChangedEvent CreateStatusChangedEvent(
         Order order,
-        OrderResult result,
+        ManagementOrderDetailResult result,
         OrderStatus fromStatus) => new()
     {
         OrderId = order.Id,
