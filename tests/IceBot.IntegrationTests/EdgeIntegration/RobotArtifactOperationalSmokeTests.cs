@@ -14,6 +14,8 @@ using Application.Orders.Management.Commands;
 using Application.Orders.PlaceOrder.Queries;
 using Application.ProductionConfiguration.Commands;
 using Application.ProductionConfiguration.Services;
+using Application.ProductionConfiguration;
+using Application.Inventory.Services;
 using Application.RobotConfiguration.Commands;
 using Application.RobotConfiguration.Services;
 using Domain.Catalog.Entities;
@@ -40,6 +42,7 @@ using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.EdgeIntegration.Persistence;
 using Infrastructure.Devices.Persistence;
 using Infrastructure.Orders.Persistence;
+using Infrastructure.Inventory.Persistence;
 using Infrastructure.ProductionConfiguration.Persistence;
 using Infrastructure.RobotConfiguration.Persistence;
 using Infrastructure.Persistence.Jobs;
@@ -621,9 +624,18 @@ public sealed class RobotArtifactOperationalSmokeTests
                 });
             Assert.True(routed.Succeeded, routed.Message);
 
+            var inventoryReadiness = new ProductionInventoryReadinessGuard(
+                new InventoryReadinessEvaluator(new InventoryStore(dbContext)),
+                Options.Create(new InventoryReadinessPolicyOptions
+                {
+                    PublishPolicy = InventoryReadinessPolicy.Warn,
+                    DeployPolicy = InventoryReadinessPolicy.Warn
+                }));
+
             var publishedRelease = await new PublishConfigurationReleaseCommandHandler(
                 productionStore,
-                new FullEdgeReleaseBundleService(_fixture.CreateObjectStorage(autoCreateBucket: true))).HandleAsync(
+                new FullEdgeReleaseBundleService(_fixture.CreateObjectStorage(autoCreateBucket: true)),
+                inventoryReadiness).HandleAsync(
                 new PublishConfigurationReleaseCommand
                 {
                     UserContext = user,
@@ -637,7 +649,8 @@ public sealed class RobotArtifactOperationalSmokeTests
             var deployed = await new DeployFullEdgeConfigurationCommandHandler(
                 productionStore,
                 edgeStore,
-                deploymentWakeUpPublisher).HandleAsync(
+                deploymentWakeUpPublisher,
+                inventoryReadiness).HandleAsync(
                 new DeployFullEdgeConfigurationCommand
                 {
                     UserContext = user,

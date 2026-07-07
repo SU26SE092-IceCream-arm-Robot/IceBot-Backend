@@ -5,7 +5,7 @@ namespace Application.Inventory.Support;
 
 public static class DispenserDeviceCapabilityRules
 {
-    public static string? Validate(DeviceModel? model, bool requiresLevelSensor)
+    public static string? Validate(DeviceModel? model)
     {
         if (model is null)
         {
@@ -15,12 +15,6 @@ public static class DispenserDeviceCapabilityRules
         if (!DeviceCapabilityContract.Supports(model.CapabilitiesJson, DeviceCapabilityContract.IngredientDispenser))
         {
             return $"Device model must support '{DeviceCapabilityContract.IngredientDispenser}'.";
-        }
-
-        if (requiresLevelSensor &&
-            !DeviceCapabilityContract.Supports(model.CapabilitiesJson, DeviceCapabilityContract.LevelSensor))
-        {
-            return $"A level-to-quantity profile requires device capability '{DeviceCapabilityContract.LevelSensor}'.";
         }
 
         return null;

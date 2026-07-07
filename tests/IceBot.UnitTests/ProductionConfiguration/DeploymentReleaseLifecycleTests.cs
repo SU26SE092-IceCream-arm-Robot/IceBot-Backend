@@ -6,6 +6,8 @@ using Application.ProductionConfiguration.Commands;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using IceBot.UnitTests.TestSupport;
+using Application.Inventory.Abstractions;
+using Application.ProductionConfiguration.Services;
 
 namespace IceBot.UnitTests.ProductionConfiguration;
 
@@ -60,7 +62,10 @@ public sealed class DeploymentReleaseLifecycleTests
                 MaxArtifactCount = 10,
                 MaxArtifactStorageBytes = 1024 * 1024
             }),
-            Substitute.For<IEdgeCommandWakeUpPublisher>());
+            Substitute.For<IEdgeCommandWakeUpPublisher>(),
+            new ProductionInventoryReadinessGuard(
+                Substitute.For<IInventoryReadinessEvaluator>(),
+                Options.Create(new InventoryReadinessPolicyOptions())));
 
     private static DeployLowCostArtifactSetCommand Command(Guid releaseId, Guid? rollbackTargetId) => new()
     {

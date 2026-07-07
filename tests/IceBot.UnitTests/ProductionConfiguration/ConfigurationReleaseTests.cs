@@ -6,6 +6,9 @@ using Domain.ProductionConfiguration.Manifests;
 using Application.ProductionConfiguration.Abstractions;
 using Application.ProductionConfiguration.Commands;
 using Application.ProductionConfiguration.Services;
+using Application.Inventory.Abstractions;
+using Application.ProductionConfiguration;
+using Microsoft.Extensions.Options;
 using Application.RobotConfiguration.Abstractions;
 using IceBot.UnitTests.TestSupport;
 using NSubstitute;
@@ -102,7 +105,8 @@ public sealed class ConfigurationReleaseTests
         var storage = Substitute.For<IArtifactObjectStorage>();
         var handler = new PublishConfigurationReleaseCommandHandler(
             store,
-            new FullEdgeReleaseBundleService(storage));
+            new FullEdgeReleaseBundleService(storage),
+            ReadinessGuard());
 
         var result = await handler.HandleAsync(new PublishConfigurationReleaseCommand
         {
@@ -125,4 +129,8 @@ public sealed class ConfigurationReleaseTests
 
     private static FullEdgeReleaseBundleDescriptor Bundle() =>
         new(1, "robot-artifacts/release-bundles/test.zip", new string('a', 64), 100, 1);
+
+    private static ProductionInventoryReadinessGuard ReadinessGuard() => new(
+        Substitute.For<IInventoryReadinessEvaluator>(),
+        Options.Create(new InventoryReadinessPolicyOptions()));
 }

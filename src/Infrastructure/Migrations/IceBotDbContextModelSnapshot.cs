@@ -2042,11 +2042,171 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("DeviceId", "ContainerCode")
                         .IsUnique()
-                        .HasFilter("\"DeletedAt\" IS NULL");
+                        .HasFilter("\"IsActive\" = TRUE AND \"DeletedAt\" IS NULL");
 
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.ToTable("IngredientDispenserStates", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyChangeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("AfterCapacityQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool?>("AfterIsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AfterUnit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal?>("BeforeCapacityQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool?>("BeforeIsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BeforeUnit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("ChangeType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContainerCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DispenserStateId", "CreatedAt");
+
+                    b.HasIndex("KioskId", "CreatedAt");
+
+                    b.ToTable("InventoryTopologyChangeRecords", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyRebindRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EstimateDisposition")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PreviousEstimatedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReplacementContainerCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("ReplacementDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReplacementDispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReplacementIngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReplacementUnit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("SourceContainerCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("SourceDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceDispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceIngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceUnit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("TransferredQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReplacementDispenserStateId")
+                        .IsUnique();
+
+                    b.HasIndex("SourceDispenserStateId")
+                        .IsUnique();
+
+                    b.HasIndex("KioskId", "CreatedAt");
+
+                    b.ToTable("InventoryTopologyRebindRecords", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Inventory.Entities.StockMovement", b =>
@@ -2055,6 +2215,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal?>("BalanceAfter")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("BalanceBefore")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
 
@@ -5741,6 +5905,21 @@ namespace Infrastructure.Migrations
                     b.Navigation("Ingredient");
 
                     b.Navigation("Kiosk");
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyRebindRecord", b =>
+                {
+                    b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacementDispenserStateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", null)
+                        .WithMany()
+                        .HasForeignKey("SourceDispenserStateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Inventory.Entities.StockMovement", b =>

@@ -15,13 +15,16 @@ public sealed class PublishConfigurationReleaseCommandHandler
 {
     private readonly IProductionConfigurationStore _productionConfigurationStore;
     private readonly FullEdgeReleaseBundleService _bundleService;
+    private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
 
     public PublishConfigurationReleaseCommandHandler(
         IProductionConfigurationStore productionConfigurationStore,
-        FullEdgeReleaseBundleService bundleService)
+        FullEdgeReleaseBundleService bundleService,
+        ProductionInventoryReadinessGuard inventoryReadiness)
     {
         _productionConfigurationStore = productionConfigurationStore;
         _bundleService = bundleService;
+        _inventoryReadiness = inventoryReadiness;
     }
 
     public async Task<ApiResult<ConfigurationReleaseResult>> HandleAsync(
@@ -49,6 +52,13 @@ public sealed class PublishConfigurationReleaseCommandHandler
                     program => program.Id,
                     program => CreateSnapshot(program, release.OrganizationId));
             var contentManifest = release.PreparePublication(command.UserContext.AccountId, snapshots);
+            var readiness = await _inventoryReadiness.EvaluatePublishAsync(release, cancellationToken);
+            if (readiness.IsBlocked)
+            {
+                return ApiResult<ConfigurationReleaseResult>
+                    .Fail("Configuration release inventory readiness policy blocked publication.", 409)
+                    .AddDetail("InventoryReadiness", readiness.Results);
+            }
             var bundle = await _bundleService.BuildAndStoreAsync(
                 release,
                 snapshots,
@@ -57,9 +67,14 @@ public sealed class PublishConfigurationReleaseCommandHandler
             release.Publish(DateTimeOffset.UtcNow, command.UserContext.AccountId, snapshots, bundle);
             release.UpdatedByAccountId = command.UserContext.AccountId;
             await _productionConfigurationStore.SaveChangesAsync(cancellationToken);
-            return ApiResult<ConfigurationReleaseResult>.Success(
+            var result = ApiResult<ConfigurationReleaseResult>.Success(
                 ConfigurationReleaseResult.FromEntity(release),
                 "Configuration release published successfully.");
+            if (readiness.HasWarnings)
+            {
+                result.AddDetail("InventoryReadinessWarnings", readiness.Results.Where(item => !item.IsReady).ToArray());
+            }
+            return result;
         }
         catch (DomainRuleException ex)
         {

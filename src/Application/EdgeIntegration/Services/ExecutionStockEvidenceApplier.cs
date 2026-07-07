@@ -30,12 +30,13 @@ internal static class ExecutionStockEvidenceApplier
                 throw new DomainRuleException("Stock movement dispenser state is retired.");
 
             var occurredAt = evidence.OccurredAt ?? command.EdgeCreatedAt;
+            var balanceBefore = state.EstimatedQuantity;
             if (evidence.BalanceAfter.HasValue)
                 state.RecordSensorLevel(state.CurrentLevelStatus, occurredAt, estimatedQuantity: evidence.BalanceAfter.Value);
 
             var movement = StockMovement.Create(
                 state.Id, state.Kiosk.OrganizationId, state.Kiosk.StoreId, state.KioskId, state.DeviceId,
-                state.IngredientId, "CONSUME", -evidence.QuantityConsumed, evidence.BalanceAfter, state.Unit,
+                state.IngredientId, "CONSUME", -evidence.QuantityConsumed, balanceBefore, evidence.BalanceAfter, state.Unit,
                 occurredAt, "PRODUCTION_EXECUTION", "Order", edgeCommand.OrderId, evidence.SourceEventId,
                 evidence.IsEstimated);
             movement.OriginNodeId = context.SourceExecutorId;

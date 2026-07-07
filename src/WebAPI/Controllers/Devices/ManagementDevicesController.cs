@@ -19,6 +19,7 @@ public sealed class ManagementDevicesController : ControllerBase
     private readonly UpdateDeviceCommandHandler _updateDeviceHandler;
     private readonly SetDeviceStatusCommandHandler _setDeviceStatusHandler;
     private readonly RetireDeviceCommandHandler _retireDeviceHandler;
+    private readonly ReplaceDeviceCommandHandler _replaceDeviceHandler;
 
     public ManagementDevicesController(
         ListDevicesQueryHandler listDevicesHandler,
@@ -26,7 +27,8 @@ public sealed class ManagementDevicesController : ControllerBase
         CreateDeviceCommandHandler createDeviceHandler,
         UpdateDeviceCommandHandler updateDeviceHandler,
         SetDeviceStatusCommandHandler setDeviceStatusHandler,
-        RetireDeviceCommandHandler retireDeviceHandler)
+        RetireDeviceCommandHandler retireDeviceHandler,
+        ReplaceDeviceCommandHandler replaceDeviceHandler)
     {
         _listDevicesHandler = listDevicesHandler;
         _getDeviceHandler = getDeviceHandler;
@@ -34,6 +36,7 @@ public sealed class ManagementDevicesController : ControllerBase
         _updateDeviceHandler = updateDeviceHandler;
         _setDeviceStatusHandler = setDeviceStatusHandler;
         _retireDeviceHandler = retireDeviceHandler;
+        _replaceDeviceHandler = replaceDeviceHandler;
     }
 
     [HttpGet("devices")]
@@ -139,16 +142,31 @@ public sealed class ManagementDevicesController : ControllerBase
     [Authorize(Policy = "devices.manage")]
     public async Task<IActionResult> RetireDevice(
         Guid deviceId,
+        [FromQuery] string? reason,
         CancellationToken cancellationToken)
     {
         var context = User.GetUserContext();
         var command = new RetireDeviceCommand
         {
             UserContext = context,
-            DeviceId = deviceId
+            DeviceId = deviceId,
+            Reason = reason
         };
 
         var result = await _retireDeviceHandler.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("devices/{deviceId:guid}/replace")]
+    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "inventory.configure")]
+    public async Task<IActionResult> ReplaceDevice(
+        Guid deviceId,
+        [FromBody] ReplaceDeviceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _replaceDeviceHandler.HandleAsync(
+            new ReplaceDeviceCommand(deviceId, request, User.GetUserContext()), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

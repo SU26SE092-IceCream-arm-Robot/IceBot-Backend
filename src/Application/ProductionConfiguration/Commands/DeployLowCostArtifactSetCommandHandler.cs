@@ -13,6 +13,7 @@ using Domain.RobotConfiguration.Manifests;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
+using Application.ProductionConfiguration.Services;
 
 namespace Application.ProductionConfiguration.Commands;
 
@@ -22,17 +23,20 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private readonly IEdgeCommandStore _edgeCommandStore;
     private readonly LowCostControllerCapacityOptions _capacity;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
+    private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
 
     public DeployLowCostArtifactSetCommandHandler(
         IProductionConfigurationStore productionConfigurationStore,
         IEdgeCommandStore edgeCommandStore,
         IOptions<LowCostControllerCapacityOptions> capacity,
-        IEdgeCommandWakeUpPublisher wakeUpPublisher)
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness)
     {
         _productionConfigurationStore = productionConfigurationStore;
         _edgeCommandStore = edgeCommandStore;
         _capacity = capacity.Value;
         _wakeUpPublisher = wakeUpPublisher;
+        _inventoryReadiness = inventoryReadiness;
     }
 
     public async Task<ApiResult<ControllerArtifactSetDeploymentResult>> HandleAsync(
@@ -108,6 +112,19 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         if (commandExpiryAt <= now)
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Command expiry must be later than the deployment request time.", 400);
+        }
+
+
+        var readiness = await _inventoryReadiness.EvaluateDeployAsync(
+            release,
+            command.KioskId,
+            command.Selections.Select(selection => selection.ExecutionRouteId).Distinct().ToArray(),
+            cancellationToken);
+        if (readiness.IsBlocked)
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>
+                .Fail("Artifact-set deployment blocked because kiosk inventory is not ready.", 409)
+                .AddDetail("InventoryReadiness", readiness.Results);
         }
 
         var result = await _productionConfigurationStore.ExecuteDeploymentCreationAsync(
@@ -190,6 +207,11 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                     EdgeCommandType.DeployConfiguration,
                     DateTimeOffset.UtcNow),
                 cancellationToken);
+        }
+
+        if (result.Succeeded && readiness.HasWarnings)
+        {
+            result.AddDetail("InventoryReadinessWarnings", readiness.Results.Where(item => !item.IsReady).ToArray());
         }
 
         return result;

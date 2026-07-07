@@ -132,6 +132,8 @@ Object storage is validated before background jobs start. Connection failure, in
 | IoT request body limit | `ExecutionEndpointSecurity__MaxRequestBodyBytes` | **P1** | Review against command/report payload size; default is 1 MiB. |
 | Low-cost artifact count | `LowCostControllerCapacity__MaxArtifactCount` | **P1** | Configure from the supported controller profile; default is `50`. |
 | Low-cost artifact bytes | `LowCostControllerCapacity__MaxArtifactStorageBytes` | **P1** | Configure from controller storage capacity; default is 50 MiB. |
+| Release publish inventory policy | `ProductionInventoryReadiness__PublishPolicy` | **P1** | `Warn` by default. Use `Block` only when every applicable kiosk must be provisioned before release publication. |
+| Release deploy inventory policy | `ProductionInventoryReadiness__DeployPolicy` | **P1** | `Block` by default. `Warn` permits deployment while returning detailed readiness warnings. |
 | Enable order execution dispatch | `OrderExecutionDispatch__Enabled` | **P1** | Keep enabled when paid machine-produced orders must be dispatched to Edge. |
 | Execute-order command expiry | `OrderExecutionDispatch__CommandExpiryMinutes` | **P1** | Review against kiosk queue and customer-wait policy; default is `30`. |
 | Active commands per endpoint | `OrderExecutionDispatch__MaxActiveCommandsPerEndpoint` | **P1** | Set from real Edge capacity; default is `20`. |
