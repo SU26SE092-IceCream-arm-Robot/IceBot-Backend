@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: IceBotDB
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: p@ssw0rd12345
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - icebot_postgres_data:/var/lib/postgresql/data
     ports:
@@ -23,8 +23,8 @@ services:
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     volumes:
       - icebot_minio_data:/data
     ports:
@@ -55,7 +55,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__IceBot_DB: "Host=postgres;Port=5432;Database=IceBotDB;Username=postgres;Password=p@ssw0rd12345"
+      ConnectionStrings__IceBot_DB: ${DB_CONNECTION_STRING}
       RobotArtifacts__ObjectStorage__Endpoint: "minio:9000"
       RobotArtifacts__ObjectStorage__DownloadEndpoint: "${MINIO_DOWNLOAD_ENDPOINT:-localhost:9000}"
       RobotArtifacts__ObjectStorage__AccessKey: "${MINIO_ROOT_USER:-minioadmin}"
@@ -70,6 +70,17 @@ services:
       Observability__Serilog__OtlpSinkEnabled: "true"
       Observability__OpenTelemetry__OtlpEndpoint: "http://IceBot-tools-aspire-dashboard:18889"
 
+      # --- CẤU HÌNH PAYOS TỪ CLASS C# ---
+      PayOS__ClientId: ${PAYOS_CLIENT_ID}
+      PayOS__ApiKey: ${PAYOS_API_KEY}
+      PayOS__ChecksumKey: ${PAYOS_CHECKSUM_KEY}
+      PayOS__ReturnUrl: ${PAYOS_RETURN_URL}
+      PayOS__CancelUrl: ${PAYOS_CANCEL_URL}
+      # --- TRUYỀN BIẾN ĐỂ CONTAINER KÍCH HOẠT IDENTITY BOOTSTRAP ---
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      BOOTSTRAP_ADMIN_FULLNAME: ${BOOTSTRAP_ADMIN_FULLNAME}
 volumes:
   icebot_postgres_data:
   icebot_minio_data:
