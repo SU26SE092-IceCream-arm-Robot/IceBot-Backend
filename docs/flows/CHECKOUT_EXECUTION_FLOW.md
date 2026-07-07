@@ -28,7 +28,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 6. Tablet checks runtime projection freshness:
    now - generatedAt <= 5-15 seconds.
 7. Tablet calls Cloud Backend to place order.
-8. Cloud validates kiosk/menu item/basic idempotency.
+8. Cloud validates kiosk, Store opening hours in `Store.TimeZone`, menu item, and basic idempotency. A Store that closes after a runtime-menu snapshot was issued rejects the order with `409`.
 9. Cloud creates:
    - Order
    - OrderItems

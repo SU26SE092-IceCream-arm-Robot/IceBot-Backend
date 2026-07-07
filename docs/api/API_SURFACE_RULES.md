@@ -284,6 +284,7 @@ Rules:
 - Organization-owned RobotProgram create contracts also do not accept `ScopeType`; RobotProgram additionally supports Device scope, so backend derives its scope from Device, Kiosk, Store, then Organization.
 - Execution endpoint authentication mode is derived from the selected profile: `FullEdge -> MutualTls`, `LowCostController -> SignedCommandTls`.
 - Normal device and kiosk management contracts do not expose raw `MetadataJson` or `SettingsJson`. Store opening hours use a typed per-day schedule while persistence continues to serialize schema-versioned JSON internally.
+- Store opening hours are an online-sale gate for both Cloud runtime-menu reads and order placement. An empty schedule means unrestricted hours; a configured schedule treats omitted/closed days as closed and evaluates `[OpensAt, ClosesAt)` in `Store.TimeZone`. Closed Stores return `409`.
 - Configuration-release route authoring accepts `RecipeId` and derives `ProductVariantId` from the recipe before storing both route identities.
 - Setting an internal-account password changes credential material only. Enabling local login remains a separate account-policy update.
 - Authentication responses contain tokens, minimal identity, role scopes, and enabled login methods. Full profile fields belong to `/me`.

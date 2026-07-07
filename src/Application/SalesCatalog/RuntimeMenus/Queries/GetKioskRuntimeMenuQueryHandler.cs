@@ -4,6 +4,7 @@ using Application.SalesCatalog.RuntimeMenus.Results;
 using Application.SalesCatalog.RuntimeMenus.Rules;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
+using Application.Tenants.Stores;
 using Application.SalesCatalog.Rules;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
@@ -36,6 +37,12 @@ public sealed class GetKioskRuntimeMenuQueryHandler
         }
 
         var now = DateTimeOffset.UtcNow;
+        var openingHoursError = StoreSalesAvailabilityRules.ValidateOpeningHours(kiosk.Store, now);
+        if (openingHoursError is not null)
+        {
+            return ApiResult<RuntimeMenuResult>.Fail(openingHoursError, 409);
+        }
+
         var menus = await _menus.ListActiveMenusForKioskAsync(
             kiosk.OrganizationId,
             kiosk.StoreId,

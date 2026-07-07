@@ -21,6 +21,8 @@ Catalog
 
 - Catalog owns product definitions and recipes.
 - Sales Catalog owns sellable menu items and prices.
+- Cloud runtime-menu reads require the Store to be open according to its typed schedule and `Store.TimeZone`. A closed Store returns `409` and no sellable snapshot is issued.
+- An empty Store schedule means no opening-hours restriction. Once any day is configured, an omitted day is treated as closed; opening is inclusive and closing is exclusive.
 - Runtime menu from Cloud is a sales catalog snapshot, not a live machine readiness guarantee.
 - Edge projection may include inventory, device, queue, and robot availability.
 - Order item snapshots preserve historical sale truth after catalog/menu changes.

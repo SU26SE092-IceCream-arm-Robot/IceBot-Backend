@@ -7,6 +7,7 @@ using Application.Orders.PlaceOrder.Rules;
 using Application.Orders.PlaceOrder.Support;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
+using Application.Tenants.Stores;
 using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Enums;
@@ -74,6 +75,12 @@ public sealed class PlaceOrderCommandHandler
             }
 
             var now = DateTimeOffset.UtcNow;
+            var openingHoursError = StoreSalesAvailabilityRules.ValidateOpeningHours(kiosk.Store, now);
+            if (openingHoursError is not null)
+            {
+                return ApiResult<OrderResult>.Fail(openingHoursError, 409);
+            }
+
             var order = new Order
             {
                 OrganizationId = kiosk.OrganizationId,

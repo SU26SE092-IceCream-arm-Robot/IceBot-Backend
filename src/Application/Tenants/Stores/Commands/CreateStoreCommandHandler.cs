@@ -49,6 +49,13 @@ public sealed class CreateStoreCommandHandler
             return ApiResult<StoreResult>.Fail(openingHoursError, 400);
         }
 
+        var timeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim();
+        var timeZoneError = StoreSalesAvailabilityRules.ValidateTimeZone(timeZone);
+        if (timeZoneError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(timeZoneError, 400);
+        }
+
         var store = new Store
         {
             Id = Guid.NewGuid(),
@@ -61,7 +68,7 @@ public sealed class CreateStoreCommandHandler
             City = request.City?.Trim(),
             Province = request.Province?.Trim(),
             Country = request.Country?.Trim(),
-            TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim(),
+            TimeZone = timeZone,
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             PhoneNumber = request.PhoneNumber?.Trim(),
