@@ -1,6 +1,6 @@
 # Management Read Flow
 
-This document describes how management UI reads aggregated backend data through GraphQL read models and focused REST endpoints.
+This document describes how management UI reads backend data through GraphQL read models and focused integration REST endpoints.
 
 ## Search Keywords
 
@@ -10,7 +10,7 @@ This document describes how management UI reads aggregated backend data through 
 
 ```text
 Management UI
-  -> GraphQL read model / REST read endpoint
+  -> GraphQL read model
   -> Application query handler
   -> scoped store query
   -> DTO/read model result
@@ -22,6 +22,10 @@ Current GraphQL read model direction:
 dashboard
 tenantTree
 orderOverview
+orders
+order
+orderStatusHistory
+orderExecutionAttempts
 kioskStatusOverview
 inventorySummary
 ```
@@ -43,6 +47,8 @@ To ensure back-office managers view up-to-date reports without unnecessary polli
 Upon receiving a `DashboardInvalidated` event, the frontend dashboard client invalidates its local GraphQL query cache and triggers a refetch of:
 - `dashboard`
 - `orderOverview`
+- `orders` and `order`
+- `orderStatusHistory` and `orderExecutionAttempts`
 - `kioskStatusOverview`
 - `inventorySummary`
 

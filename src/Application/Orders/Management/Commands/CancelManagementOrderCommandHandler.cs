@@ -1,8 +1,8 @@
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.Orders.Abstractions;
-using Application.Orders.PlaceOrder.Mapping;
-using Application.Orders.PlaceOrder.Results;
+using Application.Orders.Management.Mapping;
+using Application.Orders.Management.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Orders.Entities;
@@ -21,7 +21,7 @@ public sealed class CancelManagementOrderCommandHandler
         _publisher = publisher;
     }
 
-    public async Task<ApiResult<OrderResult>> HandleAsync(
+    public async Task<ApiResult<ManagementOrderDetailResult>> HandleAsync(
         CancelManagementOrderCommand command,
         CancellationToken cancellationToken = default)
     {
@@ -33,7 +33,7 @@ public sealed class CancelManagementOrderCommandHandler
             var order = await _orderStore.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null)
             {
-                return ApiResult<OrderResult>.Fail("Order not found.", 404);
+                return ApiResult<ManagementOrderDetailResult>.Fail("Order not found.", 404);
             }
 
             fromStatus = order.Status;
@@ -44,19 +44,19 @@ public sealed class CancelManagementOrderCommandHandler
                 order.StoreId,
                 order.KioskId))
             {
-                return ApiResult<OrderResult>.Fail("Access denied.", 403);
+                return ApiResult<ManagementOrderDetailResult>.Fail("Access denied.", 403);
             }
 
             if (order.PaymentStatus == PaymentStatus.Paid)
             {
-                return ApiResult<OrderResult>.Fail(
+                return ApiResult<ManagementOrderDetailResult>.Fail(
                     "Paid orders cannot be cancelled directly. Please flag them as RefundRequired instead.",
                     409);
             }
 
             if (order.Status == OrderStatus.Completed || order.Status == OrderStatus.Cancelled)
             {
-                return ApiResult<OrderResult>.Fail(
+                return ApiResult<ManagementOrderDetailResult>.Fail(
                     $"Cannot cancel an order in state '{order.Status}'.",
                     409);
             }
@@ -82,9 +82,9 @@ public sealed class CancelManagementOrderCommandHandler
 
             await _orderStore.SaveChangesAsync(ct);
 
-            var orderResult = OrderResultMapper.ToResult(order);
+            var orderResult = ManagementOrderResultMapper.ToDetail(order);
             statusChangedEvent = CreateStatusChangedEvent(order, orderResult, fromStatus);
-            return ApiResult<OrderResult>.Success(
+            return ApiResult<ManagementOrderDetailResult>.Success(
                 orderResult,
                 "Order cancelled successfully.");
         }, cancellationToken);
@@ -99,7 +99,7 @@ public sealed class CancelManagementOrderCommandHandler
 
     private static OrderStatusChangedEvent CreateStatusChangedEvent(
         Order order,
-        OrderResult result,
+        ManagementOrderDetailResult result,
         OrderStatus fromStatus) => new()
     {
         OrderId = order.Id,

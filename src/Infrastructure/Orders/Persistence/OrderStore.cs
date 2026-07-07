@@ -252,7 +252,7 @@ public sealed class OrderStore : IOrderStore
             allowedKioskIds);
 
         return query
-            .Include(o => o.OrderItems)
+            .AsNoTracking()
             .OrderByDescending(o => o.PlacedAt)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
