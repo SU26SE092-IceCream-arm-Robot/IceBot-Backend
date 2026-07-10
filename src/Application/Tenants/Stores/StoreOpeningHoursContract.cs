@@ -17,8 +17,8 @@ internal static class StoreOpeningHoursContract
                 return $"Closed day '{day.DayOfWeek}' must not contain opening or closing times.";
             if (!day.IsClosed && (!day.OpensAt.HasValue || !day.ClosesAt.HasValue))
                 return $"Open day '{day.DayOfWeek}' requires opening and closing times.";
-            if (!day.IsClosed && day.OpensAt!.Value >= day.ClosesAt!.Value)
-                return $"Opening time must be earlier than closing time for '{day.DayOfWeek}'.";
+            if (!day.IsClosed && day.OpensAt!.Value == day.ClosesAt!.Value)
+                return $"Opening and closing times must differ for '{day.DayOfWeek}'.";
         }
 
         return null;

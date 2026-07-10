@@ -30,7 +30,7 @@ internal static class PaymentNotificationApplier
             paymentTransaction.Cancel(DateTimeOffset.UtcNow);
             if (paymentTransaction.Order.PaymentStatus != PaymentStatus.Paid)
             {
-                paymentTransaction.Order.PaymentStatus = PaymentStatus.Cancelled;
+                paymentTransaction.Order.MarkPaymentCancelled();
             }
             return;
         }
@@ -41,7 +41,7 @@ internal static class PaymentNotificationApplier
             paymentTransaction.Status = PaymentTransactionStatus.Expired;
             if (paymentTransaction.Order.PaymentStatus != PaymentStatus.Paid)
             {
-                paymentTransaction.Order.PaymentStatus = PaymentStatus.Cancelled;
+                paymentTransaction.Order.MarkPaymentCancelled();
             }
         }
     }

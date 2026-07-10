@@ -1,5 +1,5 @@
-using Application.Devices.Support;
-using Domain.Devices.Entities;
+using Application.Devices.Catalog.Support;
+using Domain.Devices.Catalog;
 
 namespace Application.Inventory.Support;
 

@@ -1,5 +1,10 @@
-using Application.EdgeIntegration.Commands;
-using Application.EdgeIntegration.Services;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
+using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.EdgeIntegration.Dispatch.Services;
+using Application.EdgeIntegration.Reports.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.EdgeIntegration;

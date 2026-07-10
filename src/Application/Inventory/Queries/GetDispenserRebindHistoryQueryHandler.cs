@@ -16,6 +16,10 @@ public sealed class GetDispenserRebindHistoryQueryHandler(IInventoryStore invent
         {
             return ApiResult<IReadOnlyList<DispenserRebindHistoryResult>>.Fail("Dispenser state not found.", 404);
         }
+        if (state.KioskId != query.KioskId)
+        {
+            return ApiResult<IReadOnlyList<DispenserRebindHistoryResult>>.Fail("Dispenser state not found.", 404);
+        }
 
         if (!ScopeAccessRules.CanAccessScopedRow(
                 ScopeRoleSets.InventoryView,

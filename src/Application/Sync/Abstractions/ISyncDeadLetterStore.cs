@@ -1,6 +1,6 @@
 using Domain.Sync.DeadLetters;
 using Domain.Devices.ExecutionEndpoints;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Sync.Entities;
 
 namespace Application.Sync.Abstractions;

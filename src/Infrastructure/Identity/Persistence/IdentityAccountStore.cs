@@ -111,7 +111,7 @@ namespace Infrastructure.Identity.Persistence
             CancellationToken cancellationToken = default)
         {
             return ApplyFilters(
-                    _dbContext.Accounts.AsNoTracking(),
+                    _dbContext.Accounts.WhereNotDeleted().AsNoTracking(),
                     search,
                     status,
                     isSystemAdmin,
@@ -123,21 +123,21 @@ namespace Infrastructure.Identity.Persistence
 
         public Task<bool> ExistsByEmailOrUserNameAsync(string email, string userName, CancellationToken cancellationToken = default)
         {
-            return _dbContext.Accounts
+            return _dbContext.Accounts.WhereNotDeleted()
                 .AsNoTracking()
                 .AnyAsync(account => account.Email == email || account.UserName == userName, cancellationToken);
         }
 
         public Task<bool> EmailExistsForOtherAccountAsync(Guid accountId, string email, CancellationToken cancellationToken = default)
         {
-            return _dbContext.Accounts
+            return _dbContext.Accounts.WhereNotDeleted()
                 .AsNoTracking()
                 .AnyAsync(account => account.Id != accountId && account.Email == email, cancellationToken);
         }
 
         public Task<bool> UserNameExistsAsync(string userName, CancellationToken cancellationToken = default)
         {
-            return _dbContext.Accounts
+            return _dbContext.Accounts.WhereNotDeleted()
                 .AsNoTracking()
                 .AnyAsync(account => account.UserName == userName, cancellationToken);
         }
@@ -154,7 +154,7 @@ namespace Infrastructure.Identity.Persistence
 
         private IQueryable<Account> BuildAccountQuery(bool asNoTracking)
         {
-            var query = _dbContext.Accounts
+            var query = _dbContext.Accounts.WhereNotDeleted()
                 .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Role)
                 .AsQueryable();

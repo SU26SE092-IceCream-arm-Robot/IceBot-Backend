@@ -1,4 +1,4 @@
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Inventory.Enums;
 
 namespace Application.Inventory.Results;

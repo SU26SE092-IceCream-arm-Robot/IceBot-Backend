@@ -1,5 +1,9 @@
 # SignalR Realtime Contract
 
+## Search Keywords
+
+`SignalR`, `realtime`, `OrderHub`, `OperationsHub`, `ManagementDashboardHub`, `OrderStatusChanged`, `PaymentStatusChanged`, `OrderExecutionObservationChanged`, `KioskStatusChanged`, `ExecutionReadinessChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`, `DashboardInvalidated`, `reconnect`, `hub group`
+
 ## Scope
 SignalR is used exclusively for Cloud-to-Human UI realtime updates, UI deltas, and dashboard invalidation. It is **not** used for Cloud-to-Edge/Kiosk/Robot runtime integration or machine-to-machine command/event flows (which will be handled by MQTT/edge sync). SignalR does not send robot execution commands or device control commands.
 

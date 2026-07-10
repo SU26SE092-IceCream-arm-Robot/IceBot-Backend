@@ -1,8 +1,15 @@
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.ArtifactTemplates.Results;
+using Application.RobotConfiguration.ArtifactTemplates.Queries;
+using Application.RobotConfiguration.ArtifactTemplates.Commands;
+using Domain.RobotConfiguration.ArtifactTemplates;
 using System.Reflection;
 using Application.Identity.Tokens.Claims;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
-using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace IceBot.UnitTests.TestSupport;
 

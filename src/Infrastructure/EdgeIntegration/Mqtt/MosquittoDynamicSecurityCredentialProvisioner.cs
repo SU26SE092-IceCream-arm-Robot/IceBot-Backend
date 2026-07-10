@@ -1,7 +1,11 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using Application.Devices.Abstractions;
+using Application.Devices.Catalog.Abstractions;
+using Application.Devices.ExecutionEndpoints.Abstractions;
+using Application.Devices.Telemetry.Abstractions;
+using Application.Devices.Connectivity.Abstractions;
+using Application.Devices.Credentials.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MQTTnet;

@@ -65,7 +65,7 @@ public sealed class CancelManagementOrderCommandHandler
             var reason = string.IsNullOrWhiteSpace(command.Reason) ? null : command.Reason.Trim();
 
             order.Cancel(now, reason);
-            order.PaymentStatus = PaymentStatus.Cancelled;
+            order.MarkPaymentCancelled();
             order.UpdatedAt = now;
 
             var history = new OrderStatusHistory

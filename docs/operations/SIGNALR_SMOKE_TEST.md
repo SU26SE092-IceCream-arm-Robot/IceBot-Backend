@@ -1,5 +1,9 @@
 # SignalR Manual Smoke Test Workflow
 
+## Search Keywords
+
+`SignalR smoke test`, `OrderHub`, `OperationsHub`, `ManagementDashboardHub`, `JWT`, `JoinOrder`, `JoinKiosk`, `JoinDashboard`, `ExecutionReadinessChanged`
+
 This guide provides steps to manually verify that the SignalR realtime surface is working correctly.
 
 ## 1. Start the Backend
@@ -47,7 +51,7 @@ Extract the `token` from the response.
    - Example: Call `POST /api/v1/management/maintenance-tickets` to create a ticket for that kiosk.
    - Expected: You should receive a `MaintenanceTicketChanged` event.
 5. Trigger an inventory operation:
-   - Example: Call `POST /api/v1/management/inventory/dispenser-states/{id}/refill`.
+   - Example: Call `POST /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states/{id}/refill`.
    - Expected: You should receive an `InventoryChanged` event.
 
 ## 5. Test ManagementDashboardHub
@@ -63,7 +67,7 @@ Extract the `token` from the response.
 ## 6. Expected Event Names
 
 - **OrderHub**: `OrderStatusChanged`, `PaymentStatusChanged`
-- **OperationsHub**: `KioskStatusChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`
+- **OperationsHub**: `KioskStatusChanged`, `ExecutionReadinessChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`
 - **ManagementDashboardHub**: `DashboardInvalidated`
 
 `DeviceEventCreated` is emitted for a newly committed device event. `AlertChanged` is also emitted when Error/Critical telemetry creates an actionable alert and when that alert is acknowledged or resolved.

@@ -1,5 +1,5 @@
 using Domain.Devices.ExecutionEndpoints;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 
 namespace Application.EdgeIntegration.Abstractions;
 

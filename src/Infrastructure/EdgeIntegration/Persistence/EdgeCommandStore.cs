@@ -1,6 +1,6 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
@@ -23,7 +23,7 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
         Guid endpointId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.KioskExecutionEndpoints
+        return _dbContext.KioskExecutionEndpoints.WhereNotDeleted()
             .Include(endpoint => endpoint.CredentialBinding)
             .FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId, cancellationToken);
     }

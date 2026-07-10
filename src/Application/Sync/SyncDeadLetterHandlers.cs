@@ -1,7 +1,10 @@
 using Domain.Sync.DeadLetters;
 using Domain.Sync.Ingestion;
 using System.Text.Json;
-using Application.EdgeIntegration.Commands;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
 using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
 using Application.Sync.Abstractions;

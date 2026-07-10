@@ -52,7 +52,7 @@ public sealed class CancelPendingOrderCommandHandler
             var reason = NormalizeOptional(request.Reason);
 
             order.Cancel(now, reason);
-            order.PaymentStatus = PaymentStatus.Cancelled;
+            order.MarkPaymentCancelled();
             order.UpdatedAt = now;
 
             var history = new OrderStatusHistory

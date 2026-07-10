@@ -1,6 +1,6 @@
 using Domain.Catalog.Entities;
 using Domain.Common;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Identity.Entities;
 using Domain.Tenants.Entities;
 

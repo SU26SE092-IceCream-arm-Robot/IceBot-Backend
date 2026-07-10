@@ -1,3 +1,5 @@
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;

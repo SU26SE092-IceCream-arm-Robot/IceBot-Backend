@@ -238,7 +238,7 @@ Avoid:
 ## Documentation Map
 
 - [Working Protocol](docs/process/WORKING_PROTOCOL.md)
-- [RAG Context Map](docs/RAG_CONTEXT_MAP.md)
+- [Documentation Routing Map](docs/DOCUMENTATION_ROUTING_MAP.md)
 - [Documentation Rules](docs/process/DOCUMENTATION_RULES.md)
 - [Boundary Contexts](docs/architecture/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](docs/architecture/DEPENDENCY_RULES.md)

@@ -1,5 +1,9 @@
 # MQTT Operations
 
+## Search Keywords
+
+`MQTT`, `Mosquitto`, `broker`, `execution endpoint`, `MQTT credential`, `topic ACL`, `wake-up notification`, `command pull`, `TLS`
+
 ## Ownership
 
 MQTT is a best-effort command-available wake-up channel. `EdgeCommand` in PostgreSQL and the authenticated command-pull API remain authoritative.
@@ -111,9 +115,9 @@ or Git.
 Management lifecycle:
 
 ```text
-POST   /api/v1/management/execution-endpoints/{id}/mqtt-credential   provision
-PATCH  /api/v1/management/execution-endpoints/{id}/mqtt-credential   rotate
-DELETE /api/v1/management/execution-endpoints/{id}/mqtt-credential   revoke
+POST   /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   provision
+PATCH  /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   rotate
+DELETE /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   revoke
 ```
 
 Broker mutation and database audit cannot share a distributed transaction.

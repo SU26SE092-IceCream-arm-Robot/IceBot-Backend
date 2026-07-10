@@ -20,11 +20,11 @@ public sealed class DashboardStore : IDashboardStore
         IReadOnlyCollection<Guid> allowedKioskIds,
         CancellationToken cancellationToken = default)
     {
-        var orgsQuery = _dbContext.Organizations.AsNoTracking();
-        var storesQuery = _dbContext.Stores.AsNoTracking();
-        var kiosksQuery = _dbContext.Kiosks.AsNoTracking();
-        var ordersQuery = _dbContext.Orders.AsNoTracking();
-        var dispensersQuery = _dbContext.IngredientDispenserStates.AsNoTracking();
+        var orgsQuery = _dbContext.Organizations.WhereNotDeleted().AsNoTracking();
+        var storesQuery = _dbContext.Stores.WhereNotDeleted().AsNoTracking();
+        var kiosksQuery = _dbContext.Kiosks.WhereNotDeleted().AsNoTracking();
+        var ordersQuery = _dbContext.Orders.WhereNotDeleted().AsNoTracking();
+        var dispensersQuery = _dbContext.IngredientDispenserStates.WhereNotDeleted().AsNoTracking();
         var eventsQuery = _dbContext.DeviceEvents.AsNoTracking();
 
         if (!isSystemAdmin)

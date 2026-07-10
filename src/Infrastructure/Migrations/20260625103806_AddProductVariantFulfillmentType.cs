@@ -1,4 +1,11 @@
-﻿using System;
+using Application.RobotConfiguration.Programs.ReadModels;
+using Application.RobotConfiguration.Programs.Mapping;
+using Application.RobotConfiguration.Programs.Results;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable

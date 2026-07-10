@@ -1,6 +1,13 @@
-using Application.Devices.Commands;
-using Application.Devices.Queries;
-using Application.Devices.Requests;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
+using Application.Devices.Catalog.Queries;
+using Application.Devices.ExecutionEndpoints.Queries;
+using Application.Devices.Telemetry.Queries;
+using Application.Devices.Connectivity.Queries;
+using Application.Devices.Catalog.Requests;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -64,9 +71,10 @@ public sealed class ManagementDevicesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("devices/{deviceId:guid}")]
+    [HttpGet("kiosks/{kioskId:guid}/devices/{deviceId:guid}")]
     [Authorize(Policy = "devices.view")]
     public async Task<IActionResult> GetDevice(
+        Guid kioskId,
         Guid deviceId,
         CancellationToken cancellationToken)
     {
@@ -74,6 +82,7 @@ public sealed class ManagementDevicesController : ControllerBase
         var query = new GetDeviceQuery
         {
             UserContext = context,
+            KioskId = kioskId,
             DeviceId = deviceId
         };
 
@@ -100,9 +109,10 @@ public sealed class ManagementDevicesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPut("devices/{deviceId:guid}")]
+    [HttpPut("kiosks/{kioskId:guid}/devices/{deviceId:guid}")]
     [Authorize(Policy = "devices.manage")]
     public async Task<IActionResult> UpdateDevice(
+        Guid kioskId,
         Guid deviceId,
         [FromBody] UpdateDeviceRequest request,
         CancellationToken cancellationToken)
@@ -111,6 +121,7 @@ public sealed class ManagementDevicesController : ControllerBase
         var command = new UpdateDeviceCommand
         {
             UserContext = context,
+            KioskId = kioskId,
             DeviceId = deviceId,
             Request = request
         };
@@ -119,9 +130,10 @@ public sealed class ManagementDevicesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("devices/{deviceId:guid}/status")]
+    [HttpPatch("kiosks/{kioskId:guid}/devices/{deviceId:guid}/status")]
     [Authorize(Policy = "devices.manage")]
     public async Task<IActionResult> SetDeviceStatus(
+        Guid kioskId,
         Guid deviceId,
         [FromBody] SetDeviceStatusRequest request,
         CancellationToken cancellationToken)
@@ -130,6 +142,7 @@ public sealed class ManagementDevicesController : ControllerBase
         var command = new SetDeviceStatusCommand
         {
             UserContext = context,
+            KioskId = kioskId,
             DeviceId = deviceId,
             Request = request
         };
@@ -138,9 +151,10 @@ public sealed class ManagementDevicesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpDelete("devices/{deviceId:guid}")]
+    [HttpDelete("kiosks/{kioskId:guid}/devices/{deviceId:guid}")]
     [Authorize(Policy = "devices.manage")]
     public async Task<IActionResult> RetireDevice(
+        Guid kioskId,
         Guid deviceId,
         [FromQuery] string? reason,
         CancellationToken cancellationToken)
@@ -149,6 +163,7 @@ public sealed class ManagementDevicesController : ControllerBase
         var command = new RetireDeviceCommand
         {
             UserContext = context,
+            KioskId = kioskId,
             DeviceId = deviceId,
             Reason = reason
         };
@@ -157,16 +172,17 @@ public sealed class ManagementDevicesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("devices/{deviceId:guid}/replace")]
+    [HttpPost("kiosks/{kioskId:guid}/devices/{deviceId:guid}/replace")]
     [Authorize(Policy = "devices.manage")]
     [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> ReplaceDevice(
+        Guid kioskId,
         Guid deviceId,
         [FromBody] ReplaceDeviceRequest request,
         CancellationToken cancellationToken)
     {
         var result = await _replaceDeviceHandler.HandleAsync(
-            new ReplaceDeviceCommand(deviceId, request, User.GetUserContext()), cancellationToken);
+            new ReplaceDeviceCommand(kioskId, deviceId, request, User.GetUserContext()), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

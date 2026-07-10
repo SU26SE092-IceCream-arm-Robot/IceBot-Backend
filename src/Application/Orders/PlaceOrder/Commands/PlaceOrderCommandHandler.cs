@@ -90,12 +90,12 @@ public sealed class PlaceOrderCommandHandler
                 IdempotencyKey = idempotencyKey,
                 ClientOrderId = clientOrderId,
                 Channel = Domain.Orders.Enums.OrderChannel.Tablet,
-                Currency = DefaultCurrency,
                 CustomerName = NormalizeOptional(request.CustomerName),
                 CustomerPhoneNumber = NormalizeOptional(request.CustomerPhoneNumber),
                 Notes = NormalizeOptional(request.Notes),
                 CreatedAt = now
             };
+            order.SetCurrency(DefaultCurrency);
 
             foreach (var itemRequest in request.Items)
             {
@@ -142,7 +142,7 @@ public sealed class PlaceOrderCommandHandler
 
                 if (!order.OrderItems.Any())
                 {
-                    order.Currency = menuItem.Currency;
+                    order.SetCurrency(menuItem.Currency);
                 }
                 else if (!CurrencyMatches(order.Currency, menuItem.Currency))
                 {

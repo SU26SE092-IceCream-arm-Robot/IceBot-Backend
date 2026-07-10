@@ -1,7 +1,11 @@
-using Application.Devices.Queries;
+using Domain.Devices.Telemetry;
+using Application.Devices.Catalog.Queries;
+using Application.Devices.ExecutionEndpoints.Queries;
+using Application.Devices.Telemetry.Queries;
+using Application.Devices.Connectivity.Queries;
 using Asp.Versioning;
 using Domain.Common.Enums;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Authorization;

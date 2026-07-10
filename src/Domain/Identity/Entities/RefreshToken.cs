@@ -6,8 +6,6 @@ public partial class RefreshToken : GuidEntity
 {
     public Guid AccountId { get; set; }
 
-    public Guid? AccountDeviceId { get; set; }
-
     public Guid? ReplacedByTokenId { get; set; }
 
     public string TokenHash { get; set; } = null!;
@@ -33,8 +31,6 @@ public partial class RefreshToken : GuidEntity
     public bool IsUsed { get; set; }
 
     public virtual Account Account { get; set; } = null!;
-
-    public virtual AccountDevice? AccountDevice { get; set; }
 
     public virtual RefreshToken? ReplacedByToken { get; set; }
 }

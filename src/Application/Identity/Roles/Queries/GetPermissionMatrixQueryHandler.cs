@@ -107,6 +107,20 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "product-categories.read",
+            Description = "Browse the global flat ProductCategory catalog used by product authoring.",
+            Roles = new[] { "SystemAdmin", "Manager" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "product-categories.manage",
+            Description = "Create, update, activate/deactivate, and safely delete unreferenced ProductCategory definitions.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "ingredients.read",
             Description = "Browse the global ingredient reference catalog used by recipe authoring.",
             Roles = new[] { "SystemAdmin", "Manager" },
@@ -227,8 +241,15 @@ internal static class PermissionMatrixRules
         new()
         {
             Policy = "operations.view",
-            Description = "View kiosk operations telemetry such as heartbeats and device events within allowed scope.",
+            Description = "View kiosk operations telemetry such as heartbeats, device events, and curated operation logs within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "operations.diagnostics",
+            Description = "View raw operation-log diagnostic payloads within allowed kiosk scope.",
+            Roles = new[] { "SystemAdmin", "Technician" },
             ScopeRequired = true
         },
         new()

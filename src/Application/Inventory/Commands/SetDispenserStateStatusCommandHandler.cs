@@ -3,7 +3,7 @@ using Application.Inventory.Mapping;
 using Application.Inventory.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Application.Inventory.Support;
 using Domain.Inventory.Enums;
 
@@ -15,6 +15,7 @@ public sealed class SetDispenserStateStatusCommandHandler(IInventoryStore invent
     {
         var state = await inventory.GetDispenserStateByIdAsync(command.DispenserStateId, ct);
         if (state?.Kiosk is null) return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
+        if (state.KioskId != command.KioskId) return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
         if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryConfigure, command.UserContext,
                 state.Kiosk.OrganizationId, state.Kiosk.StoreId, state.KioskId))
             return ApiResult<DispenserStateResult>.Fail("Access denied.", 403);

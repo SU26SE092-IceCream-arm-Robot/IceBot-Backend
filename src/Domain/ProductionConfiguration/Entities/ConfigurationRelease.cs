@@ -1,10 +1,12 @@
+using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.Programs;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Tenants.Entities;
 using Domain.ProductionConfiguration.ValueObjects;
-using Domain.RobotConfiguration.Manifests;
+using Domain.RobotConfiguration.Programs.Manifests;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -189,8 +191,8 @@ public class ConfigurationRelease : BusinessEntity
     {
         if ((Status != ConfigurationReleaseStatus.Published &&
                 !(allowRetiredRelease && Status == ConfigurationReleaseStatus.Retired)) ||
-            endpoint.ExecutionProfile != Domain.Devices.Enums.KioskExecutionProfile.FullEdge ||
-            endpoint.Status != Domain.Devices.Enums.KioskExecutionEndpointStatus.Active ||
+            endpoint.ExecutionProfile != KioskExecutionProfile.FullEdge ||
+            endpoint.Status != KioskExecutionEndpointStatus.Active ||
             endpoint.FullEdgeRuntimeId != edgeRuntimeId)
         {
             throw new DomainRuleException("Only a published release can deploy to its active Full Edge endpoint.");

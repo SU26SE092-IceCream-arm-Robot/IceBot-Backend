@@ -1,8 +1,16 @@
-using Application.Devices.Commands;
-using Application.Devices.Queries;
-using Application.Devices.Requests;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
+using Application.Devices.Catalog.Queries;
+using Application.Devices.ExecutionEndpoints.Queries;
+using Application.Devices.ExecutionEndpoints.Requests;
+using Application.Devices.Telemetry.Queries;
+using Application.Devices.Connectivity.Queries;
+using Application.Devices.Catalog.Requests;
 using Asp.Versioning;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
@@ -78,13 +86,14 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("execution-endpoints/{endpointId:guid}")]
+    [HttpGet("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}")]
     [Authorize(Policy = "devices.view")]
-    public async Task<IActionResult> Get(Guid endpointId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Get(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _getHandler.HandleAsync(new GetExecutionEndpointQuery
         {
             UserContext = User.GetUserContext(),
+            KioskId = kioskId,
             EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -102,66 +111,67 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPut("execution-endpoints/{endpointId:guid}/supported-robot-targets")]
+    [HttpPut("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/supported-robot-targets")]
     [Authorize(Policy = "devices.manage")]
     public async Task<IActionResult> ReplaceSupportedRobotTargets(
-        Guid endpointId, [FromBody] ReplaceExecutionEndpointRobotTargetsRequest request, CancellationToken cancellationToken)
+        Guid kioskId, Guid endpointId, [FromBody] ReplaceExecutionEndpointRobotTargetsRequest request, CancellationToken cancellationToken)
     {
         var result = await _replaceTargetsHandler.HandleAsync(new ReplaceExecutionEndpointRobotTargetsCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId, Request = request
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId, Request = request
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("execution-endpoints/{endpointId:guid}/provision")]
+    [HttpPost("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/provision")]
     [Authorize(Policy = "devices.manage")]
     public async Task<IActionResult> Provision(
-        Guid endpointId, [FromBody] ProvisionExecutionEndpointRequest request, CancellationToken cancellationToken)
+        Guid kioskId, Guid endpointId, [FromBody] ProvisionExecutionEndpointRequest request, CancellationToken cancellationToken)
     {
         var result = await _provisionHandler.HandleAsync(new ProvisionExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId, Request = request
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId, Request = request
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("execution-endpoints/{endpointId:guid}/disable")]
+    [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/disable")]
     [Authorize(Policy = "devices.manage")]
-    public async Task<IActionResult> Disable(Guid endpointId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Disable(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _disableHandler.HandleAsync(new DisableExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("execution-endpoints/{endpointId:guid}/reactivate")]
+    [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/reactivate")]
     [Authorize(Policy = "devices.manage")]
-    public async Task<IActionResult> Reactivate(Guid endpointId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Reactivate(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _reactivateHandler.HandleAsync(new ReactivateExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("execution-endpoints/{endpointId:guid}/retire")]
+    [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/retire")]
     [Authorize(Policy = "devices.manage")]
-    public async Task<IActionResult> Retire(Guid endpointId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Retire(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _retireHandler.HandleAsync(new RetireExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("execution-endpoints/{endpointId:guid}/credential")]
+    [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/credential")]
     [Authorize(Policy = "devices.manage")]
     public async Task<IActionResult> RotateCredential(
+        Guid kioskId,
         Guid endpointId,
         [FromBody] RotateExecutionEndpointCredentialRequest request,
         CancellationToken cancellationToken)
@@ -169,6 +179,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         var command = new RotateExecutionEndpointCredentialCommand
         {
             UserContext = User.GetUserContext(),
+            KioskId = kioskId,
             EndpointId = endpointId,
             ClientCertificateSha256Fingerprint = request.ClientCertificateSha256Fingerprint,
             EcdsaPublicKeyPem = request.EcdsaPublicKeyPem
@@ -178,35 +189,35 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("execution-endpoints/{endpointId:guid}/mqtt-credential")]
+    [HttpPost("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/mqtt-credential")]
     [Authorize(Policy = "devices.manage")]
-    public async Task<IActionResult> ProvisionMqttCredential(Guid endpointId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ProvisionMqttCredential(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _provisionMqttHandler.HandleAsync(new ProvisionMqttEndpointCredentialCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("execution-endpoints/{endpointId:guid}/mqtt-credential")]
+    [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/mqtt-credential")]
     [Authorize(Policy = "devices.manage")]
-    public async Task<IActionResult> RotateMqttCredential(Guid endpointId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RotateMqttCredential(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _rotateMqttHandler.HandleAsync(new RotateMqttEndpointCredentialCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpDelete("execution-endpoints/{endpointId:guid}/mqtt-credential")]
+    [HttpDelete("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/mqtt-credential")]
     [Authorize(Policy = "devices.manage")]
-    public async Task<IActionResult> RevokeMqttCredential(Guid endpointId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RevokeMqttCredential(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _revokeMqttHandler.HandleAsync(new RevokeMqttEndpointCredentialCommand
         {
-            UserContext = User.GetUserContext(), EndpointId = endpointId
+            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

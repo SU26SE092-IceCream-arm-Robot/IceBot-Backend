@@ -1,6 +1,8 @@
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
 using Domain.Common;
-using Domain.RobotConfiguration.Entities;
-using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace IceBot.UnitTests.RobotConfiguration;
 

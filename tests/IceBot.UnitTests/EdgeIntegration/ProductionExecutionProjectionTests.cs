@@ -1,4 +1,6 @@
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
+using Domain.Devices.ExecutionEndpoints;
+using Domain.Devices.Telemetry;
 using Domain.ProductionExecution.Enums;
 using Domain.ProductionExecution.Projections;
 

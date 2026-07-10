@@ -1,7 +1,7 @@
 using Application.Inventory.Results;
 using Domain.Inventory.Entities;
 using Domain.Catalog.Entities;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Tenants.Entities;
 using Domain.Identity.Entities;
 

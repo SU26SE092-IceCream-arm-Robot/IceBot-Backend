@@ -4,6 +4,13 @@ namespace Application.Catalog.Abstractions;
 
 public interface ICatalogAuthoringStore
 {
+    Task<List<ProductCategory>> ListProductCategoriesAsync(bool includeInactive, CancellationToken cancellationToken = default);
+    Task<ProductCategory?> GetProductCategoryAsync(long categoryId, bool asNoTracking = true, CancellationToken cancellationToken = default);
+    Task<bool> ProductCategoryCodeExistsAsync(string code, long? excludedCategoryId = null, CancellationToken cancellationToken = default);
+    Task AddProductCategoryAsync(ProductCategory category, CancellationToken cancellationToken = default);
+    Task<bool> IsProductCategoryReferencedAsync(long categoryId, CancellationToken cancellationToken = default);
+    void RemoveProductCategory(ProductCategory category);
+
     Task<int> CountIngredientsAsync(string? search, bool? isActive, CancellationToken cancellationToken = default);
     Task<List<Ingredient>> ListIngredientsAsync(string? search, bool? isActive, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
     Task<Ingredient?> GetIngredientAsync(Guid ingredientId, bool asNoTracking = true, CancellationToken cancellationToken = default);

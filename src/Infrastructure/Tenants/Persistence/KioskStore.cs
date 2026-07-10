@@ -18,25 +18,25 @@ public sealed class KioskStore : IKioskStore
 
     public Task<Store?> GetStoreByIdAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Stores.FirstOrDefaultAsync(x => x.Id == storeId, cancellationToken);
+        return _dbContext.Stores.WhereNotDeleted().FirstOrDefaultAsync(x => x.Id == storeId, cancellationToken);
     }
 
     public Task<bool> OrganizationExistsActiveAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Organizations
+        return _dbContext.Organizations.WhereNotDeleted()
             .AnyAsync(x => x.Id == organizationId && x.Status == EntityStatus.Active, cancellationToken);
     }
 
     public Task<bool> StoreExistsActiveAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Stores
+        return _dbContext.Stores.WhereNotDeleted()
             .AnyAsync(x => x.Id == storeId && x.Status == EntityStatus.Active, cancellationToken);
     }
 
     public Task<bool> KioskCodeExistsAsync(Guid organizationId, string code, Guid? excludeKioskId = null, CancellationToken cancellationToken = default)
     {
         var normalized = code.Trim().ToUpperInvariant();
-        var query = _dbContext.Kiosks.Where(x => x.OrganizationId == organizationId && x.Code.ToUpper() == normalized);
+        var query = _dbContext.Kiosks.WhereNotDeleted().Where(x => x.OrganizationId == organizationId && x.Code.ToUpper() == normalized);
         if (excludeKioskId.HasValue)
         {
             query = query.Where(x => x.Id != excludeKioskId.Value);
@@ -46,7 +46,7 @@ public sealed class KioskStore : IKioskStore
 
     public async Task<IReadOnlyList<Kiosk>> ListAsync(Guid? organizationId, Guid? storeId, KioskStatus? status, string? search, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Kiosks.AsQueryable();
+        var query = _dbContext.Kiosks.WhereNotDeleted();
         if (organizationId.HasValue)
         {
             query = query.Where(x => x.OrganizationId == organizationId.Value);
@@ -69,7 +69,7 @@ public sealed class KioskStore : IKioskStore
         string? search,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Kiosks.Where(x =>
+        var query = _dbContext.Kiosks.WhereNotDeleted().Where(x =>
             organizationIds.Contains(x.OrganizationId) ||
             storeIds.Contains(x.StoreId) ||
             kioskIds.Contains(x.Id));
@@ -88,7 +88,7 @@ public sealed class KioskStore : IKioskStore
 
     public Task<Kiosk?> GetByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks.FirstOrDefaultAsync(x => x.Id == kioskId, cancellationToken);
+        return _dbContext.Kiosks.WhereNotDeleted().FirstOrDefaultAsync(x => x.Id == kioskId, cancellationToken);
     }
 
     public Task AddAsync(Kiosk kiosk, CancellationToken cancellationToken = default)

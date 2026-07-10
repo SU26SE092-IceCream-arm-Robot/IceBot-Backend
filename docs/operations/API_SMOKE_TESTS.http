@@ -164,13 +164,13 @@ Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Refill Kiosk Dispenser
-POST {{baseUrl}}/management/inventory/dispenser-states/{{sampleGuid}}/refill
+POST {{baseUrl}}/management/kiosks/{{sampleGuid}}/inventory/dispenser-states/{{sampleGuid}}/refill
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "refillQuantity": 1000,
-  "batchNumber": "BATCH-001"
+  "quantity": 1000,
+  "reasonCode": "BATCH-001"
 }
 
 

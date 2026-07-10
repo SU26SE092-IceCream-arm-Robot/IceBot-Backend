@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Tenants.Enums;
 
 namespace Domain.Tenants.Entities;

@@ -27,7 +27,7 @@ public sealed class ProductStore : IProductStore
         CancellationToken cancellationToken = default)
     {
         return ApplyProductFilters(
-                _dbContext.Products.AsNoTracking(),
+                _dbContext.Products.WhereNotDeleted().AsNoTracking(),
                 search,
                 organizationId,
                 storeId,
@@ -55,7 +55,7 @@ public sealed class ProductStore : IProductStore
         CancellationToken cancellationToken = default)
     {
         return ApplyProductFilters(
-                _dbContext.Products
+                _dbContext.Products.WhereNotDeleted()
                     .AsNoTracking()
                     .Include(product => product.ProductVariants)
                     .Include(product => product.OptionGroups)
@@ -81,7 +81,7 @@ public sealed class ProductStore : IProductStore
         bool asNoTracking = true,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Products
+        var query = _dbContext.Products.WhereNotDeleted()
             .Include(product => product.ProductVariants)
             .Include(product => product.OptionGroups)
                 .ThenInclude(group => group.ProductOptions)
@@ -146,7 +146,7 @@ public sealed class ProductStore : IProductStore
         Guid? excludedProductId = null,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Products.AnyAsync(
+        return _dbContext.Products.WhereNotDeleted().AnyAsync(
             product =>
                 product.OrganizationId == organizationId &&
                 product.StoreId == storeId &&
@@ -225,18 +225,18 @@ public sealed class ProductStore : IProductStore
         Guid? kioskId,
         CancellationToken cancellationToken = default)
     {
-        if (!await _dbContext.Organizations.AnyAsync(x => x.Id == organizationId, cancellationToken))
+        if (!await _dbContext.Organizations.WhereNotDeleted().AnyAsync(x => x.Id == organizationId, cancellationToken))
         {
             return false;
         }
 
-        if (storeId.HasValue && !await _dbContext.Stores.AnyAsync(
+        if (storeId.HasValue && !await _dbContext.Stores.WhereNotDeleted().AnyAsync(
                 x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
         {
             return false;
         }
 
-        return !kioskId.HasValue || await _dbContext.Kiosks.AnyAsync(
+        return !kioskId.HasValue || await _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
             x => x.Id == kioskId && x.OrganizationId == organizationId &&
                  (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
     }

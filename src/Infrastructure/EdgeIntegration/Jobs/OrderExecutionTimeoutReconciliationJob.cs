@@ -1,6 +1,11 @@
 using Application.EdgeIntegration;
+using Application.EdgeIntegration.Dispatch;
+using Application.EdgeIntegration.Reports;
 using Application.EdgeIntegration.Abstractions;
-using Application.EdgeIntegration.Commands;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

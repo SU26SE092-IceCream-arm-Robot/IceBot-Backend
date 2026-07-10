@@ -12,6 +12,7 @@ public sealed class DeleteDispenserStateCommandHandler(IInventoryStore inventory
     {
         var state = await inventory.GetDispenserStateByIdAsync(command.DispenserStateId, ct);
         if (state?.Kiosk is null) return ApiResult<bool>.Fail("Dispenser state not found.", 404);
+        if (state.KioskId != command.KioskId) return ApiResult<bool>.Fail("Dispenser state not found.", 404);
         if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryConfigure, command.UserContext,
                 state.Kiosk.OrganizationId, state.Kiosk.StoreId, state.KioskId))
             return ApiResult<bool>.Fail("Access denied.", 403);

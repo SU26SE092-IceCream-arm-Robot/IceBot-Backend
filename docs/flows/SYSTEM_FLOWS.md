@@ -24,23 +24,6 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 | Manual kiosk/device/order support ticket lifecycle | [Maintenance Ticket Flow](MAINTENANCE_TICKET_FLOW.md) |
 | Paid-but-not-executable, edge offline, duplicate retry paths | [Failure Flows](FAILURE_FLOWS.md) |
 
-## Current Assumptions
-
-- One tablet per kiosk.
-- Tablet may use Cloud runtime menu for catalog display, but should prefer Local Edge runtime projection for final device/robot availability when the edge service is available.
-- Tablet uses Cloud for order/payment.
-- Bank transfer QR is the first payment method.
-- No inventory reservation before payment.
-- Cloud can publish MQTT notifications.
-- Edge still pulls from Cloud for retry/offline recovery.
-- MQTT is notification only, not source of truth.
-
-## Source Of Truth Reminder
-
-Do not treat one UI screen as one backend source of truth.
-
-UI screens may aggregate data from several contexts, especially through GraphQL management read models.
-
 ## Related Docs
 
 - [API Surface Rules](../api/API_SURFACE_RULES.md)

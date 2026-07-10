@@ -350,6 +350,70 @@ Controller -> Handler -> Store/DbContext
 
 Current convention: controller-facing Application use cases should be implemented as explicit handlers. If a remaining `*Service` exists, treat it as a reusable capability/internal helper unless direct controller usage proves otherwise.
 
+## Application Feature Folder Names
+
+Small bounded contexts may keep direct `Commands`, `Queries`, `Results`, and `Abstractions` folders.
+
+Large bounded contexts should split by owned sub-feature first, then by use-case type:
+
+```text
+RobotConfiguration/
+  Artifacts/
+    Commands/
+    Queries/
+    Results/
+    Abstractions/
+  ArtifactTemplates/
+  Programs/
+  Storage/
+```
+
+Use this shape when a flat `Commands` or `Queries` folder starts mixing different aggregate owners, contracts, or persistence ports. Keep store interfaces in the sub-feature that owns the aggregate they persist, for example `IRobotArtifactStore` under `Artifacts` and `IRobotProgramStore` under `Programs`.
+
+## Application Helper Folder Names
+
+Use helper folder names by responsibility, not by habit.
+
+`Rules` is for focused business or domain-facing decisions with a named business meaning.
+
+Examples:
+
+```text
+maintenance access checks
+product option selection rules
+tenant scope rules
+runtime menu sellability rules
+```
+
+`Support` is for technical contracts, parsers, normalizers, factories, and small helpers owned by one module. Support code should not orchestrate a workflow or hide a business transition.
+
+Examples:
+
+```text
+JSON contract validator
+request normalizer
+metadata parser
+audit factory
+```
+
+`Services` is for reusable orchestration, calculation, integration helpers, or multi-step capabilities that are not controller-facing use cases. A service may have dependencies and may coordinate several internal operations, but it should not become a generic CRUD layer.
+
+Examples:
+
+```text
+release bundle builder
+inventory readiness evaluator
+token service
+payment signature service
+```
+
+When unsure:
+
+- Use `Rules` if the class answers "is this business action allowed?".
+- Use `Support` if the class answers "how do we parse/normalize/validate this technical contract?".
+- Use `Services` if the class performs a reusable multi-step capability or calculation.
+- Keep controller-facing operations as `CommandHandler` / `QueryHandler`, not `Service`.
+
 ## Result Wrapper Names
 
 Use `ApiResult<T>` for Application use cases whose result is returned directly by WebAPI controllers.

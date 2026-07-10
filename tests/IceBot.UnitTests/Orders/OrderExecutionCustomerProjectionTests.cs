@@ -1,5 +1,7 @@
-using Application.Shared.Utils;
-using Domain.Devices.Enums;
+using Application.Orders.Support;
+using Domain.Devices.Catalog;
+using Domain.Devices.ExecutionEndpoints;
+using Domain.Devices.Telemetry;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 using Domain.ProductionExecution.Enums;

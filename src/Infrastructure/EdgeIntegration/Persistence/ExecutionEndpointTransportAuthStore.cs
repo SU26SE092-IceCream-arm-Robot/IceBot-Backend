@@ -1,6 +1,6 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
@@ -15,7 +15,7 @@ public sealed class ExecutionEndpointTransportAuthStore : IExecutionEndpointTran
 
     public Task<KioskExecutionEndpoint?> GetEndpointAsync(Guid endpointId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.KioskExecutionEndpoints.AsNoTracking()
+        return _dbContext.KioskExecutionEndpoints.WhereNotDeleted().AsNoTracking()
             .Include(endpoint => endpoint.CredentialBinding)
             .FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId, cancellationToken);
     }

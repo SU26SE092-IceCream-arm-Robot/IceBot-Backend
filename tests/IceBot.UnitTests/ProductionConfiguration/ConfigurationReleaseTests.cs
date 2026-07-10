@@ -1,15 +1,22 @@
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.ValueObjects;
 using Domain.ProductionConfiguration.Manifests;
-using Application.ProductionConfiguration.Abstractions;
-using Application.ProductionConfiguration.Commands;
-using Application.ProductionConfiguration.Services;
+using Application.ProductionConfiguration.Releases.Abstractions;
+using Application.ProductionConfiguration.Releases.Commands;
+using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Releases.Services;
+using Application.ProductionConfiguration.Readiness.Services;
 using Application.Inventory.Abstractions;
 using Application.ProductionConfiguration;
+using Application.ProductionConfiguration.Deployments;
+using Application.ProductionConfiguration.Readiness;
 using Microsoft.Extensions.Options;
-using Application.RobotConfiguration.Abstractions;
+using Application.RobotConfiguration.Artifacts.Abstractions;
 using IceBot.UnitTests.TestSupport;
 using NSubstitute;
 
@@ -100,7 +107,7 @@ public sealed class ConfigurationReleaseTests
     public async Task InvalidReleaseIsRejectedBeforeObjectStorageIo()
     {
         var release = ConfigurationRelease.CreateDraft(Guid.NewGuid(), 1);
-        var store = Substitute.For<IProductionConfigurationStore>();
+        var store = Substitute.For<IConfigurationReleaseStore>();
         store.GetReleaseForPublishAsync(release.Id, Arg.Any<CancellationToken>()).Returns(release);
         var storage = Substitute.For<IArtifactObjectStorage>();
         var handler = new PublishConfigurationReleaseCommandHandler(

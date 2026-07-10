@@ -21,6 +21,10 @@ mono_crash.*
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+!src/Application/ProductionConfiguration/Releases/
+!src/Application/ProductionConfiguration/Releases/**
+!src/Infrastructure/ProductionConfiguration/Persistence/Releases/
+!src/Infrastructure/ProductionConfiguration/Persistence/Releases/**
 x64/
 x86/
 [Ww][Ii][Nn]32/
@@ -62,6 +66,12 @@ BenchmarkDotNet.Artifacts/
 project.lock.json
 project.fragment.lock.json
 artifacts/
+!src/Application/RobotConfiguration/Artifacts/
+!src/Application/RobotConfiguration/Artifacts/**
+!src/Domain/RobotConfiguration/Artifacts/
+!src/Domain/RobotConfiguration/Artifacts/**
+!src/Infrastructure/RobotConfiguration/Artifacts/
+!src/Infrastructure/RobotConfiguration/Artifacts/**
 
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt

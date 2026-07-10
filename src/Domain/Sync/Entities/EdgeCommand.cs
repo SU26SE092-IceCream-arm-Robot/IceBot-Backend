@@ -15,6 +15,8 @@ public class EdgeCommand : AuditedEntity
     public Guid TargetExecutionEndpointId { get; private set; }
     public Guid? DeploymentId { get; private set; }
     public DeploymentCommandTargetKind? DeploymentKind { get; private set; }
+    public Guid? RollbackTargetDeploymentId { get; private set; }
+    public DateTimeOffset? RequestedCommandExpiryAt { get; private set; }
     public string PayloadJson { get; private set; } = null!;
     public DateTimeOffset? CommandExpiryAt { get; private set; }
     public EdgeCommandStatus Status { get; private set; } = EdgeCommandStatus.PendingDelivery;
@@ -40,7 +42,9 @@ public class EdgeCommand : AuditedEntity
         int? dispatchAttemptNo = null,
         DateTimeOffset? commandExpiryAt = null,
         Guid? deploymentId = null,
-        DeploymentCommandTargetKind? deploymentKind = null)
+        DeploymentCommandTargetKind? deploymentKind = null,
+        Guid? rollbackTargetDeploymentId = null,
+        DateTimeOffset? requestedCommandExpiryAt = null)
     {
         if (kioskId == Guid.Empty || targetEndpointId == Guid.Empty || string.IsNullOrWhiteSpace(payloadJson))
         {
@@ -64,6 +68,22 @@ public class EdgeCommand : AuditedEntity
             throw new DomainRuleException("Only deploy-configuration commands can reference a deployment target.");
         }
 
+        if (type != EdgeCommandType.DeployConfiguration &&
+            (rollbackTargetDeploymentId.HasValue || requestedCommandExpiryAt.HasValue))
+        {
+            throw new DomainRuleException("Only deploy-configuration commands can include deployment provenance.");
+        }
+
+        if (rollbackTargetDeploymentId == Guid.Empty)
+        {
+            throw new DomainRuleException("Rollback target deployment id must not be empty.");
+        }
+
+        if (requestedCommandExpiryAt.HasValue && requestedCommandExpiryAt != commandExpiryAt)
+        {
+            throw new DomainRuleException("Requested deployment command expiry must match command expiry.");
+        }
+
         if (commandExpiryAt.HasValue && commandExpiryAt.Value <= createdAt)
         {
             throw new DomainRuleException("Edge command expiry must be later than command creation.");
@@ -76,6 +96,8 @@ public class EdgeCommand : AuditedEntity
             TargetExecutionEndpointId = targetEndpointId,
             DeploymentId = deploymentId,
             DeploymentKind = deploymentKind,
+            RollbackTargetDeploymentId = rollbackTargetDeploymentId,
+            RequestedCommandExpiryAt = requestedCommandExpiryAt,
             PayloadJson = payloadJson,
             OrderId = orderId,
             DispatchAttemptNo = dispatchAttemptNo,

@@ -1,11 +1,10 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.ValueObjects;
-using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace Domain.ProductionConfiguration.Entities;
 

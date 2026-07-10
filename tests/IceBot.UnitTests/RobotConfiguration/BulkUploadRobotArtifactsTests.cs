@@ -1,8 +1,11 @@
+using Application.RobotConfiguration.Storage.Abstractions;
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
 using System.Text;
-using Application.RobotConfiguration.Abstractions;
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Services;
-using Domain.RobotConfiguration.Entities;
+using Application.RobotConfiguration.Artifacts.Abstractions;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Storage.Services;
+using Domain.RobotConfiguration.Artifacts;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using IceBot.UnitTests.TestSupport;
@@ -76,7 +79,7 @@ public sealed class BulkUploadRobotArtifactsTests
     }
 
     private static BulkUploadRobotArtifactsCommandHandler CreateHandler(
-        IRobotConfigurationStore store,
+        IRobotArtifactStore store,
         IArtifactObjectStorage storage)
     {
         var contentService = new ArtifactUploadContentService(
@@ -86,9 +89,9 @@ public sealed class BulkUploadRobotArtifactsTests
             new UploadRobotArtifactCommandHandler(store, contentService));
     }
 
-    private static IRobotConfigurationStore CreateStore(Guid organizationId)
+    private static IRobotArtifactStore CreateStore(Guid organizationId)
     {
-        var store = Substitute.For<IRobotConfigurationStore>();
+        var store = Substitute.For<IRobotArtifactStore>();
         store.OrganizationExistsAsync(organizationId, Arg.Any<CancellationToken>()).Returns(true);
         return store;
     }

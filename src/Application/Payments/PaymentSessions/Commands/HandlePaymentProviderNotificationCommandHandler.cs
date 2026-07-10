@@ -9,7 +9,10 @@ using Application.Shared.Wrappers;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-using Application.EdgeIntegration.Commands;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Payments.PaymentSessions.Commands;
@@ -155,7 +158,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 provider = paymentTransaction.Provider;
                 orderPaymentStatus = paymentTransaction.Order.PaymentStatus.ToString();
 
-                var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrder(paymentTransaction.Order);
+                var customerStatusInfo = Application.Orders.Support.OrderStatusProjector.ProjectFromOrder(paymentTransaction.Order);
                 customerStatus = customerStatusInfo.CustomerStatus;
                 customerStatusMessage = customerStatusInfo.CustomerStatusMessage;
                 canRetryPayment = customerStatusInfo.CanRetryPayment;

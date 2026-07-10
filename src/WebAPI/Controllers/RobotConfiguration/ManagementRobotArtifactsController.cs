@@ -1,11 +1,13 @@
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Queries;
+using Application.RobotConfiguration.ArtifactTemplates.Commands;
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Artifacts.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using WebAPI.Authorization;
-using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.Artifacts;
 using Application.Shared.Wrappers;
 
 namespace WebAPI.Controllers.RobotConfiguration;

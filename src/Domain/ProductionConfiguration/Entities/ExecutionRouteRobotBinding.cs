@@ -1,5 +1,7 @@
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using Domain.Common;
-using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace Domain.ProductionConfiguration.Entities;
 

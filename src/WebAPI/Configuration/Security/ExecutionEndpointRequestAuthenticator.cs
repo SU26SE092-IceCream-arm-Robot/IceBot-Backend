@@ -3,8 +3,7 @@ using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Application.EdgeIntegration.Abstractions;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Microsoft.Extensions.Options;
 using WebAPI.Middlewares;
 

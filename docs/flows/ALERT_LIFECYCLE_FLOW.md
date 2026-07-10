@@ -1,5 +1,9 @@
 # Alert Lifecycle Flow
 
+## Search Keywords
+
+`alert`, `alert lifecycle`, `acknowledge alert`, `resolve alert`, `dedup`, `occurrence count`, `device event`, `SignalR AlertChanged`
+
 ## Purpose
 
 `DeviceEvent` is immutable telemetry evidence. `Alert` is the actionable operational state derived from suitable telemetry. `MaintenanceTicket` remains a separate work-management record and is not created automatically in V1.

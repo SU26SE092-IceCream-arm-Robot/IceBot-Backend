@@ -1,5 +1,5 @@
 using Domain.Devices.ExecutionEndpoints;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.Sync.Entities;
