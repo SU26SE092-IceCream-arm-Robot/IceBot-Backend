@@ -34,6 +34,11 @@ public interface IOrderExecutionDispatchStore
         Guid deploymentId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlySet<Guid>> ListReadyIngredientIdsAsync(
+        Guid kioskId,
+        IReadOnlyCollection<Guid> ingredientIds,
+        CancellationToken cancellationToken = default);
+
     Task<EdgeCommand?> GetCommandAsync(
         Guid orderId,
         int dispatchAttemptNo,

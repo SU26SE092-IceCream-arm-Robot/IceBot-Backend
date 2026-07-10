@@ -3,6 +3,7 @@ using Application.Payments.PaymentSessions.Mapping;
 using Application.Payments.PaymentSessions.Results;
 using Application.Payments.PaymentSessions.Support;
 using Application.Shared.Wrappers;
+using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
@@ -28,9 +29,13 @@ public sealed class CreatePaymentSessionCommandHandler
     {
         var orderId = command.OrderId;
         var request = command.Request;
-        var idempotencyKey = string.IsNullOrWhiteSpace(command.IdempotencyKey)
-            ? null
-            : command.IdempotencyKey.Trim();
+        if (!ScopedIdempotencyKey.TryNormalize(command.IdempotencyKey, out var idempotencyKey))
+        {
+            return ApiResult<PaymentSessionResult>.Fail(
+                $"Idempotency-Key is required and must be at most {ScopedIdempotencyKey.MaxClientKeyLength} characters.",
+                400);
+        }
+        var scopedIdempotencyKey = ScopedIdempotencyKey.ForOrder(orderId, idempotencyKey);
         var paymentMethodCode = request.PaymentMethodCode.Trim().ToLowerInvariant();
         var expectedCurrency = request.ExpectedCurrency.Trim().ToUpperInvariant();
 
@@ -39,35 +44,34 @@ public sealed class CreatePaymentSessionCommandHandler
             return ApiResult<PaymentSessionResult>.Fail("Payment method is not supported.", 400);
         }
 
-        if (idempotencyKey is not null)
-        {
-            var existing = await _paymentStore.GetPaymentTransactionByIdempotencyKeyAsync(
-                idempotencyKey,
-                cancellationToken);
+        var createdNewTransaction = false;
 
-            if (existing is not null)
+        var createResult = await _paymentStore.ExecuteInTransactionAsync(async ct =>
+        {
+            await _paymentStore.AcquirePaymentSessionLockAsync(orderId, ct);
+
+            var order = await _paymentStore.GetOrderByIdAsync(orderId, ct);
+            if (order is null)
             {
-                if (existing.OrderId != orderId ||
-                    !string.Equals(existing.PaymentMethod.Code, paymentMethodCode, StringComparison.OrdinalIgnoreCase) ||
-                    !string.Equals(existing.Provider, _paymentGateway.ProviderCode, StringComparison.OrdinalIgnoreCase) ||
-                    existing.Amount != request.ExpectedAmount ||
-                    !string.Equals(existing.Currency, expectedCurrency, StringComparison.OrdinalIgnoreCase))
+                return ApiResult<PaymentSessionResult>.Fail("Order not found.", 404);
+            }
+
+            var existingByIdempotencyKey = await _paymentStore.GetPaymentTransactionByIdempotencyKeyAsync(
+                scopedIdempotencyKey,
+                ct);
+            if (existingByIdempotencyKey is not null)
+            {
+                if (!MatchesRequest(existingByIdempotencyKey, orderId, paymentMethodCode, expectedCurrency, request.ExpectedAmount))
                 {
                     return ApiResult<PaymentSessionResult>.Fail(
                         "Idempotency key was already used for a different payment request.",
                         409);
                 }
 
-                return ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(existing));
-            }
-        }
-
-        var createResult = await _paymentStore.ExecuteInTransactionAsync(async ct =>
-        {
-            var order = await _paymentStore.GetOrderByIdAsync(orderId, ct);
-            if (order is null)
-            {
-                return ApiResult<PaymentSessionResult>.Fail("Order not found.", 404);
+                return existingByIdempotencyKey.CheckoutUrl is null &&
+                    existingByIdempotencyKey.Status is PaymentTransactionStatus.Pending or PaymentTransactionStatus.Authorized
+                    ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry with the same idempotency key.", 409)
+                    : ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(existingByIdempotencyKey));
             }
 
             if (order.PaymentStatus == PaymentStatus.Paid)
@@ -89,6 +93,16 @@ public sealed class CreatePaymentSessionCommandHandler
             if (order.TotalAmount <= 0)
             {
                 return ApiResult<PaymentSessionResult>.Fail("Order amount must be greater than zero.", 400);
+            }
+
+            var activeSession = await _paymentStore.GetActivePaymentTransactionByOrderIdAsync(order.Id, ct);
+            if (activeSession is not null)
+            {
+                return activeSession.CheckoutUrl is null
+                    ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry shortly.", 409)
+                    : ApiResult<PaymentSessionResult>.Success(
+                        PaymentSessionResultMapper.ToSessionResult(activeSession),
+                        "Existing active payment session returned.");
             }
 
             if (request.ExpectedAmount != order.TotalAmount ||
@@ -115,7 +129,7 @@ public sealed class CreatePaymentSessionCommandHandler
                 OrderId = order.Id,
                 PaymentMethodId = paymentMethod.Id,
                 TransactionNumber = PaymentTransactionNumberGenerator.GenerateTransactionNumber(now),
-                IdempotencyKey = idempotencyKey,
+                IdempotencyKey = scopedIdempotencyKey,
                 CorrelationId = order.CorrelationId,
                 Provider = _paymentGateway.ProviderCode,
                 Amount = order.TotalAmount,
@@ -133,11 +147,17 @@ public sealed class CreatePaymentSessionCommandHandler
 
             await _paymentStore.AddPaymentTransactionAsync(paymentTransaction, ct);
             await _paymentStore.SaveChangesAsync(ct);
+            createdNewTransaction = true;
 
             return ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(paymentTransaction));
         }, cancellationToken);
 
         if (!createResult.Succeeded || createResult.Data is null)
+        {
+            return createResult;
+        }
+
+        if (!createdNewTransaction)
         {
             return createResult;
         }
@@ -172,4 +192,17 @@ public sealed class CreatePaymentSessionCommandHandler
             return ApiResult<PaymentSessionResult>.Fail("Failed to create provider payment session.", 502);
         }
     }
+
+    private bool MatchesRequest(
+        PaymentTransaction transaction,
+        Guid orderId,
+        string paymentMethodCode,
+        string expectedCurrency,
+        decimal expectedAmount) =>
+        transaction.OrderId == orderId &&
+        transaction.PaymentMethod is not null &&
+        string.Equals(transaction.PaymentMethod.Code, paymentMethodCode, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(transaction.Provider, _paymentGateway.ProviderCode, StringComparison.OrdinalIgnoreCase) &&
+        transaction.Amount == expectedAmount &&
+        string.Equals(transaction.Currency, expectedCurrency, StringComparison.OrdinalIgnoreCase);
 }

@@ -30,4 +30,13 @@ public sealed class ProductOptionResult
     public bool IsDefault { get; set; }
     public bool IsAvailable { get; set; }
     public int DisplayOrder { get; set; }
+    public List<ProductOptionIngredientRequirementResult> IngredientRequirements { get; set; } = new();
+}
+
+public sealed class ProductOptionIngredientRequirementResult
+{
+    public Guid IngredientId { get; set; }
+    public decimal Quantity { get; set; }
+    public string Unit { get; set; } = null!;
+    public string RequiredWorkcellCapabilityCode { get; set; } = null!;
 }

@@ -53,6 +53,7 @@ public interface IExecutionStockEvidenceStore
 {
     Task AcquireStockMovementLocksAsync(IEnumerable<Guid> sourceEventIds, CancellationToken cancellationToken = default);
     Task<IngredientDispenserState?> GetDispenserStateAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
+    Task<bool> IsIngredientExpectedForOrderItemAsync(Guid orderId, Guid orderItemId, Guid ingredientId, CancellationToken cancellationToken = default);
     Task<bool> StockMovementExistsAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
     Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
 }

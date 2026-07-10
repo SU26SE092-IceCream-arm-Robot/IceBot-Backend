@@ -131,6 +131,7 @@ public class IceBotDbContext : DbContext
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<OptionGroup> OptionGroups => Set<OptionGroup>();
     public DbSet<ProductOption> ProductOptions => Set<ProductOption>();
+    public DbSet<ProductOptionIngredientRequirement> ProductOptionIngredientRequirements => Set<ProductOptionIngredientRequirement>();
     public DbSet<Recipe> Recipes => Set<Recipe>();
     public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
@@ -146,6 +147,7 @@ public class IceBotDbContext : DbContext
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();
     public DbSet<OrderItemOption> OrderItemOptions => Set<OrderItemOption>();
+    public DbSet<OrderItemOptionIngredientRequirement> OrderItemOptionIngredientRequirements => Set<OrderItemOptionIngredientRequirement>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
 
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();

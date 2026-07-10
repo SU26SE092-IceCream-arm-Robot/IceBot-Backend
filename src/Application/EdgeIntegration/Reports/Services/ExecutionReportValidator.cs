@@ -26,7 +26,7 @@ internal static class ExecutionReportValidator
             return "Stock movement evidence must be reported by a production job.";
         if (command.StockMovements.Count > 100)
             return "A production execution report supports at most 100 stock movement evidence items.";
-        if (command.StockMovements.Any(item => item.SourceEventId == Guid.Empty ||
+        if (command.StockMovements.Any(item => item.SourceEventId == Guid.Empty || item.OrderItemId == Guid.Empty ||
                 item.IngredientDispenserStateId == Guid.Empty || item.QuantityConsumed <= 0 || item.BalanceAfter < 0) ||
             command.StockMovements.Select(item => item.SourceEventId).Distinct().Count() != command.StockMovements.Count)
             return "Stock movement evidence requires unique event ids, dispenser states, positive consumed quantities, and non-negative balances.";

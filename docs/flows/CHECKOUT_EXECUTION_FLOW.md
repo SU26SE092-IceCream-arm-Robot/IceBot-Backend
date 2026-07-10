@@ -229,7 +229,7 @@ Check:
 
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
 
-Every production report must match the configuration release id and checksum embedded in its accepted execute-order command. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
+Every production report must match the configuration release id and checksum embedded in its accepted execute-order command. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. Each stock-evidence item identifies its `OrderItemId`; Cloud validates the ingredient against that line's immutable recipe or option snapshot. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
 
 ## Real-time Order & Payment Updates
 

@@ -9,6 +9,9 @@ public sealed class OrderResult
 
     public Guid KioskId { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? OrderAccessToken { get; set; }
+
     public string OrderNumber { get; set; } = null!;
 
     public string? ClientOrderId { get; set; }

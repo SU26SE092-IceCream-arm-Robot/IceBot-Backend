@@ -61,7 +61,17 @@ internal sealed class OrderItemOptionConfiguration : IEntityTypeConfiguration<Or
         entity.ToTable("OrderItemOptions");
         entity.HasIndex(x => new { x.OrderItemId, x.ProductOptionId }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => new { x.OrderItemId, x.OptionGroupId });
+        entity.HasMany(x => x.IngredientRequirements).WithOne(x => x.OrderItemOption).HasForeignKey(x => x.OrderItemOptionId).OnDelete(DeleteBehavior.Restrict);
 
+    }
+}
+
+internal sealed class OrderItemOptionIngredientRequirementConfiguration : IEntityTypeConfiguration<OrderItemOptionIngredientRequirement>
+{
+    public void Configure(EntityTypeBuilder<OrderItemOptionIngredientRequirement> entity)
+    {
+        entity.ToTable("OrderItemOptionIngredientRequirements");
+        entity.HasIndex(x => new { x.OrderItemOptionId, x.IngredientId }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
     }
 }
 

@@ -87,6 +87,14 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
+            if (!string.IsNullOrWhiteSpace(notification.ProviderEventId))
+            {
+                await _paymentStore.AcquirePaymentCallbackLockAsync(
+                    notification.Provider,
+                    notification.ProviderEventId,
+                    ct);
+            }
+
             if (!string.IsNullOrWhiteSpace(notification.ProviderEventId) &&
                 await _paymentStore.PaymentCallbackExistsAsync(notification.Provider, notification.ProviderEventId, ct))
             {

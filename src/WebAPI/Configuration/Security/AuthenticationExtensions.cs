@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
@@ -22,8 +23,24 @@ public static class AuthenticationExtensions
 
     public static IServiceCollection AddIceBotAuthentication(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
+        var publicOrderAccessKeyRingDirectory = configuration["PublicOrderAccess:KeyRingDirectory"];
+        if (environment.IsProduction() && string.IsNullOrWhiteSpace(publicOrderAccessKeyRingDirectory))
+        {
+            throw new InvalidOperationException(
+                "PublicOrderAccess:KeyRingDirectory is required in Production to preserve order access tokens across restarts and instances.");
+        }
+
+        var dataProtection = services.AddDataProtection().SetApplicationName("IceBot.WebAPI");
+        if (!string.IsNullOrWhiteSpace(publicOrderAccessKeyRingDirectory))
+        {
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(publicOrderAccessKeyRingDirectory));
+        }
+
+        services.AddSingleton<IPublicOrderAccessTokenService, PublicOrderAccessTokenService>();
+
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection("Authentication:Jwt"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.Secret), "JWT Secret is required.")

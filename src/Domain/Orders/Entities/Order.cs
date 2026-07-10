@@ -174,6 +174,11 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Paid amount must be greater than zero.");
         }
 
+        if (PaymentStatus is PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded)
+        {
+            throw new DomainRuleException("A refunded order payment cannot be marked as paid.");
+        }
+
         PaidAmount += paidAmount;
         PaidAt = paidAt;
 
@@ -181,17 +186,26 @@ public partial class Order : BusinessEntity, IStoreScoped
             ? PaymentStatus.Paid
             : PaymentStatus.Authorized;
 
-        if (PaymentStatus == PaymentStatus.Paid && Status == OrderStatus.PendingPayment)
+        if (PaymentStatus != PaymentStatus.Paid)
+        {
+            return;
+        }
+
+        if (Status == OrderStatus.PendingPayment)
         {
             Status = OrderStatus.ReadyForExecution;
+        }
+        else if (Status == OrderStatus.Cancelled)
+        {
+            Status = OrderStatus.RefundRequired;
         }
     }
 
     public void MarkPaymentCancelled()
     {
-        if (PaymentStatus == PaymentStatus.Paid)
+        if (PaymentStatus is PaymentStatus.Paid or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded)
         {
-            throw new DomainRuleException("A paid order payment status cannot be cancelled.");
+            throw new DomainRuleException("A paid or refunded order payment status cannot be cancelled.");
         }
 
         PaymentStatus = PaymentStatus.Cancelled;

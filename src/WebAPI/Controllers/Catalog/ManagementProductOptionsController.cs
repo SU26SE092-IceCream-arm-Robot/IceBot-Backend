@@ -20,7 +20,8 @@ public sealed class ManagementProductOptionsController(
     CreateProductOptionCommandHandler createOption,
     UpdateProductOptionCommandHandler updateOption,
     SetProductOptionAvailabilityCommandHandler setOptionAvailability,
-    DeleteProductOptionCommandHandler deleteOption) : ControllerBase
+    DeleteProductOptionCommandHandler deleteOption,
+    ReplaceProductOptionIngredientRequirementsCommandHandler replaceIngredientRequirements) : ControllerBase
 {
     [HttpPost]
     public async Task<IActionResult> CreateGroup(Guid organizationId, Guid productId, [FromBody] CreateOptionGroupRequest request, CancellationToken ct)
@@ -79,6 +80,19 @@ public sealed class ManagementProductOptionsController(
     public async Task<IActionResult> UpdateOption(Guid organizationId, Guid productId, long optionGroupId, Guid productOptionId, [FromBody] UpdateProductOptionRequest request, CancellationToken ct)
     {
         var result = await updateOption.HandleAsync(new UpdateProductOptionCommand
+        {
+            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
+            ProductOptionId = productOptionId, Request = request, UpdatedByAccountId = CurrentAccountId()
+        }, ct);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPut("{optionGroupId:long}/options/{productOptionId:guid}/ingredient-requirements")]
+    public async Task<IActionResult> ReplaceIngredientRequirements(
+        Guid organizationId, Guid productId, long optionGroupId, Guid productOptionId,
+        [FromBody] ReplaceProductOptionIngredientRequirementsRequest request, CancellationToken ct)
+    {
+        var result = await replaceIngredientRequirements.HandleAsync(new ReplaceProductOptionIngredientRequirementsCommand
         {
             Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
             ProductOptionId = productOptionId, Request = request, UpdatedByAccountId = CurrentAccountId()

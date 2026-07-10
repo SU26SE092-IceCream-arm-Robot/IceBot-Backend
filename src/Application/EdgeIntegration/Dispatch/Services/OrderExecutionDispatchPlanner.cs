@@ -43,6 +43,24 @@ internal static class OrderExecutionDispatchPlanner
             : endpoint.ActiveArtifactSetReleaseChecksum;
         if (!releaseId.HasValue || string.IsNullOrWhiteSpace(releaseChecksum)) return null;
 
+        var selectedOptionIngredientIds = productionItems
+            .SelectMany(item => item.Options)
+            .SelectMany(option => option.IngredientRequirements)
+            .Select(requirement => requirement.IngredientId)
+            .Distinct()
+            .ToArray();
+        var selectedOptionCapabilityCodes = productionItems
+            .SelectMany(item => item.Options)
+            .SelectMany(option => option.IngredientRequirements)
+            .Select(requirement => requirement.RequiredWorkcellCapabilityCode)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (!selectedOptionCapabilityCodes.IsSubsetOf(availableCapabilities))
+            return null;
+        var readyOptionIngredients = await store.ListReadyIngredientIdsAsync(
+            endpoint.KioskId, selectedOptionIngredientIds, cancellationToken);
+        if (readyOptionIngredients.Count != selectedOptionIngredientIds.Length)
+            return null;
+
         var release = await store.GetReleaseAsync(releaseId.Value, cancellationToken);
         if (release is null || !string.Equals(release.ReleaseChecksum, releaseChecksum, StringComparison.Ordinal))
             return null;
@@ -135,7 +153,18 @@ internal static class OrderExecutionDispatchPlanner
                 OptionGroupCode = option.OptionGroupCodeSnapshot,
                 Code = option.CodeSnapshot,
                 Name = option.NameSnapshot,
-                UnitPriceDelta = option.UnitPriceDelta
+                UnitPriceDelta = option.UnitPriceDelta,
+                IngredientRequirements = option.IngredientRequirements
+                    .OrderBy(requirement => requirement.IngredientId)
+                    .Select(requirement => new ExecuteOrderOptionIngredientRequirementPayload
+                    {
+                        IngredientId = requirement.IngredientId,
+                        IngredientCode = requirement.IngredientCodeSnapshot,
+                        IngredientName = requirement.IngredientNameSnapshot,
+                        QuantityPerOption = requirement.QuantityPerOption,
+                        Unit = requirement.Unit,
+                        RequiredWorkcellCapabilityCode = requirement.RequiredWorkcellCapabilityCode
+                    }).ToArray()
             }).ToArray(),
         ExecutionRouteId = selected.Route.Id,
         RouteCode = selected.Route.RouteCode,

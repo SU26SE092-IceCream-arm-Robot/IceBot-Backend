@@ -3,9 +3,11 @@ using Application.Abstractions.Realtime.Events;
 using Application.Orders.Abstractions;
 using Application.Orders.PlaceOrder.Mapping;
 using Application.Orders.PlaceOrder.Results;
+using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Rules;
 using Application.Orders.PlaceOrder.Support;
 using Application.Shared.Wrappers;
+using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
 using Application.Tenants.Stores;
 using Domain.Catalog.Enums;
@@ -39,29 +41,49 @@ public sealed class PlaceOrderCommandHandler
             return ApiResult<OrderResult>.Fail(validationError);
         }
 
-        var idempotencyKey = NormalizeOptional(command.IdempotencyKey);
-        if (idempotencyKey is not null)
+        if (!ScopedIdempotencyKey.TryNormalize(command.IdempotencyKey, out var idempotencyKey))
         {
-            var existing = await _orderStore.GetOrderByIdempotencyKeyAsync(idempotencyKey, cancellationToken);
-            if (existing is not null)
-            {
-                return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existing), "Order already created.");
-            }
+            return ApiResult<OrderResult>.Fail(
+                $"Idempotency-Key is required and must be at most {ScopedIdempotencyKey.MaxClientKeyLength} characters.",
+                400);
         }
-
+        var scopedIdempotencyKey = ScopedIdempotencyKey.ForKiosk(request.KioskId, idempotencyKey);
         var clientOrderId = NormalizeOptional(request.ClientOrderId);
-        if (clientOrderId is not null)
-        {
-            var existing = await _orderStore.GetOrderByClientOrderIdAsync(request.KioskId, clientOrderId, cancellationToken);
-            if (existing is not null)
-            {
-                return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existing), "Order already created.");
-            }
-        }
+        var clientOrderLockKey = clientOrderId is null
+            ? null
+            : $"client-order:{request.KioskId:N}:{clientOrderId}";
 
         OrderStatusChangedEvent? statusChangedEvent = null;
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
+            foreach (var lockKey in new[] { scopedIdempotencyKey, clientOrderLockKey }
+                .Where(lockKey => lockKey is not null)
+                .Cast<string>()
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(lockKey => lockKey, StringComparer.Ordinal))
+            {
+                await _orderStore.AcquireIdempotencyLockAsync(lockKey, ct);
+            }
+
+            var existingByIdempotencyKey = await _orderStore.GetOrderByIdempotencyKeyAsync(scopedIdempotencyKey, ct);
+            if (existingByIdempotencyKey is not null)
+            {
+                return IsEquivalentIdempotentRequest(existingByIdempotencyKey, request)
+                    ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByIdempotencyKey), "Order already created.")
+                    : ApiResult<OrderResult>.Fail("Idempotency key was already used for a different order request.", 409);
+            }
+
+            if (clientOrderId is not null)
+            {
+                var existingByClientOrderId = await _orderStore.GetOrderByClientOrderIdAsync(request.KioskId, clientOrderId, ct);
+                if (existingByClientOrderId is not null)
+                {
+                    return IsEquivalentIdempotentRequest(existingByClientOrderId, request)
+                        ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByClientOrderId), "Order already created.")
+                        : ApiResult<OrderResult>.Fail("Client order id was already used for a different order request.", 409);
+                }
+            }
+
             var kiosk = await _orderStore.GetKioskByIdAsync(request.KioskId, ct);
             if (kiosk is null)
             {
@@ -87,7 +109,7 @@ public sealed class PlaceOrderCommandHandler
                 StoreId = kiosk.StoreId,
                 KioskId = kiosk.Id,
                 OrderNumber = OrderNumberGenerator.GenerateOrderNumber(now),
-                IdempotencyKey = idempotencyKey,
+                IdempotencyKey = scopedIdempotencyKey,
                 ClientOrderId = clientOrderId,
                 Channel = Domain.Orders.Enums.OrderChannel.Tablet,
                 CustomerName = NormalizeOptional(request.CustomerName),
@@ -203,6 +225,12 @@ public sealed class PlaceOrderCommandHandler
                     .OrderBy(option => option.OptionGroupId)
                     .ThenBy(option => option.DisplayOrder)
                     .ToArray();
+                var optionIngredientRequirements = await _orderStore.ListProductOptionIngredientRequirementsAsync(
+                    selectedOptions.Select(option => option.ProductOptionId).ToArray(), ct);
+                if (optionIngredientRequirements.Any(requirement => !requirement.IsIngredientActive))
+                {
+                    return ApiResult<OrderResult>.Fail("One or more selected options require an inactive ingredient.", 409);
+                }
                 var optionUnitPriceDelta = selectedOptions.Sum(option => option.PriceDelta);
 
                 var orderItem = order.AddItem(
@@ -235,6 +263,21 @@ public sealed class PlaceOrderCommandHandler
                         selectedOption.PriceDelta);
                     snapshot.OrderItemId = orderItem.Id;
                     snapshot.CreatedAt = now;
+                    foreach (var requirement in optionIngredientRequirements
+                                 .Where(requirement => requirement.ProductOptionId == selectedOption.ProductOptionId))
+                    {
+                        snapshot.IngredientRequirements.Add(new OrderItemOptionIngredientRequirement
+                        {
+                            OrderItemOptionId = snapshot.Id,
+                            IngredientId = requirement.IngredientId,
+                            IngredientCodeSnapshot = requirement.IngredientCode,
+                            IngredientNameSnapshot = requirement.IngredientName,
+                            QuantityPerOption = requirement.Quantity,
+                            Unit = requirement.Unit,
+                            RequiredWorkcellCapabilityCode = requirement.RequiredWorkcellCapabilityCode,
+                            CreatedAt = now
+                        });
+                    }
                     orderItem.Options.Add(snapshot);
                 }
             }
@@ -301,5 +344,41 @@ public sealed class PlaceOrderCommandHandler
     private static string? NormalizeOptional(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    private static bool IsEquivalentIdempotentRequest(Order order, PlaceOrderRequest request)
+    {
+        if (order.KioskId != request.KioskId ||
+            !string.Equals(order.ClientOrderId, NormalizeOptional(request.ClientOrderId), StringComparison.Ordinal) ||
+            !string.Equals(order.CustomerName, NormalizeOptional(request.CustomerName), StringComparison.Ordinal) ||
+            !string.Equals(order.CustomerPhoneNumber, NormalizeOptional(request.CustomerPhoneNumber), StringComparison.Ordinal) ||
+            !string.Equals(order.Notes, NormalizeOptional(request.Notes), StringComparison.Ordinal) ||
+            (request.ClientTotalAmount.HasValue && request.ClientTotalAmount.Value != order.TotalAmount))
+        {
+            return false;
+        }
+
+        var requestedItems = request.Items
+            .Select(item => string.Join('|',
+                item.MenuItemId.ToString("N"),
+                item.Quantity,
+                NormalizeOptional(item.ClientLineId) ?? string.Empty,
+                string.Join(',', item.SelectedOptions
+                    .Select(option => option.ProductOptionId)
+                    .OrderBy(option => option)
+                    .Select(option => option.ToString("N")))))
+            .OrderBy(value => value, StringComparer.Ordinal);
+        var existingItems = order.OrderItems
+            .Select(item => string.Join('|',
+                item.MenuItemId.ToString("N"),
+                item.Quantity,
+                NormalizeOptional(item.ClientLineId) ?? string.Empty,
+                string.Join(',', item.Options
+                    .Select(option => option.ProductOptionId)
+                    .OrderBy(option => option)
+                    .Select(option => option.ToString("N")))))
+            .OrderBy(value => value, StringComparer.Ordinal);
+
+        return requestedItems.SequenceEqual(existingItems, StringComparer.Ordinal);
     }
 }

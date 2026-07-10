@@ -38,6 +38,7 @@ public static class CatalogModule
         services.AddScoped<UpdateProductOptionCommandHandler>();
         services.AddScoped<SetProductOptionAvailabilityCommandHandler>();
         services.AddScoped<DeleteProductOptionCommandHandler>();
+        services.AddScoped<ReplaceProductOptionIngredientRequirementsCommandHandler>();
         services.AddScoped<ListIngredientsQueryHandler>();
         services.AddScoped<GetIngredientQueryHandler>();
         services.AddScoped<CreateIngredientCommandHandler>();

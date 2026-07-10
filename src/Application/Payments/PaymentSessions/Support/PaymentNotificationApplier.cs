@@ -18,6 +18,11 @@ internal static class PaymentNotificationApplier
 
         if (notification.IsPaid)
         {
+            if (paymentTransaction.Status == PaymentTransactionStatus.Refunded)
+            {
+                return;
+            }
+
             var paidAt = notification.ProviderPaidAt ?? DateTimeOffset.UtcNow;
             var paidAmount = notification.PaidAmount ?? paymentTransaction.Amount;
             paymentTransaction.MarkPaid(notification.ProviderTransactionId, paidAt, notification.RawPayloadJson);
@@ -27,8 +32,13 @@ internal static class PaymentNotificationApplier
 
         if (notification.IsCancelled)
         {
+            if (paymentTransaction.Status == PaymentTransactionStatus.Refunded)
+            {
+                return;
+            }
+
             paymentTransaction.Cancel(DateTimeOffset.UtcNow);
-            if (paymentTransaction.Order.PaymentStatus != PaymentStatus.Paid)
+            if (CanMarkOrderPaymentCancelled(paymentTransaction.Order.PaymentStatus))
             {
                 paymentTransaction.Order.MarkPaymentCancelled();
             }
@@ -37,12 +47,20 @@ internal static class PaymentNotificationApplier
 
         if (notification.IsExpired)
         {
+            if (paymentTransaction.Status == PaymentTransactionStatus.Refunded)
+            {
+                return;
+            }
+
             paymentTransaction.Cancel(DateTimeOffset.UtcNow);
             paymentTransaction.Status = PaymentTransactionStatus.Expired;
-            if (paymentTransaction.Order.PaymentStatus != PaymentStatus.Paid)
+            if (CanMarkOrderPaymentCancelled(paymentTransaction.Order.PaymentStatus))
             {
                 paymentTransaction.Order.MarkPaymentCancelled();
             }
         }
     }
+
+    private static bool CanMarkOrderPaymentCancelled(PaymentStatus status) =>
+        status is not (PaymentStatus.Paid or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded);
 }

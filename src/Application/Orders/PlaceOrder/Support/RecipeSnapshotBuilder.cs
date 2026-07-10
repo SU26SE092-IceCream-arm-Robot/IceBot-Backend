@@ -17,7 +17,20 @@ internal static class RecipeSnapshotBuilder
             recipe.Status,
             recipe.EstimatedDurationSeconds,
             recipe.InstructionsSchemaVersion,
-            recipe.InstructionsJson
+            recipe.InstructionsJson,
+            Ingredients = recipe.RecipeItems
+                .OrderBy(item => item.StepOrder)
+                .ThenBy(item => item.Id)
+                .Select(item => new
+                {
+                    item.IngredientId,
+                    IngredientCode = item.Ingredient.Code,
+                    IngredientName = item.Ingredient.Name,
+                    item.Quantity,
+                    item.Unit,
+                    item.StepOrder,
+                    item.IsOptional
+                })
         });
     }
 }

@@ -24,6 +24,9 @@ public class OrderItemOption : BusinessEntity
 
     public virtual OrderItem OrderItem { get; set; } = null!;
 
+    public virtual ICollection<OrderItemOptionIngredientRequirement> IngredientRequirements { get; set; } =
+        new List<OrderItemOptionIngredientRequirement>();
+
     public static OrderItemOption Create(
         Guid productOptionId,
         long optionGroupId,

@@ -58,6 +58,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
         return _dbContext.Orders.WhereNotDeleted()
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
+                    .ThenInclude(option => option.IngredientRequirements)
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.ProductVariant)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
@@ -99,6 +100,25 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
         return _dbContext.ControllerArtifactSetDeployments
             .Include(deployment => deployment.Items)
             .FirstOrDefaultAsync(deployment => deployment.Id == deploymentId, cancellationToken);
+    }
+
+    public async Task<IReadOnlySet<Guid>> ListReadyIngredientIdsAsync(
+        Guid kioskId,
+        IReadOnlyCollection<Guid> ingredientIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (ingredientIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var ids = await _dbContext.IngredientDispenserStates
+            .Where(state => state.KioskId == kioskId && state.IsActive && ingredientIds.Contains(state.IngredientId))
+            .Where(state => state.Ingredient.IsActive && state.Device.Status == DeviceStatus.Online)
+            .Select(state => state.IngredientId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        return ids.ToHashSet();
     }
 
     public Task<EdgeCommand?> GetCommandAsync(

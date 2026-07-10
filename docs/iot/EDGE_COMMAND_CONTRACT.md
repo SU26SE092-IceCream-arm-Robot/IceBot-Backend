@@ -85,7 +85,7 @@ Response:
 Rules:
 
 - Edge must deduplicate by `commandId`.
-- New `ExecuteOrder` payloads include `SchemaVersion = 1`. Edge must reject unsupported schema versions; Cloud may read release provenance from legacy payloads without treating those payloads as fully executable V1 contracts.
+- New `ExecuteOrder` payloads include `SchemaVersion = 2`. Edge must reject unsupported schema versions; Cloud may read release provenance from legacy payloads without treating those payloads as fully executable contracts. Each selected option can include immutable ingredient requirements (`ingredientId`, code/name snapshots, quantity per option, unit, required workcell capability); Edge must use this order snapshot rather than live catalog data.
 - Deployment commands include typed Cloud correlation fields for deployment ownership. `PayloadJson` is execution data, not the authoritative link used by timeout reconciliation.
 - Pull first materializes any short-lived artifact download URLs. Only after payload enrichment succeeds does it mark returned commands as `Delivered` and record a delivery attempt.
 - Retrying command pull can return delivered but unacknowledged commands.

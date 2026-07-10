@@ -213,7 +213,7 @@ public sealed class CloneProductTemplateCommandHandler
             };
             foreach (var sourceOption in sourceGroup.ProductOptions.Where(option => option.DeletedAt == null))
             {
-                clonedGroup.ProductOptions.Add(new ProductOption
+                var clonedOption = new ProductOption
                 {
                     OptionGroupId = clonedGroup.Id,
                     TemplateProductOptionId = sourceOption.Id,
@@ -227,7 +227,20 @@ public sealed class CloneProductTemplateCommandHandler
                     MetadataJson = sourceOption.MetadataJson,
                     CreatedAt = now,
                     CreatedByAccountId = command.Scope.UserContext.AccountId
-                });
+                };
+                foreach (var sourceRequirement in sourceOption.IngredientRequirements.Where(requirement => requirement.DeletedAt == null))
+                {
+                    clonedOption.IngredientRequirements.Add(new ProductOptionIngredientRequirement
+                    {
+                        IngredientId = sourceRequirement.IngredientId,
+                        Quantity = sourceRequirement.Quantity,
+                        Unit = sourceRequirement.Unit,
+                        RequiredWorkcellCapabilityCode = sourceRequirement.RequiredWorkcellCapabilityCode,
+                        CreatedAt = now,
+                        CreatedByAccountId = command.Scope.UserContext.AccountId
+                    });
+                }
+                clonedGroup.ProductOptions.Add(clonedOption);
             }
             product.OptionGroups.Add(clonedGroup);
         }

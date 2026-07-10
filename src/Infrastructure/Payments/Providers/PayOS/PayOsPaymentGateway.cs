@@ -170,7 +170,10 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         var reference = GetString(data, "reference") ?? GetString(data, "id") ?? GetString(root, "id");
         var amount = GetDecimal(data, "amount");
         var paidAt = GetDateTimeOffset(data, "transactionDateTime") ?? GetDateTimeOffset(root, "transactionDateTime");
-        var eventId = reference ?? paymentLinkId ?? orderCode;
+        var providerEventId = GetString(data, "eventId") ?? GetString(root, "eventId");
+        var eventId = !string.IsNullOrWhiteSpace(providerEventId)
+            ? $"event:{providerEventId}"
+            : $"payload:{Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawPayload)))}";
         var isPaid = IsPaidStatus(status);
         var isCancelled = IsCancelledStatus(status);
         var isExpired = IsExpiredStatus(status);

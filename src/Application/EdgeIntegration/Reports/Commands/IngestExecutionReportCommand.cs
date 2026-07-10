@@ -33,4 +33,5 @@ public sealed record StockMovementEvidenceInput(
     decimal QuantityConsumed,
     decimal? BalanceAfter,
     DateTimeOffset? OccurredAt,
-    bool IsEstimated);
+    bool IsEstimated,
+    Guid OrderItemId = default);

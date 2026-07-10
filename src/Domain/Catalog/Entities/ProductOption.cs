@@ -24,4 +24,7 @@ public partial class ProductOption : BusinessEntity
     public string? MetadataJson { get; set; }
 
     public virtual OptionGroup OptionGroup { get; set; } = null!;
+
+    public virtual ICollection<ProductOptionIngredientRequirement> IngredientRequirements { get; set; } =
+        new List<ProductOptionIngredientRequirement>();
 }
