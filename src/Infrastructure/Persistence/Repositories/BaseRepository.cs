@@ -19,7 +19,7 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : 
 
     public IQueryable<TEntity> Query(bool asNoTracking = true)
     {
-        return ApplyTracking(DbSet, asNoTracking);
+        return ApplyTracking(ApplySoftDeleteVisibility(DbSet), asNoTracking);
     }
 
     public IQueryable<TEntity> QueryIgnoreFilters(bool asNoTracking = true)
@@ -27,14 +27,15 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : 
         return ApplyTracking(DbSet.IgnoreQueryFilters(), asNoTracking);
     }
 
-    public ValueTask<TEntity?> FindAsync(object[] keyValues, CancellationToken cancellationToken = default)
+    public async ValueTask<TEntity?> FindAsync(object[] keyValues, CancellationToken cancellationToken = default)
     {
         if (keyValues.Length == 0)
         {
             throw new ArgumentException("At least one key value is required.", nameof(keyValues));
         }
 
-        return DbSet.FindAsync(keyValues, cancellationToken);
+        var entity = await DbSet.FindAsync(keyValues, cancellationToken);
+        return entity is ISoftDeletable { DeletedAt: not null } ? null : entity;
     }
 
     public Task<TEntity?> FirstOrDefaultAsync(
@@ -61,16 +62,17 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : 
         Expression<Func<TEntity, bool>> predicate,
         CancellationToken cancellationToken = default)
     {
-        return DbSet.AnyAsync(predicate, cancellationToken);
+        return Query().AnyAsync(predicate, cancellationToken);
     }
 
     public Task<int> CountAsync(
         Expression<Func<TEntity, bool>>? predicate = null,
         CancellationToken cancellationToken = default)
     {
+        var query = Query();
         return predicate is null
-            ? DbSet.CountAsync(cancellationToken)
-            : DbSet.CountAsync(predicate, cancellationToken);
+            ? query.CountAsync(cancellationToken)
+            : query.CountAsync(predicate, cancellationToken);
     }
 
     public async Task AddAsync(TEntity entity, CancellationToken cancellationToken = default)
@@ -128,6 +130,16 @@ public class BaseRepository<TEntity> : IBaseRepository<TEntity> where TEntity : 
     private static IQueryable<TEntity> ApplyTracking(IQueryable<TEntity> query, bool asNoTracking)
     {
         return asNoTracking ? query.AsNoTracking() : query;
+    }
+
+    private static IQueryable<TEntity> ApplySoftDeleteVisibility(IQueryable<TEntity> query)
+    {
+        if (!typeof(ISoftDeletable).IsAssignableFrom(typeof(TEntity)))
+        {
+            return query;
+        }
+
+        return query.Where(entity => EF.Property<DateTimeOffset?>(entity, nameof(ISoftDeletable.DeletedAt)) == null);
     }
 
     private static void StampCreated(TEntity entity)

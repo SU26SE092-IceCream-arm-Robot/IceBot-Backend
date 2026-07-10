@@ -1,7 +1,7 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.SalesCatalog.Abstractions;
 using Domain.Catalog.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.SalesCatalog.Entities;
 using Domain.SalesCatalog.Enums;
 using Domain.ProductionConfiguration.Enums;
@@ -24,7 +24,7 @@ public sealed class MenuStore : IMenuStore
 
     public Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks
+        return _dbContext.Kiosks.WhereNotDeleted()
             .AsNoTracking()
             .Include(kiosk => kiosk.Store)
             .Include(kiosk => kiosk.Organization)
@@ -139,7 +139,7 @@ public sealed class MenuStore : IMenuStore
                 readiness.Readiness == ExecutionReadinessState.Ready &&
                 readiness.Safety == ExecutionSafetyState.Safe &&
                 readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
-                _dbContext.ConfigurationReleases.Any(release =>
+                _dbContext.ConfigurationReleases.WhereNotDeleted().Any(release =>
                     release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
                         ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
                         : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
@@ -187,7 +187,7 @@ public sealed class MenuStore : IMenuStore
 
     public Task<Product?> GetProductByIdAsync(Guid productId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Products
+        return _dbContext.Products.WhereNotDeleted()
             .AsNoTracking()
             .FirstOrDefaultAsync(product => product.Id == productId, cancellationToken);
     }
@@ -216,7 +216,7 @@ public sealed class MenuStore : IMenuStore
             return Task.FromResult(new List<ProductOption>());
         }
 
-        return _dbContext.Products
+        return _dbContext.Products.WhereNotDeleted()
             .AsNoTracking()
             .Where(product => product.Id == productId)
             .SelectMany(product => product.OptionGroups)
@@ -301,18 +301,18 @@ public sealed class MenuStore : IMenuStore
         Guid? kioskId,
         CancellationToken cancellationToken = default)
     {
-        if (!await _dbContext.Organizations.AnyAsync(x => x.Id == organizationId, cancellationToken))
+        if (!await _dbContext.Organizations.WhereNotDeleted().AnyAsync(x => x.Id == organizationId, cancellationToken))
         {
             return false;
         }
 
-        if (storeId.HasValue && !await _dbContext.Stores.AnyAsync(
+        if (storeId.HasValue && !await _dbContext.Stores.WhereNotDeleted().AnyAsync(
                 x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
         {
             return false;
         }
 
-        return !kioskId.HasValue || await _dbContext.Kiosks.AnyAsync(
+        return !kioskId.HasValue || await _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
             x => x.Id == kioskId && x.OrganizationId == organizationId &&
                  (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
     }

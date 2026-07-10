@@ -105,7 +105,7 @@ public sealed class MarkRefundProcessedCommandHandler
                 order.MarkRefunded();
                 if (command.MoneyWasRefunded is true)
                 {
-                    order.PaymentStatus = PaymentStatus.Refunded;
+                    order.MarkPaymentRefunded();
                     transaction.Status = PaymentTransactionStatus.Refunded;
                 }
             }
@@ -117,7 +117,7 @@ public sealed class MarkRefundProcessedCommandHandler
             orderPaymentStatus = order.PaymentStatus.ToString();
             statusChanged = newOrderStatus != originalOrderStatus;
             txStatusChanged = newTxStatus != originalTxStatus;
-            var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrder(order);
+            var customerStatusInfo = Application.Orders.Support.OrderStatusProjector.ProjectFromOrder(order);
             customerStatus = customerStatusInfo.CustomerStatus;
             customerStatusMessage = customerStatusInfo.CustomerStatusMessage;
             canRetryPayment = customerStatusInfo.CanRetryPayment;

@@ -1,9 +1,18 @@
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Programs.ReadModels;
+using Application.RobotConfiguration.Programs.Mapping;
+using Application.RobotConfiguration.Programs.Results;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Domain.RobotConfiguration.Programs;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Artifacts;
 using Domain.Tenants.Enums;
-using Domain.RobotConfiguration.Manifests;
+using Domain.RobotConfiguration.Programs.Manifests;
 using IceBot.UnitTests.TestSupport;
 
 namespace IceBot.UnitTests.RobotConfiguration;

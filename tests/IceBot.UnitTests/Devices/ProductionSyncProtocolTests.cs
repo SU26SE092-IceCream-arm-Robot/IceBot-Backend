@@ -1,10 +1,18 @@
 using Domain.Sync.Ingestion;
 using Domain.Devices.ExecutionEndpoints;
-using Application.Devices;
-using Application.Devices.Abstractions;
-using Application.Devices.Commands;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Application.Devices.Telemetry;
+using Application.Devices.Catalog.Abstractions;
+using Application.Devices.ExecutionEndpoints.Abstractions;
+using Application.Devices.Telemetry.Abstractions;
+using Application.Devices.Connectivity.Abstractions;
+using Application.Devices.Credentials.Abstractions;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
+using Domain.Devices.Catalog;
+using Domain.Devices.Telemetry;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
@@ -51,9 +59,9 @@ public sealed class ProductionSyncProtocolTests
         telemetryStore.GetEndpointAsync(endpoint.Id, Arg.Any<CancellationToken>()).Returns(endpoint);
         syncStore.ExecuteHistoryIngestionAsync(
                 sourceExecutorId,
-                Arg.Any<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.ProductionEventSyncResult>>>>(),
+                Arg.Any<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.ProductionEventSyncResult>>>>(),
                 Arg.Any<CancellationToken>())
-            .Returns(call => call.Arg<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.ProductionEventSyncResult>>>>()(CancellationToken.None));
+            .Returns(call => call.Arg<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.ProductionEventSyncResult>>>>()(CancellationToken.None));
         syncStore.ListContiguousCandidatesAsync(sourceExecutorId, 0, Arg.Any<CancellationToken>())
             .Returns([new SyncEventInbox { EventId = eventId, SourceNodeId = sourceExecutorId, SequenceNumber = 2 }]);
 
@@ -90,9 +98,9 @@ public sealed class ProductionSyncProtocolTests
         telemetryStore.GetEndpointAsync(endpoint.Id, Arg.Any<CancellationToken>()).Returns(endpoint);
         syncStore.ExecuteHistoryIngestionAsync(
                 sourceExecutorId,
-                Arg.Any<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.ProductionEventSyncResult>>>>(),
+                Arg.Any<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.ProductionEventSyncResult>>>>(),
                 Arg.Any<CancellationToken>())
-            .Returns(call => call.Arg<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.ProductionEventSyncResult>>>>()(CancellationToken.None));
+            .Returns(call => call.Arg<Func<CancellationToken, Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.ProductionEventSyncResult>>>>()(CancellationToken.None));
         syncStore.GetEventByIdAsync(sourceExecutorId, eventId, Arg.Any<CancellationToken>())
             .Returns(new SyncEventInbox
             {

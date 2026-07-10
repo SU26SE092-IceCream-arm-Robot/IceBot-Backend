@@ -11,8 +11,8 @@ internal static class PaymentStatusResultMapper
         OrderExecutionRecord? executionRecord = null)
     {
         var customerStatusInfo = executionRecord is null
-            ? Application.Shared.Utils.OrderStatusProjector.ProjectFromTransaction(paymentTransaction.Status, paymentTransaction.Order)
-            : Application.Shared.Utils.OrderStatusProjector.ProjectFromOrderAndExecution(
+            ? Application.Orders.Support.OrderStatusProjector.ProjectFromTransaction(paymentTransaction.Status, paymentTransaction.Order)
+            : Application.Orders.Support.OrderStatusProjector.ProjectFromOrderAndExecution(
                 paymentTransaction.Order,
                 executionRecord,
                 paymentTransaction.Status);

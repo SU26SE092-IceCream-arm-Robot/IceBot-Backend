@@ -8,8 +8,51 @@ namespace Infrastructure.Catalog.Persistence;
 
 public sealed class CatalogAuthoringStore(IceBotDbContext dbContext) : ICatalogAuthoringStore
 {
+    public Task<List<ProductCategory>> ListProductCategoriesAsync(
+        bool includeInactive,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.ProductCategories.AsNoTracking();
+        if (!includeInactive)
+        {
+            query = query.Where(category => category.IsActive);
+        }
+
+        return query
+            .OrderBy(category => category.DisplayOrder)
+            .ThenBy(category => category.Name)
+            .ThenBy(category => category.Code)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<ProductCategory?> GetProductCategoryAsync(
+        long categoryId,
+        bool asNoTracking = true,
+        CancellationToken cancellationToken = default)
+    {
+        var query = dbContext.ProductCategories.Where(category => category.Id == categoryId);
+        return (asNoTracking ? query.AsNoTracking() : query).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<bool> ProductCategoryCodeExistsAsync(
+        string code,
+        long? excludedCategoryId = null,
+        CancellationToken cancellationToken = default) =>
+        dbContext.ProductCategories.AnyAsync(category =>
+            category.Code == code &&
+            (!excludedCategoryId.HasValue || category.Id != excludedCategoryId.Value), cancellationToken);
+
+    public Task AddProductCategoryAsync(ProductCategory category, CancellationToken cancellationToken = default) =>
+        dbContext.ProductCategories.AddAsync(category, cancellationToken).AsTask();
+
+    public async Task<bool> IsProductCategoryReferencedAsync(long categoryId, CancellationToken cancellationToken = default) =>
+        await dbContext.Products.IgnoreQueryFilters().AnyAsync(product => product.CategoryId == categoryId, cancellationToken) ||
+        await dbContext.ProductCategories.IgnoreQueryFilters().AnyAsync(category => category.ParentCategoryId == categoryId, cancellationToken);
+
+    public void RemoveProductCategory(ProductCategory category) => dbContext.ProductCategories.Remove(category);
+
     public Task<int> CountIngredientsAsync(string? search, bool? isActive, CancellationToken cancellationToken = default) =>
-        ApplyIngredientFilters(dbContext.Ingredients.AsNoTracking(), search, isActive).CountAsync(cancellationToken);
+        ApplyIngredientFilters(dbContext.Ingredients.WhereNotDeleted().AsNoTracking(), search, isActive).CountAsync(cancellationToken);
 
     public Task<List<Ingredient>> ListIngredientsAsync(
         string? search,
@@ -17,7 +60,7 @@ public sealed class CatalogAuthoringStore(IceBotDbContext dbContext) : ICatalogA
         int pageNumber,
         int pageSize,
         CancellationToken cancellationToken = default) =>
-        ApplyIngredientFilters(dbContext.Ingredients.AsNoTracking(), search, isActive)
+        ApplyIngredientFilters(dbContext.Ingredients.WhereNotDeleted().AsNoTracking(), search, isActive)
             .OrderBy(ingredient => ingredient.Name)
             .ThenBy(ingredient => ingredient.Code)
             .Skip((pageNumber - 1) * pageSize)
@@ -29,7 +72,7 @@ public sealed class CatalogAuthoringStore(IceBotDbContext dbContext) : ICatalogA
         bool asNoTracking = true,
         CancellationToken cancellationToken = default)
     {
-        var query = dbContext.Ingredients.Where(ingredient => ingredient.Id == ingredientId);
+        var query = dbContext.Ingredients.WhereNotDeleted().Where(ingredient => ingredient.Id == ingredientId);
         return (asNoTracking ? query.AsNoTracking() : query).FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -37,7 +80,7 @@ public sealed class CatalogAuthoringStore(IceBotDbContext dbContext) : ICatalogA
         string code,
         Guid? excludedIngredientId = null,
         CancellationToken cancellationToken = default) =>
-        dbContext.Ingredients.AnyAsync(ingredient =>
+        dbContext.Ingredients.WhereNotDeleted().AnyAsync(ingredient =>
             ingredient.Code == code &&
             (!excludedIngredientId.HasValue || ingredient.Id != excludedIngredientId), cancellationToken);
 
@@ -52,7 +95,7 @@ public sealed class CatalogAuthoringStore(IceBotDbContext dbContext) : ICatalogA
     public void RemoveIngredient(Ingredient ingredient) => dbContext.Ingredients.Remove(ingredient);
 
     public Task<Product?> GetProductForRecipeAuthoringAsync(Guid productId, CancellationToken cancellationToken = default) =>
-        dbContext.Products.AsNoTracking().FirstOrDefaultAsync(product => product.Id == productId, cancellationToken);
+        dbContext.Products.WhereNotDeleted().AsNoTracking().FirstOrDefaultAsync(product => product.Id == productId, cancellationToken);
 
     public Task<ProductVariant?> GetVariantForRecipeAuthoringAsync(
         Guid productId,
@@ -115,7 +158,7 @@ public sealed class CatalogAuthoringStore(IceBotDbContext dbContext) : ICatalogA
     public Task<List<Ingredient>> ListIngredientsByIdsAsync(
         IReadOnlyCollection<Guid> ingredientIds,
         CancellationToken cancellationToken = default) =>
-        dbContext.Ingredients.AsNoTracking()
+        dbContext.Ingredients.WhereNotDeleted().AsNoTracking()
             .Where(ingredient => ingredientIds.Contains(ingredient.Id))
             .ToListAsync(cancellationToken);
 

@@ -17,7 +17,7 @@ public sealed class PaymentStore : IPaymentStore
 
     public Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders
+        return _dbContext.Orders.WhereNotDeleted()
             .Include(order => order.Kiosk)
                 .ThenInclude(kiosk => kiosk.Store)
             .Include(order => order.Kiosk)
@@ -42,7 +42,7 @@ public sealed class PaymentStore : IPaymentStore
 
     public Task<PaymentTransaction?> GetPaymentTransactionByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return _dbContext.PaymentTransactions
+        return _dbContext.PaymentTransactions.WhereNotDeleted()
             .Include(payment => payment.Order)
             .FirstOrDefaultAsync(payment => payment.Id == id, cancellationToken);
     }
@@ -66,7 +66,7 @@ public sealed class PaymentStore : IPaymentStore
 
     public Task<PaymentTransaction?> GetLatestPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.PaymentTransactions
+        return _dbContext.PaymentTransactions.WhereNotDeleted()
             .Include(payment => payment.Order)
             .Where(payment => payment.OrderId == orderId)
             .OrderByDescending(payment => payment.RequestedAt)
@@ -75,7 +75,7 @@ public sealed class PaymentStore : IPaymentStore
 
     public Task<PaymentTransaction?> GetLatestPaidPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.PaymentTransactions
+        return _dbContext.PaymentTransactions.WhereNotDeleted()
             .Include(payment => payment.Order)
             .Where(payment => payment.OrderId == orderId && payment.Status == Domain.Payments.Enums.PaymentTransactionStatus.Paid)
             .OrderByDescending(payment => payment.RequestedAt)

@@ -1,3 +1,4 @@
+using Application.RobotConfiguration.Storage.Abstractions;
 using Domain.Sync.Ingestion;
 using Domain.Devices.ExecutionEndpoints;
 using System.Net;
@@ -6,12 +7,19 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Application.EdgeIntegration;
-using Application.EdgeIntegration.Commands;
-using Application.EdgeIntegration.Services;
-using Application.RobotConfiguration.Abstractions;
+using Application.EdgeIntegration.Dispatch;
+using Application.EdgeIntegration.Reports;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
+using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.EdgeIntegration.Dispatch.Services;
+using Application.EdgeIntegration.Reports.Services;
+using Application.RobotConfiguration.Artifacts.Abstractions;
 using Domain.Common.Enums;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
+using Domain.Devices.Telemetry;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Sync.Entities;
@@ -122,7 +130,7 @@ public sealed class EdgeControllerContractIntegrationTests
         Assert.Equal(1, await assertionContext.SyncEventInbox.CountAsync(x => x.EventId == sourceEventId));
     }
 
-    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Results.EdgeCommandPullResult>> PullAsync(
+    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.CommandDelivery.Results.EdgeCommandPullResult>> PullAsync(
         DeploymentGraph graph)
     {
         await using var dbContext = _fixture.CreateDbContext();
@@ -137,7 +145,7 @@ public sealed class EdgeControllerContractIntegrationTests
         });
     }
 
-    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Results.EdgeCommandAckResult>> AcknowledgeAsync(
+    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.CommandDelivery.Results.EdgeCommandAckResult>> AcknowledgeAsync(
         DeploymentGraph graph,
         string status,
         string? rejectionCode = null,
@@ -159,7 +167,7 @@ public sealed class EdgeControllerContractIntegrationTests
         });
     }
 
-    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Results.ExecutionReportIngestResult>> ReportAsync(
+    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Reports.Results.ExecutionReportIngestResult>> ReportAsync(
         DeploymentGraph graph,
         Guid sourceEventId,
         long sequenceNumber,

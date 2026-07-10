@@ -196,12 +196,12 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
 
     public Task<bool> DeviceBelongsToKioskAsync(Guid deviceId, Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Devices.AnyAsync(d => d.Id == deviceId && d.KioskId == kioskId, cancellationToken);
+        return _dbContext.Devices.WhereNotDeleted().AnyAsync(d => d.Id == deviceId && d.KioskId == kioskId, cancellationToken);
     }
 
     public Task<bool> OrderBelongsToScopeAsync(Guid orderId, Guid organizationId, Guid storeId, Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders.AnyAsync(o => o.Id == orderId && o.OrganizationId == organizationId && o.StoreId == storeId && o.KioskId == kioskId, cancellationToken);
+        return _dbContext.Orders.WhereNotDeleted().AnyAsync(o => o.Id == orderId && o.OrganizationId == organizationId && o.StoreId == storeId && o.KioskId == kioskId, cancellationToken);
     }
 
     public Task<bool> DeviceEventBelongsToKioskAsync(Guid deviceEventId, Guid kioskId, CancellationToken cancellationToken = default)

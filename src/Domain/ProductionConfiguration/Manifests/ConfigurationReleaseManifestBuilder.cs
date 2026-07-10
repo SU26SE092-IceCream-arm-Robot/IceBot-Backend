@@ -1,3 +1,6 @@
+using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.ValueObjects;

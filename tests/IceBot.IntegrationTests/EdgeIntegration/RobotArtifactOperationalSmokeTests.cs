@@ -1,28 +1,46 @@
+using Application.RobotConfiguration.Programs.Commands;
+using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
+using Application.RobotConfiguration.Storage.Abstractions;
 using Domain.Sync.Ingestion;
 using Domain.Devices.Telemetry;
 using Domain.Devices.ExecutionEndpoints;
 using System.Text;
 using System.Text.Json;
 using Application.EdgeIntegration;
-using Application.EdgeIntegration.Commands;
-using Application.EdgeIntegration.Services;
-using Application.Devices;
-using Application.Devices.Commands;
+using Application.EdgeIntegration.Dispatch;
+using Application.EdgeIntegration.Reports;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
+using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.EdgeIntegration.Dispatch.Services;
+using Application.EdgeIntegration.Reports.Services;
+using Application.Devices.Telemetry;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
 using Application.Identity.Tokens.Claims;
 using Application.Orders.Management.Queries;
 using Application.Orders.Management.Commands;
 using Application.Orders.PlaceOrder.Queries;
-using Application.ProductionConfiguration.Commands;
-using Application.ProductionConfiguration.Services;
+using Application.ProductionConfiguration.Releases.Commands;
+using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Releases.Services;
+using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration;
+using Application.ProductionConfiguration.Deployments;
+using Application.ProductionConfiguration.Readiness;
 using Application.Inventory.Services;
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Services;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Storage.Services;
 using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
 using Domain.Common.Enums;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Identity.Entities;
 using Domain.Inventory.Entities;
 using Domain.Inventory.Enums;
@@ -40,11 +58,17 @@ using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.EdgeIntegration.Persistence;
-using Infrastructure.Devices.Persistence;
+using Infrastructure.Devices.Catalog.Persistence;
+using Infrastructure.Devices.Connectivity.Persistence;
+using Infrastructure.Devices.ExecutionEndpoints.Persistence;
+using Infrastructure.Devices.Telemetry.Persistence;
 using Infrastructure.Orders.Persistence;
 using Infrastructure.Inventory.Persistence;
-using Infrastructure.ProductionConfiguration.Persistence;
-using Infrastructure.RobotConfiguration.Persistence;
+using Infrastructure.ProductionConfiguration.Persistence.Deployments;
+using Infrastructure.ProductionConfiguration.Persistence.Releases;
+using Infrastructure.ProductionConfiguration.Persistence.Routes;
+using Infrastructure.RobotConfiguration.Artifacts.Persistence;
+using Infrastructure.RobotConfiguration.Programs.Persistence;
 using Infrastructure.Persistence.Jobs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -71,7 +95,7 @@ public sealed class RobotArtifactOperationalSmokeTests
         var graph = await SeedPrerequisitesAsync();
         var publisher = new NoOpRealtimeNotificationPublisher();
 
-        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.ExecutionReadinessResult>> IngestAsync(
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Connectivity.Results.ExecutionReadinessResult>> IngestAsync(
             long revision,
             params ExecutionCapabilityInput[] capabilities)
         {
@@ -132,7 +156,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             await setupContext.SaveChangesAsync();
         }
 
-        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.HeartbeatIngestResult>> IngestAsync(
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.HeartbeatIngestResult>> IngestAsync(
             long sequence,
             KioskHeartbeatStatus status)
         {
@@ -237,7 +261,7 @@ public sealed class RobotArtifactOperationalSmokeTests
         var eventId = Guid.NewGuid();
         var publisher = new NoOpRealtimeNotificationPublisher();
 
-        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.DeviceEventIngestResult>> IngestAsync(
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.DeviceEventIngestResult>> IngestAsync(
             Guid sourceEventId,
             SeverityLevel severity = SeverityLevel.Error)
         {
@@ -303,7 +327,7 @@ public sealed class RobotArtifactOperationalSmokeTests
         var deviceEventId = Guid.NewGuid();
         var localLogEventId = Guid.NewGuid();
 
-        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Results.BatchEventSyncResult>> IngestAsync()
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.BatchEventSyncResult>> IngestAsync()
         {
             await using var dbContext = _fixture.CreateDbContext();
             var telemetryStore = new EdgeTelemetryIngestionStore(dbContext);
@@ -521,9 +545,10 @@ public sealed class RobotArtifactOperationalSmokeTests
         Guid programId;
         await using (var dbContext = _fixture.CreateDbContext())
         {
-            var robotStore = new RobotConfigurationStore(dbContext);
+            var robotArtifactStore = new RobotArtifactStore(dbContext);
+            var robotProgramStore = new RobotProgramStore(dbContext);
             var upload = new UploadRobotArtifactCommandHandler(
-                robotStore,
+                robotArtifactStore,
                 new ArtifactUploadContentService(
                     _fixture.CreateObjectStorage(autoCreateBucket: true),
                     NullLogger<ArtifactUploadContentService>.Instance));
@@ -551,7 +576,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             Assert.True(uploaded.Succeeded, uploaded.Message);
             artifactId = Assert.Single(uploaded.Data!.Items).RobotArtifactId!.Value;
 
-            var publishedArtifact = await new PublishRobotArtifactCommandHandler(robotStore).HandleAsync(
+            var publishedArtifact = await new PublishRobotArtifactCommandHandler(robotArtifactStore).HandleAsync(
                 new PublishRobotArtifactCommand
                 {
                     UserContext = user,
@@ -560,7 +585,7 @@ public sealed class RobotArtifactOperationalSmokeTests
                 });
             Assert.True(publishedArtifact.Succeeded, publishedArtifact.Message);
 
-            var createdProgram = await new CreateRobotProgramCommandHandler(robotStore).HandleAsync(
+            var createdProgram = await new CreateRobotProgramCommandHandler(robotProgramStore).HandleAsync(
                 new CreateRobotProgramCommand
                 {
                     UserContext = user,
@@ -571,7 +596,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             Assert.True(createdProgram.Succeeded, createdProgram.Message);
             programId = createdProgram.Data!.Id;
 
-            var assigned = await new ReplaceRobotProgramArtifactsCommandHandler(robotStore).HandleAsync(
+            var assigned = await new ReplaceRobotProgramArtifactsCommandHandler(robotProgramStore, robotArtifactStore).HandleAsync(
                 new ReplaceRobotProgramArtifactsCommand
                 {
                     UserContext = user,
@@ -581,7 +606,7 @@ public sealed class RobotArtifactOperationalSmokeTests
                 });
             Assert.True(assigned.Succeeded, assigned.Message);
 
-            var publishedProgram = await new PublishRobotProgramCommandHandler(robotStore).HandleAsync(
+            var publishedProgram = await new PublishRobotProgramCommandHandler(robotProgramStore, robotArtifactStore).HandleAsync(
                 new PublishRobotProgramCommand
                 {
                     UserContext = user,
@@ -596,8 +621,10 @@ public sealed class RobotArtifactOperationalSmokeTests
         Guid commandId;
         await using (var dbContext = _fixture.CreateDbContext())
         {
-            var productionStore = new ProductionConfigurationStore(dbContext);
-            var createdRelease = await new CreateConfigurationReleaseCommandHandler(productionStore).HandleAsync(
+            var releaseStore = new ConfigurationReleaseStore(dbContext);
+            var routeStore = new ConfigurationRouteStore(dbContext);
+            var deploymentStore = new ConfigurationDeploymentStore(dbContext);
+            var createdRelease = await new CreateConfigurationReleaseCommandHandler(releaseStore).HandleAsync(
                 new CreateConfigurationReleaseCommand
                 {
                     UserContext = user,
@@ -606,7 +633,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             Assert.True(createdRelease.Succeeded, createdRelease.Message);
             releaseId = createdRelease.Data!.Id;
 
-            var routed = await new ReplaceConfigurationReleaseRoutesCommandHandler(productionStore).HandleAsync(
+            var routed = await new ReplaceConfigurationReleaseRoutesCommandHandler(releaseStore, routeStore).HandleAsync(
                 new ReplaceConfigurationReleaseRoutesCommand
                 {
                     UserContext = user,
@@ -633,7 +660,7 @@ public sealed class RobotArtifactOperationalSmokeTests
                 }));
 
             var publishedRelease = await new PublishConfigurationReleaseCommandHandler(
-                productionStore,
+                releaseStore,
                 new FullEdgeReleaseBundleService(_fixture.CreateObjectStorage(autoCreateBucket: true)),
                 inventoryReadiness).HandleAsync(
                 new PublishConfigurationReleaseCommand
@@ -647,7 +674,8 @@ public sealed class RobotArtifactOperationalSmokeTests
             var edgeStore = new EdgeCommandStore(dbContext);
             var deploymentWakeUpPublisher = new NoOpEdgeCommandWakeUpPublisher { PublishResult = false };
             var deployed = await new DeployFullEdgeConfigurationCommandHandler(
-                productionStore,
+                deploymentStore,
+                releaseStore,
                 edgeStore,
                 deploymentWakeUpPublisher,
                 inventoryReadiness).HandleAsync(
@@ -1132,7 +1160,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             .ToListAsync(), reason => reason.Contains("Operator confirmed safe retry after expiry."));
     }
 
-    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Results.OrderExecutionDispatchResult>> RedispatchAsync(
+    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Dispatch.Results.OrderExecutionDispatchResult>> RedispatchAsync(
         Guid orderId,
         CurrentUserContext user,
         string reason,
@@ -1239,9 +1267,9 @@ public sealed class RobotArtifactOperationalSmokeTests
             OrganizationId = graph.OrganizationId,
             StoreId = graph.StoreId,
             KioskId = graph.KioskId,
-            OrderNumber = $"SMOKE-{Guid.NewGuid():N}",
-            Currency = "VND"
+            OrderNumber = $"SMOKE-{Guid.NewGuid():N}"
         };
+        order.SetCurrency("VND");
         order.AddItem(
             graph.MenuItemId,
             graph.ProductId,
@@ -1433,15 +1461,22 @@ public sealed class RobotArtifactOperationalSmokeTests
             Code = $"DISPENSER-{Guid.NewGuid():N}",
             Name = "Operational smoke dispenser"
         };
-        var device = new Device
-        {
-            DeviceType = deviceType,
-            KioskId = kiosk.Id,
-            Kiosk = kiosk,
-            Code = $"DEVICE-{Guid.NewGuid():N}",
-            Name = "Operational smoke dispenser",
-            Status = DeviceStatus.Online
-        };
+        dbContext.DeviceTypes.Add(deviceType);
+        await dbContext.SaveChangesAsync();
+
+        var device = Device.CreateProvisioning(
+            deviceType.Id,
+            null,
+            kiosk.Id,
+            $"DEVICE-{Guid.NewGuid():N}",
+            "Operational smoke dispenser",
+            null,
+            null,
+            null,
+            null);
+        device.DeviceType = deviceType;
+        device.Kiosk = kiosk;
+        device.SetStatus(DeviceStatus.Online);
         var ingredient = new Ingredient
         {
             Code = $"INGREDIENT-{Guid.NewGuid():N}",
@@ -1505,7 +1540,6 @@ public sealed class RobotArtifactOperationalSmokeTests
             recipe,
             menu,
             menuItem,
-            deviceType,
             device,
             ingredient,
             dispenserState,

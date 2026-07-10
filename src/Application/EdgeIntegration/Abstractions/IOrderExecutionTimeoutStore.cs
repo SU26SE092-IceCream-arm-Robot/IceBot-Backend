@@ -1,5 +1,5 @@
 using Domain.Devices.Telemetry;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;

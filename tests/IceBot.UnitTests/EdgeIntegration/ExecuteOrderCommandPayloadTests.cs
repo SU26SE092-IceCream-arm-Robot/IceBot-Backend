@@ -1,4 +1,5 @@
-using Application.EdgeIntegration.Contracts;
+using Application.EdgeIntegration.Dispatch.Contracts;
+using Application.EdgeIntegration.Reports.Contracts;
 using Domain.Common;
 
 namespace IceBot.UnitTests.EdgeIntegration;

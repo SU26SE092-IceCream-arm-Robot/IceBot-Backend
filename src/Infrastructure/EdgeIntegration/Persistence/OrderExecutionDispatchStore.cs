@@ -1,8 +1,14 @@
+using Application.RobotConfiguration.Programs.ReadModels;
+using Application.RobotConfiguration.Programs.Mapping;
+using Application.RobotConfiguration.Programs.Results;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
 using Domain.Catalog.Enums;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 using Domain.ProductionConfiguration.Entities;
@@ -49,7 +55,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
 
     public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders
+        return _dbContext.Orders.WhereNotDeleted()
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
             .Include(order => order.OrderItems)
@@ -61,7 +67,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
         Guid kioskId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.KioskExecutionEndpoints
+        return await _dbContext.KioskExecutionEndpoints.WhereNotDeleted()
             .Include(endpoint => endpoint.CredentialBinding)
             .Where(endpoint =>
                 endpoint.KioskId == kioskId &&
@@ -148,7 +154,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
         int maxOrders,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Orders.AsNoTracking()
+        return await _dbContext.Orders.WhereNotDeleted().AsNoTracking()
             .Where(order =>
                 order.PaymentStatus == PaymentStatus.Paid &&
                 order.Status == OrderStatus.ReadyForExecution &&
@@ -175,7 +181,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
 
     private IQueryable<ConfigurationRelease> ReleaseGraph()
     {
-        return _dbContext.ConfigurationReleases
+        return _dbContext.ConfigurationReleases.WhereNotDeleted()
             .Include(release => release.ExecutionRoutes)
                 .ThenInclude(route => route.ProductVariant)
                     .ThenInclude(variant => variant.Product)

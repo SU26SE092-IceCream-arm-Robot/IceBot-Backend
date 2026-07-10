@@ -1,6 +1,7 @@
+using Application.RobotConfiguration.Storage.Abstractions;
 using System.Net;
 using System.Text;
-using Application.RobotConfiguration.Abstractions;
+using Application.RobotConfiguration.Artifacts.Abstractions;
 using IceBot.IntegrationTests.Infrastructure;
 
 namespace IceBot.IntegrationTests.RobotConfiguration;

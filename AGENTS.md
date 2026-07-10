@@ -7,7 +7,7 @@ Operational rules for coding agents working in this repository.
 - Architecture decisions: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Domain context map: [docs/architecture/BOUNDARY_CONTEXTS.md](docs/architecture/BOUNDARY_CONTEXTS.md)
 - Dependency boundaries: [docs/architecture/DEPENDENCY_RULES.md](docs/architecture/DEPENDENCY_RULES.md)
-- RAG/docs routing map: [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md)
+- Documentation routing map: [docs/DOCUMENTATION_ROUTING_MAP.md](docs/DOCUMENTATION_ROUTING_MAP.md)
 - Documentation structure: [docs/process/DOCUMENTATION_RULES.md](docs/process/DOCUMENTATION_RULES.md)
 
 Do not duplicate long architecture explanations here. This file is for execution rules.
@@ -27,13 +27,14 @@ This is the main implementation repository for IceBot backend work.
 - Do not follow every link in every document.
 - If a linked file was already read in the current task, do not reopen it unless the user asks, the file may have changed, or a specific section is needed.
 - Prefer reading the smallest relevant set of docs, then inspect code.
-- When the right backend doc is unclear after direct retrieval or metadata/path filters, use [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md) as a fallback router.
+- When the right backend doc is unclear after direct retrieval or metadata/path filters, use [docs/DOCUMENTATION_ROUTING_MAP.md](docs/DOCUMENTATION_ROUTING_MAP.md) as a fallback router.
 
 ## Working Workflow
 
 - Use current task context first; do not reread docs/code when the answer is already settled in context.
 - For concrete symbols/endpoints/handlers, use Code Intelligence before broad search.
 - For rules/flows/contracts, use docs/RAG only when current context is insufficient.
+- Before implementing a feature, define the complete vertical slice and its affected contracts so the work is not delivered as disconnected file-level patches.
 - Make the smallest scoped change, then verify with the narrowest relevant check.
 - After meaningful backend code/API/domain changes, run backend preflight as the final check.
 
@@ -55,7 +56,7 @@ This is the main implementation repository for IceBot backend work.
 - When the user asks to inspect or adjust an existing abstraction, preserve it and repair it first. Do not delete it just because it is currently unused or copied from another project.
 - Do not perform broad renames, namespace moves, or folder reshuffles unless requested.
 - Do not remove files, abstractions, or extension points unless the user explicitly asks for removal, or the file is proven obsolete and the removal is stated as part of the intended fix before editing.
-- Do not create EF Core migrations unless the user explicitly asks for migrations.
+- Do not create EF Core migrations unless the user explicitly asks for migrations. When asked, review and stabilize the complete model change before generating a migration; do not generate successive migrations while the same model change is still being repaired.
 - Do not use destructive git commands unless explicitly requested.
 - Work with existing uncommitted changes; do not revert user changes.
 

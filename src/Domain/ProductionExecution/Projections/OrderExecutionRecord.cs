@@ -1,6 +1,6 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.ProductionExecution.Enums;
 
 namespace Domain.ProductionExecution.Projections;

@@ -38,6 +38,10 @@ public sealed class RefillDispenserCommandHandler
             {
                 return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
             }
+            if (state.KioskId != command.KioskId)
+            {
+                return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
+            }
             if (!state.IsActive)
             {
                 return ApiResult<DispenserStateResult>.Fail("Retired dispenser state cannot be refilled.", 409);

@@ -1,5 +1,9 @@
 # Observability
 
+## Search Keywords
+
+`observability`, `Serilog`, `OpenTelemetry`, `OTLP`, `Aspire Dashboard`, `trace`, `metric`, `structured log`, `debug body logging`
+
 This document outlines the observability strategy for IceBot Backend. It uses a combination of **Serilog** for structured logging and **OpenTelemetry** for traces, metrics, and correlation.
 
 ## 1. Architecture Strategy

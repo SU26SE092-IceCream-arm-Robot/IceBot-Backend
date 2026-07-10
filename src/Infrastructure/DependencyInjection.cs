@@ -1,16 +1,33 @@
+using Infrastructure.RobotConfiguration.Storage.Jobs;
+using Infrastructure.RobotConfiguration.ArtifactTemplates.Persistence;
+using Application.RobotConfiguration.ArtifactTemplates.Abstractions;
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
+using Infrastructure.Devices.Connectivity.Jobs;
+using Infrastructure.Devices.Connectivity.Persistence;
+using Infrastructure.Devices.Telemetry.Persistence;
+using Infrastructure.Devices.ExecutionEndpoints.Persistence;
 using Application.Abstractions.Persistence;
 using Application.Dashboard.Abstractions;
-using Application.Devices.Abstractions;
+using Application.Devices.Catalog.Abstractions;
+using Application.Devices.ExecutionEndpoints.Abstractions;
+using Application.Devices.Telemetry.Abstractions;
+using Application.Devices.Connectivity.Abstractions;
+using Application.Devices.Credentials.Abstractions;
 using Application.Email;
 using Application.Inventory.Abstractions;
 using Application.Operations.Abstractions;
+using Application.Operations.OperationLogs.Abstractions;
 using Application.EdgeIntegration.Abstractions;
-using Application.ProductionConfiguration.Abstractions;
-using Application.RobotConfiguration.Abstractions;
+using Application.ProductionConfiguration.Deployments.Abstractions;
+using Application.ProductionConfiguration.Releases.Abstractions;
+using Application.ProductionConfiguration.Routes.Abstractions;
+using Application.RobotConfiguration.Artifacts.Abstractions;
+using Application.RobotConfiguration.Programs.Abstractions;
 using Infrastructure.Catalog;
 using Infrastructure.Dashboard.Persistence;
 using Infrastructure.Data;
-using Infrastructure.Devices.Persistence;
+using Infrastructure.Devices.Catalog.Persistence;
 using Infrastructure.Email;
 using Infrastructure.EdgeIntegration.Persistence;
 using Infrastructure.EdgeIntegration.Mqtt;
@@ -19,10 +36,13 @@ using Infrastructure.Inventory.Persistence;
 using Infrastructure.Operations.Persistence;
 using Infrastructure.Orders;
 using Infrastructure.Payments;
-using Infrastructure.ProductionConfiguration.Persistence;
+using Infrastructure.ProductionConfiguration.Persistence.Deployments;
+using Infrastructure.ProductionConfiguration.Persistence.Releases;
+using Infrastructure.ProductionConfiguration.Persistence.Routes;
 using Infrastructure.ProductionConfiguration.ObjectStorage;
-using Infrastructure.RobotConfiguration.ObjectStorage;
-using Infrastructure.RobotConfiguration.Persistence;
+using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
+using Infrastructure.RobotConfiguration.Artifacts.Persistence;
+using Infrastructure.RobotConfiguration.Programs.Persistence;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
 using Infrastructure.Sync;
@@ -92,8 +112,8 @@ namespace Infrastructure
             services.AddScoped<IProductionEventSyncStore, ProductionEventSyncStore>();
             services.AddScoped<IExecutionReadinessStore, ExecutionReadinessStore>();
             services.AddScoped<Application.Sync.Abstractions.ISyncDeadLetterStore, SyncDeadLetterStore>();
-            services.AddOptions<Application.Devices.EdgeTelemetryIngestionOptions>()
-                .Bind(config.GetSection(Application.Devices.EdgeTelemetryIngestionOptions.SectionName))
+            services.AddOptions<Application.Devices.Telemetry.EdgeTelemetryIngestionOptions>()
+                .Bind(config.GetSection(Application.Devices.Telemetry.EdgeTelemetryIngestionOptions.SectionName))
                 .Validate(options =>
                         options.MaxFutureClockSkewSeconds >= 0 &&
                         options.HeartbeatTimeoutSeconds > 0 &&
@@ -103,12 +123,13 @@ namespace Infrastructure
                         options.AlertCorrelationWindowMinutes > 0,
                     "Edge telemetry clock skew and connectivity reconciliation settings are invalid.")
                 .ValidateOnStart();
-            services.AddHostedService<Devices.Jobs.KioskConnectivityReconciliationJob>();
+            services.AddHostedService<KioskConnectivityReconciliationJob>();
             services.AddScoped<IDeviceManagementStore, DeviceManagementStore>();
             services.AddScoped<IExecutionEndpointStore, ExecutionEndpointStore>();
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
             services.AddScoped<IAlertStore, AlertStore>();
+            services.AddScoped<IOperationLogStore, OperationLogStore>();
             services.AddOptions<RobotArtifactObjectStorageOptions>()
                 .Bind(config.GetSection(RobotArtifactObjectStorageOptions.SectionName))
                 .Validate(options =>
@@ -128,17 +149,20 @@ namespace Infrastructure
             services.AddScoped<IArtifactObjectReferenceSource, RobotConfigurationObjectReferenceSource>();
             services.AddScoped<IArtifactObjectReferenceSource, ConfigurationReleaseBundleReferenceSource>();
             services.AddHostedService<RobotArtifactObjectStorageStartupValidator>();
-            services.AddHostedService<RobotConfiguration.Jobs.RobotArtifactOrphanCleanupJob>();
-            services.AddScoped<IRobotConfigurationStore, RobotConfigurationStore>();
+            services.AddHostedService<RobotArtifactOrphanCleanupJob>();
+            services.AddScoped<IRobotArtifactStore, RobotArtifactStore>();
+            services.AddScoped<IRobotProgramStore, RobotProgramStore>();
             services.AddScoped<IRobotArtifactTemplateStore, RobotArtifactTemplateStore>();
-            services.AddScoped<IProductionConfigurationStore, ProductionConfigurationStore>();
-            services.AddOptions<Application.ProductionConfiguration.LowCostControllerCapacityOptions>()
-                .Bind(config.GetSection(Application.ProductionConfiguration.LowCostControllerCapacityOptions.SectionName))
+            services.AddScoped<IConfigurationReleaseStore, ConfigurationReleaseStore>();
+            services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
+            services.AddScoped<IConfigurationDeploymentStore, ConfigurationDeploymentStore>();
+            services.AddOptions<Application.ProductionConfiguration.Deployments.LowCostControllerCapacityOptions>()
+                .Bind(config.GetSection(Application.ProductionConfiguration.Deployments.LowCostControllerCapacityOptions.SectionName))
                 .Validate(options => options.MaxArtifactCount > 0 && options.MaxArtifactStorageBytes > 0,
                     "Low-cost controller capacity limits must be positive.")
                 .ValidateOnStart();
-            services.AddOptions<Application.ProductionConfiguration.InventoryReadinessPolicyOptions>()
-                .Bind(config.GetSection(Application.ProductionConfiguration.InventoryReadinessPolicyOptions.SectionName))
+            services.AddOptions<Application.ProductionConfiguration.Readiness.InventoryReadinessPolicyOptions>()
+                .Bind(config.GetSection(Application.ProductionConfiguration.Readiness.InventoryReadinessPolicyOptions.SectionName))
                 .Validate(options => Enum.IsDefined(options.PublishPolicy) && Enum.IsDefined(options.DeployPolicy),
                     "Production inventory readiness policies must be Warn or Block.")
                 .ValidateOnStart();
@@ -179,13 +203,13 @@ namespace Infrastructure
                     "Enabled MQTT credential provisioning settings are incomplete or invalid.")
                 .ValidateOnStart();
             services.AddScoped<IMqttEndpointCredentialProvisioner, MosquittoDynamicSecurityCredentialProvisioner>();
-            services.AddOptions<Application.EdgeIntegration.ExecutionReportIngestionOptions>()
-                .Bind(config.GetSection(Application.EdgeIntegration.ExecutionReportIngestionOptions.SectionName))
+            services.AddOptions<Application.EdgeIntegration.Reports.ExecutionReportIngestionOptions>()
+                .Bind(config.GetSection(Application.EdgeIntegration.Reports.ExecutionReportIngestionOptions.SectionName))
                 .Validate(options => options.MaxFutureClockSkewSeconds >= 0,
                     "Execution report future clock skew cannot be negative.")
                 .ValidateOnStart();
-            services.AddOptions<Application.EdgeIntegration.OrderExecutionDispatchOptions>()
-                .Bind(config.GetSection(Application.EdgeIntegration.OrderExecutionDispatchOptions.SectionName))
+            services.AddOptions<Application.EdgeIntegration.Dispatch.OrderExecutionDispatchOptions>()
+                .Bind(config.GetSection(Application.EdgeIntegration.Dispatch.OrderExecutionDispatchOptions.SectionName))
                 .Validate(options =>
                         options.CommandExpiryMinutes > 0 &&
                         options.MaxActiveCommandsPerEndpoint > 0 &&

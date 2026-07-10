@@ -1,13 +1,19 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
 using Application.ProductionConfiguration;
-using Application.ProductionConfiguration.Abstractions;
-using Application.ProductionConfiguration.Commands;
+using Application.ProductionConfiguration.Deployments;
+using Application.ProductionConfiguration.Readiness;
+using Application.ProductionConfiguration.Deployments.Abstractions;
+using Application.ProductionConfiguration.Releases.Abstractions;
+using Application.ProductionConfiguration.Releases.Commands;
+using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Routes.Commands;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 using IceBot.UnitTests.TestSupport;
 using Application.Inventory.Abstractions;
-using Application.ProductionConfiguration.Services;
+using Application.ProductionConfiguration.Releases.Services;
+using Application.ProductionConfiguration.Readiness.Services;
 
 namespace IceBot.UnitTests.ProductionConfiguration;
 
@@ -17,17 +23,18 @@ public sealed class DeploymentReleaseLifecycleTests
     public async Task NormalLowCostDeploy_RejectsRetiredRelease()
     {
         var release = TestData.RetiredRelease(Guid.NewGuid());
-        var store = Substitute.For<IProductionConfigurationStore>();
-        store.GetPublishedReleaseForDeploymentAsync(release.Id, Arg.Any<CancellationToken>())
+        var deploymentStore = Substitute.For<IConfigurationDeploymentStore>();
+        var releaseStore = Substitute.For<IConfigurationReleaseStore>();
+        releaseStore.GetPublishedReleaseForDeploymentAsync(release.Id, Arg.Any<CancellationToken>())
             .Returns(release);
-        var handler = CreateHandler(store);
+        var handler = CreateHandler(deploymentStore, releaseStore);
 
         var result = await handler.HandleAsync(Command(release.Id, rollbackTargetId: null));
 
         Assert.False(result.Succeeded);
         Assert.Equal(400, result.StatusCode);
         Assert.Contains("retired releases are available only through rollback", result.Message);
-        await store.DidNotReceive().GetEndpointForDeploymentAsync(
+        await deploymentStore.DidNotReceive().GetEndpointForDeploymentAsync(
             Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
     }
@@ -36,26 +43,30 @@ public sealed class DeploymentReleaseLifecycleTests
     public async Task RollbackLowCostDeploy_AllowsRetiredReleasePastLifecycleGate()
     {
         var release = TestData.RetiredRelease(Guid.NewGuid());
-        var store = Substitute.For<IProductionConfigurationStore>();
-        store.GetPublishedReleaseForDeploymentAsync(release.Id, Arg.Any<CancellationToken>())
+        var deploymentStore = Substitute.For<IConfigurationDeploymentStore>();
+        var releaseStore = Substitute.For<IConfigurationReleaseStore>();
+        releaseStore.GetPublishedReleaseForDeploymentAsync(release.Id, Arg.Any<CancellationToken>())
             .Returns(release);
-        store.GetEndpointForDeploymentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        deploymentStore.GetEndpointForDeploymentAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns((Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint?)null);
-        var handler = CreateHandler(store);
+        var handler = CreateHandler(deploymentStore, releaseStore);
 
         var result = await handler.HandleAsync(Command(release.Id, Guid.NewGuid()));
 
         Assert.False(result.Succeeded);
         Assert.Equal(404, result.StatusCode);
         Assert.Equal("Kiosk execution endpoint not found.", result.Message);
-        await store.Received(1).GetEndpointForDeploymentAsync(
+        await deploymentStore.Received(1).GetEndpointForDeploymentAsync(
             Arg.Any<Guid>(),
             Arg.Any<CancellationToken>());
     }
 
-    private static DeployLowCostArtifactSetCommandHandler CreateHandler(IProductionConfigurationStore store) =>
+    private static DeployLowCostArtifactSetCommandHandler CreateHandler(
+        IConfigurationDeploymentStore deploymentStore,
+        IConfigurationReleaseStore releaseStore) =>
         new(
-            store,
+            deploymentStore,
+            releaseStore,
             Substitute.For<IEdgeCommandStore>(),
             Options.Create(new LowCostControllerCapacityOptions
             {

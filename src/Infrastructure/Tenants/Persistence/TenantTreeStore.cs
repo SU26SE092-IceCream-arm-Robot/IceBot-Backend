@@ -20,7 +20,7 @@ public sealed class TenantTreeStore : ITenantTreeStore
         bool includeInactive,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Organizations.AsNoTracking();
+        var query = _dbContext.Organizations.WhereNotDeleted().AsNoTracking();
         if (!includeInactive)
         {
             query = query.Where(organization => organization.Status == EntityStatus.Active);
@@ -33,7 +33,7 @@ public sealed class TenantTreeStore : ITenantTreeStore
         bool includeInactive,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Stores.AsNoTracking();
+        var query = _dbContext.Stores.WhereNotDeleted().AsNoTracking();
         if (!includeInactive)
         {
             query = query.Where(store => store.Status == EntityStatus.Active);
@@ -46,7 +46,7 @@ public sealed class TenantTreeStore : ITenantTreeStore
         bool includeInactive,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Kiosks.AsNoTracking();
+        var query = _dbContext.Kiosks.WhereNotDeleted().AsNoTracking();
         if (!includeInactive)
         {
             query = query.Where(kiosk =>
@@ -68,7 +68,7 @@ public sealed class TenantTreeStore : ITenantTreeStore
             return Array.Empty<Store>();
         }
 
-        var query = _dbContext.Stores.AsNoTracking().Where(store => ids.Contains(store.Id));
+        var query = _dbContext.Stores.WhereNotDeleted().AsNoTracking().Where(store => ids.Contains(store.Id));
         if (!includeInactive)
         {
             query = query.Where(store => store.Status == EntityStatus.Active);
@@ -88,7 +88,7 @@ public sealed class TenantTreeStore : ITenantTreeStore
             return Array.Empty<Kiosk>();
         }
 
-        var query = _dbContext.Kiosks.AsNoTracking().Where(kiosk => ids.Contains(kiosk.Id));
+        var query = _dbContext.Kiosks.WhereNotDeleted().AsNoTracking().Where(kiosk => ids.Contains(kiosk.Id));
         if (!includeInactive)
         {
             query = query.Where(kiosk =>

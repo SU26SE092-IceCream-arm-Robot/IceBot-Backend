@@ -2,6 +2,8 @@ using Application.Catalog;
 using Application.Dashboard.Queries;
 using Application.Devices;
 using Application.EdgeIntegration;
+using Application.EdgeIntegration.Dispatch;
+using Application.EdgeIntegration.Reports;
 using Application.Identity;
 using Application.Inventory;
 using Application.Operations;

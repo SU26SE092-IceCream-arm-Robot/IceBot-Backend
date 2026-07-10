@@ -1,7 +1,7 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.Orders.Abstractions;
 using Application.Orders.Management.Results;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionExecution.Projections;
@@ -36,7 +36,7 @@ public sealed class OrderStore : IOrderStore
         IReadOnlyCollection<Guid> allowedKioskIds,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Orders.AsNoTracking();
+        var query = _dbContext.Orders.WhereNotDeleted().AsNoTracking();
 
         if (from.HasValue)
         {
@@ -93,7 +93,7 @@ public sealed class OrderStore : IOrderStore
 
         var recentOrders = recentOrdersList.Select(o =>
         {
-            var project = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrder(o);
+            var project = Application.Orders.Support.OrderStatusProjector.ProjectFromOrder(o);
             return new RecentOrderDto
             {
                 OrderId = o.Id,
@@ -120,7 +120,7 @@ public sealed class OrderStore : IOrderStore
 
     public Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks
+        return _dbContext.Kiosks.WhereNotDeleted()
             .Include(kiosk => kiosk.Store)
             .Include(kiosk => kiosk.Organization)
             .FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
@@ -177,7 +177,7 @@ public sealed class OrderStore : IOrderStore
                 readiness.KioskId == kioskId && readiness.Readiness == ExecutionReadinessState.Ready &&
                 readiness.Safety == ExecutionSafetyState.Safe &&
                 readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
-                _dbContext.ConfigurationReleases.Any(release =>
+                _dbContext.ConfigurationReleases.WhereNotDeleted().Any(release =>
                     release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
                         ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
                         : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
@@ -190,7 +190,7 @@ public sealed class OrderStore : IOrderStore
 
     public Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders
+        return _dbContext.Orders.WhereNotDeleted()
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
@@ -409,7 +409,7 @@ public sealed class OrderStore : IOrderStore
         IReadOnlyCollection<Guid> allowedStoreIds,
         IReadOnlyCollection<Guid> allowedKioskIds)
     {
-        var query = _dbContext.Orders.AsQueryable();
+        var query = _dbContext.Orders.WhereNotDeleted();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
@@ -462,7 +462,7 @@ public sealed class OrderStore : IOrderStore
 
     public Task<Order?> GetOrderByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders
+        return _dbContext.Orders.WhereNotDeleted()
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(order => order.IdempotencyKey == idempotencyKey, cancellationToken);
@@ -470,7 +470,7 @@ public sealed class OrderStore : IOrderStore
 
     public Task<Order?> GetOrderByClientOrderIdAsync(Guid kioskId, string clientOrderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders
+        return _dbContext.Orders.WhereNotDeleted()
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(

@@ -19,6 +19,11 @@ public sealed class GetDispenserHistoryQueryHandler(IInventoryStore inventory)
             return PagedResult<DispenserHistoryResult>.Fail(
                 "Dispenser state not found.", 404, requestedPage, requestedPageSize);
         }
+        if (state.KioskId != query.KioskId)
+        {
+            return PagedResult<DispenserHistoryResult>.Fail(
+                "Dispenser state not found.", 404, requestedPage, requestedPageSize);
+        }
         if (!ScopeAccessRules.CanAccessScopedRow(
                 ScopeRoleSets.InventoryView,
                 query.UserContext,

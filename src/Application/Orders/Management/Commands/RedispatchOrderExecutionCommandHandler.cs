@@ -1,9 +1,14 @@
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
-using Application.EdgeIntegration.Commands;
-using Application.EdgeIntegration.Results;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
+using Application.EdgeIntegration.CommandDelivery.Results;
+using Application.EdgeIntegration.Dispatch.Results;
+using Application.EdgeIntegration.Reports.Results;
 using Application.Orders.Abstractions;
-using Application.Shared.Utils;
+using Application.Orders.Support;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 

@@ -23,6 +23,9 @@ Fields:
 - `RobotArtifact.MetadataJson`
 - `ConfigurationRelease.ManifestJson` with `ReleaseManifestSchemaVersion`
 - `ExecutionRoute.RequiredCapabilitiesJson`
+  - When present, this field must use schema version `1`: `{ "schemaVersion": 1, "requires": [{ "code": "...", "minVersion": "...", "required": true }] }`.
+  - Codes must match capability codes already declared by the same route's robot bindings. Unknown fields are rejected.
+  - Cloud V1 still uses `ExecutionRouteRobotBinding.RequiredWorkcellCapabilityCode` as the online sellability/dispatch enforcement gate; this JSON is a bounded Edge-facing requirements payload.
 - `EdgeCommand.PayloadJson`
 - `IngredientDispenserState.LevelToQuantityProfileJson` with `LevelToQuantityProfileSchemaVersion`
   - API contracts expose typed `Low`, `Medium`, and `Full` points; FE does not send JSON or schema version.

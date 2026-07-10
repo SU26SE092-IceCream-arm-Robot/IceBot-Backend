@@ -4,7 +4,7 @@ using Application.Inventory.Results;
 using Application.Inventory.Support;
 using Application.Shared.Wrappers;
 using Application.Tenants;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Inventory.Entities;
 using Domain.Inventory.Enums;
 

@@ -5,6 +5,7 @@ namespace Application.Inventory.Commands;
 
 public sealed class AdjustDispenserEstimateCommand
 {
+    public required Guid KioskId { get; init; }
     public required Guid DispenserStateId { get; init; }
     public required CurrentUserContext UserContext { get; init; }
     public required decimal EstimatedQuantity { get; init; }

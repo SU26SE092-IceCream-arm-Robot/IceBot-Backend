@@ -1,4 +1,4 @@
-using Application.Devices.Support;
+using Application.Devices.Catalog.Support;
 using Application.Inventory.Abstractions;
 using Application.Inventory.Results;
 using Application.Shared.Wrappers;
@@ -82,18 +82,18 @@ public sealed class GetKioskInventoryTopologyQueryHandler(IInventoryStore invent
         return ApiResult<KioskInventoryTopologyResult>.Success(result);
     }
 
-    private static IReadOnlyList<string> BuildDeviceWarnings(Domain.Devices.Entities.Device device)
+    private static IReadOnlyList<string> BuildDeviceWarnings(Domain.Devices.Catalog.Device device)
     {
         var warnings = new List<string>();
-        if (device.DeletedAt.HasValue || device.Status == Domain.Devices.Enums.DeviceStatus.Retired)
+        if (device.DeletedAt.HasValue || device.Status == Domain.Devices.Catalog.DeviceStatus.Retired)
             warnings.Add("DeviceInactive");
-        else if (device.Status != Domain.Devices.Enums.DeviceStatus.Online)
+        else if (device.Status != Domain.Devices.Catalog.DeviceStatus.Online)
             warnings.Add("DeviceUnavailable");
         return warnings;
     }
 
     private static IReadOnlyList<string> BuildContainerWarnings(
-        Domain.Devices.Entities.Device device,
+        Domain.Devices.Catalog.Device device,
         Domain.Inventory.Entities.IngredientDispenserState state)
     {
         var warnings = new List<string>(BuildDeviceWarnings(device));

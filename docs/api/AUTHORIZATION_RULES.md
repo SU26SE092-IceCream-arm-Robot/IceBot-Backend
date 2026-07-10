@@ -162,6 +162,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `product-templates.read` | `SystemAdmin`, `Manager` | Browse global product templates for cloning into an assigned organization |
 | `product-templates.manage` | `SystemAdmin` | Manage global product templates; tenant roles cannot author or mutate global catalog rows |
 | `products.manage` | `SystemAdmin`, `Manager` | Manage organization-owned products and variants within assigned organization/store/kiosk scope |
+| `product-categories.read` | `SystemAdmin`, `Manager` | Browse the global flat ProductCategory catalog used by product authoring |
+| `product-categories.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ProductCategory definitions |
 | `ingredients.read` | `SystemAdmin`, `Manager` | Browse the global ingredient reference catalog used by recipe authoring |
 | `ingredients.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ingredient definitions |
 | `menus.manage` | `SystemAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
@@ -170,7 +172,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
 | `inventory.manage` | `SystemAdmin`, `Manager`, `Staff`, `Technician` | Refill dispenser state and adjust inventory estimates within assigned scope |
 | `inventory.configure` | `SystemAdmin`, `Manager`, `Technician` | Provision and configure dispenser topology, activate/retire states, and delete only unused states within assigned scope |
-| `operations.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosk heartbeat history and device events within assigned scope |
+| `operations.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosk heartbeat history, device events, and curated operation logs within assigned scope |
+| `operations.diagnostics` | `SystemAdmin`, `Technician` | View raw operation-log diagnostic payloads within assigned kiosk scope |
 | `maintenance.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View maintenance tickets within assigned scope |
 | `maintenance.create` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Create maintenance tickets within assigned scope |
 | `maintenance.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Manage, assign, resolve, and close maintenance tickets within assigned scope. Staff can create/view tickets but cannot assign or resolve by default |
@@ -190,6 +193,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 - `GET /management/accounts/{accountId}/effective-access` uses `accounts.read` and returns the target account's active role scopes plus the effective ids used by current scoped authorization rules.
 - Effective access does not expand organization scope into store/kiosk ids. Use GraphQL `tenantTree` or REST `role-scope-options` for UI tree display.
 - `GET /me/access` is a self-inspection endpoint based on the current access token claims. Refresh the token after role changes to see updated access.
+- `/me/notification-devices` is authenticated self-service only; callers can register, inspect, or invalidate only their own FCM installations.
 - `PUT /management/accounts/{accountId}/roles` replaces active role assignments for the target account. `POST /management/accounts/{accountId}/roles` remains an add/upsert single-role operation.
 - Do not add `Staff` or `Technician` to product/menu pricing policies unless the business explicitly gives them that responsibility.
 

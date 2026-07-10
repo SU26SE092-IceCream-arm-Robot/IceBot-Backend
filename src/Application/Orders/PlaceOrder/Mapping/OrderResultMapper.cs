@@ -8,7 +8,7 @@ internal static class OrderResultMapper
 {
     public static OrderResult ToResult(Order order, OrderExecutionRecord? executionRecord = null)
     {
-        var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrderAndExecution(order, executionRecord);
+        var customerStatusInfo = Application.Orders.Support.OrderStatusProjector.ProjectFromOrderAndExecution(order, executionRecord);
 
         return new OrderResult
         {

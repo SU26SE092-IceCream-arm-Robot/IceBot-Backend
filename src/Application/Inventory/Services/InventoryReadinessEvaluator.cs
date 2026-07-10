@@ -1,6 +1,6 @@
 using Application.Inventory.Abstractions;
 using Application.Inventory.Results;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Inventory.Entities;
 using Domain.Inventory.Enums;
 using Domain.Tenants.Entities;

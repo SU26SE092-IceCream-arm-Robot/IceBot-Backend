@@ -4,7 +4,7 @@ using Domain.Inventory.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Catalog.Entities;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Tenants.Entities;
 using Npgsql;
 using Domain.ProductionExecution.Enums;
@@ -90,18 +90,18 @@ public sealed class InventoryStore : IInventoryStore
     }
 
     public Task<Device?> GetDeviceForTopologyAsync(Guid kioskId, Guid deviceId, CancellationToken cancellationToken = default) =>
-        _dbContext.Devices.AsNoTracking()
+        _dbContext.Devices.WhereNotDeleted().AsNoTracking()
             .Include(device => device.Kiosk)
             .Include(device => device.DeviceType)
             .Include(device => device.DeviceModel)
             .FirstOrDefaultAsync(device => device.Id == deviceId && device.KioskId == kioskId, cancellationToken);
 
     public Task<Ingredient?> GetIngredientForTopologyAsync(Guid ingredientId, CancellationToken cancellationToken = default) =>
-        _dbContext.Ingredients.AsNoTracking()
+        _dbContext.Ingredients.WhereNotDeleted().AsNoTracking()
             .FirstOrDefaultAsync(ingredient => ingredient.Id == ingredientId, cancellationToken);
 
     public Task<Kiosk?> GetKioskForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
-        _dbContext.Kiosks.AsNoTracking().FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
+        _dbContext.Kiosks.WhereNotDeleted().AsNoTracking().FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
 
     public Task<List<Device>> ListDevicesForInventoryTopologyAsync(
         Guid kioskId,
@@ -127,7 +127,7 @@ public sealed class InventoryStore : IInventoryStore
     public Task<List<Kiosk>> ListKiosksForInventoryReadinessAsync(
         Guid organizationId,
         CancellationToken cancellationToken = default) =>
-        _dbContext.Kiosks.AsNoTracking()
+        _dbContext.Kiosks.WhereNotDeleted().AsNoTracking()
             .Where(kiosk => kiosk.OrganizationId == organizationId)
             .OrderBy(kiosk => kiosk.Code)
             .ToListAsync(cancellationToken);
@@ -147,7 +147,7 @@ public sealed class InventoryStore : IInventoryStore
         string containerCode,
         Guid? excludedId = null,
         CancellationToken cancellationToken = default) =>
-        _dbContext.IngredientDispenserStates.AnyAsync(state =>
+        _dbContext.IngredientDispenserStates.WhereNotDeleted().AnyAsync(state =>
             state.IsActive && state.DeviceId == deviceId && state.ContainerCode == containerCode &&
             (!excludedId.HasValue || state.Id != excludedId), cancellationToken);
 
@@ -215,7 +215,7 @@ public sealed class InventoryStore : IInventoryStore
     public Task<List<IngredientDispenserState>> ListActiveDispenserStatesByDeviceAsync(
         Guid deviceId,
         CancellationToken cancellationToken = default) =>
-        _dbContext.IngredientDispenserStates
+        _dbContext.IngredientDispenserStates.WhereNotDeleted()
             .Include(state => state.Kiosk)
             .Include(state => state.Device).ThenInclude(device => device.DeviceModel)
             .Include(state => state.Ingredient)
@@ -425,7 +425,7 @@ public sealed class InventoryStore : IInventoryStore
         IReadOnlyCollection<Guid> allowedStoreIds,
         IReadOnlyCollection<Guid> allowedKioskIds)
     {
-        var query = _dbContext.IngredientDispenserStates.AsQueryable();
+        var query = _dbContext.IngredientDispenserStates.WhereNotDeleted();
 
         if (isActive.HasValue)
         {

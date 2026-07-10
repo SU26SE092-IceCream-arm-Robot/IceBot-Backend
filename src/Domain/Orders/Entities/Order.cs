@@ -28,33 +28,33 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public string? ExternalChannel { get; set; }
 
-    public OrderStatus Status { get; set; } = OrderStatus.Draft;
+    public OrderStatus Status { get; private set; } = OrderStatus.Draft;
 
-    public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
+    public PaymentStatus PaymentStatus { get; private set; } = PaymentStatus.Unpaid;
 
-    public string Currency { get; set; } = "VND";
+    public string Currency { get; private set; } = "VND";
 
-    public decimal SubtotalAmount { get; set; }
+    public decimal SubtotalAmount { get; private set; }
 
-    public decimal DiscountAmount { get; set; }
+    public decimal DiscountAmount { get; private set; }
 
-    public decimal TaxAmount { get; set; }
+    public decimal TaxAmount { get; private set; }
 
-    public decimal TotalAmount { get; set; }
+    public decimal TotalAmount { get; private set; }
 
-    public decimal PaidAmount { get; set; }
+    public decimal PaidAmount { get; private set; }
 
     public string? CustomerName { get; set; }
 
     public string? CustomerPhoneNumber { get; set; }
 
-    public DateTimeOffset PlacedAt { get; set; }
+    public DateTimeOffset PlacedAt { get; private set; }
 
-    public DateTimeOffset? PaidAt { get; set; }
+    public DateTimeOffset? PaidAt { get; private set; }
 
-    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? CompletedAt { get; private set; }
 
-    public DateTimeOffset? CancelledAt { get; set; }
+    public DateTimeOffset? CancelledAt { get; private set; }
 
     public string? Notes { get; set; }
 
@@ -65,6 +65,17 @@ public partial class Order : BusinessEntity, IStoreScoped
     public virtual Store? Store { get; set; }
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+
+    public void SetCurrency(string currency)
+    {
+        EnsureEditable();
+        if (string.IsNullOrWhiteSpace(currency))
+        {
+            throw new DomainRuleException("Order currency is required.");
+        }
+
+        Currency = currency.Trim().ToUpperInvariant();
+    }
 
     public OrderItem AddItem(
         Guid menuItemId,
@@ -174,6 +185,26 @@ public partial class Order : BusinessEntity, IStoreScoped
         {
             Status = OrderStatus.ReadyForExecution;
         }
+    }
+
+    public void MarkPaymentCancelled()
+    {
+        if (PaymentStatus == PaymentStatus.Paid)
+        {
+            throw new DomainRuleException("A paid order payment status cannot be cancelled.");
+        }
+
+        PaymentStatus = PaymentStatus.Cancelled;
+    }
+
+    public void MarkPaymentRefunded()
+    {
+        if (PaymentStatus != PaymentStatus.Paid || Status is not (OrderStatus.Refunded or OrderStatus.Compensated))
+        {
+            throw new DomainRuleException("Only a completed refund can mark an order payment as refunded.");
+        }
+
+        PaymentStatus = PaymentStatus.Refunded;
     }
 
     public void MarkExecutionRejected(string? notes = null)

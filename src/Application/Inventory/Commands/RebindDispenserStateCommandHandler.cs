@@ -5,7 +5,7 @@ using Application.Inventory.Support;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Inventory.Entities;
 using Domain.Inventory.Enums;
 
@@ -35,6 +35,10 @@ public sealed class RebindDispenserStateCommandHandler(IInventoryStore inventory
         await inventory.AcquireDispenserMutationLockAsync(command.DispenserStateId, cancellationToken);
         var source = await inventory.GetDispenserStateByIdAsync(command.DispenserStateId, cancellationToken);
         if (source?.Kiosk is null)
+        {
+            return ApiResult<DispenserRebindResult>.Fail("Dispenser state not found.", 404);
+        }
+        if (source.KioskId != command.KioskId)
         {
             return ApiResult<DispenserRebindResult>.Fail("Dispenser state not found.", 404);
         }

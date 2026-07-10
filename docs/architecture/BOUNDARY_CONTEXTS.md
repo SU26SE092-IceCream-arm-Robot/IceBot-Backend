@@ -34,12 +34,12 @@ This project keeps one Domain project, but domain entities are grouped by bounde
 
 Namespace: `Domain.Identity`
 
-Owns accounts, roles, login devices, and refresh tokens.
+Owns accounts, roles, notification-device registrations, and refresh tokens.
 
 Entities:
 
 - `Account`
-- `AccountDevice`
+- `AccountNotificationDevice`
 - `PasswordResetRequest`
 - `RefreshToken`
 - `Role`

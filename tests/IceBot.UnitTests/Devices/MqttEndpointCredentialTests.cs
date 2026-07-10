@@ -1,7 +1,7 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
+using Domain.Devices.Telemetry;
 
 namespace IceBot.UnitTests.Devices;
 

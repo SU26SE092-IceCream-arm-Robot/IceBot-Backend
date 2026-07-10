@@ -1,3 +1,5 @@
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 namespace Domain.ProductionConfiguration.ValueObjects;
 
 public sealed record ControllerArtifactSetItemSnapshot(

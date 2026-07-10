@@ -43,30 +43,32 @@ public sealed class ManagementInventoryTopologyController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("inventory/dispenser-states/{dispenserStateId:guid}/rebind")]
+    [HttpPost("kiosks/{kioskId:guid}/inventory/dispenser-states/{dispenserStateId:guid}/rebind")]
     [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> Rebind(
+        Guid kioskId,
         Guid dispenserStateId,
         [FromBody] RebindDispenserStateRequest request,
         CancellationToken cancellationToken)
     {
         var result = await rebindHandler.HandleAsync(
-            new RebindDispenserStateCommand(dispenserStateId, request, User.GetUserContext()), cancellationToken);
+            new RebindDispenserStateCommand(kioskId, dispenserStateId, request, User.GetUserContext()), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("inventory/dispenser-states/{dispenserStateId:guid}/rebind-history")]
+    [HttpGet("kiosks/{kioskId:guid}/inventory/dispenser-states/{dispenserStateId:guid}/rebind-history")]
     [Authorize(Policy = "inventory.view")]
-    public async Task<IActionResult> GetRebindHistory(Guid dispenserStateId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetRebindHistory(Guid kioskId, Guid dispenserStateId, CancellationToken cancellationToken)
     {
         var result = await getRebindHistoryHandler.HandleAsync(
-            new GetDispenserRebindHistoryQuery(dispenserStateId, User.GetUserContext()), cancellationToken);
+            new GetDispenserRebindHistoryQuery(kioskId, dispenserStateId, User.GetUserContext()), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("inventory/dispenser-states/{dispenserStateId:guid}/history")]
+    [HttpGet("kiosks/{kioskId:guid}/inventory/dispenser-states/{dispenserStateId:guid}/history")]
     [Authorize(Policy = "inventory.view")]
     public async Task<IActionResult> GetHistory(
+        Guid kioskId,
         Guid dispenserStateId,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
@@ -74,6 +76,7 @@ public sealed class ManagementInventoryTopologyController(
     {
         var result = await getHistoryHandler.HandleAsync(
             new GetDispenserHistoryQuery(
+                kioskId,
                 dispenserStateId,
                 pageNumber,
                 pageSize,
@@ -82,36 +85,38 @@ public sealed class ManagementInventoryTopologyController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPut("inventory/dispenser-states/{dispenserStateId:guid}")]
+    [HttpPut("kiosks/{kioskId:guid}/inventory/dispenser-states/{dispenserStateId:guid}")]
     [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> Update(
+        Guid kioskId,
         Guid dispenserStateId,
         [FromBody] UpdateDispenserStateRequest request,
         CancellationToken cancellationToken)
     {
         var result = await updateHandler.HandleAsync(
-            new UpdateDispenserStateCommand(dispenserStateId, request, User.GetUserContext()), cancellationToken);
+            new UpdateDispenserStateCommand(kioskId, dispenserStateId, request, User.GetUserContext()), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("inventory/dispenser-states/{dispenserStateId:guid}/status")]
+    [HttpPatch("kiosks/{kioskId:guid}/inventory/dispenser-states/{dispenserStateId:guid}/status")]
     [Authorize(Policy = "inventory.configure")]
     public async Task<IActionResult> SetStatus(
+        Guid kioskId,
         Guid dispenserStateId,
         [FromBody] SetDispenserStateStatusRequest request,
         CancellationToken cancellationToken)
     {
         var result = await setStatusHandler.HandleAsync(
-            new SetDispenserStateStatusCommand(dispenserStateId, request.IsActive, request.Reason, User.GetUserContext()), cancellationToken);
+            new SetDispenserStateStatusCommand(kioskId, dispenserStateId, request.IsActive, request.Reason, User.GetUserContext()), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpDelete("inventory/dispenser-states/{dispenserStateId:guid}")]
+    [HttpDelete("kiosks/{kioskId:guid}/inventory/dispenser-states/{dispenserStateId:guid}")]
     [Authorize(Policy = "inventory.configure")]
-    public async Task<IActionResult> Delete(Guid dispenserStateId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(Guid kioskId, Guid dispenserStateId, CancellationToken cancellationToken)
     {
         var result = await deleteHandler.HandleAsync(
-            new DeleteDispenserStateCommand(dispenserStateId, User.GetUserContext()), cancellationToken);
+            new DeleteDispenserStateCommand(kioskId, dispenserStateId, User.GetUserContext()), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

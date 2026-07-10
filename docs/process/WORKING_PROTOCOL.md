@@ -144,7 +144,7 @@ Links are routing hints, not mandatory recursive reads. If a linked file was alr
 
 Use:
 
-- [RAG Context Map](../RAG_CONTEXT_MAP.md) when the right backend doc is unclear.
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md) when the right backend doc is unclear.
 - [Documentation Rules](DOCUMENTATION_RULES.md) for RAG-friendly document structure.
 - [Architecture](../../ARCHITECTURE.md) for high-level architecture.
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md) for domain ownership.
@@ -214,7 +214,7 @@ A change is done when:
 ## Related Docs
 
 - [Documentation Rules](DOCUMENTATION_RULES.md)
-- [RAG Context Map](../RAG_CONTEXT_MAP.md)
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md)
 - [Architecture](../../ARCHITECTURE.md)
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](../architecture/DEPENDENCY_RULES.md)

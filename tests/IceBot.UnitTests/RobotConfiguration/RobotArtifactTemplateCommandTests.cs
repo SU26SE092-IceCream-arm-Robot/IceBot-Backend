@@ -1,8 +1,14 @@
-using Application.RobotConfiguration.Abstractions;
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Services;
-using Domain.RobotConfiguration.Entities;
-using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.ArtifactTemplates;
+using Application.RobotConfiguration.ArtifactTemplates.Results;
+using Application.RobotConfiguration.ArtifactTemplates.Commands;
+using Application.RobotConfiguration.ArtifactTemplates.Abstractions;
+using Application.RobotConfiguration.Storage.Abstractions;
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Abstractions;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Storage.Services;
+using Domain.RobotConfiguration.Artifacts;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using IceBot.UnitTests.TestSupport;
@@ -37,7 +43,7 @@ public sealed class RobotArtifactTemplateCommandTests
         template.Publish();
         var templateStore = Substitute.For<IRobotArtifactTemplateStore>();
         templateStore.GetByIdAsync(template.Id, false, Arg.Any<CancellationToken>()).Returns(template);
-        var robotStore = Substitute.For<IRobotConfigurationStore>();
+        var robotStore = Substitute.For<IRobotArtifactStore>();
         robotStore.OrganizationExistsAsync(organizationId, Arg.Any<CancellationToken>()).Returns(true);
         robotStore.InsertArtifactOrGetExistingAsync(Arg.Any<RobotArtifact>(), Arg.Any<CancellationToken>())
             .Returns(call => new RobotArtifactInsertResult(true, call.Arg<RobotArtifact>()));

@@ -1,7 +1,7 @@
 using Domain.Sync.Ingestion;
 using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Inventory.Entities;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Entities;
@@ -45,9 +45,11 @@ public sealed class ExecutionReportStore :
         Guid endpointId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.KioskExecutionEndpoints
+        return _dbContext.KioskExecutionEndpoints.WhereNotDeleted()
             .Include(endpoint => endpoint.CredentialBinding)
-            .FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId, cancellationToken);
+            .FirstOrDefaultAsync(
+                endpoint => endpoint.Id == endpointId && endpoint.Kiosk.DeletedAt == null,
+                cancellationToken);
     }
 
     public Task<SyncEventInbox?> GetSyncEventByEventIdAsync(

@@ -1,6 +1,11 @@
-using Application.ProductionConfiguration.Commands;
-using Application.ProductionConfiguration.Queries;
-using Application.ProductionConfiguration.ReadModels;
+using Application.ProductionConfiguration.Releases.Commands;
+using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Releases.Queries;
+using Application.ProductionConfiguration.Deployments.Queries;
+using Application.ProductionConfiguration.Readiness.Queries;
+using Application.ProductionConfiguration.Releases.ReadModels;
+using Application.ProductionConfiguration.Deployments.ReadModels;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -51,24 +56,45 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("configuration-deployments/{deploymentId:guid}")]
+    [HttpGet("kiosks/{kioskId:guid}/configuration-deployments")]
     [Authorize(Policy = "deployment.read")]
-    public async Task<IActionResult> Get(Guid deploymentId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ListForKiosk(
+        Guid kioskId,
+        [FromQuery] Guid? configurationReleaseId, [FromQuery] ConfigurationDeploymentProfile? profile,
+        [FromQuery] ConfigurationDeploymentReadStatus? status, [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
-        var result = await _getHandler.HandleAsync(
-            new GetConfigurationDeploymentQuery(deploymentId) { UserContext = User.GetUserContext() }, cancellationToken);
+        var result = await _listHandler.HandleAsync(new ListConfigurationDeploymentsQuery
+        {
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            ConfigurationReleaseId = configurationReleaseId,
+            Profile = profile,
+            Status = status,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("configuration-deployments/{deploymentId:guid}/rollback")]
+    [HttpGet("kiosks/{kioskId:guid}/configuration-deployments/{deploymentId:guid}")]
+    [Authorize(Policy = "deployment.read")]
+    public async Task<IActionResult> Get(Guid kioskId, Guid deploymentId, CancellationToken cancellationToken)
+    {
+        var result = await _getHandler.HandleAsync(
+            new GetConfigurationDeploymentQuery(kioskId, deploymentId) { UserContext = User.GetUserContext() }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("kiosks/{kioskId:guid}/configuration-deployments/{deploymentId:guid}/rollback")]
     [Authorize(Policy = "release.rollback")]
     public async Task<IActionResult> Rollback(
-        Guid deploymentId, [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        Guid kioskId, Guid deploymentId, [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
         CancellationToken cancellationToken)
     {
         var result = await _rollbackHandler.HandleAsync(new RollbackConfigurationDeploymentCommand
         {
-            UserContext = User.GetUserContext(), TargetDeploymentId = deploymentId,
+            UserContext = User.GetUserContext(), KioskId = kioskId, TargetDeploymentId = deploymentId,
             IdempotencyKey = idempotencyKey
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);

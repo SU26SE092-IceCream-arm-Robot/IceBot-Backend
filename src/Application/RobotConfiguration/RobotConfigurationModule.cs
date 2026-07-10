@@ -1,6 +1,10 @@
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Queries;
-using Application.RobotConfiguration.Services;
+using Application.RobotConfiguration.ArtifactTemplates.Commands;
+using Application.RobotConfiguration.ArtifactTemplates.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Storage.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.RobotConfiguration;

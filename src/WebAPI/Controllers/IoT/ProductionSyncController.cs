@@ -1,7 +1,14 @@
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Application.Devices.Commands;
-using Application.Devices.Queries;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
+using Application.Devices.Catalog.Queries;
+using Application.Devices.ExecutionEndpoints.Queries;
+using Application.Devices.Telemetry.Queries;
+using Application.Devices.Connectivity.Queries;
 using Application.Shared.Wrappers;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Mvc;
