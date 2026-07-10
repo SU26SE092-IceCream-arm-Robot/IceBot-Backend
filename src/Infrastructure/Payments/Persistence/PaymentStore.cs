@@ -55,6 +55,20 @@ public sealed class PaymentStore : IPaymentStore
             .FirstOrDefaultAsync(payment => payment.IdempotencyKey == idempotencyKey, cancellationToken);
     }
 
+    public Task<PaymentTransaction?> GetActivePaymentTransactionByOrderIdAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.PaymentTransactions.WhereNotDeleted()
+            .Include(payment => payment.Order)
+            .Include(payment => payment.PaymentMethod)
+            .Where(payment => payment.OrderId == orderId &&
+                (payment.Status == Domain.Payments.Enums.PaymentTransactionStatus.Pending ||
+                 payment.Status == Domain.Payments.Enums.PaymentTransactionStatus.Authorized))
+            .OrderByDescending(payment => payment.RequestedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public Task<PaymentTransaction?> GetPaymentTransactionByProviderOrderCodeAsync(string provider, string providerOrderCode, CancellationToken cancellationToken = default)
     {
         return _dbContext.PaymentTransactions
@@ -88,6 +102,18 @@ public sealed class PaymentStore : IPaymentStore
             callback => callback.Provider == provider && callback.ProviderEventId == providerEventId,
             cancellationToken);
     }
+
+    public Task AcquirePaymentSessionLockAsync(Guid orderId, CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync($"payment-session:{orderId:N}", cancellationToken);
+
+    public Task AcquireRefundRequestLockAsync(Guid paymentTransactionId, CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync($"refund:{paymentTransactionId:N}", cancellationToken);
+
+    public Task AcquirePaymentCallbackLockAsync(
+        string provider,
+        string providerEventId,
+        CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync($"payment-callback:{provider}:{providerEventId}", cancellationToken);
 
     public async Task AddPaymentMethodAsync(PaymentMethod paymentMethod, CancellationToken cancellationToken = default)
     {
@@ -271,5 +297,12 @@ public sealed class PaymentStore : IPaymentStore
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    private async Task AcquireAdvisoryLockAsync(string lockKey, CancellationToken cancellationToken)
+    {
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0));",
+            cancellationToken);
     }
 }

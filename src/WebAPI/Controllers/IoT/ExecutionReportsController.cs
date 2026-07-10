@@ -66,7 +66,8 @@ public sealed class ExecutionReportsController : ControllerBase
                 item.QuantityConsumed,
                 item.BalanceAfter,
                 item.OccurredAt,
-                item.IsEstimated)).ToArray()
+                item.IsEstimated,
+                item.OrderItemId)).ToArray()
         };
 
         var result = await _ingestExecutionReportHandler.HandleAsync(command, cancellationToken);
@@ -133,6 +134,9 @@ public sealed class StockMovementEvidenceRequest
 {
     [Required]
     public Guid SourceEventId { get; init; }
+
+    [Required]
+    public Guid OrderItemId { get; init; }
 
     [Required]
     public Guid IngredientDispenserStateId { get; init; }

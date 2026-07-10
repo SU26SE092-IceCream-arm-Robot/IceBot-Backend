@@ -104,9 +104,19 @@ public partial class Device : BusinessEntity
 
     public void SetStatus(DeviceStatus status)
     {
-        if (Status == DeviceStatus.Retired || status == DeviceStatus.Retired)
+        if (!Enum.IsDefined(status))
         {
-            throw new DomainRuleException("Use the retirement workflow to retire a device.");
+            throw new DomainRuleException("Device status is invalid.");
+        }
+
+        if (status == Status)
+        {
+            return;
+        }
+
+        if (!CanTransitionTo(status))
+        {
+            throw new DomainRuleException($"Cannot transition a device from {Status} to {status}.");
         }
 
         Status = status;
@@ -114,8 +124,24 @@ public partial class Device : BusinessEntity
 
     public void Retire()
     {
+        if (Status == DeviceStatus.Retired)
+        {
+            return;
+        }
+
         Status = DeviceStatus.Retired;
     }
+
+    private bool CanTransitionTo(DeviceStatus target) => (Status, target) switch
+    {
+        (DeviceStatus.Provisioning, DeviceStatus.Online or DeviceStatus.Offline or DeviceStatus.Maintenance or DeviceStatus.Error or DeviceStatus.Disabled) => true,
+        (DeviceStatus.Online, DeviceStatus.Offline or DeviceStatus.Maintenance or DeviceStatus.Error or DeviceStatus.Disabled) => true,
+        (DeviceStatus.Offline, DeviceStatus.Online or DeviceStatus.Maintenance or DeviceStatus.Error or DeviceStatus.Disabled) => true,
+        (DeviceStatus.Maintenance, DeviceStatus.Online or DeviceStatus.Offline or DeviceStatus.Error or DeviceStatus.Disabled) => true,
+        (DeviceStatus.Error, DeviceStatus.Online or DeviceStatus.Offline or DeviceStatus.Maintenance or DeviceStatus.Disabled) => true,
+        (DeviceStatus.Disabled, DeviceStatus.Provisioning) => true,
+        _ => false
+    };
 
     private static string? TrimToNull(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

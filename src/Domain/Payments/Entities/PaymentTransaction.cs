@@ -108,9 +108,9 @@ public partial class PaymentTransaction : BusinessEntity
             throw new DomainRuleException("Payment amount must be greater than zero.");
         }
 
-        if (Status is PaymentTransactionStatus.Cancelled or PaymentTransactionStatus.Refunded)
+        if (Status == PaymentTransactionStatus.Refunded)
         {
-            throw new DomainRuleException("Cannot mark a cancelled or refunded payment as paid.");
+            throw new DomainRuleException("Cannot mark a refunded payment as paid.");
         }
 
         ProviderTransactionId = providerTransactionId ?? ProviderTransactionId;
@@ -151,9 +151,14 @@ public partial class PaymentTransaction : BusinessEntity
 
     public void Cancel(DateTimeOffset cancelledAt)
     {
-        if (Status == PaymentTransactionStatus.Paid)
+        if (Status == PaymentTransactionStatus.Cancelled)
         {
-            throw new DomainRuleException("Cannot cancel a paid transaction.");
+            return;
+        }
+
+        if (Status is PaymentTransactionStatus.Paid or PaymentTransactionStatus.Refunded)
+        {
+            throw new DomainRuleException("Cannot cancel a paid or refunded transaction.");
         }
 
         CancelledAt = cancelledAt;

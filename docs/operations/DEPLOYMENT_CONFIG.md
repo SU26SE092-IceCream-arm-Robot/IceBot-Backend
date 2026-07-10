@@ -43,6 +43,7 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | JWT signing secret | `Authentication__Jwt__Secret` | **P0 Core** | **Secret/env required.** Use a strong environment-specific secret. |
 | JWT issuer | `Authentication__Jwt__Issuer` | **P1** | Use appsettings default only if `IceBotApp` is the intended issuer. |
 | JWT audience | `Authentication__Jwt__Audience` | **P1** | Use appsettings default only if `IceBotUsers` is the intended audience. |
+| Public order token key ring | `PublicOrderAccess__KeyRingDirectory` | **P0 Core** | **Required in Production.** Persistent shared filesystem path for Data Protection keys; mount the same protected directory into every API instance. Tokens survive restarts but remain invalid after the 24-hour lifetime. |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... | **P0 Core** | **Env required for browser deployments.** Production does not use the Development allow-any fallback. |
 | Public hosting port | `PORT` | **P0 Feature** | Provide only when the hosting platform injects a public port; otherwise use normal ASP.NET hosting configuration. |
 | Diagnostics API key | `Diagnostics__ApiKey` | **P0 Feature** | **Secret/env required** before exposing management diagnostics outside Development. |

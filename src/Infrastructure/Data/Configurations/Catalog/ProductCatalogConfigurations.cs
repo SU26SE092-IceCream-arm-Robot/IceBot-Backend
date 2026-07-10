@@ -84,6 +84,17 @@ internal sealed class ProductOptionConfiguration : IEntityTypeConfiguration<Prod
             .IsUnique()
             .HasFilter("\"IsDefault\" = TRUE AND \"DeletedAt\" IS NULL");
         entity.HasOne(x => x.OptionGroup).WithMany(x => x.ProductOptions).HasForeignKey(x => x.OptionGroupId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasMany(x => x.IngredientRequirements).WithOne(x => x.ProductOption).HasForeignKey(x => x.ProductOptionId).OnDelete(DeleteBehavior.Restrict);
 
+    }
+}
+
+internal sealed class ProductOptionIngredientRequirementConfiguration : IEntityTypeConfiguration<ProductOptionIngredientRequirement>
+{
+    public void Configure(EntityTypeBuilder<ProductOptionIngredientRequirement> entity)
+    {
+        entity.ToTable("ProductOptionIngredientRequirements");
+        entity.HasIndex(x => new { x.ProductOptionId, x.IngredientId }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasOne<Ingredient>().WithMany().HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Restrict);
     }
 }

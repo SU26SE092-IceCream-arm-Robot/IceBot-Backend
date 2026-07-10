@@ -12,6 +12,7 @@ using Domain.Tenants.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Application.SalesCatalog.ReadModels;
+using Application.Orders.PlaceOrder.ReadModels;
 
 namespace Infrastructure.Orders.Persistence;
 
@@ -133,6 +134,8 @@ public sealed class OrderStore : IOrderStore
             .Include(menuItem => menuItem.Product)
             .Include(menuItem => menuItem.ProductVariant)
             .Include(menuItem => menuItem.Recipe)
+                .ThenInclude(recipe => recipe!.RecipeItems)
+                    .ThenInclude(item => item.Ingredient)
             .FirstOrDefaultAsync(menuItem => menuItem.Id == menuItemId, cancellationToken);
     }
 
@@ -162,6 +165,30 @@ public sealed class OrderStore : IOrderStore
                     option.IsAvailable,
                     option.IsDefault,
                     option.DisplayOrder))
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<ProductOptionIngredientRequirementReadModel>> ListProductOptionIngredientRequirementsAsync(
+        IReadOnlyCollection<Guid> productOptionIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (productOptionIds.Count == 0)
+        {
+            return Task.FromResult(new List<ProductOptionIngredientRequirementReadModel>());
+        }
+
+        return (from requirement in _dbContext.ProductOptionIngredientRequirements.AsNoTracking()
+                join ingredient in _dbContext.Ingredients.AsNoTracking() on requirement.IngredientId equals ingredient.Id
+                where productOptionIds.Contains(requirement.ProductOptionId) && requirement.DeletedAt == null
+                select new ProductOptionIngredientRequirementReadModel(
+                    requirement.ProductOptionId,
+                    ingredient.Id,
+                    ingredient.Code,
+                    ingredient.Name,
+                    requirement.Quantity,
+                    requirement.Unit,
+                    requirement.RequiredWorkcellCapabilityCode,
+                    ingredient.IsActive))
             .ToListAsync(cancellationToken);
     }
 
@@ -466,6 +493,15 @@ public sealed class OrderStore : IOrderStore
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(order => order.IdempotencyKey == idempotencyKey, cancellationToken);
+    }
+
+    public async Task AcquireIdempotencyLockAsync(
+        string scopedIdempotencyKey,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({scopedIdempotencyKey}, 0));",
+            cancellationToken);
     }
 
     public Task<Order?> GetOrderByClientOrderIdAsync(Guid kioskId, string clientOrderId, CancellationToken cancellationToken = default)

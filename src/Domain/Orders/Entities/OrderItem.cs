@@ -43,7 +43,7 @@ public partial class OrderItem : BusinessEntity
 
     public OrderItemStatus Status { get; set; } = OrderItemStatus.Pending;
 
-    public int RecipeSnapshotSchemaVersion { get; set; } = 1;
+    public int RecipeSnapshotSchemaVersion { get; set; } = 2;
 
     public string? RecipeSnapshotJson { get; set; }
 

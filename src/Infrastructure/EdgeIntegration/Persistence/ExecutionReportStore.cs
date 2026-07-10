@@ -9,6 +9,7 @@ using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -162,6 +163,51 @@ public sealed class ExecutionReportStore :
             .Include(state => state.Kiosk)
             .Include(state => state.Ingredient)
             .FirstOrDefaultAsync(state => state.Id == dispenserStateId, cancellationToken);
+    }
+
+    public async Task<bool> IsIngredientExpectedForOrderItemAsync(
+        Guid orderId,
+        Guid orderItemId,
+        Guid ingredientId,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await _dbContext.OrderItems.AsNoTracking()
+            .Where(candidate => candidate.Id == orderItemId && candidate.OrderId == orderId)
+            .Select(candidate => new { candidate.RecipeId, candidate.RecipeSnapshotSchemaVersion, candidate.RecipeSnapshotJson })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (item is null) return false;
+
+        if (item.RecipeSnapshotSchemaVersion >= 2)
+        {
+            if (string.IsNullOrWhiteSpace(item.RecipeSnapshotJson)) return false;
+            try
+            {
+                using var document = JsonDocument.Parse(item.RecipeSnapshotJson);
+                var recipeIngredientExists = document.RootElement.TryGetProperty("Ingredients", out var ingredients) &&
+                    ingredients.ValueKind == JsonValueKind.Array &&
+                    ingredients.EnumerateArray().Any(entry =>
+                        entry.TryGetProperty("IngredientId", out var id) && id.TryGetGuid(out var snapshotIngredientId) &&
+                        snapshotIngredientId == ingredientId);
+                if (recipeIngredientExists) return true;
+            }
+            catch (JsonException)
+            {
+                return false;
+            }
+        }
+        else if (item.RecipeId.HasValue)
+        {
+            var legacyRecipeIngredientExists = await _dbContext.RecipeItems.AnyAsync(
+                recipeItem => recipeItem.RecipeId == item.RecipeId.Value && recipeItem.IngredientId == ingredientId,
+                cancellationToken);
+            if (legacyRecipeIngredientExists) return true;
+        }
+
+        return await (
+            from optionRequirement in _dbContext.OrderItemOptionIngredientRequirements
+            join option in _dbContext.OrderItemOptions on optionRequirement.OrderItemOptionId equals option.Id
+            where option.OrderItemId == orderItemId && optionRequirement.IngredientId == ingredientId
+            select optionRequirement.Id).AnyAsync(cancellationToken);
     }
 
     public Task<bool> StockMovementExistsAsync(

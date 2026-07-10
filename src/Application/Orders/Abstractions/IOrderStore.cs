@@ -5,6 +5,7 @@ using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
 using Application.SalesCatalog.ReadModels;
+using Application.Orders.PlaceOrder.ReadModels;
 
 namespace Application.Orders.Abstractions;
 
@@ -28,6 +29,10 @@ public interface IOrderStore
 
     Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
         Guid menuItemId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<ProductOptionIngredientRequirementReadModel>> ListProductOptionIngredientRequirementsAsync(
+        IReadOnlyCollection<Guid> productOptionIds,
         CancellationToken cancellationToken = default);
 
     Task<bool> HasActiveProductionRouteAsync(
@@ -113,6 +118,8 @@ public interface IOrderStore
         CancellationToken cancellationToken = default);
 
     Task<Order?> GetOrderByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
+
+    Task AcquireIdempotencyLockAsync(string scopedIdempotencyKey, CancellationToken cancellationToken = default);
 
     Task<Order?> GetOrderByClientOrderIdAsync(Guid kioskId, string clientOrderId, CancellationToken cancellationToken = default);
 

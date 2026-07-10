@@ -5,7 +5,7 @@ namespace Application.EdgeIntegration.Dispatch.Contracts;
 
 public sealed record ExecuteOrderCommandPayload
 {
-    public int SchemaVersion { get; init; } = 1;
+    public int SchemaVersion { get; init; } = 2;
     public Guid CommandId { get; init; }
     public int DispatchAttemptNo { get; init; }
     public Guid OrderId { get; init; }
@@ -50,6 +50,17 @@ public sealed record ExecuteOrderLineOptionPayload
     public string Code { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public decimal UnitPriceDelta { get; init; }
+    public IReadOnlyList<ExecuteOrderOptionIngredientRequirementPayload> IngredientRequirements { get; init; } = [];
+}
+
+public sealed record ExecuteOrderOptionIngredientRequirementPayload
+{
+    public Guid IngredientId { get; init; }
+    public string IngredientCode { get; init; } = string.Empty;
+    public string IngredientName { get; init; } = string.Empty;
+    public decimal QuantityPerOption { get; init; }
+    public string Unit { get; init; } = string.Empty;
+    public string RequiredWorkcellCapabilityCode { get; init; } = string.Empty;
 }
 
 public sealed record ExecuteOrderRobotProgramPayload
@@ -121,7 +132,7 @@ public static class ExecuteOrderCommandPayloadCodec
 
     private static void ValidateFull(ExecuteOrderCommandPayload payload)
     {
-        if (payload.SchemaVersion != 1)
+        if (payload.SchemaVersion != 2)
             throw new DomainRuleException("Execute-order command payload schema version is unsupported.");
         if (payload.CommandId == Guid.Empty || payload.DispatchAttemptNo <= 0 || payload.OrderId == Guid.Empty ||
             payload.KioskId == Guid.Empty || payload.TargetExecutionEndpointId == Guid.Empty ||
@@ -135,7 +146,12 @@ public static class ExecuteOrderCommandPayloadCodec
                 line.SelectedOptions.Select(option => option.ProductOptionId).Distinct().Count() != line.SelectedOptions.Count ||
                 line.SelectedOptions.Any(option => option.ProductOptionId == Guid.Empty || option.OptionGroupId <= 0 ||
                     string.IsNullOrWhiteSpace(option.OptionGroupCode) || string.IsNullOrWhiteSpace(option.Code) ||
-                    string.IsNullOrWhiteSpace(option.Name) || option.UnitPriceDelta < 0) ||
+                    string.IsNullOrWhiteSpace(option.Name) || option.UnitPriceDelta < 0 ||
+                    option.IngredientRequirements.Select(requirement => requirement.IngredientId).Distinct().Count() != option.IngredientRequirements.Count ||
+                    option.IngredientRequirements.Any(requirement => requirement.IngredientId == Guid.Empty ||
+                        string.IsNullOrWhiteSpace(requirement.IngredientCode) || string.IsNullOrWhiteSpace(requirement.IngredientName) ||
+                        requirement.QuantityPerOption <= 0 || string.IsNullOrWhiteSpace(requirement.Unit) ||
+                        string.IsNullOrWhiteSpace(requirement.RequiredWorkcellCapabilityCode))) ||
                 line.RobotPrograms.Count == 0 || line.RobotPrograms.Any(program =>
                     program.RobotProgramId == Guid.Empty || program.BindingOrder <= 0 || program.Artifacts.Count == 0 ||
                     program.Artifacts.Any(artifact => artifact.RobotArtifactId == Guid.Empty || artifact.RunOrder <= 0 ||

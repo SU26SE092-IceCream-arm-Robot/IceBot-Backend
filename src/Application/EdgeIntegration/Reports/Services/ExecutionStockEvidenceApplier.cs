@@ -31,6 +31,11 @@ internal static class ExecutionStockEvidenceApplier
                 throw new DomainRuleException("Stock movement dispenser state does not belong to the reporting kiosk.");
             if (!state.IsActive)
                 throw new DomainRuleException("Stock movement dispenser state is retired.");
+            if (!edgeCommand.OrderId.HasValue || !await store.IsIngredientExpectedForOrderItemAsync(
+                    edgeCommand.OrderId.Value, evidence.OrderItemId, state.IngredientId, cancellationToken))
+            {
+                throw new DomainRuleException("Stock movement ingredient is not required by the dispatched order.");
+            }
 
             var occurredAt = evidence.OccurredAt ?? command.EdgeCreatedAt;
             var balanceBefore = state.EstimatedQuantity;

@@ -92,7 +92,7 @@ public sealed class ExecuteOrderCommandPayloadTests
         var json = ExecuteOrderCommandPayloadCodec.Serialize(payload);
         var restored = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(json);
 
-        Assert.Equal(1, restored.SchemaVersion);
+        Assert.Equal(2, restored.SchemaVersion);
         Assert.Equal(payload.CommandId, restored.CommandId);
         Assert.Single(restored.OrderLines);
     }

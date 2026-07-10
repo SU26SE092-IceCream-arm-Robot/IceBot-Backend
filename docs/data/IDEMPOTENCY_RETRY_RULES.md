@@ -141,6 +141,8 @@ Recommended unique constraint:
 
 Reason: payment providers commonly send duplicate webhooks.
 
+Use a provider-guaranteed event id when one is present. If the provider does not supply one, persist a deterministic SHA-256 fingerprint of the raw signed payload as the deduplication key. Do not substitute an order code, payment-link id, or transaction reference because those can identify multiple legitimate state changes.
+
 ### Refund
 
 Current phase uses manual cash refund. Treat auto provider refund and payout as future integration work unless explicitly requested.

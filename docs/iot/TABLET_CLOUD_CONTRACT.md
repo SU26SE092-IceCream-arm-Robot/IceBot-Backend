@@ -163,6 +163,7 @@ Response:
 ```json
 {
   "orderId": "uuid",
+  "orderAccessToken": "bearer-capability",
   "orderNumber": "ORD-20260521-0001",
   "customerStatus": "WaitingForPayment",
   "customerStatusMessage": "Waiting for payment. Please scan the QR code.",
@@ -190,6 +191,7 @@ Headers:
 
 ```text
 Idempotency-Key: payment-session:{orderId}
+Order-Access-Token: {orderAccessToken}
 X-Correlation-Id: {correlationId}
 ```
 
@@ -258,7 +260,7 @@ The command identity is `(OrderId, DispatchAttemptNo)`. Repeating the same attem
 
 ## Cloud To Tablet Status
 
-Tablet needs fast feedback after the customer pays. Cloud supports this through polling `GET /api/v1/orders/{orderId}` or `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds.
+Tablet needs fast feedback after the customer pays. Cloud supports this through polling `GET /api/v1/orders/{orderId}` or `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds. Both requests send `Order-Access-Token` received from order creation; payment-session creation and customer cancellation use the same header.
 
 Raw order/payment state-machine enums are not serialized by the customer polling contracts. The tablet client consumes the following projected fields on `OrderResult` and `PaymentStatusResult`:
 

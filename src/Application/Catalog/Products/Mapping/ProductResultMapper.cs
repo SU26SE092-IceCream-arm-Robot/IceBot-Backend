@@ -75,7 +75,17 @@ internal static class ProductResultMapper
         Currency = currency,
         IsDefault = option.IsDefault,
         IsAvailable = option.IsAvailable,
-        DisplayOrder = option.DisplayOrder
+        DisplayOrder = option.DisplayOrder,
+        IngredientRequirements = option.IngredientRequirements
+            .Where(requirement => requirement.DeletedAt == null)
+            .OrderBy(requirement => requirement.IngredientId)
+            .Select(requirement => new ProductOptionIngredientRequirementResult
+            {
+                IngredientId = requirement.IngredientId,
+                Quantity = requirement.Quantity,
+                Unit = requirement.Unit,
+                RequiredWorkcellCapabilityCode = requirement.RequiredWorkcellCapabilityCode
+            }).ToList()
     };
 
     public static ProductVariantResult ToVariantResult(ProductVariant variant)

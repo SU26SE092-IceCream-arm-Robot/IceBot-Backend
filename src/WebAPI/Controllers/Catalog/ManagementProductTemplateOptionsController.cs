@@ -21,7 +21,8 @@ public sealed class ManagementProductTemplateOptionsController(
     CreateProductOptionCommandHandler createOption,
     UpdateProductOptionCommandHandler updateOption,
     SetProductOptionAvailabilityCommandHandler setOptionAvailability,
-    DeleteProductOptionCommandHandler deleteOption) : ControllerBase
+    DeleteProductOptionCommandHandler deleteOption,
+    ReplaceProductOptionIngredientRequirementsCommandHandler replaceIngredientRequirements) : ControllerBase
 {
     [HttpPost]
     public Task<IActionResult> CreateGroup(Guid productId, CreateOptionGroupRequest request, CancellationToken ct) =>
@@ -46,6 +47,16 @@ public sealed class ManagementProductTemplateOptionsController(
     [HttpPut("{optionGroupId:long}/options/{productOptionId:guid}")]
     public Task<IActionResult> UpdateOption(Guid productId, long optionGroupId, Guid productOptionId, UpdateProductOptionRequest request, CancellationToken ct) =>
         Execute(updateOption.HandleAsync(new UpdateProductOptionCommand { Scope = Scope(), ProductId = productId, OptionGroupId = optionGroupId, ProductOptionId = productOptionId, Request = request, UpdatedByAccountId = CurrentAccountId() }, ct));
+
+    [HttpPut("{optionGroupId:long}/options/{productOptionId:guid}/ingredient-requirements")]
+    public Task<IActionResult> ReplaceIngredientRequirements(
+        Guid productId, long optionGroupId, Guid productOptionId,
+        ReplaceProductOptionIngredientRequirementsRequest request, CancellationToken ct) =>
+        Execute(replaceIngredientRequirements.HandleAsync(new ReplaceProductOptionIngredientRequirementsCommand
+        {
+            Scope = Scope(), ProductId = productId, OptionGroupId = optionGroupId,
+            ProductOptionId = productOptionId, Request = request, UpdatedByAccountId = CurrentAccountId()
+        }, ct));
 
     [HttpPatch("{optionGroupId:long}/options/{productOptionId:guid}/availability")]
     public Task<IActionResult> SetOptionAvailability(Guid productId, long optionGroupId, Guid productOptionId, SetAvailabilityRequest request, CancellationToken ct) =>

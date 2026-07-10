@@ -85,6 +85,8 @@ Rules:
 - Keep payloads small and UX-oriented.
 - Do not expose internal management fields or back-office-only metadata.
 - Use idempotency for retried checkout/payment commands.
+- `Idempotency-Key` is required for order placement, payment-session creation, and refund requests. The backend scopes it to the kiosk, order, or payment transaction; clients must not reuse one key for a different request body.
+- `POST /orders` returns an `orderAccessToken` bearer capability. `GET /orders/{orderId}`, payment-session creation, payment-status polling, and customer cancellation require that token in the `Order-Access-Token` header. The token is scoped to one order and expires after 24 hours.
 - Online sales require `KioskStatus.Active` and active parent tenant scope.
 - `KioskStatus.Offline` does not allow new online sales through Cloud APIs.
 - Offline-created orders may be synchronized later only when they were created under a valid offline sales session issued while the kiosk was active and offline sales was enabled.
@@ -109,6 +111,7 @@ POST /api/v1/management/organizations/{organizationId}/products/{productId}/opti
 PUT /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}
 PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}/availability
 DELETE /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}
+PUT /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/options/{productOptionId}/ingredient-requirements
 GET /api/v1/management/organizations/{organizationId}/menus
 GET /api/v1/management/accounts
 GET /api/v1/management/accounts/{accountId}/effective-access
@@ -252,6 +255,8 @@ Device management rules:
 - Device retirement is atomic with Inventory topology retirement and is blocked while the kiosk has an Accepted or Running execution. Active dispenser states are retired with the supplied `reason` query value or the system reason `DEVICE_RETIRED`; estimates remain historical and are not silently discarded.
 - `POST /api/v1/management/kiosks/{kioskId}/devices/{deviceId}/replace` requires both `devices.manage` and `inventory.configure` and accepts an already-provisioned replacement Device in the same kiosk. It preserves every active container/ingredient/configuration mapping, transfers positive estimates with balanced stock movements, writes rebind audit records, then retires the source Device in one transaction.
 - `PATCH /api/v1/management/kiosks/{kioskId}/devices/{deviceId}/status` must not set `Retired`; use the retire endpoint instead.
+- Device lifecycle is `Provisioning -> Online|Offline|Maintenance|Error|Disabled`; operational states may move between each other or to `Disabled`; `Disabled -> Provisioning` is the explicit re-enable path; `Retired` is terminal and is reached only through device retirement.
+- A provider-confirmed payment received after local payment expiry or customer cancellation remains authoritative. A pending order becomes execution-ready; an already-cancelled order becomes `RefundRequired` for staff handling and is never dispatched automatically.
 - `Device.Status` is a management/operations state for configured hardware. Runtime connectivity and error evidence still come from heartbeat and device-event telemetry.
 - Device types and models are a global technical catalog, not tenant-owned records. Authenticated device-management users may read the catalog; only `SystemAdmin` may author it.
 - Device catalog routes are `GET/POST /management/device-types`, `GET/PUT /management/device-types/{id}`, `PATCH /management/device-types/{id}/status`, `GET/POST /management/device-types/{id}/models`, and `GET/PUT/DELETE /management/device-models/{id}`.
@@ -295,6 +300,8 @@ Rules:
 - Ingredients are a global reference catalog in V1. `ingredients.read` provides paged lookup with optional active-status filtering. `ingredients.manage` creates, updates, and changes active status. Inactive ingredients cannot be added to Draft recipes. Delete is allowed only while no RecipeItem, dispenser state, or stock movement references the ingredient.
 - Recipes are authored under their owning ProductVariant. Organization/store/kiosk scope is inherited from Product and is never accepted from the request body. Recipe code is immutable within a version family; backend allocates the next version number for each variant/code.
 - Recipe metadata and ingredient membership can be changed only while status is `Draft`. `PUT .../items` atomically replaces ingredient requirements. `RecipeItem.DisplayOrder` is declaration order, not robot execution order.
+- A product option with ingredient requirements is a physical ingredient adjustment; an option without them is commercial-only. `PUT .../ingredient-requirements` replaces the physical adjustment set. Every requirement uses the catalog ingredient unit and declares its required workcell capability. Each selected option snapshots those requirements into the order; dispatch requires an active, online kiosk dispenser and an available matching capability on the chosen endpoint. Estimated quantity remains outside this gate.
+- New order recipe snapshots use schema version `2` and include immutable base-recipe ingredient declarations. Existing version `1` snapshots remain historical records.
 - Recipe lifecycle is `Draft -> Published -> Active -> Retired`. Publishing requires at least one non-optional ingredient. Published/Active recipe content is immutable; historical Order recipe snapshots are never rewritten.
 - `POST .../recipes/{recipeId}/versions` copies a non-Draft recipe and its ingredient requirements into the next backend-allocated version as Draft. The new version is not default automatically. Version allocation is serialized per ProductVariant; concurrent default changes return `409` and the database enforces one non-retired default recipe per ProductVariant.
 - Product-template cloning copies the latest Published/Active recipe version for each variant/code into the organization product as a new Draft recipe. It creates new recipe/item identities and retains `TemplateRecipeId` lineage.

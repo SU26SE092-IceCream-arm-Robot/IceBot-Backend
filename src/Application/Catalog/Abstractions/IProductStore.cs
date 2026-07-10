@@ -89,6 +89,8 @@ public interface IProductStore
 
     Task<bool> IsProductOptionReferencedByMenuItemsAsync(Guid productOptionId, CancellationToken cancellationToken = default);
 
+    Task<List<Ingredient>> ListIngredientsByIdsAsync(IReadOnlyCollection<Guid> ingredientIds, CancellationToken cancellationToken = default);
+
     Task<bool> ProductCategoryExistsAsync(long categoryId, CancellationToken cancellationToken = default);
 
     Task<bool> TenantScopeExistsAsync(
@@ -108,6 +110,8 @@ public interface IProductStore
     void RemoveOptionGroup(OptionGroup optionGroup);
 
     void RemoveProductOption(ProductOption productOption);
+
+    void ReplaceProductOptionIngredientRequirements(ProductOption option, IReadOnlyCollection<ProductOptionIngredientRequirement> replacements);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

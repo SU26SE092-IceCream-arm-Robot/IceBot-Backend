@@ -15,6 +15,8 @@ public interface IPaymentStore
 
     Task<PaymentTransaction?> GetPaymentTransactionByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 
+    Task<PaymentTransaction?> GetActivePaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default);
+
     Task<PaymentTransaction?> GetPaymentTransactionByProviderOrderCodeAsync(string provider, string providerOrderCode, CancellationToken cancellationToken = default);
 
     Task<PaymentTransaction?> GetLatestPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default);
@@ -22,6 +24,12 @@ public interface IPaymentStore
     Task<PaymentTransaction?> GetLatestPaidPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default);
 
     Task<bool> PaymentCallbackExistsAsync(string provider, string providerEventId, CancellationToken cancellationToken = default);
+
+    Task AcquirePaymentSessionLockAsync(Guid orderId, CancellationToken cancellationToken = default);
+
+    Task AcquireRefundRequestLockAsync(Guid paymentTransactionId, CancellationToken cancellationToken = default);
+
+    Task AcquirePaymentCallbackLockAsync(string provider, string providerEventId, CancellationToken cancellationToken = default);
 
     Task AddPaymentMethodAsync(PaymentMethod paymentMethod, CancellationToken cancellationToken = default);
 
