@@ -6,11 +6,21 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class CompleteProductionPackageAndExecutionWorkflows : Migration
+    public partial class CatchUpProductionPackageAndExecutionWorkflows : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(
+                """
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM "ProductionExecutionRecords") THEN
+                        RAISE EXCEPTION 'ProductionExecutionRecords must be empty before adding production-unit identity. Preserve and migrate those records explicitly before retrying.';
+                    END IF;
+                END $$;
+                """);
+
             migrationBuilder.DropForeignKey(
                 name: "FK_ProductCategories_ProductCategories_ParentCategoryId",
                 table: "ProductCategories");
@@ -100,8 +110,7 @@ namespace Infrastructure.Migrations
                 name: "FulfillmentType",
                 table: "OrderItems",
                 type: "integer",
-                nullable: false,
-                defaultValue: 0);
+                nullable: true);
 
             migrationBuilder.AddColumn<int>(
                 name: "ExecutionImpact",
@@ -213,35 +222,17 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.Sql(
                 """
-                UPDATE "ProductOptions" AS option
-                SET "ExecutionImpact" = 1
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM "ProductOptionIngredientRequirements" AS requirement
-                    WHERE requirement."ProductOptionId" = option."Id"
-                      AND requirement."DeletedAt" IS NULL
-                );
+                UPDATE "OrderItems" AS item
+                SET "FulfillmentType" = variant."FulfillmentType"
+                FROM "ProductVariants" AS variant
+                WHERE variant."Id" = item."ProductVariantId";
 
-                UPDATE "OrderItemOptions" AS item_option
-                SET "ExecutionImpact" = product_option."ExecutionImpact"
-                FROM "ProductOptions" AS product_option
-                WHERE product_option."Id" = item_option."ProductOptionId";
+                UPDATE "OrderItems"
+                SET "FulfillmentType" = 2
+                WHERE "FulfillmentType" IS NULL;
 
-                UPDATE "ExecutionRoutes" AS route
-                SET "SupportedOptionCodesJson" = COALESCE((
-                    SELECT jsonb_agg(option_code ORDER BY option_code)
-                    FROM (
-                        SELECT DISTINCT upper(trim(program_artifact."RequiredOptionCode")) AS option_code
-                        FROM "ExecutionRouteRobotBindings" AS binding
-                        JOIN "RobotProgramArtifacts" AS program_artifact
-                          ON program_artifact."RobotProgramId" = binding."RobotProgramId"
-                        WHERE binding."ExecutionRouteId" = route."Id"
-                          AND binding."DeletedAt" IS NULL
-                          AND program_artifact."DeletedAt" IS NULL
-                          AND program_artifact."RequiredOptionCode" IS NOT NULL
-                          AND trim(program_artifact."RequiredOptionCode") <> ''
-                    ) AS supported_options
-                ), '[]'::jsonb);
+                ALTER TABLE "OrderItems"
+                    ALTER COLUMN "FulfillmentType" SET NOT NULL;
 
                 UPDATE "KioskConfigurationDeployments"
                 SET "ValidationReportChecksum" = 'legacy',
@@ -288,6 +279,36 @@ namespace Infrastructure.Migrations
                         name: "FK_KioskConnectivityProjections_Kiosks_KioskId",
                         column: x => x.KioskId,
                         principalTable: "Kiosks",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "OrderItemOptionIngredientRequirements",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    OrderItemOptionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    IngredientId = table.Column<Guid>(type: "uuid", nullable: false),
+                    IngredientCodeSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    IngredientNameSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    QuantityPerOption = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Unit = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    RequiredWorkcellCapabilityCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_OrderItemOptionIngredientRequirements", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_OrderItemOptionIngredientRequirements_OrderItemOptions_Orde~",
+                        column: x => x.OrderItemOptionId,
+                        principalTable: "OrderItemOptions",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -342,6 +363,40 @@ namespace Infrastructure.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_ProductionPackages", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ProductOptionIngredientRequirements",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    ProductOptionId = table.Column<Guid>(type: "uuid", nullable: false),
+                    IngredientId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Quantity = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
+                    Unit = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    RequiredWorkcellCapabilityCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
+                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
+                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ProductOptionIngredientRequirements", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ProductOptionIngredientRequirements_Ingredients_IngredientId",
+                        column: x => x.IngredientId,
+                        principalTable: "Ingredients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_ProductOptionIngredientRequirements_ProductOptions_ProductO~",
+                        column: x => x.ProductOptionId,
+                        principalTable: "ProductOptions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
                 });
 
             migrationBuilder.CreateTable(
@@ -845,6 +900,13 @@ namespace Infrastructure.Migrations
                 columns: new[] { "Status", "LastObservedAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_OrderItemOptionIngredientRequirements_OrderItemOptionId_Ing~",
+                table: "OrderItemOptionIngredientRequirements",
+                columns: new[] { "OrderItemOptionId", "IngredientId" },
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OrderItemStatusHistories_ChangedByAccountId",
                 table: "OrderItemStatusHistories",
                 column: "ChangedByAccountId");
@@ -1004,6 +1066,18 @@ namespace Infrastructure.Migrations
                 filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
+                name: "IX_ProductOptionIngredientRequirements_IngredientId",
+                table: "ProductOptionIngredientRequirements",
+                column: "IngredientId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ProductOptionIngredientRequirements_ProductOptionId_Ingredi~",
+                table: "ProductOptionIngredientRequirements",
+                columns: new[] { "ProductOptionId", "IngredientId" },
+                unique: true,
+                filter: "\"DeletedAt\" IS NULL");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RobotArtifactDeclaredEffects_TechnicalContractId_EffectCode",
                 table: "RobotArtifactDeclaredEffects",
                 columns: new[] { "TechnicalContractId", "EffectCode" },
@@ -1123,6 +1197,9 @@ namespace Infrastructure.Migrations
                 name: "KioskConnectivityProjections");
 
             migrationBuilder.DropTable(
+                name: "OrderItemOptionIngredientRequirements");
+
+            migrationBuilder.DropTable(
                 name: "OrderItemStatusHistories");
 
             migrationBuilder.DropTable(
@@ -1142,6 +1219,9 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ProductionPackageRouteBlueprints");
+
+            migrationBuilder.DropTable(
+                name: "ProductOptionIngredientRequirements");
 
             migrationBuilder.DropTable(
                 name: "RobotArtifactDeclaredEffects");

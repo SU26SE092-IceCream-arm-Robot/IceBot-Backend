@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Infrastructure.Migrations
 {
     [DbContext(typeof(IceBotDbContext))]
-    [Migration("20260715145419_CompleteProductionPackageAndExecutionWorkflows")]
-    partial class CompleteProductionPackageAndExecutionWorkflows
+    [Migration("20260715152003_CatchUpProductionPackageAndExecutionWorkflows")]
+    partial class CatchUpProductionPackageAndExecutionWorkflows
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)

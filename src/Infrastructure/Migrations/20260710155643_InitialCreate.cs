@@ -1905,40 +1905,6 @@ namespace Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ProductOptionIngredientRequirements",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    ProductOptionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    IngredientId = table.Column<Guid>(type: "uuid", nullable: false),
-                    Quantity = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
-                    Unit = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    RequiredWorkcellCapabilityCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ProductOptionIngredientRequirements", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ProductOptionIngredientRequirements_Ingredients_IngredientId",
-                        column: x => x.IngredientId,
-                        principalTable: "Ingredients",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_ProductOptionIngredientRequirements_ProductOptions_ProductO~",
-                        column: x => x.ProductOptionId,
-                        principalTable: "ProductOptions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "ExecutionRoutes",
                 columns: table => new
                 {
@@ -2233,36 +2199,6 @@ namespace Infrastructure.Migrations
                         name: "FK_OrderItemOptions_OrderItems_OrderItemId",
                         column: x => x.OrderItemId,
                         principalTable: "OrderItems",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "OrderItemOptionIngredientRequirements",
-                columns: table => new
-                {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    OrderItemOptionId = table.Column<Guid>(type: "uuid", nullable: false),
-                    IngredientId = table.Column<Guid>(type: "uuid", nullable: false),
-                    IngredientCodeSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    IngredientNameSnapshot = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    QuantityPerOption = table.Column<decimal>(type: "numeric(18,4)", precision: 18, scale: 4, nullable: false),
-                    Unit = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    RequiredWorkcellCapabilityCode = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    CreatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    UpdatedByAccountId = table.Column<Guid>(type: "uuid", nullable: true),
-                    DeletedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
-                    DeletedByAccountId = table.Column<Guid>(type: "uuid", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_OrderItemOptionIngredientRequirements", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_OrderItemOptionIngredientRequirements_OrderItemOptions_Orde~",
-                        column: x => x.OrderItemOptionId,
-                        principalTable: "OrderItemOptions",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Restrict);
                 });
@@ -3639,13 +3575,6 @@ namespace Infrastructure.Migrations
                 column: "SourceConfigurationReleaseId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_OrderItemOptionIngredientRequirements_OrderItemOptionId_Ing~",
-                table: "OrderItemOptionIngredientRequirements",
-                columns: new[] { "OrderItemOptionId", "IngredientId" },
-                unique: true,
-                filter: "\"DeletedAt\" IS NULL");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_OrderItemOptions_OrderItemId_OptionGroupId",
                 table: "OrderItemOptions",
                 columns: new[] { "OrderItemId", "OptionGroupId" });
@@ -3848,18 +3777,6 @@ namespace Infrastructure.Migrations
                 table: "ProductionExecutionRecords",
                 columns: new[] { "SourceCommandId", "SourceProductionJobId" },
                 unique: true);
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ProductOptionIngredientRequirements_IngredientId",
-                table: "ProductOptionIngredientRequirements",
-                column: "IngredientId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_ProductOptionIngredientRequirements_ProductOptionId_Ingredi~",
-                table: "ProductOptionIngredientRequirements",
-                columns: new[] { "ProductOptionId", "IngredientId" },
-                unique: true,
-                filter: "\"DeletedAt\" IS NULL");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ProductOptions_OptionGroupId",
@@ -4373,7 +4290,7 @@ namespace Infrastructure.Migrations
                 name: "OrderExecutionRecords");
 
             migrationBuilder.DropTable(
-                name: "OrderItemOptionIngredientRequirements");
+                name: "OrderItemOptions");
 
             migrationBuilder.DropTable(
                 name: "OrderStatusHistories");
@@ -4389,9 +4306,6 @@ namespace Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ProductionExecutionRecords");
-
-            migrationBuilder.DropTable(
-                name: "ProductOptionIngredientRequirements");
 
             migrationBuilder.DropTable(
                 name: "RecipeItems");
@@ -4427,13 +4341,13 @@ namespace Infrastructure.Migrations
                 name: "DeviceEvents");
 
             migrationBuilder.DropTable(
-                name: "OrderItemOptions");
+                name: "ProductOptions");
+
+            migrationBuilder.DropTable(
+                name: "OrderItems");
 
             migrationBuilder.DropTable(
                 name: "EdgeCommands");
-
-            migrationBuilder.DropTable(
-                name: "ProductOptions");
 
             migrationBuilder.DropTable(
                 name: "PaymentTransactions");
@@ -4454,10 +4368,13 @@ namespace Infrastructure.Migrations
                 name: "ConfigurationReleases");
 
             migrationBuilder.DropTable(
-                name: "OrderItems");
+                name: "OptionGroups");
 
             migrationBuilder.DropTable(
-                name: "OptionGroups");
+                name: "MenuItems");
+
+            migrationBuilder.DropTable(
+                name: "Orders");
 
             migrationBuilder.DropTable(
                 name: "PaymentMethods");
@@ -4478,25 +4395,19 @@ namespace Infrastructure.Migrations
                 name: "SyncEventInbox");
 
             migrationBuilder.DropTable(
-                name: "MenuItems");
-
-            migrationBuilder.DropTable(
-                name: "Orders");
-
-            migrationBuilder.DropTable(
-                name: "DeviceModels");
-
-            migrationBuilder.DropTable(
                 name: "Menus");
 
             migrationBuilder.DropTable(
                 name: "Recipes");
 
             migrationBuilder.DropTable(
-                name: "DeviceTypes");
+                name: "DeviceModels");
 
             migrationBuilder.DropTable(
                 name: "ProductVariants");
+
+            migrationBuilder.DropTable(
+                name: "DeviceTypes");
 
             migrationBuilder.DropTable(
                 name: "Products");
