@@ -27,6 +27,7 @@ using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
 using Application.ProductionConfiguration.Releases.Services;
 using Application.ProductionConfiguration.Readiness.Services;
+using Application.ProductionConfiguration.Deployments.Services;
 
 namespace Application.ProductionConfiguration.Deployments.Commands;
 
@@ -38,6 +39,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private readonly LowCostControllerCapacityOptions _capacity;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
     private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
+    private readonly DeploymentValidationService? _deploymentValidation;
 
     public DeployLowCostArtifactSetCommandHandler(
         IConfigurationDeploymentStore deploymentStore,
@@ -53,6 +55,19 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         _capacity = capacity.Value;
         _wakeUpPublisher = wakeUpPublisher;
         _inventoryReadiness = inventoryReadiness;
+    }
+
+    public DeployLowCostArtifactSetCommandHandler(
+        IConfigurationDeploymentStore deploymentStore,
+        IConfigurationReleaseStore releaseStore,
+        IEdgeCommandStore edgeCommandStore,
+        IOptions<LowCostControllerCapacityOptions> capacity,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        DeploymentValidationService deploymentValidation)
+        : this(deploymentStore, releaseStore, edgeCommandStore, capacity, wakeUpPublisher, inventoryReadiness)
+    {
+        _deploymentValidation = deploymentValidation;
     }
 
     public async Task<ApiResult<ControllerArtifactSetDeploymentResult>> HandleAsync(
@@ -87,14 +102,6 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Published configuration release not found.", 404);
         }
 
-        if (release.Status != ConfigurationReleaseStatus.Published &&
-            !(command.IsRollback && release.Status == ConfigurationReleaseStatus.Retired))
-        {
-            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
-                "Only a published configuration release can be deployed; retired releases are available only through rollback.",
-                400);
-        }
-
         var endpoint = await _deploymentStore.GetEndpointForDeploymentAsync(
             command.KioskExecutionEndpointId,
             cancellationToken);
@@ -121,6 +128,40 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseDeploy, command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Access denied.", 403);
+        }
+
+        var expectedValidationChecksum = _deploymentValidation is null
+            ? "legacy"
+            : command.ValidationReportChecksum.Trim();
+        var idempotentResult = await GetIdempotentResultAsync(
+            command,
+            expectedValidationChecksum,
+            cancellationToken);
+        if (idempotentResult is not null)
+        {
+            await TryPublishWakeUpAsync(idempotentResult, cancellationToken);
+            return idempotentResult;
+        }
+
+        if (release.Status != ConfigurationReleaseStatus.Published &&
+            !(command.IsRollback && release.Status == ConfigurationReleaseStatus.Retired))
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
+                "Only a published configuration release can be deployed; retired releases are available only through rollback.",
+                400);
+        }
+
+        var validationReport = _deploymentValidation?.Build(release, endpoint);
+        try
+        {
+            if (validationReport is not null)
+                DeploymentValidationService.ValidateAcknowledgement(validationReport,
+                    command.ValidationReportChecksum, command.AcknowledgeRemainingRisk);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(ex.Message, 409)
+                .AddDetail("DeploymentValidation", validationReport!);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -151,16 +192,11 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                     command.KioskExecutionEndpointId, command.IdempotencyKey.Trim(), ct);
                 if (existing is not null)
                 {
-                    var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, ct);
-                    if (existing.SourceConfigurationReleaseId != command.ConfigurationReleaseId ||
-                        !SelectionsMatch(existing, command.Selections) ||
-                        existingCommand is null ||
-                        existingCommand.RollbackTargetDeploymentId != command.RollbackTargetDeploymentId ||
-                        existingCommand.RequestedCommandExpiryAt != command.CommandExpiryAt)
-                        return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Idempotency key was already used for a different deployment request.", 409);
-                    return ApiResult<ControllerArtifactSetDeploymentResult>.Success(
-                        ControllerArtifactSetDeploymentResult.FromEntity(existing, existingCommand?.Id),
-                        "Existing controller artifact-set deployment returned for idempotent retry.");
+                    return await BuildIdempotentResultAsync(
+                        existing,
+                        command,
+                        expectedValidationChecksum,
+                        ct);
                 }
 
                 if (await _deploymentStore.HasPendingControllerArtifactSetDeploymentAsync(endpoint.ControllerId.Value, ct))
@@ -184,7 +220,12 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 _capacity.MaxArtifactStorageBytes,
                 command.UserContext.AccountId,
                 now,
-                items);
+                items,
+                validationReport?.Checksum ?? "legacy",
+                validationReport?.RiskLevel ?? "Legacy",
+                JsonSerializer.Serialize(validationReport?.WarningCodes ?? []),
+                command.UserContext.AccountId,
+                now);
 
             var edgeCommand = EdgeCommand.Create(
                 EdgeCommandType.DeployConfiguration,
@@ -216,16 +257,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             },
             cancellationToken);
 
-        if (result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId)
-        {
-            await _wakeUpPublisher.TryPublishAsync(
-                new EdgeCommandWakeUp(
-                    edgeCommandId,
-                    result.Data.KioskExecutionEndpointId,
-                    EdgeCommandType.DeployConfiguration,
-                    DateTimeOffset.UtcNow),
-                cancellationToken);
-        }
+        await TryPublishWakeUpAsync(result, cancellationToken);
 
         if (result.Succeeded && readiness.HasWarnings)
         {
@@ -234,6 +266,57 @@ public sealed class DeployLowCostArtifactSetCommandHandler
 
         return result;
     }
+
+    private async Task<ApiResult<ControllerArtifactSetDeploymentResult>?> GetIdempotentResultAsync(
+        DeployLowCostArtifactSetCommand command,
+        string expectedValidationChecksum,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _deploymentStore.GetControllerDeploymentByIdempotencyKeyAsync(
+            command.KioskExecutionEndpointId,
+            command.IdempotencyKey.Trim(),
+            cancellationToken);
+        return existing is null
+            ? null
+            : await BuildIdempotentResultAsync(
+                existing, command, expectedValidationChecksum, cancellationToken);
+    }
+
+    private async Task<ApiResult<ControllerArtifactSetDeploymentResult>> BuildIdempotentResultAsync(
+        ControllerArtifactSetDeployment existing,
+        DeployLowCostArtifactSetCommand command,
+        string expectedValidationChecksum,
+        CancellationToken cancellationToken)
+    {
+        var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, cancellationToken);
+        if (existing.SourceConfigurationReleaseId != command.ConfigurationReleaseId ||
+            existing.ValidationReportChecksum != expectedValidationChecksum ||
+            !SelectionsMatch(existing, command.Selections) ||
+            existingCommand is null ||
+            existingCommand.RollbackTargetDeploymentId != command.RollbackTargetDeploymentId ||
+            existingCommand.RequestedCommandExpiryAt != command.CommandExpiryAt)
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
+                "Idempotency key was already used for a different deployment request.", 409);
+        }
+
+        return ApiResult<ControllerArtifactSetDeploymentResult>.Success(
+            ControllerArtifactSetDeploymentResult.FromEntity(existing, existingCommand.Id),
+            "Existing controller artifact-set deployment returned for idempotent retry.");
+    }
+
+    private Task TryPublishWakeUpAsync(
+        ApiResult<ControllerArtifactSetDeploymentResult> result,
+        CancellationToken cancellationToken) =>
+        result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId
+            ? _wakeUpPublisher.TryPublishAsync(
+                new EdgeCommandWakeUp(
+                    edgeCommandId,
+                    result.Data.KioskExecutionEndpointId,
+                    EdgeCommandType.DeployConfiguration,
+                    DateTimeOffset.UtcNow),
+                cancellationToken)
+            : Task.CompletedTask;
 
     private static string BuildDeployPayload(
         ControllerArtifactSetDeployment deployment,
@@ -275,7 +358,8 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                     item.ContentLengthBytes,
                     item.RunOrder,
                     item.ParametersSchemaVersion,
-                    item.ParametersJson
+                    item.ParametersJson,
+                    item.RequiredOptionCode
                 })
                 .ToArray()
         };
@@ -332,7 +416,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                     route.Id, program.Id, program.ProgramManifestChecksum!, artifact.Id, artifact.Checksum,
                     artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId,
                     artifact.ContentLengthBytes, programArtifact.RunOrder, programArtifact.ParametersSchemaVersion,
-                    programArtifact.Parameters?.ToJsonString()));
+                    programArtifact.Parameters?.ToJsonString(), programArtifact.RequiredOptionCode));
             }
         }
         return items;

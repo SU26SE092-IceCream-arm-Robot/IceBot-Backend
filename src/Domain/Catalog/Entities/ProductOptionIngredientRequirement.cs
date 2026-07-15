@@ -12,4 +12,5 @@ public sealed class ProductOptionIngredientRequirement : BusinessEntity
     public string RequiredWorkcellCapabilityCode { get; set; } = null!;
 
     public ProductOption ProductOption { get; set; } = null!;
+    public Ingredient Ingredient { get; set; } = null!;
 }

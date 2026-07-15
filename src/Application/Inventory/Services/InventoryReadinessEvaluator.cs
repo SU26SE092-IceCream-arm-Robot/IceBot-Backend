@@ -50,11 +50,16 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
         var applicableRoutes = routes.Where(route => AppliesToKiosk(route, kiosk)).ToArray();
         var recipeIds = applicableRoutes.Select(route => route.RecipeId).Distinct().ToArray();
         var recipeItems = await inventory.ListRequiredRecipeItemsAsync(recipeIds, cancellationToken);
+        var supportedOptions = await inventory.ListSupportedProductOptionsAsync(
+            applicableRoutes.Select(route => route.ProductId).Distinct().ToArray(),
+            applicableRoutes.SelectMany(route => route.SupportedOptionCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
+            cancellationToken);
         var states = await inventory.ListStatesForInventoryTopologyAsync(kiosk.Id, cancellationToken);
         var statesByIngredient = states.ToLookup(state => state.IngredientId);
 
         var itemsByRecipe = recipeItems.ToLookup(item => item.RecipeId);
         var results = new List<InventoryIngredientReadinessResult>();
+        var optionGroupResults = new List<InventoryOptionGroupReadinessResult>();
         foreach (var route in applicableRoutes)
         {
             foreach (var item in itemsByRecipe[route.RecipeId])
@@ -72,17 +77,70 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
                     MatchingDispenserStateIds = matching.Select(state => state.Id).ToArray()
                 });
             }
+
+            var routeOptions = supportedOptions.Where(option =>
+                option.OptionGroup.ProductId == route.ProductId && route.SupportedOptionCodes.Contains(option.Code)).ToArray();
+            foreach (var group in routeOptions.GroupBy(option => option.OptionGroupId))
+            {
+                var groupDefinition = group.First().OptionGroup;
+                var options = group.Select(option =>
+                {
+                    var ingredients = option.IngredientRequirements.Select(requirement =>
+                    {
+                        var matching = statesByIngredient[requirement.IngredientId].ToArray();
+                        return new InventoryIngredientReadinessResult
+                        {
+                            ExecutionRouteId = route.ExecutionRouteId,
+                            RouteCode = route.RouteCode,
+                            RecipeId = route.RecipeId,
+                            IngredientId = requirement.IngredientId,
+                            IngredientCode = requirement.Ingredient.Code,
+                            IngredientName = requirement.Ingredient.Name,
+                            Status = ResolveStatus(matching),
+                            MatchingDispenserStateIds = matching.Select(state => state.Id).ToArray()
+                        };
+                    }).ToArray();
+                    return new InventoryOptionReadinessResult
+                    {
+                        ProductOptionId = option.Id,
+                        OptionCode = option.Code,
+                        IsReady = ingredients.All(item => item.Status == InventoryReadinessStatus.Ready),
+                        Ingredients = ingredients
+                    };
+                }).ToArray();
+                var readyCount = options.Count(option => option.IsReady);
+                optionGroupResults.Add(new InventoryOptionGroupReadinessResult
+                {
+                    ExecutionRouteId = route.ExecutionRouteId,
+                    RouteCode = route.RouteCode,
+                    RecipeId = route.RecipeId,
+                    OptionGroupId = groupDefinition.Id,
+                    OptionGroupCode = groupDefinition.Code,
+                    IsRequired = groupDefinition.IsRequired,
+                    MinimumSelections = groupDefinition.MinSelections,
+                    ReadyOptionCount = readyCount,
+                    IsReady = !groupDefinition.IsRequired || readyCount >= groupDefinition.MinSelections,
+                    Options = options
+                });
+            }
         }
 
-        var overallStatus = ResolveOverallStatus(results);
+        var blockingResults = results.Concat(optionGroupResults.Where(group => group.IsRequired)
+            .SelectMany(group => group.Options.Where(option => !option.IsReady).SelectMany(option => option.Ingredients))).ToArray();
+        var baseReady = results.All(item => item.Status == InventoryReadinessStatus.Ready);
+        var requiredOptionsReady = optionGroupResults.Where(group => group.IsRequired).All(group => group.IsReady);
+        var overallStatus = baseReady && requiredOptionsReady
+            ? InventoryReadinessStatus.Ready
+            : ResolveOverallStatus(blockingResults);
         return new KioskInventoryReadinessResult
         {
             KioskId = kiosk.Id,
             OrganizationId = kiosk.OrganizationId,
             StoreId = kiosk.StoreId,
-            IsReady = results.All(item => item.Status == InventoryReadinessStatus.Ready),
+            IsReady = baseReady && requiredOptionsReady,
             OverallStatus = overallStatus,
-            Ingredients = results
+            Ingredients = results,
+            OptionGroups = optionGroupResults
         };
     }
 

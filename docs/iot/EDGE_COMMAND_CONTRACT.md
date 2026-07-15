@@ -86,6 +86,7 @@ Rules:
 
 - Edge must deduplicate by `commandId`.
 - New `ExecuteOrder` payloads include `SchemaVersion = 2`. Edge must reject unsupported schema versions; Cloud may read release provenance from legacy payloads without treating those payloads as fully executable contracts. Each selected option can include immutable ingredient requirements (`ingredientId`, code/name snapshots, quantity per option, unit, required workcell capability); Edge must use this order snapshot rather than live catalog data.
+- An ordered artifact may include `RequiredOptionCode`. Edge executes that artifact only when the same order line contains a selected option with the matching normalized code; otherwise Edge skips it without changing the remaining `RunOrder`. This is conditional file selection, not a Lua runtime parameter.
 - Deployment commands include typed Cloud correlation fields for deployment ownership. `PayloadJson` is execution data, not the authoritative link used by timeout reconciliation.
 - Pull first materializes any short-lived artifact download URLs. Only after payload enrichment succeeds does it mark returned commands as `Delivered` and record a delivery attempt.
 - Retrying command pull can return delivered but unacknowledged commands.
@@ -93,9 +94,10 @@ Rules:
 - If a deployment command expires before acceptance, Cloud marks the command `Rejected` with `CommandExpired` and marks the linked Pending deployment `Failed`.
 - Once accepted, command expiry no longer applies. If no `Installed`, `Active`, or `Failed` report moves the deployment out of Pending within the configured accepted-report timeout, Cloud marks that attempt `Failed/ExecutionReportTimeout` without changing the endpoint's previously active release/artifact set.
 - Late reports do not revive a timed-out attempt. Reconciliation requires a new deployment/rollback attempt so Cloud and endpoint history remain explicit.
-- A Full Edge `DeployConfiguration` payload contains both an immutable bundle descriptor and individual artifact descriptors. During authenticated pull, both receive short-lived URLs so Edge may choose cache-aware incremental download or the complete bundle. Low-cost payloads contain only their selected artifact descriptors.
+- A Full Edge deployment materializes or reuses a deterministic bundle from the published profile-neutral release manifest. Its `DeployConfiguration` payload contains both that immutable bundle descriptor and individual artifact descriptors. During authenticated pull, both receive short-lived URLs so Edge may choose cache-aware incremental download or the complete bundle. Low-cost publication and payloads do not require a Full Edge bundle and contain only their selected artifact descriptors.
 - The Full Edge ZIP contains `release-content-manifest.json` plus `artifacts/{RobotArtifactId}.lua`. The manifest includes routes, ordered program bindings, parameters, compatibility, entry names, sizes, and artifact checksums needed for installation.
 - Rollback uses the same `DeployConfiguration` command contract and includes `RollbackTargetDeploymentId` as provenance. Edge installs it as a new deployment attempt; it does not locally mutate the historical deployment.
+- `Installed` and `Active` deployment reports must match the accepted command's typed `DeploymentId` and deployment kind. Full Edge reports must echo `SourceConfigurationReleaseId` and `ReleaseChecksum`; Low-cost reports must additionally echo `ActiveSetVersion` and `ActiveSetChecksum`. Mismatches are rejected without changing deployment or endpoint observed state. `Failed` may omit installed-state provenance because no activation is asserted.
 - Presigned download URLs are transport data only. They are not persisted in `EdgeCommand.PayloadJson`, release manifests, or artifact metadata.
 - The object-storage bucket remains private. Edge must download before URL expiry and must not treat the URL as an artifact identity.
 - `DownloadUrl` must use an endpoint reachable from the execution endpoint. A Docker-internal MinIO hostname is not a valid external Edge download endpoint unless both runtimes share that network.
@@ -207,8 +209,8 @@ boundary, not this endpoint.
 
 For `ExecuteOrder` commands:
 
-- `Accepted` moves `Order` from `ReadyForExecution` to `Accepted`.
-- `ExecutorBusy` is temporary: the command returns to `PendingDelivery` and the order remains `ReadyForExecution`.
+- `Accepted` may move `Order` from `ReadyForFulfillment` to `Accepted` when aggregate line state allows it.
+- `ExecutorBusy` is temporary: the command returns to `PendingDelivery` and the order remains `ReadyForFulfillment`.
 - `Rejected` with `physicalOutputMayHaveOccurred` absent or `false` moves the order to `ExecutionRejected`.
 - `Rejected` with `physicalOutputMayHaveOccurred=true` moves the paid order to `RefundRequired` because staff support or compensation may be required.
 - Order status changes and their `OrderStatusHistory` row commit together with the command acknowledgement.
@@ -216,7 +218,7 @@ For `ExecuteOrder` commands:
 
 Execution timeout reconciliation:
 
-- Before ACK, an expired `ExecuteOrder` command becomes `Rejected/CommandExpired`; a still-`ReadyForExecution` order becomes `ExecutionRejected` with status history.
+- Before ACK, an expired `ExecuteOrder` command becomes `Rejected/CommandExpired`; a still-`ReadyForFulfillment` order becomes `ExecutionRejected` with status history.
 - An Accepted command with no order-summary report beyond the configured deadline becomes `Stale/Delayed` when the executor heartbeat is still current.
 - An Accepted or Running execution with no current heartbeat becomes `Unreachable/PendingRecovery`.
 - Prolonged unreachable observation becomes `Unreachable/SupportRequired` for customer/support handling without asserting physical failure.
@@ -312,10 +314,10 @@ Rules:
 - A final replay may transition `Accepted` directly to `Completed`, `Failed`, or `RequiresManualIntervention`; `Running` may have been lost while the controller was disconnected.
 - `physicalOutputMayHaveOccurred` must be set when reporting failed production execution. It drives customer/support projection: failure before output can be handled differently from failure after possible physical output.
 - Deployment report `Active` updates the observed active configuration/artifact-set snapshot on `KioskExecutionEndpoint`.
-- Production reports update the business order in the same transaction: `Accepted -> Accepted`, `Running -> Preparing`, `Completed -> Completed`, `Failed -> Failed`, and `RequiresManualIntervention -> RefundRequired`. Each change appends `OrderStatusHistory`.
+- Production reports update machine-produced item status in the same transaction, then aggregate the whole mixed order. A failed line produces `FulfillmentIssue`; it does not automatically claim that the whole order failed or that a refund occurred. Each aggregate change appends `OrderStatusHistory`.
 - A report with `sourceProductionJobId` set is job/unit-level evidence: it updates `ProductionExecutionRecord` and optional stock evidence only. It must not complete or fail the whole order.
 - A report with `sourceProductionJobId=null` is the Edge-computed order summary: it updates `OrderExecutionRecord` and the business Order, not a job-level `ProductionExecutionRecord`. Edge emits this summary only after applying its local multi-job aggregation policy.
-- Successful order transitions publish `OrderStatusChanged` through SignalR after commit.
+- Changed lines publish `OrderItemFulfillmentChanged`; aggregate order transitions publish `OrderStatusChanged` through SignalR after commit.
 - `stockMovements` is typed append-only consumption evidence and is accepted only on a report with `sourceProductionJobId`. Each item has its own globally unique `sourceEventId`; duplicates are serialized by evidence identity and ignored even when two different reports arrive concurrently. The dispenser must belong to the reporting kiosk.
 - A supplied `balanceAfter` updates the observed dispenser estimate. Without it, Cloud records evidence without guessing a new balance. Inventory evidence does not gate runtime-menu sellability or order creation in V1.
 - Applied stock evidence publishes `InventoryChanged` after commit. Do not encode authoritative stock adjustments only inside `payloadJson`.
@@ -336,7 +338,7 @@ Published ConfigurationRelease
 -> Active report
 ```
 
-Cloud ships immutable release/program manifests and ordered `RobotArtifact` descriptors. `RobotProgramArtifact.RunOrder` defines artifact execution order; Cloud does not ship `RobotProgramStep`, motion commands, Blockly trees, teaching points, or realtime robot steps.
+Cloud ships immutable release/program manifests and ordered `RobotArtifact` descriptors. `RobotProgramArtifact.RunOrder` defines artifact execution order, and optional `RequiredOptionCode` controls whether an option-specific file participates for an order line. Cloud does not ship `RobotProgramStep`, motion commands, Blockly trees, teaching points, or realtime robot steps.
 
 A future catalog/menu snapshot endpoint is a separate contract. It must not reintroduce the removed step-first robot configuration model or duplicate the deployment command path.
 

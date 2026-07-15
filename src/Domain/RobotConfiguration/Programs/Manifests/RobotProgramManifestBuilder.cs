@@ -77,6 +77,12 @@ public static class RobotProgramManifestBuilder
             throw new DomainRuleException("Robot program publication requires published robot artifact snapshots.");
         }
 
+        if (!artifact.TechnicalContractId.HasValue || string.IsNullOrWhiteSpace(artifact.TechnicalContractChecksum))
+        {
+            throw new DomainRuleException(
+                "Robot program publication requires technical-contract provenance for every artifact.");
+        }
+
         return new RobotProgramManifestItem(
             membership.Id,
             membership.RunOrder,
@@ -88,7 +94,10 @@ public static class RobotProgramManifestBuilder
                 artifact.StorageKey,
                 artifact.RuntimeTargetCode,
                 artifact.MachineModelCode,
-                artifact.ContentLengthBytes));
+                artifact.ContentLengthBytes,
+                artifact.TechnicalContractId,
+                artifact.TechnicalContractChecksum),
+            membership.RequiredOptionCode);
     }
 
     private static JsonNode? CanonicalizeOptionalJson(string? json)
@@ -130,7 +139,9 @@ public sealed record RobotArtifactManifestSnapshot(
     string StorageKey,
     string RuntimeTargetCode,
     string MachineModelCode,
-    long ContentLengthBytes);
+    long ContentLengthBytes,
+    Guid? TechnicalContractId = null,
+    string? TechnicalContractChecksum = null);
 
 public sealed record RobotProgramManifestDocument(
     Guid Id,
@@ -143,7 +154,8 @@ public sealed record RobotProgramManifestItem(
     int RunOrder,
     int ParametersSchemaVersion,
     JsonNode? Parameters,
-    RobotProgramManifestArtifact RobotArtifact);
+    RobotProgramManifestArtifact RobotArtifact,
+    string? RequiredOptionCode = null);
 
 public sealed record RobotProgramManifestArtifact(
     Guid Id,
@@ -151,7 +163,9 @@ public sealed record RobotProgramManifestArtifact(
     string StorageKey,
     string RuntimeTargetCode,
     string MachineModelCode,
-    long ContentLengthBytes);
+    long ContentLengthBytes,
+    Guid? TechnicalContractId,
+    string? TechnicalContractChecksum);
 
 public sealed record RobotProgramManifest(
     RobotProgramManifestDocument Document,

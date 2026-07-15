@@ -12,6 +12,7 @@ using Application.Devices.Credentials.Results;
 using Domain.Common.Enums;
 using Domain.Devices.Catalog;
 using Domain.Tenants.Entities;
+using Domain.Devices.Connectivity;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,7 +67,7 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToListAsync(cancellationToken);
 
-        var byStatus = statusCounts
+        var byLifecycleStatus = statusCounts
             .Select(sc => new KioskStatusSummaryDto
             {
                 Status = sc.Status.ToString(),
@@ -79,6 +80,28 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
             .ToListAsync(cancellationToken);
 
         var kioskIds = kiosksList.Select(k => k.Id).ToList();
+
+        var connectivityByKiosk = await _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .Where(connectivity => kioskIds.Contains(connectivity.KioskId))
+            .ToDictionaryAsync(connectivity => connectivity.KioskId, cancellationToken);
+
+        var byConnectivityStatus = connectivityByKiosk.Values
+            .GroupBy(connectivity => connectivity.Status)
+            .Select(group => new KioskStatusSummaryDto
+            {
+                Status = group.Key.ToString(),
+                Count = group.Count()
+            })
+            .ToList();
+        var unknownConnectivityCount = totalCount - connectivityByKiosk.Count;
+        if (unknownConnectivityCount > 0)
+        {
+            byConnectivityStatus.Add(new KioskStatusSummaryDto
+            {
+                Status = KioskConnectivityStatus.Unknown.ToString(),
+                Count = unknownConnectivityCount
+            });
+        }
 
         var lastHeartbeats = await _dbContext.KioskHeartbeats.AsNoTracking()
             .Where(hb => kioskIds.Contains(hb.KioskId))
@@ -130,7 +153,10 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
                 OrganizationId = k.OrganizationId,
                 StoreId = k.StoreId,
                 StoreName = k.Store?.Name ?? string.Empty,
-                Status = k.Status.ToString(),
+                LifecycleStatus = k.Status.ToString(),
+                ConnectivityStatus = connectivityByKiosk.TryGetValue(k.Id, out var connectivity)
+                    ? connectivity.Status.ToString()
+                    : KioskConnectivityStatus.Unknown.ToString(),
                 LastHeartbeatAt = lastHeartbeat,
                 LastEventSeverity = severity,
                 LastEventAt = lastEventAt,
@@ -147,7 +173,8 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
         return new KioskStatusOverviewResult
         {
             TotalCount = totalCount,
-            ByStatus = byStatus,
+            ByLifecycleStatus = byLifecycleStatus,
+            ByConnectivityStatus = byConnectivityStatus,
             Items = items
         };
     }

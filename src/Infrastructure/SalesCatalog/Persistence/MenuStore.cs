@@ -9,6 +9,7 @@ using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 using Application.SalesCatalog.ReadModels;
 
 namespace Infrastructure.SalesCatalog.Persistence;
@@ -126,15 +127,15 @@ public sealed class MenuStore : IMenuStore
             .ToListAsync(cancellationToken);
     }
 
-    public Task<bool> HasActiveProductionRouteAsync(
+    public async Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.ExecutionEndpointReadinessProjections
+        var route = await _dbContext.ExecutionEndpointReadinessProjections
             .AsNoTracking()
-            .AnyAsync(readiness =>
+            .Where(readiness =>
                 readiness.KioskId == kioskId &&
                 readiness.Readiness == ExecutionReadinessState.Ready &&
                 readiness.Safety == ExecutionSafetyState.Safe &&
@@ -144,12 +145,24 @@ public sealed class MenuStore : IMenuStore
                         ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
                         : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
                     release.Status == ConfigurationReleaseStatus.Published &&
-                    release.ExecutionRoutes.Any(route =>
-                        route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
-                        route.RobotBindings.Any() &&
+                    release.ExecutionRoutes.Any(route => route.ProductVariantId == productVariantId &&
+                        route.RecipeId == recipeId && route.RobotBindings.Any() &&
                         route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
-                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))),
-                cancellationToken);
+                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
+            .SelectMany(readiness => _dbContext.ConfigurationReleases.WhereNotDeleted()
+                .Where(release => release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
+                    ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
+                    : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId))
+                .SelectMany(release => release.ExecutionRoutes.Where(route =>
+                    route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
+                    route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
+                        capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
+            .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
+            .Select(route => new { route.Id, route.SupportedOptionCodesJson })
+            .FirstOrDefaultAsync(cancellationToken);
+        return route is null ? null : new ActiveProductionRouteOptionPolicy(route.Id,
+            (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
     }
 
     public Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default)
@@ -206,6 +219,12 @@ public sealed class MenuStore : IMenuStore
             .FirstOrDefaultAsync(recipe => recipe.Id == recipeId, cancellationToken);
     }
 
+    public Task<Domain.Devices.Connectivity.KioskConnectivityProjection?> GetKioskConnectivityAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .FirstOrDefaultAsync(connectivity => connectivity.KioskId == kioskId, cancellationToken);
+
     public Task<List<ProductOption>> ListProductOptionsAsync(
         Guid productId,
         IReadOnlyCollection<Guid> optionIds,
@@ -258,6 +277,7 @@ public sealed class MenuStore : IMenuStore
                    option.Name,
                    option.Description,
                    option.PriceDelta,
+                   option.ExecutionImpact,
                    option.IsAvailable,
                    option.IsDefault,
                    option.DisplayOrder);

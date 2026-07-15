@@ -156,14 +156,14 @@ public sealed class DispatchOrderExecutionCommandHandler
 
         var canPrepareRejectedOrder = redispatch is not null && order.Status == OrderStatus.ExecutionRejected;
         if (order.PaymentStatus != PaymentStatus.Paid ||
-            (order.Status != OrderStatus.ReadyForExecution && !canPrepareRejectedOrder))
+            (order.Status != OrderStatus.ReadyForFulfillment && !canPrepareRejectedOrder))
         {
             return ApiResult<OrderExecutionDispatchResult>.Fail(
                 "Only paid orders ready for execution can be dispatched.", 409);
         }
 
         var productionItems = order.OrderItems
-            .Where(item => item.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced)
+            .Where(item => item.FulfillmentType == FulfillmentType.MachineProduced)
             .OrderBy(item => item.Id)
             .ToArray();
         if (productionItems.Length == 0)

@@ -221,6 +221,7 @@ public sealed class CloneProductTemplateCommandHandler
                     Name = sourceOption.Name,
                     Description = sourceOption.Description,
                     PriceDelta = sourceOption.PriceDelta,
+                    ExecutionImpact = sourceOption.ExecutionImpact,
                     IsDefault = sourceOption.IsDefault,
                     IsAvailable = false,
                     DisplayOrder = sourceOption.DisplayOrder,

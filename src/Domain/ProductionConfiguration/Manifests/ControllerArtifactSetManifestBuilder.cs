@@ -33,7 +33,8 @@ public static class ControllerArtifactSetManifestBuilder
                     item.ContentLengthBytes,
                     item.RunOrder,
                     item.ParametersSchemaVersion,
-                    item.ParametersJson
+                    item.ParametersJson,
+                    item.RequiredOptionCode
                 }).ToArray()
         };
         var json = JsonSerializer.Serialize(document);

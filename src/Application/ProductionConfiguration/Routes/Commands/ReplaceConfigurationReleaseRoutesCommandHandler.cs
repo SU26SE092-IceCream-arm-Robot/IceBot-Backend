@@ -89,6 +89,25 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
                 return ApiResult<ConfigurationReleaseResult>.Fail("Route product variants and recipes must belong to the release organization or be global.", 400);
             }
 
+            var productionOptionCodes = variant.Product.OptionGroups
+                .SelectMany(group => group.ProductOptions)
+                .Where(option => option.DeletedAt == null &&
+                    option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting)
+                .Select(option => option.Code)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var requestedOptionCodes = route.SupportedOptionCodes
+                .Select(code => code?.Trim())
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Cast<string>()
+                .ToArray();
+            if (requestedOptionCodes.Length != route.SupportedOptionCodes.Count ||
+                requestedOptionCodes.Distinct(StringComparer.OrdinalIgnoreCase).Count() != requestedOptionCodes.Length ||
+                requestedOptionCodes.Any(code => !productionOptionCodes.Contains(code)))
+            {
+                return ApiResult<ConfigurationReleaseResult>.Fail(
+                    "Supported option codes must be unique production-affecting options of the route product.", 400);
+            }
+
             foreach (var binding in route.RobotBindings)
             {
                 var program = programsById[binding.RobotProgramId];
@@ -110,6 +129,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
                     route.RouteCode.Trim().ToUpperInvariant(),
                     route.Priority,
                     string.IsNullOrWhiteSpace(route.RequiredCapabilitiesJson) ? null : route.RequiredCapabilitiesJson.Trim(),
+                    (IReadOnlyCollection<string>)route.SupportedOptionCodes.ToArray(),
                     (IReadOnlyCollection<(Guid, int, string)>)route.RobotBindings
                         .OrderBy(binding => binding.BindingOrder)
                         .Select(binding => (binding.RobotProgramId, binding.BindingOrder,

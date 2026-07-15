@@ -1,28 +1,20 @@
-using Application.RobotConfiguration.Artifacts.Results;
-using Application.RobotConfiguration.Artifacts.Queries;
-using Application.RobotConfiguration.Artifacts.Commands;
-using Domain.RobotConfiguration.Artifacts;
-using Application.RobotConfiguration.Programs.ReadModels;
-using Application.RobotConfiguration.Programs.Mapping;
-using Application.RobotConfiguration.Programs.Results;
-using Application.RobotConfiguration.Programs.Queries;
-using Application.RobotConfiguration.Programs.Commands;
-using Domain.RobotConfiguration.Programs;
+using Application.RobotConfiguration.Storage.Abstractions;
 using System.Text.Json;
 using Application.EdgeIntegration.Abstractions;
 using Application.ProductionConfiguration.Deployments.Abstractions;
 using Application.ProductionConfiguration.Releases.Abstractions;
-using Application.ProductionConfiguration.Releases.Results;
 using Application.ProductionConfiguration.Deployments.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
+using Domain.ProductionConfiguration.Manifests;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Domain.RobotConfiguration.Programs.Manifests;
 using Application.ProductionConfiguration.Releases.Services;
 using Application.ProductionConfiguration.Readiness.Services;
+using Application.ProductionConfiguration.Deployments.Services;
 
 namespace Application.ProductionConfiguration.Deployments.Commands;
 
@@ -33,19 +25,36 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     private readonly IEdgeCommandStore _edgeCommandStore;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
     private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
+    private readonly FullEdgeReleaseBundleService _bundleService;
+    private readonly DeploymentValidationService? _deploymentValidation;
 
     public DeployFullEdgeConfigurationCommandHandler(
         IConfigurationDeploymentStore deploymentStore,
         IConfigurationReleaseStore releaseStore,
         IEdgeCommandStore edgeCommandStore,
         IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        ProductionInventoryReadinessGuard inventoryReadiness)
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        FullEdgeReleaseBundleService bundleService)
     {
         _deploymentStore = deploymentStore;
         _releaseStore = releaseStore;
         _edgeCommandStore = edgeCommandStore;
         _wakeUpPublisher = wakeUpPublisher;
         _inventoryReadiness = inventoryReadiness;
+        _bundleService = bundleService;
+    }
+
+    public DeployFullEdgeConfigurationCommandHandler(
+        IConfigurationDeploymentStore deploymentStore,
+        IConfigurationReleaseStore releaseStore,
+        IEdgeCommandStore edgeCommandStore,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        FullEdgeReleaseBundleService bundleService,
+        DeploymentValidationService deploymentValidation)
+        : this(deploymentStore, releaseStore, edgeCommandStore, wakeUpPublisher, inventoryReadiness, bundleService)
+    {
+        _deploymentValidation = deploymentValidation;
     }
 
     public async Task<ApiResult<KioskConfigurationDeploymentResult>> HandleAsync(
@@ -86,6 +95,32 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Access denied.", 403);
         }
 
+        var expectedValidationChecksum = _deploymentValidation is null
+            ? "legacy"
+            : command.ValidationReportChecksum.Trim();
+        var idempotentResult = await GetIdempotentResultAsync(
+            command,
+            expectedValidationChecksum,
+            cancellationToken);
+        if (idempotentResult is not null)
+        {
+            await TryPublishWakeUpAsync(idempotentResult, cancellationToken);
+            return idempotentResult;
+        }
+
+        var validationReport = _deploymentValidation?.Build(release, endpoint);
+        try
+        {
+            if (validationReport is not null)
+                DeploymentValidationService.ValidateAcknowledgement(validationReport,
+                    command.ValidationReportChecksum, command.AcknowledgeRemainingRisk);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>.Fail(ex.Message, 409)
+                .AddDetail("DeploymentValidation", validationReport!);
+        }
+
         var now = DateTimeOffset.UtcNow;
         var commandExpiryAt = command.CommandExpiryAt ?? now.AddMinutes(30);
         if (commandExpiryAt <= now)
@@ -104,6 +139,38 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                 .AddDetail("InventoryReadiness", readiness.Results);
         }
 
+        FullEdgeReleaseBundleDescriptor bundle;
+        try
+        {
+            release.ValidateFullEdgeDeploymentTarget(
+                endpoint,
+                endpoint.FullEdgeRuntimeId ?? Guid.Empty,
+                allowRetiredRelease: command.IsRollback);
+            var snapshots = PublishedRobotProgramSnapshotFactory.CreateForDeployment(release);
+            bundle = await _bundleService.BuildAndStoreAsync(
+                release,
+                snapshots,
+                release.ManifestJson ?? throw new DomainRuleException("Published release manifest is missing."),
+                cancellationToken);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>.Fail(ex.Message, 400);
+        }
+        catch (ArtifactObjectNotFoundException ex)
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectIntegrityException ex)
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectStorageUnavailableException)
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>.Fail(
+                "Artifact object storage is temporarily unavailable.", 503);
+        }
+
         var result = await _deploymentStore.ExecuteDeploymentCreationAsync(
             command.KioskId,
             async ct =>
@@ -112,15 +179,11 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                     command.KioskExecutionEndpointId, command.IdempotencyKey.Trim(), ct);
                 if (existing is not null)
                 {
-                    var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, ct);
-                    if (existing.ConfigurationReleaseId != command.ConfigurationReleaseId ||
-                        existingCommand is null ||
-                        existingCommand.RollbackTargetDeploymentId != command.RollbackTargetDeploymentId ||
-                        existingCommand.RequestedCommandExpiryAt != command.CommandExpiryAt)
-                        return ApiResult<KioskConfigurationDeploymentResult>.Fail("Idempotency key was already used for a different deployment request.", 409);
-                    return ApiResult<KioskConfigurationDeploymentResult>.Success(
-                        KioskConfigurationDeploymentResult.FromEntity(existing, existingCommand?.Id),
-                        "Existing configuration deployment returned for idempotent retry.");
+                    return await BuildIdempotentResultAsync(
+                        existing,
+                        command,
+                        expectedValidationChecksum,
+                        ct);
                 }
 
                 if (await _deploymentStore.HasPendingFullEdgeDeploymentAsync(command.KioskId, ct))
@@ -129,42 +192,50 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                 var attemptNo = await _deploymentStore.GetNextFullEdgeDeploymentAttemptNoAsync(command.KioskId, release.Id, ct);
                 try
                 {
-            release.ValidateFullEdgeDeploymentTarget(
-                endpoint, endpoint.FullEdgeRuntimeId ?? Guid.Empty, allowRetiredRelease: command.IsRollback);
-            var deployment = KioskConfigurationDeployment.CreatePending(
-                endpoint.KioskId,
-                endpoint.Kiosk.OrganizationId,
-                endpoint.Id,
-                endpoint.FullEdgeRuntimeId!.Value,
-                release.Id,
-                release.ReleaseChecksum!,
-                attemptNo,
-                command.IdempotencyKey.Trim(),
-                now,
-                command.UserContext.AccountId);
+                    var deployment = KioskConfigurationDeployment.CreatePending(
+                        endpoint.KioskId,
+                        endpoint.Kiosk.OrganizationId,
+                        endpoint.Id,
+                        endpoint.FullEdgeRuntimeId!.Value,
+                        release.Id,
+                        release.ReleaseChecksum!,
+                        attemptNo,
+                        command.IdempotencyKey.Trim(),
+                        now,
+                        command.UserContext.AccountId,
+                        validationReport?.Checksum ?? "legacy",
+                        validationReport?.RiskLevel ?? "Legacy",
+                        JsonSerializer.Serialize(validationReport?.WarningCodes ?? []),
+                        command.UserContext.AccountId,
+                        now);
 
-            var edgeCommand = EdgeCommand.Create(
-                EdgeCommandType.DeployConfiguration,
-                deployment.KioskId,
-                deployment.KioskExecutionEndpointId,
-                BuildDeployPayload(deployment, release, command.RollbackTargetDeploymentId, command.CommandExpiryAt),
-                now,
-                commandExpiryAt: commandExpiryAt,
-                deploymentId: deployment.Id,
-                deploymentKind: DeploymentCommandTargetKind.FullEdgeConfiguration,
-                rollbackTargetDeploymentId: command.RollbackTargetDeploymentId,
-                requestedCommandExpiryAt: command.CommandExpiryAt);
+                    var edgeCommand = EdgeCommand.Create(
+                        EdgeCommandType.DeployConfiguration,
+                        deployment.KioskId,
+                        deployment.KioskExecutionEndpointId,
+                        BuildDeployPayload(
+                            deployment,
+                            release,
+                            bundle,
+                            command.RollbackTargetDeploymentId,
+                            command.CommandExpiryAt),
+                        now,
+                        commandExpiryAt: commandExpiryAt,
+                        deploymentId: deployment.Id,
+                        deploymentKind: DeploymentCommandTargetKind.FullEdgeConfiguration,
+                        rollbackTargetDeploymentId: command.RollbackTargetDeploymentId,
+                        requestedCommandExpiryAt: command.CommandExpiryAt);
 
-            edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
+                    edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
 
-            await _deploymentStore.AddFullEdgeDeploymentAsync(deployment, ct);
-            await _edgeCommandStore.AddAsync(edgeCommand, ct);
-            await _deploymentStore.SaveChangesAsync(ct);
+                    await _deploymentStore.AddFullEdgeDeploymentAsync(deployment, ct);
+                    await _edgeCommandStore.AddAsync(edgeCommand, ct);
+                    await _deploymentStore.SaveChangesAsync(ct);
 
-            return ApiResult<KioskConfigurationDeploymentResult>.Success(
-                KioskConfigurationDeploymentResult.FromEntity(deployment, edgeCommand.Id),
-                "Configuration deployment requested successfully.",
-                201);
+                    return ApiResult<KioskConfigurationDeploymentResult>.Success(
+                        KioskConfigurationDeploymentResult.FromEntity(deployment, edgeCommand.Id),
+                        "Configuration deployment requested successfully.",
+                        201);
                 }
                 catch (DomainRuleException ex)
                 {
@@ -173,16 +244,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             },
             cancellationToken);
 
-        if (result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId)
-        {
-            await _wakeUpPublisher.TryPublishAsync(
-                new EdgeCommandWakeUp(
-                    edgeCommandId,
-                    result.Data.KioskExecutionEndpointId,
-                    EdgeCommandType.DeployConfiguration,
-                    DateTimeOffset.UtcNow),
-                cancellationToken);
-        }
+        await TryPublishWakeUpAsync(result, cancellationToken);
 
         if (result.Succeeded && readiness.HasWarnings)
         {
@@ -192,19 +254,63 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         return result;
     }
 
+    private async Task<ApiResult<KioskConfigurationDeploymentResult>?> GetIdempotentResultAsync(
+        DeployFullEdgeConfigurationCommand command,
+        string expectedValidationChecksum,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _deploymentStore.GetFullEdgeDeploymentByIdempotencyKeyAsync(
+            command.KioskExecutionEndpointId,
+            command.IdempotencyKey.Trim(),
+            cancellationToken);
+        return existing is null
+            ? null
+            : await BuildIdempotentResultAsync(
+                existing, command, expectedValidationChecksum, cancellationToken);
+    }
+
+    private async Task<ApiResult<KioskConfigurationDeploymentResult>> BuildIdempotentResultAsync(
+        KioskConfigurationDeployment existing,
+        DeployFullEdgeConfigurationCommand command,
+        string expectedValidationChecksum,
+        CancellationToken cancellationToken)
+    {
+        var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, cancellationToken);
+        if (existing.ConfigurationReleaseId != command.ConfigurationReleaseId ||
+            existing.ValidationReportChecksum != expectedValidationChecksum ||
+            existingCommand is null ||
+            existingCommand.RollbackTargetDeploymentId != command.RollbackTargetDeploymentId ||
+            existingCommand.RequestedCommandExpiryAt != command.CommandExpiryAt)
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>.Fail(
+                "Idempotency key was already used for a different deployment request.", 409);
+        }
+
+        return ApiResult<KioskConfigurationDeploymentResult>.Success(
+            KioskConfigurationDeploymentResult.FromEntity(existing, existingCommand.Id),
+            "Existing configuration deployment returned for idempotent retry.");
+    }
+
+    private Task TryPublishWakeUpAsync(
+        ApiResult<KioskConfigurationDeploymentResult> result,
+        CancellationToken cancellationToken) =>
+        result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId
+            ? _wakeUpPublisher.TryPublishAsync(
+                new EdgeCommandWakeUp(
+                    edgeCommandId,
+                    result.Data.KioskExecutionEndpointId,
+                    EdgeCommandType.DeployConfiguration,
+                    DateTimeOffset.UtcNow),
+                cancellationToken)
+            : Task.CompletedTask;
+
     private static string BuildDeployPayload(
         KioskConfigurationDeployment deployment,
         ConfigurationRelease release,
+        FullEdgeReleaseBundleDescriptor fullEdgeBundle,
         Guid? rollbackTargetDeploymentId,
         DateTimeOffset? requestedCommandExpiryAt)
     {
-        using var releaseManifest = JsonDocument.Parse(
-            release.ManifestJson ?? throw new DomainRuleException("Published release manifest is missing."));
-        if (!releaseManifest.RootElement.TryGetProperty("FullEdgeBundle", out var fullEdgeBundle))
-        {
-            throw new DomainRuleException("Published release Full Edge bundle descriptor is missing.");
-        }
-
         var artifacts = release.ExecutionRoutes
             .SelectMany(route => route.RobotBindings)
             .SelectMany(binding => RobotProgramManifestBuilder.Parse(
@@ -238,7 +344,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             RequestedCommandExpiryAt = requestedCommandExpiryAt,
             release.ReleaseManifestSchemaVersion,
             release.ManifestJson,
-            FullEdgeBundle = JsonSerializer.Deserialize<JsonElement>(fullEdgeBundle.GetRawText()),
+            FullEdgeBundle = fullEdgeBundle,
             Artifacts = artifacts
         };
 

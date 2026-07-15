@@ -15,15 +15,74 @@ public sealed class ManagementOrdersController : ControllerBase
     private readonly CancelManagementOrderCommandHandler _cancelHandler;
     private readonly MarkOrderRefundRequiredCommandHandler _refundRequiredHandler;
     private readonly RedispatchOrderExecutionCommandHandler _redispatchHandler;
+    private readonly RecordManualOrderItemFulfillmentEventCommandHandler _manualItemFulfillmentHandler;
+    private readonly SetPackagedOrderItemFulfillmentCommandHandler _packagedItemFulfillmentHandler;
 
     public ManagementOrdersController(
         CancelManagementOrderCommandHandler cancelHandler,
         MarkOrderRefundRequiredCommandHandler refundRequiredHandler,
-        RedispatchOrderExecutionCommandHandler redispatchHandler)
+        RedispatchOrderExecutionCommandHandler redispatchHandler,
+        RecordManualOrderItemFulfillmentEventCommandHandler manualItemFulfillmentHandler,
+        SetPackagedOrderItemFulfillmentCommandHandler packagedItemFulfillmentHandler)
     {
         _cancelHandler = cancelHandler;
         _refundRequiredHandler = refundRequiredHandler;
         _redispatchHandler = redispatchHandler;
+        _manualItemFulfillmentHandler = manualItemFulfillmentHandler;
+        _packagedItemFulfillmentHandler = packagedItemFulfillmentHandler;
+    }
+
+    [HttpPost("{orderId:guid}/items/{orderItemId:guid}/manual-fulfillment-events")]
+    [Authorize(Policy = "orders.manage")]
+    public async Task<IActionResult> RecordManualItemFulfillmentEvent(
+        Guid orderId,
+        Guid orderItemId,
+        [FromBody] RecordManualOrderItemFulfillmentEventRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _manualItemFulfillmentHandler.HandleAsync(
+            new RecordManualOrderItemFulfillmentEventCommand(orderId, orderItemId, User.GetUserContext(), request),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{orderId:guid}/items/{orderItemId:guid}/fulfill")]
+    [Authorize(Policy = "orders.manage")]
+    public async Task<IActionResult> FulfillPackagedItem(
+        Guid orderId,
+        Guid orderItemId,
+        [FromBody] RecordPackagedOrderItemFulfillmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _packagedItemFulfillmentHandler.HandleAsync(
+            new SetPackagedOrderItemFulfillmentCommand(
+                orderId,
+                orderItemId,
+                request.FulfillmentEventId,
+                User.GetUserContext(),
+                PackagedOrderItemFulfillmentAction.Fulfill),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{orderId:guid}/items/{orderItemId:guid}/fail")]
+    [Authorize(Policy = "orders.manage")]
+    public async Task<IActionResult> FailPackagedItem(
+        Guid orderId,
+        Guid orderItemId,
+        [FromBody] RecordPackagedOrderItemFulfillmentRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _packagedItemFulfillmentHandler.HandleAsync(
+            new SetPackagedOrderItemFulfillmentCommand(
+                orderId,
+                orderItemId,
+                request.FulfillmentEventId,
+                User.GetUserContext(),
+                PackagedOrderItemFulfillmentAction.Fail,
+                request.Reason),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 
     [HttpPost("{orderId:guid}/execution-attempts")]

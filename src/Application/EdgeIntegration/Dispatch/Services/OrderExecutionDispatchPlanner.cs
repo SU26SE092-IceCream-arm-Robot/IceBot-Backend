@@ -85,6 +85,12 @@ internal static class OrderExecutionDispatchPlanner
                 .OrderBy(candidate => candidate.Priority).ThenBy(candidate => candidate.RouteCode).FirstOrDefault();
             if (route is null) return null;
 
+            var supportedOptionCodes = route.GetSupportedOptionCodes().ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (item.Options.Any(option =>
+                    option.ExecutionImpact == Domain.Catalog.Enums.ProductOptionExecutionImpact.ProductionAffecting &&
+                    !supportedOptionCodes.Contains(option.CodeSnapshot)))
+                return null;
+
             var bindings = route.RobotBindings.OrderBy(binding => binding.BindingOrder).ToArray();
             if (activeSet is not null)
             {
@@ -169,6 +175,7 @@ internal static class OrderExecutionDispatchPlanner
         ExecutionRouteId = selected.Route.Id,
         RouteCode = selected.Route.RouteCode,
         RequiredCapabilitiesJson = selected.Route.RequiredCapabilitiesJson,
+        ProductionDefinitionChecksum = selected.Route.ProductionDefinitionChecksum,
         RobotPrograms = selected.Bindings.Select(binding => new ExecuteOrderRobotProgramPayload
         {
             BindingOrder = binding.BindingOrder,
@@ -187,7 +194,10 @@ internal static class OrderExecutionDispatchPlanner
                     ParametersJson = artifact.Parameters?.ToJsonString(),
                     ArtifactChecksum = artifact.RobotArtifact.Checksum,
                     RuntimeTargetCode = artifact.RobotArtifact.RuntimeTargetCode,
-                    MachineModelCode = artifact.RobotArtifact.MachineModelCode
+                    MachineModelCode = artifact.RobotArtifact.MachineModelCode,
+                    TechnicalContractId = artifact.RobotArtifact.TechnicalContractId,
+                    TechnicalContractChecksum = artifact.RobotArtifact.TechnicalContractChecksum,
+                    RequiredOptionCode = artifact.RequiredOptionCode
                 }).ToArray()
         }).ToArray()
     };

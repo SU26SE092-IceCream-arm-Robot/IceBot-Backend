@@ -115,8 +115,8 @@ Response:
 Rules:
 
 - Use this endpoint only for Cloud Sales Catalog truth.
-- Cloud online sales require `KioskStatus.Active` and active parent tenant scope.
-- `KioskStatus.Offline` is a connectivity/availability signal, not permission to create new online sales.
+- Cloud online sales require `KioskStatus.Active`, active parent tenant scope, and connectivity `Online` or `Degraded`.
+- Lifecycle and connectivity are separate contracts; `Unreachable` is not a `KioskStatus` value.
 - Offline-created orders may be synchronized later only if they were created under a valid offline sales session issued while the kiosk was active and offline sales was enabled.
 - For final runtime availability before checkout, the tablet should still prefer the Local Edge runtime projection when the edge service is available.
 - `snapshotId` identifies the runtime-menu response for client cache/debug purposes. Order creation does not accept it as authority; Cloud always reloads the selected menu items and recalculates prices.
@@ -235,9 +235,9 @@ Cloud must:
 - Verify signature/provider authenticity.
 - Deduplicate provider event by provider event id.
 - Update `PaymentTransactionStatus`.
-- Set `OrderStatus = ReadyForExecution` only after verified payment.
+- Set `OrderStatus = ReadyForFulfillment` only after verified payment.
 - Commit payment/order state before notifying Tablet or Edge.
-- Emit a durable domain/application event after commit, such as `PaymentSucceeded` or `OrderReadyForExecution`.
+- Emit a durable domain/application event after commit, such as `PaymentSucceeded` or `OrderReadyForFulfillment`.
 
 Cloud must not:
 

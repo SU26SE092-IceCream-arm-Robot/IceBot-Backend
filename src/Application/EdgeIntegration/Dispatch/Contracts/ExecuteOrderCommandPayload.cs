@@ -39,6 +39,7 @@ public sealed record ExecuteOrderLinePayload
     public Guid ExecutionRouteId { get; init; }
     public string RouteCode { get; init; } = string.Empty;
     public string? RequiredCapabilitiesJson { get; init; }
+    public string? ProductionDefinitionChecksum { get; init; }
     public IReadOnlyList<ExecuteOrderRobotProgramPayload> RobotPrograms { get; init; } = [];
 }
 
@@ -82,6 +83,9 @@ public sealed record ExecuteOrderArtifactPayload
     public string ArtifactChecksum { get; init; } = string.Empty;
     public string RuntimeTargetCode { get; init; } = string.Empty;
     public string MachineModelCode { get; init; } = string.Empty;
+    public Guid? TechnicalContractId { get; init; }
+    public string? TechnicalContractChecksum { get; init; }
+    public string? RequiredOptionCode { get; init; }
 }
 
 public static class ExecuteOrderCommandPayloadCodec

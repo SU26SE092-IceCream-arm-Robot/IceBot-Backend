@@ -10,6 +10,29 @@ public sealed class KioskInventoryReadinessResult
     public bool IsReady { get; set; }
     public InventoryReadinessStatus OverallStatus { get; set; }
     public IReadOnlyList<InventoryIngredientReadinessResult> Ingredients { get; set; } = [];
+    public IReadOnlyList<InventoryOptionGroupReadinessResult> OptionGroups { get; set; } = [];
+}
+
+public sealed class InventoryOptionGroupReadinessResult
+{
+    public Guid ExecutionRouteId { get; set; }
+    public string RouteCode { get; set; } = null!;
+    public Guid RecipeId { get; set; }
+    public long OptionGroupId { get; set; }
+    public string OptionGroupCode { get; set; } = null!;
+    public bool IsRequired { get; set; }
+    public int MinimumSelections { get; set; }
+    public int ReadyOptionCount { get; set; }
+    public bool IsReady { get; set; }
+    public IReadOnlyList<InventoryOptionReadinessResult> Options { get; set; } = [];
+}
+
+public sealed class InventoryOptionReadinessResult
+{
+    public Guid ProductOptionId { get; set; }
+    public string OptionCode { get; set; } = null!;
+    public bool IsReady { get; set; }
+    public IReadOnlyList<InventoryIngredientReadinessResult> Ingredients { get; set; } = [];
 }
 
 public sealed class InventoryIngredientReadinessResult

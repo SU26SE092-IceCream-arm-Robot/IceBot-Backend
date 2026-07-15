@@ -7,6 +7,8 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.RobotConfiguration.Artifacts;
+using Application.RobotConfiguration.ArtifactContracts;
+using Domain.RobotConfiguration.ArtifactContracts;
 
 namespace Application.RobotConfiguration.Artifacts.Commands;
 
@@ -14,6 +16,7 @@ public sealed class UploadRobotArtifactCommandHandler
 {
     private readonly IRobotArtifactStore _robotArtifactStore;
     private readonly ArtifactUploadContentService _contentService;
+    private readonly IRobotArtifactTechnicalContractStore? _technicalContracts;
 
     public UploadRobotArtifactCommandHandler(
         IRobotArtifactStore robotArtifactStore,
@@ -21,6 +24,15 @@ public sealed class UploadRobotArtifactCommandHandler
     {
         _robotArtifactStore = robotArtifactStore;
         _contentService = contentService;
+    }
+
+    public UploadRobotArtifactCommandHandler(
+        IRobotArtifactStore robotArtifactStore,
+        ArtifactUploadContentService contentService,
+        IRobotArtifactTechnicalContractStore technicalContracts)
+        : this(robotArtifactStore, contentService)
+    {
+        _technicalContracts = technicalContracts;
     }
 
     public async Task<ApiResult<RobotArtifactResult>> HandleAsync(
@@ -51,6 +63,19 @@ public sealed class UploadRobotArtifactCommandHandler
         if (!ArtifactUploadContentService.IsValidMetadataJson(command.MetadataJson))
         {
             return ApiResult<RobotArtifactResult>.Fail("MetadataJson must be a valid JSON string.", 400);
+        }
+
+        RobotArtifactTechnicalContract? technicalContract = null;
+        if (command.TechnicalContractId.HasValue)
+        {
+            if (_technicalContracts is null)
+                return ApiResult<RobotArtifactResult>.Fail("Technical contract validation is unavailable.", 503);
+            technicalContract = await _technicalContracts.GetAsync(command.TechnicalContractId.Value, false, cancellationToken);
+            if (technicalContract is null || technicalContract.Status != RobotArtifactContractStatus.Published ||
+                (technicalContract.OrganizationId.HasValue && technicalContract.OrganizationId != command.OrganizationId) ||
+                !string.Equals(technicalContract.RuntimeTargetCode, command.RuntimeTargetCode.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(technicalContract.MachineModelCode, command.MachineModelCode.Trim(), StringComparison.OrdinalIgnoreCase))
+                return ApiResult<RobotArtifactResult>.Fail("Published compatible technical contract not found.", 400);
         }
 
         BufferedArtifactContent bufferedContent;
@@ -100,6 +125,11 @@ public sealed class UploadRobotArtifactCommandHandler
         {
             return ApiResult<RobotArtifactResult>.Fail("Robot artifact object already exists.", 409);
         }
+        catch (ArtifactObjectStorageUnavailableException)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(
+                "Artifact object storage is temporarily unavailable.", 503);
+        }
 
         RobotArtifact artifact;
         try
@@ -116,7 +146,9 @@ public sealed class UploadRobotArtifactCommandHandler
                 writeResult.ContentLengthBytes,
                 command.ExportedAt ?? DateTimeOffset.UtcNow,
                 command.Description,
-                command.MetadataJson?.Trim());
+                command.MetadataJson?.Trim(),
+                technicalContractId: technicalContract?.Id,
+                technicalContractChecksum: technicalContract?.ContractChecksum);
 
         }
         catch (DomainRuleException ex)

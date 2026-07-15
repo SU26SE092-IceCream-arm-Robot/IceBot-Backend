@@ -38,4 +38,16 @@ public partial class AccountNotificationDevice : BusinessEntity
     public string? InvalidationReason { get; set; }
 
     public virtual Account Account { get; set; } = null!;
+
+    public void Invalidate(string reason, DateTimeOffset invalidatedAt)
+    {
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new DomainRuleException("Notification-device invalidation reason is required.");
+        }
+
+        InvalidatedAt = invalidatedAt;
+        InvalidationReason = reason.Trim();
+        UpdatedAt = invalidatedAt;
+    }
 }

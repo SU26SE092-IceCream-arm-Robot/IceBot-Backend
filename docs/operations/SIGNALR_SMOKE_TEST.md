@@ -44,8 +44,9 @@ Extract the `token` from the response.
 2. Call the `JoinKiosk` method:
    - Target: `JoinKiosk`
    - Arguments: `["00000000-0000-0000-0000-000000000000"]` (Replace with a valid Kiosk ID)
-3. Trigger a kiosk status change via API:
-   - Example: Call `PATCH /api/v1/management/kiosks/{kioskId}/status` with a new status (e.g., `Offline`).
+3. Trigger a kiosk lifecycle or connectivity change:
+   - Example lifecycle: call `PATCH /api/v1/management/kiosks/{kioskId}/status` with `Maintenance`.
+   - Example connectivity: ingest a newer authenticated heartbeat whose status changes between `Online`, `Degraded`, and `Offline`.
    - Expected: You should receive a `KioskStatusChanged` event in your SignalR client.
 4. Trigger a maintenance ticket update:
    - Example: Call `POST /api/v1/management/maintenance-tickets` to create a ticket for that kiosk.
@@ -66,7 +67,8 @@ Extract the `token` from the response.
 
 ## 6. Expected Event Names
 
-- **OrderHub**: `OrderStatusChanged`, `PaymentStatusChanged`
+- **OrderHub**: `OrderStatusChanged`, `OrderItemFulfillmentChanged`, `PaymentStatusChanged`
+- **OperationsHub**: `OrderItemFulfillmentChanged` is sent to `kiosk:{kioskId}` for fulfillment-workspace refresh.
 - **OperationsHub**: `KioskStatusChanged`, `ExecutionReadinessChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`
 - **ManagementDashboardHub**: `DashboardInvalidated`
 

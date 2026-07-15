@@ -84,6 +84,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         string orderPaymentStatus = "";
         bool canRetryPayment = false;
         bool requiresStaffSupport = false;
+        bool requiresMachineExecution = false;
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
@@ -165,6 +166,8 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 orderNumber = paymentTransaction.Order.OrderNumber;
                 provider = paymentTransaction.Provider;
                 orderPaymentStatus = paymentTransaction.Order.PaymentStatus.ToString();
+                requiresMachineExecution = paymentTransaction.Order.OrderItems.Any(item =>
+                    item.FulfillmentType == Domain.Catalog.Enums.FulfillmentType.MachineProduced);
 
                 var customerStatusInfo = Application.Orders.Support.OrderStatusProjector.ProjectFromOrder(paymentTransaction.Order);
                 customerStatus = customerStatusInfo.CustomerStatus;
@@ -238,7 +241,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 }, cancellationToken);
             }
 
-            if (result.Data.Status == PaymentTransactionStatus.Paid)
+            if (result.Data.Status == PaymentTransactionStatus.Paid && requiresMachineExecution)
             {
                 var dispatchResult = await _dispatchOrderExecutionHandler.HandleAsync(
                     new DispatchOrderExecutionCommand

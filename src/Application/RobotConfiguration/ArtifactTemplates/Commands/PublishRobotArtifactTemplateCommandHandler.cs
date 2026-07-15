@@ -4,16 +4,22 @@ using Application.RobotConfiguration.ArtifactTemplates.Abstractions;
 using Application.RobotConfiguration.ArtifactTemplates.Results;
 using Application.Shared.Wrappers;
 using Domain.Common;
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
 
 namespace Application.RobotConfiguration.ArtifactTemplates.Commands;
 
 public sealed class PublishRobotArtifactTemplateCommandHandler
 {
     private readonly IRobotArtifactTemplateStore _store;
+    private readonly ArtifactPublicationValidator _publicationValidator;
 
-    public PublishRobotArtifactTemplateCommandHandler(IRobotArtifactTemplateStore store)
+    public PublishRobotArtifactTemplateCommandHandler(
+        IRobotArtifactTemplateStore store,
+        ArtifactPublicationValidator publicationValidator)
     {
         _store = store;
+        _publicationValidator = publicationValidator;
     }
 
     public async Task<ApiResult<RobotArtifactTemplateResult>> HandleAsync(
@@ -33,6 +39,7 @@ public sealed class PublishRobotArtifactTemplateCommandHandler
 
         try
         {
+            await _publicationValidator.ValidateAsync(template, cancellationToken);
             template.Publish();
             template.UpdatedByAccountId = command.UserContext.AccountId;
             await _store.SaveChangesAsync(cancellationToken);
@@ -41,6 +48,18 @@ public sealed class PublishRobotArtifactTemplateCommandHandler
         catch (DomainRuleException ex)
         {
             return ApiResult<RobotArtifactTemplateResult>.Fail(ex.Message, 400);
+        }
+        catch (ArtifactObjectNotFoundException ex)
+        {
+            return ApiResult<RobotArtifactTemplateResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectIntegrityException ex)
+        {
+            return ApiResult<RobotArtifactTemplateResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectStorageUnavailableException ex)
+        {
+            return ApiResult<RobotArtifactTemplateResult>.Fail(ex.Message, 503);
         }
     }
 }

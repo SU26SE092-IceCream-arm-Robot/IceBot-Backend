@@ -89,6 +89,11 @@ public sealed class UploadRobotArtifactTemplateCommandHandler
         {
             return ApiResult<RobotArtifactTemplateResult>.Fail("Template object already exists.", 409);
         }
+        catch (ArtifactObjectStorageUnavailableException)
+        {
+            return ApiResult<RobotArtifactTemplateResult>.Fail(
+                "Artifact object storage is temporarily unavailable.", 503);
+        }
 
         try
         {

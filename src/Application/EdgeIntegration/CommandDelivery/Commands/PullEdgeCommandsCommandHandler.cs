@@ -57,15 +57,26 @@ public sealed class PullEdgeCommandsCommandHandler
         var commandResults = new List<(Domain.Sync.Entities.EdgeCommand Command, string PayloadJson)>(commands.Count);
         foreach (var edgeCommand in commands)
         {
-            var payloadJson = await _artifactPayloadEnricher.EnrichAsync(edgeCommand, cancellationToken);
-            commandResults.Add((edgeCommand, payloadJson));
-
             var nextAttemptNo = edgeCommand.DeliveryAttempts.Count + 1;
-            edgeCommand.RecordDeliveryAttempt(nextAttemptNo, now, EdgeCommandDeliveryOutcome.Sent);
+            try
+            {
+                var payloadJson = await _artifactPayloadEnricher.EnrichAsync(edgeCommand, cancellationToken);
+                commandResults.Add((edgeCommand, payloadJson));
+                edgeCommand.RecordDeliveryAttempt(nextAttemptNo, now, EdgeCommandDeliveryOutcome.Sent);
+            }
+            catch (InvalidArtifactCommandPayloadException exception)
+            {
+                edgeCommand.RecordDeliveryAttempt(
+                    nextAttemptNo,
+                    now,
+                    EdgeCommandDeliveryOutcome.DeliveryFailed,
+                    "InvalidDurablePayload",
+                    exception.Message);
+            }
         }
 
         await _edgeCommandStore.SaveChangesAsync(cancellationToken);
-        foreach (var edgeCommand in commands)
+        foreach (var edgeCommand in commandResults.Select(result => result.Command))
         {
             IceBotEdgeMetrics.RecordCommandPull(now - edgeCommand.CreatedAt, edgeCommand.CommandType.ToString());
         }

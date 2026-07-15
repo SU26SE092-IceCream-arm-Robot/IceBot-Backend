@@ -17,4 +17,5 @@ public sealed class UploadRobotArtifactCommand
     public DateTimeOffset? ExportedAt { get; init; }
     public string? Description { get; init; }
     public string? MetadataJson { get; init; }
+    public Guid? TechnicalContractId { get; init; }
 }

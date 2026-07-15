@@ -78,6 +78,36 @@ public sealed class BulkUploadRobotArtifactsTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task HandleAsync_MapsObjectStorageOutageToServiceUnavailableItem()
+    {
+        var organizationId = Guid.NewGuid();
+        var store = CreateStore(organizationId);
+        var storage = Substitute.For<IArtifactObjectStorage>();
+        storage.WriteImmutableAsync(
+                Arg.Any<ArtifactObjectWriteRequest>(),
+                Arg.Any<Stream>(),
+                Arg.Any<CancellationToken>())
+            .Returns<Task<ArtifactObjectWriteResult>>(_ =>
+                throw new ArtifactObjectStorageUnavailableException(
+                    "storage offline", new IOException("test outage")));
+        var handler = CreateHandler(store, storage);
+
+        var result = await handler.HandleAsync(new BulkUploadRobotArtifactsCommand
+        {
+            UserContext = TestData.SystemAdmin(),
+            OrganizationId = organizationId,
+            Items = [Item("offline.lua", "OFFLINE")]
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(503, result.StatusCode);
+        var item = Assert.Single(result.Data!.Items);
+        Assert.False(item.Succeeded);
+        Assert.Equal(503, item.StatusCode);
+        Assert.Equal("Artifact object storage is temporarily unavailable.", item.Message);
+    }
+
     private static BulkUploadRobotArtifactsCommandHandler CreateHandler(
         IRobotArtifactStore store,
         IArtifactObjectStorage storage)

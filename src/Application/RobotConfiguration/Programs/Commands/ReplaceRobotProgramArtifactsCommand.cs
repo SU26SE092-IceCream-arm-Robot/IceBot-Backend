@@ -15,4 +15,5 @@ public sealed record RobotProgramArtifactInput(
     Guid RobotArtifactId,
     int RunOrder,
     int ParametersSchemaVersion,
-    string? ParametersJson);
+    string? ParametersJson,
+    string? RequiredOptionCode = null);

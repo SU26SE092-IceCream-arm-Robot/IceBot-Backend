@@ -3,6 +3,7 @@ using Application.Devices.Telemetry.Abstractions;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.Devices.Connectivity.Abstractions;
+using Domain.Devices.Connectivity;
 using Domain.Tenants.Enums;
 using Microsoft.Extensions.Options;
 
@@ -53,15 +54,24 @@ public sealed class ReconcileKioskConnectivityCommandHandler
         }
 
         var cutoff = command.ObservedAt.AddSeconds(-_options.HeartbeatTimeoutSeconds);
-        var connectivityTimestamp = kiosk.LastOnlineAt ?? kiosk.CreatedAt;
+        var connectivity = await _store.GetConnectivityAsync(command.KioskId, cancellationToken);
+        if (connectivity is null || !connectivity.LastObservedAt.HasValue)
+        {
+            return null;
+        }
+
+        var connectivityTimestamp = connectivity.LastObservedAt.Value;
         if (connectivityTimestamp >= cutoff)
         {
             return null;
         }
 
-        kiosk.Status = KioskStatus.Offline;
-        kiosk.UpdatedAt = command.ObservedAt;
-        kiosk.UpdatedByAccountId = null;
+        var oldConnectivity = connectivity.Status;
+        if (!connectivity.MarkUnreachable(command.ObservedAt))
+        {
+            return null;
+        }
+
         await _store.SaveChangesAsync(cancellationToken);
 
         return new KioskStatusChangedEvent
@@ -69,9 +79,8 @@ public sealed class ReconcileKioskConnectivityCommandHandler
             KioskId = kiosk.Id,
             OrganizationId = kiosk.OrganizationId,
             StoreId = kiosk.StoreId,
-            OldStatus = KioskStatus.Active.ToString(),
-            NewStatus = KioskStatus.Offline.ToString(),
-            Connectivity = "Unreachable",
+            OldConnectivity = oldConnectivity.ToString(),
+            NewConnectivity = KioskConnectivityStatus.Unreachable.ToString(),
             Reason = "HeartbeatTimeout",
             UpdatedAt = command.ObservedAt,
             Version = 1

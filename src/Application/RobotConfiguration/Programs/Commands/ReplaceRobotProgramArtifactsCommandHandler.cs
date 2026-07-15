@@ -79,7 +79,8 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
                 .OrderBy(item => item.RunOrder)
                 .Select(item => (item.RobotArtifactId, item.RunOrder,
                     string.IsNullOrWhiteSpace(item.ParametersJson) ? null : item.ParametersJson.Trim(),
-                    item.ParametersSchemaVersion)));
+                    item.ParametersSchemaVersion,
+                    string.IsNullOrWhiteSpace(item.RequiredOptionCode) ? null : item.RequiredOptionCode.Trim().ToUpperInvariant())));
 
             program.UpdatedByAccountId = command.UserContext.AccountId;
             await _robotProgramStore.SaveProgramReplacementAsync(removedArtifacts, cancellationToken);

@@ -38,8 +38,6 @@ public partial class Kiosk : BusinessEntity, IOrganizationScoped
 
     public DateTimeOffset? LastOnlineAt { get; set; }
 
-    public bool SupportsOfflineMode { get; set; } = true;
-
     public long ConfigurationVersion { get; set; }
 
     public int SettingsSchemaVersion { get; set; } = 1;

@@ -16,6 +16,9 @@ public sealed record ExecutionReportInboxPayload
     public DateTimeOffset? ExecutorReportedAt { get; init; }
     public Guid? DeploymentId { get; init; }
     public Guid? SourceProductionJobId { get; init; }
+    public Guid? OrderItemId { get; init; }
+    public int? ProductionUnitNo { get; init; }
+    public int? ProductionUnitQuantity { get; init; }
     public Guid? WorkcellId { get; init; }
     public Guid? ControllerId { get; init; }
     public string? ExecutionPlanChecksum { get; init; }

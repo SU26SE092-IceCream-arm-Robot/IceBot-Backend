@@ -19,7 +19,6 @@ public sealed class UpdateProductCategoryCommandHandler(ICatalogAuthoringStore c
         }
 
         var request = command.Request;
-        category.ParentCategoryId = null;
         category.Name = request.Name.Trim();
         category.Description = ProductNormalizer.TrimToNull(request.Description);
         category.ProductType = request.ProductType.Trim();

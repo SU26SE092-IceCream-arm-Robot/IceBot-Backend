@@ -22,7 +22,6 @@ public sealed class CreateProductCategoryCommandHandler(ICatalogAuthoringStore c
 
         var category = new ProductCategory
         {
-            ParentCategoryId = null,
             Code = code,
             Name = request.Name.Trim(),
             Description = ProductNormalizer.TrimToNull(request.Description),

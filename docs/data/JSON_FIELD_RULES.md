@@ -14,7 +14,6 @@ These fields can affect runtime behavior. They are mutable only while the owning
 
 Fields:
 
-- `PaymentMethod.ConfigJson` with `ConfigSchemaVersion`
 - `DeviceModel.CapabilitiesJson` with `CapabilitiesSchemaVersion`
 - `Kiosk.SettingsJson` with `SettingsSchemaVersion`
 - `Store.OpeningHoursJson` with `OpeningHoursSchemaVersion`
@@ -26,6 +25,10 @@ Fields:
   - When present, this field must use schema version `1`: `{ "schemaVersion": 1, "requires": [{ "code": "...", "minVersion": "...", "required": true }] }`.
   - Codes must match capability codes already declared by the same route's robot bindings. Unknown fields are rejected.
   - Cloud V1 still uses `ExecutionRouteRobotBinding.RequiredWorkcellCapabilityCode` as the online sellability/dispatch enforcement gate; this JSON is a bounded Edge-facing requirements payload.
+- `ExecutionRoute.SupportedOptionCodesJson`
+  - Internal JSON storage for the normalized production-affecting option codes supported by one route.
+  - Management APIs expose `supportedOptionCodes` as a typed string collection; clients do not send JSON.
+  - The value is included in immutable production-definition and release checksums and is enforced by runtime-menu, order, readiness, and dispatch flows.
 - `EdgeCommand.PayloadJson`
 - `IngredientDispenserState.LevelToQuantityProfileJson` with `LevelToQuantityProfileSchemaVersion`
   - API contracts expose typed `Low`, `Medium`, and `Full` points; FE does not send JSON or schema version.

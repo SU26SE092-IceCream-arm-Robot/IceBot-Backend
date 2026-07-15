@@ -55,6 +55,12 @@ public sealed class PaymentStore : IPaymentStore
             .FirstOrDefaultAsync(payment => payment.IdempotencyKey == idempotencyKey, cancellationToken);
     }
 
+    public Task<Domain.Devices.Connectivity.KioskConnectivityProjection?> GetKioskConnectivityAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .FirstOrDefaultAsync(connectivity => connectivity.KioskId == kioskId, cancellationToken);
+
     public Task<PaymentTransaction?> GetActivePaymentTransactionByOrderIdAsync(
         Guid orderId,
         CancellationToken cancellationToken = default)
@@ -73,6 +79,7 @@ public sealed class PaymentStore : IPaymentStore
     {
         return _dbContext.PaymentTransactions
             .Include(payment => payment.Order)
+                .ThenInclude(order => order.OrderItems)
             .FirstOrDefaultAsync(
                 payment => payment.Provider == provider && payment.ProviderOrderCode == providerOrderCode,
                 cancellationToken);

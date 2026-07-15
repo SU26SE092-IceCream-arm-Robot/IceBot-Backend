@@ -10,6 +10,7 @@ using Application.Operations;
 using Application.Orders;
 using Application.Payments;
 using Application.ProductionConfiguration;
+using Application.ProductionPackages;
 using Application.RobotConfiguration;
 using Application.SalesCatalog;
 using Application.Tenants;
@@ -36,6 +37,7 @@ namespace Application
             services.AddOrderModule();
             services.AddPaymentModule();
             services.AddProductionConfigurationModule();
+            services.AddProductionPackagesModule();
             services.AddRobotConfigurationModule();
             services.AddSalesCatalogModule();
             services.AddTenantsApplication();

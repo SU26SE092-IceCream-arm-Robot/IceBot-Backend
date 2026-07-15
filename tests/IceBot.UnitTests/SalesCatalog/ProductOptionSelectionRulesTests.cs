@@ -58,6 +58,7 @@ public sealed class ProductOptionSelectionRulesTests
             "Oreo",
             null,
             5000,
+            ProductOptionExecutionImpact.ProductionAffecting,
             true,
             false,
             1);

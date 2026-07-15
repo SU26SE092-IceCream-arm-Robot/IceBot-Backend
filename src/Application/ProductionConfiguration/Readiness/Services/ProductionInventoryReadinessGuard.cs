@@ -42,7 +42,9 @@ public sealed class ProductionInventoryReadinessGuard(
         routes.Select(route => new InventoryReadinessRouteInput(
             route.Id,
             route.RouteCode,
+            route.ProductVariant.ProductId,
             route.RecipeId,
+            route.GetSupportedOptionCodes().ToHashSet(StringComparer.OrdinalIgnoreCase),
             route.ProductVariant.Product.OrganizationId,
             route.ProductVariant.Product.StoreId,
             route.ProductVariant.Product.KioskId,

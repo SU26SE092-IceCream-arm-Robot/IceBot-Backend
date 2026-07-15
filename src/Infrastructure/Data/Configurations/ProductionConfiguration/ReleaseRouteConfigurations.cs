@@ -57,6 +57,12 @@ internal sealed class ExecutionRouteConfiguration : IEntityTypeConfiguration<Exe
             .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => new { x.ConfigurationReleaseId, x.ProductVariantId, x.RecipeId, x.Priority });
         entity.Property(x => x.RequiredCapabilitiesJson).HasColumnType("jsonb");
+        entity.Property(x => x.SupportedOptionCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
+            .HasDefaultValueSql("'[]'::jsonb");
+        entity.Property(x => x.ProductionDefinitionJson).HasColumnType("jsonb");
+        entity.Property(x => x.ProductionDefinitionChecksum).HasMaxLength(64);
+        entity.HasIndex(x => x.ProductionDefinitionChecksum)
+            .HasFilter("\"ProductionDefinitionChecksum\" IS NOT NULL");
         entity.HasOne(x => x.ConfigurationRelease)
             .WithMany(x => x.ExecutionRoutes)
             .HasForeignKey(x => x.ConfigurationReleaseId)

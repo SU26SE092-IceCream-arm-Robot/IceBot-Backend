@@ -23,7 +23,6 @@ internal static class KioskResultMapper
             Longitude = kiosk.Longitude,
             InstalledAt = kiosk.InstalledAt,
             LastOnlineAt = kiosk.LastOnlineAt,
-            SupportsOfflineMode = kiosk.SupportsOfflineMode,
             CreatedAt = kiosk.CreatedAt,
             UpdatedAt = kiosk.UpdatedAt
         };

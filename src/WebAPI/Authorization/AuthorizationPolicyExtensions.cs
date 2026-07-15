@@ -70,6 +70,10 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("deployment.read", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
         options.AddScopedRolePolicy("release.deploy", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("release.rollback", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("package.read", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("package.manage", "SystemAdmin");
+        options.AddScopedRolePolicy("package.install", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("package.fork", "SystemAdmin", "OrgAdmin");
 
         return options;
     }

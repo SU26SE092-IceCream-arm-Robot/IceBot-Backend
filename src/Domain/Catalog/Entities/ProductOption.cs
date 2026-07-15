@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Catalog.Enums;
 namespace Domain.Catalog.Entities;
 
 public partial class ProductOption : BusinessEntity
@@ -14,6 +15,8 @@ public partial class ProductOption : BusinessEntity
     public string? Description { get; set; }
 
     public decimal PriceDelta { get; set; }
+
+    public ProductOptionExecutionImpact ExecutionImpact { get; set; }
 
     public bool IsDefault { get; set; }
 

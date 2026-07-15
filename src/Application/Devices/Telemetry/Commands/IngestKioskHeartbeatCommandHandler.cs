@@ -7,7 +7,7 @@ using Application.Devices.Telemetry.Results;
 using Application.Shared.Wrappers;
 using Domain.Common.Enums;
 using Domain.Devices.Catalog;
-using Domain.Tenants.Enums;
+using Domain.Devices.Connectivity;
 using Microsoft.Extensions.Options;
 
 namespace Application.Devices.Telemetry.Commands;
@@ -127,40 +127,45 @@ public sealed class IngestKioskHeartbeatCommandHandler
             kiosk.LastOnlineAt = receivedAt;
         }
 
-        var oldStatus = kiosk.Status;
-        string? transitionReason = null;
-        if (advancesCurrentState && command.Status == KioskHeartbeatStatus.Offline && oldStatus == KioskStatus.Active)
-        {
-            kiosk.Status = KioskStatus.Offline;
-            transitionReason = "HeartbeatReportedOffline";
-        }
-        else if (advancesCurrentState &&
-                 (command.Status is KioskHeartbeatStatus.Online or KioskHeartbeatStatus.Degraded) &&
-                 oldStatus == KioskStatus.Offline &&
-                 kiosk.Organization.Status == EntityStatus.Active &&
-                 kiosk.Store.Status == EntityStatus.Active)
-        {
-            kiosk.Status = KioskStatus.Active;
-            transitionReason = "HeartbeatRecovered";
-        }
-
         KioskStatusChangedEvent? statusChangedEvent = null;
-        if (kiosk.Status != oldStatus)
+        if (advancesCurrentState)
         {
-            kiosk.UpdatedAt = receivedAt;
-            kiosk.UpdatedByAccountId = null;
-            statusChangedEvent = new KioskStatusChangedEvent
+            var connectivity = await _store.GetConnectivityAsync(command.KioskId, cancellationToken);
+            if (connectivity is null)
             {
-                KioskId = kiosk.Id,
-                OrganizationId = kiosk.OrganizationId,
-                StoreId = kiosk.StoreId,
-                OldStatus = oldStatus.ToString(),
-                NewStatus = kiosk.Status.ToString(),
-                Connectivity = command.Status.ToString(),
-                Reason = transitionReason,
-                UpdatedAt = receivedAt,
-                Version = 1
+                connectivity = KioskConnectivityProjection.Create(command.KioskId, receivedAt);
+                await _store.AddConnectivityAsync(connectivity, cancellationToken);
+            }
+
+            var oldConnectivity = connectivity.Status;
+            var newConnectivity = command.Status switch
+            {
+                KioskHeartbeatStatus.Online => KioskConnectivityStatus.Online,
+                KioskHeartbeatStatus.Degraded => KioskConnectivityStatus.Degraded,
+                KioskHeartbeatStatus.Offline => KioskConnectivityStatus.Unreachable,
+                _ => KioskConnectivityStatus.Unknown
             };
+
+            if (connectivity.Observe(
+                    newConnectivity,
+                    command.OriginNodeId,
+                    command.HeartbeatSequence,
+                    receivedAt))
+            {
+                statusChangedEvent = new KioskStatusChangedEvent
+                {
+                    KioskId = kiosk.Id,
+                    OrganizationId = kiosk.OrganizationId,
+                    StoreId = kiosk.StoreId,
+                    OldConnectivity = oldConnectivity.ToString(),
+                    NewConnectivity = newConnectivity.ToString(),
+                    Reason = newConnectivity == KioskConnectivityStatus.Unreachable
+                        ? "HeartbeatReportedUnreachable"
+                        : "HeartbeatConnectivityChanged",
+                    UpdatedAt = receivedAt,
+                    Version = 1
+                };
+            }
         }
 
         await _store.AddHeartbeatAsync(heartbeat, cancellationToken);

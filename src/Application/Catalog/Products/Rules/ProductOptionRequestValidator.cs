@@ -23,10 +23,12 @@ public static class ProductOptionRequestValidator
         return null;
     }
 
-    public static string? ValidateOption(string? code, string? name, decimal priceDelta)
+    public static string? ValidateOption(string? code, string? name, decimal priceDelta,
+        ProductOptionExecutionImpact executionImpact)
     {
         if (string.IsNullOrWhiteSpace(code) || code.Trim().Length > 100) return "Product option code is required and must not exceed 100 characters.";
         if (string.IsNullOrWhiteSpace(name) || name.Trim().Length > 200) return "Product option name is required and must not exceed 200 characters.";
+        if (!Enum.IsDefined(executionImpact)) return "Product option execution impact is invalid.";
         return priceDelta < 0 ? "Product option price delta cannot be negative." : null;
     }
 }

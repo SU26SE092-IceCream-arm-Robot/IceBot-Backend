@@ -22,7 +22,17 @@ public sealed class ProductOptionRequestValidatorTests
     [Fact]
     public void Option_RejectsNegativePriceDelta()
     {
-        var error = ProductOptionRequestValidator.ValidateOption("OREO", "Oreo", -1);
+        var error = ProductOptionRequestValidator.ValidateOption(
+            "OREO", "Oreo", -1, ProductOptionExecutionImpact.CommercialOnly);
         Assert.Equal("Product option price delta cannot be negative.", error);
+    }
+
+    [Fact]
+    public void Option_RejectsUnknownExecutionImpact()
+    {
+        var error = ProductOptionRequestValidator.ValidateOption(
+            "OREO", "Oreo", 0, (ProductOptionExecutionImpact)99);
+
+        Assert.Equal("Product option execution impact is invalid.", error);
     }
 }

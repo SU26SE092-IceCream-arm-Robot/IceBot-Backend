@@ -47,6 +47,7 @@ public interface IProductionExecutionReportStore
     Task AddOrderExecutionRecordAsync(OrderExecutionRecord record, CancellationToken cancellationToken = default);
     Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task AddOrderStatusHistoryAsync(OrderStatusHistory history, CancellationToken cancellationToken = default);
+    Task AddOrderItemStatusHistoryAsync(OrderItemStatusHistory history, CancellationToken cancellationToken = default);
 }
 
 public interface IExecutionStockEvidenceStore

@@ -27,6 +27,7 @@ using Domain.Payments.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.ArtifactContracts;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.DeadLetters;
 using Domain.Sync.Entities;
@@ -60,6 +61,7 @@ internal sealed class RobotProgramArtifactConfiguration : IEntityTypeConfigurati
         entity.ToTable("RobotProgramArtifacts");
         entity.HasIndex(x => new { x.RobotProgramId, x.RunOrder }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => x.RobotArtifactId);
+        entity.Property(x => x.RequiredOptionCode).HasMaxLength(100);
         entity.HasOne(x => x.RobotProgram).WithMany(x => x.RobotProgramArtifacts).HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne<RobotArtifact>().WithMany().HasForeignKey(x => x.RobotArtifactId).OnDelete(DeleteBehavior.Restrict);
 
@@ -74,8 +76,10 @@ internal sealed class RobotArtifactConfiguration : IEntityTypeConfiguration<Robo
         entity.HasIndex(x => new { x.OrganizationId, x.ArtifactCode, x.Checksum }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => x.StorageKey).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => new { x.RuntimeTargetCode, x.MachineModelCode, x.Status });
+        entity.Property(x => x.TechnicalContractChecksum).HasMaxLength(64);
         entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne<RobotArtifactTemplate>().WithMany().HasForeignKey(x => x.SourceRobotArtifactTemplateId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<RobotArtifactTechnicalContract>().WithMany().HasForeignKey(x => x.TechnicalContractId).OnDelete(DeleteBehavior.Restrict);
 
     }
 }
@@ -88,6 +92,8 @@ internal sealed class RobotArtifactTemplateConfiguration : IEntityTypeConfigurat
         entity.HasIndex(x => new { x.TemplateCode, x.Checksum }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => x.StorageKey).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => new { x.RuntimeTargetCode, x.MachineModelCode, x.Status });
+        entity.Property(x => x.TechnicalContractChecksum).HasMaxLength(64);
+        entity.HasOne<RobotArtifactTechnicalContract>().WithMany().HasForeignKey(x => x.TechnicalContractId).OnDelete(DeleteBehavior.Restrict);
 
     }
 }

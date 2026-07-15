@@ -2,6 +2,7 @@ using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.RuntimeMenus.Mapping;
 using Application.SalesCatalog.RuntimeMenus.Results;
 using Application.SalesCatalog.RuntimeMenus.Rules;
+using Application.SalesCatalog.ReadModels;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
 using Application.Tenants.Stores;
@@ -30,7 +31,8 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             return ApiResult<RuntimeMenuResult>.Fail("Kiosk not found.", 404);
         }
 
-        var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk);
+        var connectivity = await _menus.GetKioskConnectivityAsync(kioskId, cancellationToken);
+        var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk, connectivity);
         if (salesAvailabilityError is not null)
         {
             return ApiResult<RuntimeMenuResult>.Fail(salesAvailabilityError, 409);
@@ -59,14 +61,17 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             cancellationToken);
         var optionsByMenuItem = optionRows.ToLookup(option => option.MenuItemId);
 
-        var routeReadiness = new Dictionary<(Guid ProductVariantId, Guid RecipeId), bool>();
-        foreach (var candidate in candidates.Where(candidate => candidate.Item.RecipeId.HasValue))
+        var routePolicies = new Dictionary<(Guid ProductVariantId, Guid RecipeId),
+            ActiveProductionRouteOptionPolicy?>();
+        foreach (var candidate in candidates.Where(candidate =>
+                     candidate.Item.ProductVariant.FulfillmentType == Domain.Catalog.Enums.FulfillmentType.MachineProduced &&
+                     candidate.Item.RecipeId.HasValue))
         {
             var recipeId = candidate.Item.RecipeId!.Value;
             var key = (ProductVariantId: candidate.Item.ProductVariantId, RecipeId: recipeId);
-            if (!routeReadiness.ContainsKey(key))
+            if (!routePolicies.ContainsKey(key))
             {
-                routeReadiness[key] = await _menus.HasActiveProductionRouteAsync(
+                routePolicies[key] = await _menus.GetActiveProductionRouteOptionPolicyAsync(
                     kiosk.Id,
                     key.ProductVariantId,
                     key.RecipeId,
@@ -74,18 +79,46 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             }
         }
 
+        var filteredOptionsByMenuItem = candidates.ToDictionary(candidate => candidate.Item.Id, candidate =>
+        {
+            var options = optionsByMenuItem[candidate.Item.Id].ToArray();
+            return candidate.Item.ProductVariant.FulfillmentType switch
+            {
+                Domain.Catalog.Enums.FulfillmentType.Packaged => options.Where(option =>
+                    option.ExecutionImpact == Domain.Catalog.Enums.ProductOptionExecutionImpact.CommercialOnly).ToArray(),
+                Domain.Catalog.Enums.FulfillmentType.Manual => options,
+                Domain.Catalog.Enums.FulfillmentType.MachineProduced when candidate.Item.RecipeId.HasValue =>
+                    FilterMachineProducedOptions(candidate.Item.ProductVariantId, candidate.Item.RecipeId.Value, options),
+                _ => []
+            };
+
+            MenuItemProductOptionReadModel[] FilterMachineProducedOptions(
+                Guid productVariantId,
+                Guid recipeId,
+                MenuItemProductOptionReadModel[] sourceOptions)
+            {
+                var policy = routePolicies.GetValueOrDefault((productVariantId, recipeId));
+                if (policy is null) return [];
+                return sourceOptions.Where(option =>
+                    option.ExecutionImpact != Domain.Catalog.Enums.ProductOptionExecutionImpact.ProductionAffecting ||
+                    policy.SupportedOptionCodes.Contains(option.Code)).ToArray();
+            }
+        });
+
         var items = candidates
             .Where(entry =>
             {
-                var hasActiveProductionRoute = entry.Item.RecipeId.HasValue &&
-                                               routeReadiness.GetValueOrDefault((entry.Item.ProductVariantId, entry.Item.RecipeId.Value));
+                var hasActiveProductionRoute =
+                    entry.Item.ProductVariant.FulfillmentType == Domain.Catalog.Enums.FulfillmentType.MachineProduced &&
+                    entry.Item.RecipeId.HasValue &&
+                    routePolicies.GetValueOrDefault((entry.Item.ProductVariantId, entry.Item.RecipeId.Value)) is not null;
                 return RuntimeMenuSellabilityRules.IsSellable(entry.Item, now, hasActiveProductionRoute) &&
-                       ProductOptionSelectionRules.IsSatisfiable(optionsByMenuItem[entry.Item.Id].ToArray());
+                       ProductOptionSelectionRules.IsSatisfiable(filteredOptionsByMenuItem[entry.Item.Id]);
             })
             .OrderBy(entry => entry.Menu.DisplayOrder)
             .ThenBy(entry => entry.Item.DisplayOrder)
             .ThenBy(entry => entry.Item.DisplayName)
-            .Select(entry => RuntimeMenuResultMapper.ToResult(entry.Item, optionsByMenuItem[entry.Item.Id].ToArray()))
+            .Select(entry => RuntimeMenuResultMapper.ToResult(entry.Item, filteredOptionsByMenuItem[entry.Item.Id]))
             .ToList();
 
         var result = new RuntimeMenuResult

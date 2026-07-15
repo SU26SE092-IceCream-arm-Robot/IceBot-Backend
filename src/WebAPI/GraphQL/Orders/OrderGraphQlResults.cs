@@ -21,3 +21,11 @@ public sealed record OrderStatusHistoryPage(
 public sealed record OrderExecutionAttemptsPage(
     IReadOnlyCollection<ExecutionAttemptResult> Items,
     OrderPageInfo PageInfo);
+
+public sealed record FulfillmentQueuePage(
+    IReadOnlyCollection<FulfillmentQueueItemResult> Items,
+    OrderPageInfo PageInfo);
+
+public sealed record OrderItemStatusHistoryPage(
+    IReadOnlyCollection<OrderItemStatusHistoryResult> Items,
+    OrderPageInfo PageInfo);

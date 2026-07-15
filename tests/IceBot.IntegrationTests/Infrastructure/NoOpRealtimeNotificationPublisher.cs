@@ -10,8 +10,14 @@ internal sealed class NoOpRealtimeNotificationPublisher : IRealtimeNotificationP
     public List<KioskStatusChangedEvent> KioskStatusChangedEvents { get; } = [];
     public List<ExecutionReadinessChangedEvent> ExecutionReadinessChangedEvents { get; } = [];
     public List<AlertChangedEvent> AlertChangedEvents { get; } = [];
+    public List<OrderItemFulfillmentChangedEvent> OrderItemFulfillmentChangedEvents { get; } = [];
 
     public Task PublishOrderStatusChangedAsync(OrderStatusChangedEvent evt, CancellationToken ct = default) => Task.CompletedTask;
+    public Task PublishOrderItemFulfillmentChangedAsync(OrderItemFulfillmentChangedEvent evt, CancellationToken ct = default)
+    {
+        OrderItemFulfillmentChangedEvents.Add(evt);
+        return Task.CompletedTask;
+    }
     public Task PublishOrderExecutionObservationChangedAsync(OrderExecutionObservationChangedEvent evt, CancellationToken ct = default)
     {
         OrderExecutionObservationEvents.Add(evt);

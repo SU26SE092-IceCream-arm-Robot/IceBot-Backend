@@ -6,7 +6,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 
 ## Search Keywords
 
-`checkout to execution`, `tablet checkout`, `payment session`, `QR payment`, `post-payment fan-out`, `tablet status`, `edge command flow`, `execution event sync`, `payment success`, `ready for execution`, `OrderReadyForExecution`, `MQTT`, `EdgeCommand`, `ProductionExecutionRecord`
+`checkout to execution`, `tablet checkout`, `payment session`, `QR payment`, `post-payment fan-out`, `tablet status`, `edge command flow`, `execution event sync`, `payment success`, `ready for fulfillment`, `OrderReadyForFulfillment`, `MQTT`, `EdgeCommand`, `ProductionExecutionRecord`
 
 ## Checkout To Execution Flow
 
@@ -45,10 +45,10 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 14. Customer pays.
 15. Payment provider calls Cloud webhook.
 16. Cloud verifies provider callback and signature.
-17. Cloud updates PaymentTransaction = Paid and Order = ReadyForExecution in one DB transaction.
+17. Cloud updates PaymentTransaction = Paid and Order = ReadyForFulfillment in one DB transaction.
 18. Cloud commits payment/order state.
 19. After the payment transaction commits, Cloud dispatches execution attempt `1`.
-   A reconciliation worker repairs any paid `ReadyForExecution` order whose initial command was not created.
+   A reconciliation worker repairs any paid `ReadyForFulfillment` order whose required machine-execution command was not created.
 20. Tablet status flow updates payment/order screen.
 21. Edge dispatch resolves one active execution endpoint and the active configuration release, then maps every machine-produced order line to an execution route and ordered robot programs.
 22. Cloud publishes a best-effort MQTT `CommandAvailable` wake-up after commit. Edge still finds the durable `ExecuteOrder` command through authenticated pull; periodic polling recovers missed wake-ups.
@@ -110,7 +110,7 @@ State mapping:
 | Cloud state | Tablet screen |
 | --- | --- |
 | `PaymentTransaction = Pending` | QR payment screen |
-| `PaymentTransaction = Paid`, `Order = ReadyForExecution` | Payment successful, preparing order |
+| `PaymentTransaction = Paid`, `Order = ReadyForFulfillment` | Payment successful, preparing fulfillment |
 | `Order = Accepted` | Machine accepted order |
 | `Order = Preparing` | Making item |
 | `Order = Completed` | Ready / pick up |
@@ -150,7 +150,7 @@ Order tracking read model boundary limitations and data exclusions are detailed 
    - Cloud moves Order to Accepted
    - create local execution work
 8. If not ready:
-   - ack ExecutorBusy when capacity is temporarily unavailable; Cloud keeps the order ReadyForExecution and redelivers later
+   - ack ExecutorBusy when capacity is temporarily unavailable; Cloud keeps the order ReadyForFulfillment and redelivers later
    - otherwise ack Rejected
    - include rejection reason and readiness snapshot
    - Cloud moves the order to ExecutionRejected, or RefundRequired when physical output may already have occurred
@@ -215,26 +215,22 @@ Check:
 3. Edge batches events for Cloud sync.
 4. Cloud ingests events through SyncEventInbox.
 5. Cloud deduplicates by eventId/source node.
-6. Job/unit reports carrying `sourceProductionJobId` update production and stock evidence without prematurely changing the whole Order.
-7. The Edge order-summary report (`sourceProductionJobId = null`) updates the order projection and business Order in one transaction:
-   - Accepted -> Accepted
-   - Running -> Preparing
-   - Completed -> Completed
-   - Failed -> Failed
-   - RequiresManualIntervention -> RefundRequired
+6. Job/unit reports carry `sourceProductionJobId`, `orderItemId`, `productionUnitNo`, and `productionUnitQuantity`; they update production evidence and only the identified machine-produced order line.
+7. The Edge order-summary report (`sourceProductionJobId = null`) advances all dispatched machine-produced lines. The Order is then aggregated across every line, including manual and packaged fulfillment; it completes only when every order item is complete.
 8. Cloud appends OrderStatusHistory and typed stock-consumption evidence supplied by Edge.
-9. After commit, Cloud publishes OrderStatusChanged and InventoryChanged SignalR events.
+9. After commit, Cloud publishes OrderItemFulfillmentChanged for changed lines, OrderStatusChanged when the aggregate status changes, and InventoryChanged for stock evidence.
 10. Cloud returns accepted/duplicate/rejected result.
 ```
 
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
 
-Every production report must match the configuration release id and checksum embedded in its accepted execute-order command. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. Each stock-evidence item identifies its `OrderItemId`; Cloud validates the ingredient against that line's immutable recipe or option snapshot. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
+Every production report must match the configuration release id and checksum embedded in its accepted execute-order command. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. A source production job is permanently bound to its first reported order item and production-unit range. Each stock-evidence item identifies its `OrderItemId`; Cloud validates the ingredient against that line's immutable recipe or option snapshot. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
 
 ## Real-time Order & Payment Updates
 
 During the checkout and execution flow, state changes (e.g. order placement, cancellation, payment webhook status updates, refund flagging) emit real-time SignalR notifications to subscribed clients:
 - **`OrderStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when order status transitions.
+- **`OrderItemFulfillmentChanged`** is published to `order:{orderId}` and `kiosk:{kioskId}` when a manual, packaged, or machine-produced line changes status.
 - **`PaymentStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when payment transaction status changes.
 - **`OrderExecutionObservationChanged`** is published on `OrderHub` when execution observation changes to `Delayed`, `PendingRecovery`, or `SupportRequired` without changing `Order.Status`.
 

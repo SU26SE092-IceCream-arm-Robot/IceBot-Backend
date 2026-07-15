@@ -181,6 +181,11 @@ public sealed class IngestExecutionReportCommandHandler
                 cancellationToken);
         }
 
+        foreach (var itemEvent in notifications.OrderItemFulfillmentChanged)
+        {
+            await _publisher.PublishOrderItemFulfillmentChangedAsync(itemEvent, cancellationToken);
+        }
+
         foreach (var inventoryEvent in notifications.InventoryChanged)
         {
             await _publisher.PublishInventoryChangedAsync(inventoryEvent, cancellationToken);

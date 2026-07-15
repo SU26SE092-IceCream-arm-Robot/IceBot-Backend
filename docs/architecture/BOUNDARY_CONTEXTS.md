@@ -23,6 +23,7 @@ This project keeps one Domain project, but domain entities are grouped by bounde
 | Payments | `Domain.Payments` | payment transactions, callbacks, refunds, payment methods |
 | Robot Configuration | `Domain.RobotConfiguration` | robot Lua artifacts and reusable robot manifests |
 | Production Configuration | `Domain.ProductionConfiguration` | configuration releases, routes, robot bindings and deployment records |
+| Production Packages | `Domain.ProductionPackages` | reusable package/version manifests, deterministic installation provenance, and composition audit; references Catalog and RobotConfiguration by IDs/snapshots |
 | Production Execution | `Domain.ProductionExecution` | Cloud execution projections from executor evidence |
 | Devices | `Domain.Devices` | device catalog, telemetry, heartbeats and kiosk execution endpoints |
 | Inventory | `Domain.Inventory` | dispenser state, stock movements |
@@ -35,6 +36,8 @@ This project keeps one Domain project, but domain entities are grouped by bounde
 Namespace: `Domain.Identity`
 
 Owns accounts, roles, notification-device registrations, and refresh tokens.
+
+`AccountNotificationDevice` is an FCM installation registry. Firebase delivery targets active registrations by account and invalidates provider-rejected tokens; recipient policy belongs to the calling product workflow. It is not a trusted-session or login-security model.
 
 Entities:
 
@@ -110,8 +113,10 @@ Entities:
 - `Order`
 - `OrderItem`
 - `OrderStatusHistory`
+- `OrderItemStatusHistory`
 
 Orders may reference catalog, payment, kiosk, and execution evidence by id or snapshot, but should not depend on mutable Edge runtime state for historical truth.
+Each order item snapshots its fulfillment type. Manual lines use the strict staff preparation lifecycle; packaged lines use idempotent handoff/failure commands and never enter acceptance or preparation; machine-produced lines advance through authenticated production reports carrying order-item and production-unit identity. Item failure is represented by the Orders-owned `FulfillmentIssue` aggregate state and does not itself decide payment compensation.
 
 ### Payments
 
@@ -127,6 +132,8 @@ Entities:
 - `Refund`
 
 Provider payloads are external evidence. Idempotency and retry decisions must use typed columns.
+
+`PaymentMethod` is a reference/status catalog. Provider credentials and provider-specific settings remain in application configuration or secret storage, not database JSON or management DTOs.
 
 Current refund phase is manual cash refund. Auto provider refund or payout integration can be added later, but should not be assumed in the first implementation.
 

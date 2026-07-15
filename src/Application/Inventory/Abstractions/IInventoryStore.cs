@@ -26,6 +26,10 @@ public interface IInventoryStore
     Task<List<IngredientDispenserState>> ListStatesForInventoryTopologyAsync(Guid kioskId, CancellationToken cancellationToken = default);
     Task<List<Kiosk>> ListKiosksForInventoryReadinessAsync(Guid organizationId, CancellationToken cancellationToken = default);
     Task<List<RecipeItem>> ListRequiredRecipeItemsAsync(IReadOnlyCollection<Guid> recipeIds, CancellationToken cancellationToken = default);
+    Task<List<ProductOption>> ListSupportedProductOptionsAsync(
+        IReadOnlyCollection<Guid> productIds,
+        IReadOnlyCollection<string> optionCodes,
+        CancellationToken cancellationToken = default);
     Task<bool> DispenserIdentityExistsAsync(Guid deviceId, string containerCode, Guid? excludedId = null, CancellationToken cancellationToken = default);
     Task<bool> HasStockMovementsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<bool> HasActiveExecutionAsync(Guid kioskId, CancellationToken cancellationToken = default);

@@ -5,6 +5,7 @@ using Serilog;
 using Serilog.Sinks.OpenTelemetry;
 using Application.EdgeIntegration.Observability;
 using Infrastructure.Payments.Observability;
+using Infrastructure.Firebase;
 
 namespace WebAPI.Configuration.Observability;
 
@@ -103,6 +104,7 @@ public static class ObservabilityExtensions
                 metrics
                     .AddMeter(IceBotEdgeMetrics.MeterName)
                     .AddMeter(PayOsResilienceMetrics.MeterName)
+                    .AddMeter(FirebaseAccountPushNotificationSender.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();

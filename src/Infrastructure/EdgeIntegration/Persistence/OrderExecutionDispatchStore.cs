@@ -177,8 +177,8 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
         return await _dbContext.Orders.WhereNotDeleted().AsNoTracking()
             .Where(order =>
                 order.PaymentStatus == PaymentStatus.Paid &&
-                order.Status == OrderStatus.ReadyForExecution &&
-                order.OrderItems.Any(item => item.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced) &&
+                order.Status == OrderStatus.ReadyForFulfillment &&
+                order.OrderItems.Any(item => item.FulfillmentType == FulfillmentType.MachineProduced) &&
                 !_dbContext.EdgeCommands.Any(command =>
                     command.OrderId == order.Id &&
                     command.DispatchAttemptNo == 1))

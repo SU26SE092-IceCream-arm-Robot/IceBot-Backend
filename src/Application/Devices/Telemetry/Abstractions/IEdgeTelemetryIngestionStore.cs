@@ -3,6 +3,7 @@ using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Catalog;
 using Domain.Tenants.Entities;
 using Domain.Operations.Entities;
+using Domain.Devices.Connectivity;
 
 namespace Application.Devices.Telemetry.Abstractions;
 
@@ -62,6 +63,7 @@ public interface IEdgeTelemetryIngestionStore
         CancellationToken cancellationToken = default);
 
     Task<Kiosk?> GetKioskAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<KioskConnectivityProjection?> GetConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<Device?> GetDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);
 
@@ -71,6 +73,7 @@ public interface IEdgeTelemetryIngestionStore
         CancellationToken cancellationToken = default);
 
     Task AddHeartbeatAsync(KioskHeartbeat heartbeat, CancellationToken cancellationToken = default);
+    Task AddConnectivityAsync(KioskConnectivityProjection connectivity, CancellationToken cancellationToken = default);
 
     Task AddDeviceEventAsync(DeviceEvent deviceEvent, CancellationToken cancellationToken = default);
 

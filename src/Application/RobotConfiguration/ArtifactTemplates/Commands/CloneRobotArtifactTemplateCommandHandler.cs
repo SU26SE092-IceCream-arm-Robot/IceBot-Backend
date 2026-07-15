@@ -10,6 +10,8 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.ArtifactContracts;
+using Application.RobotConfiguration.ArtifactContracts;
 
 namespace Application.RobotConfiguration.ArtifactTemplates.Commands;
 
@@ -19,17 +21,20 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
     private readonly IRobotArtifactTemplateStore _templateStore;
     private readonly IArtifactObjectStorage _storage;
     private readonly ArtifactUploadContentService _contentService;
+    private readonly IRobotArtifactTechnicalContractStore _technicalContracts;
 
     public CloneRobotArtifactTemplateCommandHandler(
         IRobotArtifactStore store,
         IRobotArtifactTemplateStore templateStore,
         IArtifactObjectStorage storage,
-        ArtifactUploadContentService contentService)
+        ArtifactUploadContentService contentService,
+        IRobotArtifactTechnicalContractStore technicalContracts)
     {
         _store = store;
         _templateStore = templateStore;
         _storage = storage;
         _contentService = contentService;
+        _technicalContracts = technicalContracts;
     }
 
     public async Task<ApiResult<RobotArtifactResult>> HandleAsync(
@@ -60,6 +65,28 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
         if (template is null || template.Status != RobotArtifactStatus.Published)
         {
             return ApiResult<RobotArtifactResult>.Fail("Published robot artifact template not found.", 404);
+        }
+
+        if (!template.TechnicalContractId.HasValue ||
+            string.IsNullOrWhiteSpace(template.TechnicalContractChecksum))
+        {
+            return ApiResult<RobotArtifactResult>.Fail(
+                "The published template does not have a technical contract.", 409);
+        }
+
+        var technicalContract = await _technicalContracts.GetAsync(
+            template.TechnicalContractId.Value,
+            false,
+            cancellationToken);
+        if (technicalContract is null ||
+            technicalContract.OrganizationId.HasValue ||
+            technicalContract.Status != RobotArtifactContractStatus.Published ||
+            !string.Equals(technicalContract.ContractChecksum, template.TechnicalContractChecksum, StringComparison.Ordinal) ||
+            !string.Equals(technicalContract.RuntimeTargetCode, template.RuntimeTargetCode, StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(technicalContract.MachineModelCode, template.MachineModelCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return ApiResult<RobotArtifactResult>.Fail(
+                "The template technical contract is no longer published or compatible.", 409);
         }
 
         var code = command.ArtifactCode.Trim().ToUpperInvariant();
@@ -105,7 +132,9 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
                 template.ExportedAt,
                 command.Description ?? template.Description,
                 command.MetadataJson?.Trim() ?? template.MetadataJson,
-                template.Id);
+                template.Id,
+                template.TechnicalContractId,
+                template.TechnicalContractChecksum);
             artifact.Id = artifactId;
             artifact.CreatedByAccountId = command.UserContext.AccountId;
 
@@ -136,6 +165,19 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
         catch (ArtifactObjectAlreadyExistsException)
         {
             return ApiResult<RobotArtifactResult>.Fail("Destination artifact object already exists.", 409);
+        }
+        catch (ArtifactObjectNotFoundException ex)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectIntegrityException ex)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectStorageUnavailableException)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(
+                "Artifact object storage is temporarily unavailable.", 503);
         }
     }
 }

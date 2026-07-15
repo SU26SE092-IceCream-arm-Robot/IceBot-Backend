@@ -132,6 +132,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
                 route.RouteCode,
                 route.Priority,
                 route.RequiredCapabilitiesJson,
+                route.SupportedOptionCodes,
                 route.RobotBindings.Select(binding => new ConfigurationReleaseRobotBindingInput(
                     binding.RobotProgramId,
                     binding.BindingOrder,
@@ -205,6 +206,9 @@ public sealed class ConfigurationReleaseRouteRequest
     public int Priority { get; init; }
 
     public string? RequiredCapabilitiesJson { get; init; }
+
+    [Required]
+    public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
 
     [Required, MinLength(1)]
     public IReadOnlyCollection<ConfigurationReleaseRobotBindingRequest> RobotBindings { get; init; } = Array.Empty<ConfigurationReleaseRobotBindingRequest>();

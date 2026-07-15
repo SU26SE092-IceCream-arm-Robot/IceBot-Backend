@@ -19,7 +19,8 @@ public sealed class CreateProductOptionCommandHandler(IProductStore products)
         var group = await products.GetOptionGroupByIdAsync(product.Id, command.OptionGroupId, false, ct);
         if (group is null) return ApiResult<ProductOptionResult>.Fail("Option group not found.", 404);
         var request = command.Request;
-        var error = ProductOptionRequestValidator.ValidateOption(request.Code, request.Name, request.PriceDelta);
+        var error = ProductOptionRequestValidator.ValidateOption(request.Code, request.Name, request.PriceDelta,
+            request.ExecutionImpact);
         if (error is not null) return ApiResult<ProductOptionResult>.Fail(error);
         var code = ProductNormalizer.NormalizeCode(request.Code);
         if (await products.ProductOptionCodeExistsAsync(group.Id, code, cancellationToken: ct))
@@ -34,6 +35,7 @@ public sealed class CreateProductOptionCommandHandler(IProductStore products)
             Name = request.Name.Trim(),
             Description = ProductNormalizer.TrimToNull(request.Description),
             PriceDelta = request.PriceDelta,
+            ExecutionImpact = request.ExecutionImpact,
             IsDefault = request.IsDefault,
             IsAvailable = false,
             DisplayOrder = request.DisplayOrder,

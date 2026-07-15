@@ -31,14 +31,19 @@ public sealed class ArtifactCommandPayloadEnricher
         {
             root = JsonNode.Parse(command.PayloadJson);
         }
-        catch (JsonException)
+        catch (JsonException exception)
         {
-            return command.PayloadJson;
+            throw new InvalidArtifactCommandPayloadException(
+                command.Id,
+                "The deployment command contains an invalid durable JSON payload.",
+                exception);
         }
 
         if (root is null)
         {
-            return command.PayloadJson;
+            throw new InvalidArtifactCommandPayloadException(
+                command.Id,
+                "The deployment command contains an empty durable JSON payload.");
         }
 
         var artifactNodes = new List<(JsonObject Node, string StorageKey)>();
@@ -86,4 +91,15 @@ public sealed class ArtifactCommandPayloadEnricher
             }
         }
     }
+}
+
+public sealed class InvalidArtifactCommandPayloadException : Exception
+{
+    public InvalidArtifactCommandPayloadException(Guid commandId, string message, Exception? innerException = null)
+        : base($"Deployment command '{commandId}' is not deliverable. {message}", innerException)
+    {
+        CommandId = commandId;
+    }
+
+    public Guid CommandId { get; }
 }

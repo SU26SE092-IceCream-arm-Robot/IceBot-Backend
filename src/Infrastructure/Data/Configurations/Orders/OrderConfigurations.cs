@@ -86,3 +86,18 @@ internal sealed class OrderStatusHistoryConfiguration : IEntityTypeConfiguration
 
     }
 }
+
+internal sealed class OrderItemStatusHistoryConfiguration : IEntityTypeConfiguration<OrderItemStatusHistory>
+{
+    public void Configure(EntityTypeBuilder<OrderItemStatusHistory> entity)
+    {
+        entity.ToTable("OrderItemStatusHistories");
+        entity.HasIndex(x => new { x.OrderItemId, x.ChangedAt });
+        entity.Property(x => x.SourcePayloadHash).HasMaxLength(64);
+        entity.HasIndex(x => new { x.OrderItemId, x.SourceEventId })
+            .IsUnique()
+            .HasFilter("\"SourceEventId\" IS NOT NULL");
+        entity.HasOne<OrderItem>().WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Account>().WithMany().HasForeignKey(x => x.ChangedByAccountId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
