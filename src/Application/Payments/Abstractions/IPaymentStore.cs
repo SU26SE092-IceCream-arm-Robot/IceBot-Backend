@@ -1,11 +1,13 @@
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
+using Domain.Devices.Connectivity;
 
 namespace Application.Payments.Abstractions;
 
 public interface IPaymentStore
 {
     Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default);
+    Task<KioskConnectivityProjection?> GetKioskConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<PaymentMethod?> GetPaymentMethodByCodeAsync(string code, CancellationToken cancellationToken = default);
 

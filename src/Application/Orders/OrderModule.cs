@@ -15,9 +15,13 @@ public static class OrderModule
         services.AddScoped<Management.Queries.GetOrderExecutionAttemptsQueryHandler>();
         services.AddScoped<Management.Queries.GetExecutionAttemptQueryHandler>();
         services.AddScoped<Management.Queries.GetOrderOverviewQueryHandler>();
+        services.AddScoped<Management.Queries.ListFulfillmentQueueQueryHandler>();
+        services.AddScoped<Management.Queries.GetOrderItemStatusHistoryQueryHandler>();
         services.AddScoped<Management.Commands.CancelManagementOrderCommandHandler>();
         services.AddScoped<Management.Commands.MarkOrderRefundRequiredCommandHandler>();
         services.AddScoped<Management.Commands.RedispatchOrderExecutionCommandHandler>();
+        services.AddScoped<Management.Commands.RecordManualOrderItemFulfillmentEventCommandHandler>();
+        services.AddScoped<Management.Commands.SetPackagedOrderItemFulfillmentCommandHandler>();
 
         return services;
     }

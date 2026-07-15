@@ -15,6 +15,7 @@ public sealed record ConfigurationReleaseRouteInput(
     string RouteCode,
     int Priority,
     string? RequiredCapabilitiesJson,
+    IReadOnlyCollection<string> SupportedOptionCodes,
     IReadOnlyCollection<ConfigurationReleaseRobotBindingInput> RobotBindings);
 
 public sealed record ConfigurationReleaseRobotBindingInput(

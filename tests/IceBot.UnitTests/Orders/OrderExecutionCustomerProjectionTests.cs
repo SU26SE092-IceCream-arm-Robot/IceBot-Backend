@@ -12,6 +12,18 @@ namespace IceBot.UnitTests.Orders;
 
 public sealed class OrderExecutionCustomerProjectionTests
 {
+    [Fact]
+    public void ProjectFromOrder_FulfillmentIssueRequiresStaffSupport()
+    {
+        var order = new Order();
+        TestData.SetProperty(order, nameof(Order.Status), OrderStatus.FulfillmentIssue);
+
+        var projection = OrderStatusProjector.ProjectFromOrder(order);
+
+        Assert.Equal("SupportRequired", projection.CustomerStatus);
+        Assert.True(projection.RequiresStaffSupport);
+    }
+
     [Theory]
     [InlineData(ExecutionObservationStatus.Stale, CustomerExecutionStatus.Delayed, "Delayed", false)]
     [InlineData(ExecutionObservationStatus.Unreachable, CustomerExecutionStatus.PendingRecovery, "PendingRecovery", false)]

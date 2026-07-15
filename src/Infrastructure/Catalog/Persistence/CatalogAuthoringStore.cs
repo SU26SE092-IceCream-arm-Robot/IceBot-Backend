@@ -45,9 +45,8 @@ public sealed class CatalogAuthoringStore(IceBotDbContext dbContext) : ICatalogA
     public Task AddProductCategoryAsync(ProductCategory category, CancellationToken cancellationToken = default) =>
         dbContext.ProductCategories.AddAsync(category, cancellationToken).AsTask();
 
-    public async Task<bool> IsProductCategoryReferencedAsync(long categoryId, CancellationToken cancellationToken = default) =>
-        await dbContext.Products.IgnoreQueryFilters().AnyAsync(product => product.CategoryId == categoryId, cancellationToken) ||
-        await dbContext.ProductCategories.IgnoreQueryFilters().AnyAsync(category => category.ParentCategoryId == categoryId, cancellationToken);
+    public Task<bool> IsProductCategoryReferencedAsync(long categoryId, CancellationToken cancellationToken = default) =>
+        dbContext.Products.IgnoreQueryFilters().AnyAsync(product => product.CategoryId == categoryId, cancellationToken);
 
     public void RemoveProductCategory(ProductCategory category) => dbContext.ProductCategories.Remove(category);
 

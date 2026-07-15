@@ -31,6 +31,9 @@ internal static class ProductionExecutionReportApplier
         var physicalOutputState = ExecutionReportStatusMapper.ToPhysicalOutputState(command.PhysicalOutputMayHaveOccurred);
         var productionApplied = await ApplyProductionRecordAsync(
             unitOfWork, context, status, physicalOutputState, cancellationToken);
+        if (command.SourceProductionJobId.HasValue)
+            await OrderItemExecutionLifecycleApplier.ApplyJobReportAsync(
+                unitOfWork, context, status, cancellationToken);
         var orderApplied = !command.SourceProductionJobId.HasValue && await ApplyOrderRecordAsync(
             unitOfWork, context, status, cancellationToken);
 
@@ -61,11 +64,21 @@ internal static class ProductionExecutionReportApplier
             record = ProductionExecutionRecord.Create(
                 edgeCommand.Id, endpoint.Id, endpoint.ExecutionProfile, context.SourceExecutorId, command.SourceEventId,
                 command.SequenceNumber, command.EdgeCreatedAt, context.ExecutorReportedAt, context.CloudReceivedAt, status,
-                physicalOutputState, command.SourceProductionJobId.Value, command.WorkcellId, command.ControllerId,
+                physicalOutputState, command.SourceProductionJobId.Value,
+                command.OrderItemId!.Value, command.ProductionUnitNo!.Value, command.ProductionUnitQuantity!.Value,
+                command.WorkcellId, command.ControllerId,
                 command.ExecutionPlanChecksum, command.ActiveSetVersion, command.ActiveSetChecksum,
                 command.ErrorCode, command.ErrorMessage);
             await store.AddProductionExecutionRecordAsync(record, cancellationToken);
             return true;
+        }
+
+        if (record.OrderItemId != command.OrderItemId!.Value ||
+            record.ProductionUnitNo != command.ProductionUnitNo!.Value ||
+            record.ProductionUnitQuantity != command.ProductionUnitQuantity!.Value)
+        {
+            throw new DomainRuleException(
+                "Production execution report unit identity does not match the first report for this source job.");
         }
 
         return record.ApplyObservation(

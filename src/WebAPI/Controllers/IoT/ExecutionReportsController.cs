@@ -49,6 +49,9 @@ public sealed class ExecutionReportsController : ControllerBase
             Status = request.Status,
             DeploymentId = request.DeploymentId,
             SourceProductionJobId = request.SourceProductionJobId,
+            OrderItemId = request.OrderItemId,
+            ProductionUnitNo = request.ProductionUnitNo,
+            ProductionUnitQuantity = request.ProductionUnitQuantity,
             WorkcellId = request.WorkcellId,
             ControllerId = request.ControllerId,
             ExecutionPlanChecksum = request.ExecutionPlanChecksum,
@@ -99,6 +102,14 @@ public sealed class IngestExecutionReportRequest
     public Guid? DeploymentId { get; init; }
 
     public Guid? SourceProductionJobId { get; init; }
+
+    public Guid? OrderItemId { get; init; }
+
+    [Range(1, int.MaxValue)]
+    public int? ProductionUnitNo { get; init; }
+
+    [Range(1, int.MaxValue)]
+    public int? ProductionUnitQuantity { get; init; }
 
     public Guid? WorkcellId { get; init; }
 

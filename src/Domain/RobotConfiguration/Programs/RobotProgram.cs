@@ -94,7 +94,8 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
         Guid robotArtifactId,
         int runOrder,
         string? parametersJson = null,
-        int parametersSchemaVersion = 1)
+        int parametersSchemaVersion = 1,
+        string? requiredOptionCode = null)
     {
         EnsureDraft();
 
@@ -103,7 +104,8 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
             throw new DomainRuleException("A robot program artifact with the same run order already exists.");
         }
 
-        var artifact = RobotProgramArtifact.Create(robotArtifactId, runOrder, parametersJson, parametersSchemaVersion);
+        var artifact = RobotProgramArtifact.Create(robotArtifactId, runOrder, parametersJson,
+            parametersSchemaVersion, requiredOptionCode);
         _robotProgramArtifacts.Add(artifact);
         return artifact;
     }
@@ -115,14 +117,16 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
     }
 
     public IReadOnlyCollection<RobotProgramArtifact> ReplaceArtifacts(
-        IEnumerable<(Guid ArtifactId, int RunOrder, string? ParametersJson, int ParametersSchemaVersion)> replacements)
+        IEnumerable<(Guid ArtifactId, int RunOrder, string? ParametersJson, int ParametersSchemaVersion,
+            string? RequiredOptionCode)> replacements)
     {
         EnsureDraft();
         var removed = _robotProgramArtifacts.ToArray();
         _robotProgramArtifacts.Clear();
         foreach (var replacement in replacements)
         {
-            AddArtifact(replacement.ArtifactId, replacement.RunOrder, replacement.ParametersJson, replacement.ParametersSchemaVersion);
+            AddArtifact(replacement.ArtifactId, replacement.RunOrder, replacement.ParametersJson,
+                replacement.ParametersSchemaVersion, replacement.RequiredOptionCode);
         }
 
         return removed;

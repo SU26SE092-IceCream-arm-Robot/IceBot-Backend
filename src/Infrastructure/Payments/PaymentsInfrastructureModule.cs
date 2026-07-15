@@ -1,5 +1,6 @@
 using Application.Payments.Abstractions;
 using Infrastructure.Payments.Options;
+using Infrastructure.Payments.Bootstrap;
 using Infrastructure.Payments.Persistence;
 using Infrastructure.Payments.Providers.PayOS;
 using Microsoft.Extensions.Configuration;
@@ -39,6 +40,7 @@ public static class PaymentsInfrastructureModule
 
         services.AddScoped<IPaymentStore, PaymentStore>();
         services.AddScoped<IPaymentGateway>(provider => provider.GetRequiredService<PayOsPaymentGateway>());
+        services.AddHostedService<PaymentMethodCatalogHostedService>();
 
         return services;
     }

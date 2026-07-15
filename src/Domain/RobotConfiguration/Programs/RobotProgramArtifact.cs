@@ -14,6 +14,8 @@ public class RobotProgramArtifact : RobotConfigurationEntity
 
     public string? ParametersJson { get; private set; }
 
+    public string? RequiredOptionCode { get; private set; }
+
     public virtual RobotProgram RobotProgram { get; private set; } = null!;
 
     private RobotProgramArtifact()
@@ -24,7 +26,8 @@ public class RobotProgramArtifact : RobotConfigurationEntity
         Guid robotArtifactId,
         int runOrder,
         string? parametersJson = null,
-        int parametersSchemaVersion = 1)
+        int parametersSchemaVersion = 1,
+        string? requiredOptionCode = null)
     {
         if (robotArtifactId == Guid.Empty)
         {
@@ -46,7 +49,10 @@ public class RobotProgramArtifact : RobotConfigurationEntity
             RobotArtifactId = robotArtifactId,
             RunOrder = runOrder,
             ParametersJson = parametersJson,
-            ParametersSchemaVersion = parametersSchemaVersion
+            ParametersSchemaVersion = parametersSchemaVersion,
+            RequiredOptionCode = string.IsNullOrWhiteSpace(requiredOptionCode)
+                ? null
+                : requiredOptionCode.Trim().ToUpperInvariant()
         };
     }
 }

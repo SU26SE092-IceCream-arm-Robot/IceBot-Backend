@@ -26,6 +26,7 @@ public sealed class RobotArtifactTests
     {
         var artifact = CreateDraft();
 
+        artifact.AssignTechnicalContract(Guid.NewGuid(), new string('c', 64));
         artifact.Publish();
 
         Assert.Equal(RobotArtifactStatus.Published, artifact.Status);

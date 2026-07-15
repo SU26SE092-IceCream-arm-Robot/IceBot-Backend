@@ -28,6 +28,10 @@ public static class ConfigurationReleaseManifestBuilder
                 route.Priority,
                 route.ProductVariantId,
                 route.RecipeId,
+                route.ProductionDefinitionSchemaVersion,
+                route.ProductionDefinitionChecksum,
+                ProductionDefinition = CanonicalizeOptionalJson(route.ProductionDefinitionJson, "production definition"),
+                SupportedOptionCodes = route.GetSupportedOptionCodes(),
                 RequiredCapabilities = CanonicalizeOptionalJson(route.RequiredCapabilitiesJson, "execution route required capabilities"),
                 RobotBindings = route.RobotBindings
                     .OrderBy(binding => binding.BindingOrder)
@@ -47,18 +51,6 @@ public static class ConfigurationReleaseManifestBuilder
         };
 
         var json = JsonSerializer.Serialize(document);
-        var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
-        return new ConfigurationReleaseManifest(json, checksum);
-    }
-
-    public static ConfigurationReleaseManifest AttachFullEdgeBundle(
-        ConfigurationReleaseManifest contentManifest,
-        FullEdgeReleaseBundleDescriptor fullEdgeBundle)
-    {
-        var root = JsonNode.Parse(contentManifest.Json) as JsonObject
-            ?? throw new DomainRuleException("Configuration release content manifest must be a JSON object.");
-        root["FullEdgeBundle"] = JsonSerializer.SerializeToNode(fullEdgeBundle);
-        var json = root.ToJsonString();
         var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
         return new ConfigurationReleaseManifest(json, checksum);
     }
@@ -86,6 +78,7 @@ public static class ConfigurationReleaseManifestBuilder
                     artifact.RunOrder,
                     Parameters = CanonicalizeOptionalJson(artifact.ParametersJson, "robot program artifact parameters"),
                     artifact.ParametersSchemaVersion,
+                    artifact.RequiredOptionCode,
                     RobotArtifact = new
                     {
                         Id = artifact.RobotArtifactId,
@@ -94,6 +87,8 @@ public static class ConfigurationReleaseManifestBuilder
                         artifact.RuntimeTargetCode,
                         artifact.MachineModelCode,
                         artifact.ContentLengthBytes,
+                        artifact.TechnicalContractId,
+                        artifact.TechnicalContractChecksum,
                         BundleEntryName = $"artifacts/{artifact.RobotArtifactId:D}.lua"
                     }
                 };

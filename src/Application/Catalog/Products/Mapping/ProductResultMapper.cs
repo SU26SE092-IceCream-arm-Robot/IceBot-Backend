@@ -72,6 +72,7 @@ internal static class ProductResultMapper
         Name = option.Name,
         Description = option.Description,
         PriceDelta = option.PriceDelta,
+        ExecutionImpact = option.ExecutionImpact,
         Currency = currency,
         IsDefault = option.IsDefault,
         IsAvailable = option.IsAvailable,

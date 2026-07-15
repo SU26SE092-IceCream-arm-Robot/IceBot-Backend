@@ -27,6 +27,8 @@ using Domain.Payments.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.ProductionConfiguration.Entities;
 using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.ArtifactContracts;
+using Domain.ProductionPackages;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
@@ -34,6 +36,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System.Linq.Expressions;
 using Domain.Devices.ExecutionEndpoints.Projections;
+using Domain.Devices.Connectivity;
 
 namespace Infrastructure.Data;
 
@@ -118,6 +121,7 @@ public class IceBotDbContext : DbContext
     public DbSet<Device> Devices => Set<Device>();
     public DbSet<DeviceEvent> DeviceEvents => Set<DeviceEvent>();
     public DbSet<KioskHeartbeat> KioskHeartbeats => Set<KioskHeartbeat>();
+    public DbSet<KioskConnectivityProjection> KioskConnectivityProjections => Set<KioskConnectivityProjection>();
     public DbSet<KioskExecutionEndpoint> KioskExecutionEndpoints => Set<KioskExecutionEndpoint>();
     public DbSet<ExecutionEndpointCredentialBinding> ExecutionEndpointCredentialBindings => Set<ExecutionEndpointCredentialBinding>();
     public DbSet<ExecutionEndpointMqttCredential> ExecutionEndpointMqttCredentials => Set<ExecutionEndpointMqttCredential>();
@@ -149,6 +153,7 @@ public class IceBotDbContext : DbContext
     public DbSet<OrderItemOption> OrderItemOptions => Set<OrderItemOption>();
     public DbSet<OrderItemOptionIngredientRequirement> OrderItemOptionIngredientRequirements => Set<OrderItemOptionIngredientRequirement>();
     public DbSet<OrderStatusHistory> OrderStatusHistories => Set<OrderStatusHistory>();
+    public DbSet<OrderItemStatusHistory> OrderItemStatusHistories => Set<OrderItemStatusHistory>();
 
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
@@ -158,7 +163,20 @@ public class IceBotDbContext : DbContext
     public DbSet<RobotProgram> RobotPrograms => Set<RobotProgram>();
     public DbSet<RobotArtifact> RobotArtifacts => Set<RobotArtifact>();
     public DbSet<RobotArtifactTemplate> RobotArtifactTemplates => Set<RobotArtifactTemplate>();
+    public DbSet<RobotArtifactTechnicalContract> RobotArtifactTechnicalContracts => Set<RobotArtifactTechnicalContract>();
+    public DbSet<RobotArtifactDeclaredEffect> RobotArtifactDeclaredEffects => Set<RobotArtifactDeclaredEffect>();
+    public DbSet<RobotArtifactOrderingConstraint> RobotArtifactOrderingConstraints => Set<RobotArtifactOrderingConstraint>();
     public DbSet<RobotProgramArtifact> RobotProgramArtifacts => Set<RobotProgramArtifact>();
+    public DbSet<ProductionPackage> ProductionPackages => Set<ProductionPackage>();
+    public DbSet<ProductionPackageVersion> ProductionPackageVersions => Set<ProductionPackageVersion>();
+    public DbSet<ProductionPackageProductDefinition> ProductionPackageProductDefinitions => Set<ProductionPackageProductDefinition>();
+    public DbSet<ProductionPackageArtifactDefinition> ProductionPackageArtifactDefinitions => Set<ProductionPackageArtifactDefinition>();
+    public DbSet<ProductionPackageProgramBlueprint> ProductionPackageProgramBlueprints => Set<ProductionPackageProgramBlueprint>();
+    public DbSet<ProductionPackageProgramSlot> ProductionPackageProgramSlots => Set<ProductionPackageProgramSlot>();
+    public DbSet<ProductionPackageRouteBlueprint> ProductionPackageRouteBlueprints => Set<ProductionPackageRouteBlueprint>();
+    public DbSet<ProductionPackageInstallation> ProductionPackageInstallations => Set<ProductionPackageInstallation>();
+    public DbSet<ProductionPackageMaterialization> ProductionPackageMaterializations => Set<ProductionPackageMaterialization>();
+    public DbSet<ProductionComposition> ProductionCompositions => Set<ProductionComposition>();
     public DbSet<ConfigurationRelease> ConfigurationReleases => Set<ConfigurationRelease>();
     public DbSet<ExecutionRoute> ExecutionRoutes => Set<ExecutionRoute>();
     public DbSet<ExecutionRouteRobotBinding> ExecutionRouteRobotBindings => Set<ExecutionRouteRobotBinding>();

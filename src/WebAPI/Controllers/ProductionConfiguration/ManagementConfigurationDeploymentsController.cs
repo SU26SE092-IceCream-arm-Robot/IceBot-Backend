@@ -10,6 +10,7 @@ using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Authorization;
+using Application.ProductionConfiguration.Deployments.Services;
 using System.ComponentModel.DataAnnotations;
 
 namespace WebAPI.Controllers.ProductionConfiguration;
@@ -24,19 +25,22 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     private readonly RollbackConfigurationDeploymentCommandHandler _rollbackHandler;
     private readonly DeployFullEdgeConfigurationCommandHandler _fullEdgeHandler;
     private readonly DeployLowCostArtifactSetCommandHandler _lowCostHandler;
+    private readonly DeploymentValidationPreviewHandler _validationPreview;
 
     public ManagementConfigurationDeploymentsController(
         ListConfigurationDeploymentsQueryHandler listHandler,
         GetConfigurationDeploymentQueryHandler getHandler,
         RollbackConfigurationDeploymentCommandHandler rollbackHandler,
         DeployFullEdgeConfigurationCommandHandler fullEdgeHandler,
-        DeployLowCostArtifactSetCommandHandler lowCostHandler)
+        DeployLowCostArtifactSetCommandHandler lowCostHandler,
+        DeploymentValidationPreviewHandler validationPreview)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
         _rollbackHandler = rollbackHandler;
         _fullEdgeHandler = fullEdgeHandler;
         _lowCostHandler = lowCostHandler;
+        _validationPreview = validationPreview;
     }
 
     [HttpGet("configuration-deployments")]
@@ -86,6 +90,20 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpGet("kiosks/{kioskId:guid}/configuration-deployments/{deploymentId:guid}/artifacts")]
+    [Authorize(Policy = "deployment.read")]
+    public async Task<IActionResult> GetArtifacts(
+        Guid kioskId,
+        Guid deploymentId,
+        [FromServices] GetConfigurationDeploymentArtifactsQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(
+            new GetConfigurationDeploymentArtifactsQuery(User.GetUserContext(), kioskId, deploymentId),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("kiosks/{kioskId:guid}/configuration-deployments/{deploymentId:guid}/rollback")]
     [Authorize(Policy = "release.rollback")]
     public async Task<IActionResult> Rollback(
@@ -111,8 +129,20 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             UserContext = User.GetUserContext(), KioskId = kioskId,
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
-            IdempotencyKey = idempotencyKey
+            IdempotencyKey = idempotencyKey,
+            ValidationReportChecksum = request.ValidationReportChecksum,
+            AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk
         }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("kiosks/{kioskId:guid}/configuration-deployments/validation-preview")]
+    [Authorize(Policy = "release.deploy")]
+    public async Task<IActionResult> PreviewValidation(Guid kioskId,
+        [FromBody] DeploymentValidationPreviewRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _validationPreview.HandleAsync(User.GetUserContext(), kioskId,
+            request.ConfigurationReleaseId, request.KioskExecutionEndpointId, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -128,6 +158,8 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
+            ValidationReportChecksum = request.ValidationReportChecksum,
+            AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk,
             Selections = request.Selections.Select(item => new DeployLowCostArtifactSelection(
                 item.ExecutionRouteId, item.RobotProgramId)).ToArray()
         }, cancellationToken);
@@ -143,6 +175,17 @@ public sealed class DeployFullEdgeConfigurationRequest
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
 
+    [Required]
+    public string ValidationReportChecksum { get; init; } = string.Empty;
+
+    public bool AcknowledgeRemainingRisk { get; init; }
+
+}
+
+public sealed class DeploymentValidationPreviewRequest
+{
+    [Required] public Guid ConfigurationReleaseId { get; init; }
+    [Required] public Guid KioskExecutionEndpointId { get; init; }
 }
 
 public sealed class DeployLowCostArtifactSetRequest
@@ -152,6 +195,11 @@ public sealed class DeployLowCostArtifactSetRequest
 
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
+
+    [Required]
+    public string ValidationReportChecksum { get; init; } = string.Empty;
+
+    public bool AcknowledgeRemainingRisk { get; init; }
 
     [Required, MinLength(1)]
     public IReadOnlyCollection<DeployLowCostArtifactSetSelectionRequest> Selections { get; init; } = [];

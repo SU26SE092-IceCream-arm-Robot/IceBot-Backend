@@ -4,6 +4,9 @@ using Application.RobotConfiguration.Artifacts.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.RobotConfiguration.Artifacts;
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
+using Domain.Common;
 
 namespace Application.RobotConfiguration.Artifacts.Commands;
 
@@ -11,8 +14,15 @@ public sealed class BulkPublishRobotArtifactsCommandHandler
 {
     private const int MaximumItemCount = 100;
     private readonly IRobotArtifactStore _store;
+    private readonly ArtifactPublicationValidator _publicationValidator;
 
-    public BulkPublishRobotArtifactsCommandHandler(IRobotArtifactStore store) => _store = store;
+    public BulkPublishRobotArtifactsCommandHandler(
+        IRobotArtifactStore store,
+        ArtifactPublicationValidator publicationValidator)
+    {
+        _store = store;
+        _publicationValidator = publicationValidator;
+    }
 
     public async Task<ApiResult<BulkRobotArtifactPublishResult>> HandleAsync(
         BulkPublishRobotArtifactsCommand command,
@@ -49,10 +59,34 @@ public sealed class BulkPublishRobotArtifactsCommandHandler
             .Select(artifact => artifact.Id)
             .ToHashSet();
         var drafts = artifacts.Where(artifact => artifact.Status == RobotArtifactStatus.Draft).ToArray();
-        foreach (var artifact in drafts)
+        try
         {
-            artifact.Publish();
-            artifact.UpdatedByAccountId = command.UserContext.AccountId;
+            foreach (var artifact in drafts)
+            {
+                await _publicationValidator.ValidateAsync(artifact, cancellationToken);
+            }
+
+            foreach (var artifact in drafts)
+            {
+                artifact.Publish();
+                artifact.UpdatedByAccountId = command.UserContext.AccountId;
+            }
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<BulkRobotArtifactPublishResult>.Fail(ex.Message, 400);
+        }
+        catch (ArtifactObjectNotFoundException ex)
+        {
+            return ApiResult<BulkRobotArtifactPublishResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectIntegrityException ex)
+        {
+            return ApiResult<BulkRobotArtifactPublishResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectStorageUnavailableException ex)
+        {
+            return ApiResult<BulkRobotArtifactPublishResult>.Fail(ex.Message, 503);
         }
 
         if (drafts.Length > 0)

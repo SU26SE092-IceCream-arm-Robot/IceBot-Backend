@@ -12,6 +12,8 @@ public sealed class DeployLowCostArtifactSetCommand
     public required IReadOnlyCollection<DeployLowCostArtifactSelection> Selections { get; init; }
     public DateTimeOffset? CommandExpiryAt { get; init; }
     public Guid? RollbackTargetDeploymentId { get; init; }
+    public string ValidationReportChecksum { get; init; } = string.Empty;
+    public bool AcknowledgeRemainingRisk { get; init; }
     public bool IsRollback => RollbackTargetDeploymentId.HasValue;
 }
 

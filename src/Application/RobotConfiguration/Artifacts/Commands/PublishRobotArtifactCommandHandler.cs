@@ -5,16 +5,22 @@ using Application.RobotConfiguration.Artifacts.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
 
 namespace Application.RobotConfiguration.Artifacts.Commands;
 
 public sealed class PublishRobotArtifactCommandHandler
 {
     private readonly IRobotArtifactStore _robotArtifactStore;
+    private readonly ArtifactPublicationValidator _publicationValidator;
 
-    public PublishRobotArtifactCommandHandler(IRobotArtifactStore robotArtifactStore)
+    public PublishRobotArtifactCommandHandler(
+        IRobotArtifactStore robotArtifactStore,
+        ArtifactPublicationValidator publicationValidator)
     {
         _robotArtifactStore = robotArtifactStore;
+        _publicationValidator = publicationValidator;
     }
 
     public async Task<ApiResult<RobotArtifactResult>> HandleAsync(
@@ -35,6 +41,7 @@ public sealed class PublishRobotArtifactCommandHandler
 
         try
         {
+            await _publicationValidator.ValidateAsync(artifact, cancellationToken);
             artifact.Publish();
             artifact.UpdatedByAccountId = command.UserContext.AccountId;
             await _robotArtifactStore.SaveChangesAsync(cancellationToken);
@@ -43,6 +50,18 @@ public sealed class PublishRobotArtifactCommandHandler
         catch (DomainRuleException ex)
         {
             return ApiResult<RobotArtifactResult>.Fail(ex.Message, 400);
+        }
+        catch (ArtifactObjectNotFoundException ex)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectIntegrityException ex)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(ex.Message, 409);
+        }
+        catch (ArtifactObjectStorageUnavailableException ex)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(ex.Message, 503);
         }
     }
 }

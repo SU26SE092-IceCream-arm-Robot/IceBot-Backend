@@ -52,7 +52,12 @@ public sealed class DashboardStore : IDashboardStore
 
         var kioskCount = kioskStats.Sum(x => x.Count);
         var activeKioskCount = kioskStats.FirstOrDefault(x => x.Status == Domain.Tenants.Enums.KioskStatus.Active)?.Count ?? 0;
-        var offlineKioskCount = kioskStats.FirstOrDefault(x => x.Status == Domain.Tenants.Enums.KioskStatus.Offline)?.Count ?? 0;
+        var visibleKioskIds = kiosksQuery.Select(kiosk => kiosk.Id);
+        var offlineKioskCount = await _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .CountAsync(
+                connectivity => visibleKioskIds.Contains(connectivity.KioskId) &&
+                    connectivity.Status == Domain.Devices.Connectivity.KioskConnectivityStatus.Unreachable,
+                cancellationToken);
         var maintenanceKioskCount = kioskStats.FirstOrDefault(x => x.Status == Domain.Tenants.Enums.KioskStatus.Maintenance)?.Count ?? 0;
 
         var pendingOrderCount = await ordersQuery.CountAsync(o => o.Status == Domain.Orders.Enums.OrderStatus.PendingPayment, cancellationToken);

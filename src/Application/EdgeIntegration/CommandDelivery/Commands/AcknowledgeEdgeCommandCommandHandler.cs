@@ -250,7 +250,7 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
 
         if (string.Equals(command.AckStatus.Trim(), "Accepted", StringComparison.OrdinalIgnoreCase))
         {
-            if (order.Status == OrderStatus.ReadyForExecution)
+            if (order.Status == OrderStatus.ReadyForFulfillment)
             {
                 order.MarkAccepted();
             }

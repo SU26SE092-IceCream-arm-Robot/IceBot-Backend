@@ -15,6 +15,9 @@ public sealed class KioskConfigurationDeploymentResult
     public string Status { get; init; } = null!;
     public DateTimeOffset RequestedAt { get; init; }
     public Guid? RequestedByAccountId { get; init; }
+    public string ValidationReportChecksum { get; init; } = null!;
+    public string RiskLevel { get; init; } = null!;
+    public DateTimeOffset? RiskAcknowledgedAt { get; init; }
     [JsonIgnore]
     public Guid? EdgeCommandId { get; init; }
 
@@ -33,6 +36,9 @@ public sealed class KioskConfigurationDeploymentResult
             Status = deployment.Status.ToString(),
             RequestedAt = deployment.RequestedAt,
             RequestedByAccountId = deployment.RequestedByAccountId,
+            ValidationReportChecksum = deployment.ValidationReportChecksum,
+            RiskLevel = deployment.RiskLevel,
+            RiskAcknowledgedAt = deployment.RiskAcknowledgedAt,
             EdgeCommandId = edgeCommandId
         };
     }

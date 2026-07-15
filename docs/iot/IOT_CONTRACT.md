@@ -88,7 +88,7 @@ Current mapping:
 | Business state | Current enum |
 | --- | --- |
 | Created, waiting for payment | `PendingPayment` |
-| Payment verified, ready to dispatch to edge | `ReadyForExecution` |
+| Payment verified, ready for all line fulfillment modes | `ReadyForFulfillment` |
 | Edge accepted executable command | `Accepted` |
 | Robot job running | `Preparing` |
 | Robot execution completed | `Completed` |
@@ -96,7 +96,7 @@ Current mapping:
 | Paid order needs manual refund/support | `RefundRequired` |
 | Payment failed, cancelled, or non-refundable execution failure | `Failed` / `Cancelled` |
 
-`Paid` remains a coarse payment-confirmed state, but current orchestration should move fully paid orders to `ReadyForExecution`.
+`Paid` remains a coarse payment-confirmed state, but current orchestration should move fully paid orders to `ReadyForFulfillment`.
 
 ### Payment
 

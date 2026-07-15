@@ -8,6 +8,7 @@ using Application.Devices.Credentials.Abstractions;
 using Domain.Devices.Catalog;
 using Domain.Tenants.Entities;
 using Domain.Operations.Entities;
+using Domain.Devices.Connectivity;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,13 +67,14 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore, 
         int batchSize,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks.WhereNotDeleted().AsNoTracking()
-            .Where(kiosk =>
-                kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active &&
-                ((kiosk.LastOnlineAt.HasValue && kiosk.LastOnlineAt.Value < cutoff) ||
-                 (!kiosk.LastOnlineAt.HasValue && kiosk.CreatedAt < cutoff)))
-            .OrderBy(kiosk => kiosk.LastOnlineAt ?? kiosk.CreatedAt)
-            .Select(kiosk => kiosk.Id)
+        return _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .Where(connectivity =>
+                connectivity.Status != KioskConnectivityStatus.Unreachable &&
+                connectivity.LastObservedAt < cutoff &&
+                _dbContext.Kiosks.WhereNotDeleted().Any(kiosk =>
+                    kiosk.Id == connectivity.KioskId && kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active))
+            .OrderBy(connectivity => connectivity.LastObservedAt)
+            .Select(connectivity => connectivity.KioskId)
             .Take(batchSize)
             .ToListAsync(cancellationToken);
     }
@@ -144,6 +146,12 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore, 
             .FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
     }
 
+    public Task<KioskConnectivityProjection?> GetConnectivityAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskConnectivityProjections.FirstOrDefaultAsync(
+            connectivity => connectivity.KioskId == kioskId, cancellationToken);
+
     public Task<Device?> GetDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Devices.WhereNotDeleted().Include(device => device.Kiosk)
@@ -158,6 +166,9 @@ public sealed class EdgeTelemetryIngestionStore : IEdgeTelemetryIngestionStore, 
 
     public Task AddHeartbeatAsync(KioskHeartbeat heartbeat, CancellationToken cancellationToken = default) =>
         _dbContext.KioskHeartbeats.AddAsync(heartbeat, cancellationToken).AsTask();
+
+    public Task AddConnectivityAsync(KioskConnectivityProjection connectivity, CancellationToken cancellationToken = default) =>
+        _dbContext.KioskConnectivityProjections.AddAsync(connectivity, cancellationToken).AsTask();
 
     public Task AddDeviceEventAsync(DeviceEvent deviceEvent, CancellationToken cancellationToken = default) =>
         _dbContext.DeviceEvents.AddAsync(deviceEvent, cancellationToken).AsTask();

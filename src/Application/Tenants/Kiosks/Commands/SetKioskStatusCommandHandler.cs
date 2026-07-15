@@ -42,18 +42,6 @@ public sealed class SetKioskStatusCommandHandler
             return ApiResult<KioskResult>.Fail("Invalid kiosk status.", 400);
         }
 
-        if (request.Status == KioskStatus.Offline)
-        {
-            return ApiResult<KioskResult>.Fail(
-                "Offline status is managed by the heartbeat connectivity state machine.", 400);
-        }
-
-        if (kiosk.Status == KioskStatus.Offline && request.Status == KioskStatus.Active)
-        {
-            return ApiResult<KioskResult>.Fail(
-                "An offline kiosk becomes active only after a reachable heartbeat is accepted.", 400);
-        }
-
         if (request.Status == KioskStatus.Active)
         {
             var isStoreActive = await _kioskStore.StoreExistsActiveAsync(kiosk.StoreId, cancellationToken);
@@ -87,9 +75,8 @@ public sealed class SetKioskStatusCommandHandler
             KioskId = kiosk.Id,
             OrganizationId = kiosk.OrganizationId,
             StoreId = kiosk.StoreId,
-            OldStatus = oldStatus.ToString(),
-            NewStatus = request.Status.ToString(),
-            Connectivity = request.Status.ToString(), // "new status string for now" as per plan
+            OldLifecycleStatus = oldStatus.ToString(),
+            NewLifecycleStatus = request.Status.ToString(),
             Reason = "KioskStatusUpdated",
             UpdatedAt = changedAt,
             Version = 1

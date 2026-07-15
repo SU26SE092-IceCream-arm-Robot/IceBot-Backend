@@ -35,9 +35,23 @@ Verify:
 
 Verify:
 
-- New online order/payment session is allowed only when `KioskStatus.Active`.
-- `Offline`, `Maintenance`, `Suspended`, and `Inactive` do not allow new Cloud online sales.
-- Offline sale support is not controlled by `KioskStatus.Offline`; it requires a future offline session/capability.
+- New online order/payment session is allowed only when lifecycle is `KioskStatus.Active` and connectivity is `Online` or `Degraded`.
+- `Maintenance`, `Disabled`, `Retired`, `Unknown` connectivity, and `Unreachable` connectivity do not allow new Cloud online sales.
+- Offline sale support requires a future offline session/capability; it is not inferred from lifecycle or connectivity fields.
+
+## Order Item Fulfillment
+
+Verify:
+
+- Manual items alone accept strict `Pending -> Accepted -> Preparing -> Completed` transitions and require a reason when failed.
+- Packaged items use only the packaged commands: idempotent `Pending -> Completed` through `fulfill`, or `Pending -> Failed` through `fail` with a required reason. They never enter `Accepted` or `Preparing`.
+- Machine-produced items reject management fulfillment commands and advance only from authenticated execution reports.
+- A mixed order completes only after every item is completed.
+- A failed paid item creates `FulfillmentIssue`; remaining items may still progress and whole-order refund is never inferred automatically.
+- Manual and packaged fulfillment writes require `fulfillmentEventId`; same id and same payload is idempotent, while payload mismatch is rejected.
+- V1 manual/packaged transitions apply to the entire order line quantity; partial line fulfillment is unsupported.
+- Packaged options are `CommercialOnly`; machine-produced production-affecting options require route support.
+- Customer order responses do not expose backend-only `FulfillmentType`.
 
 ## Enum Inputs
 

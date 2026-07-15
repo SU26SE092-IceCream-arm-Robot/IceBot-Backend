@@ -3,7 +3,8 @@ namespace Application.Devices.Connectivity.Results;
 public class KioskStatusOverviewResult
 {
     public int TotalCount { get; set; }
-    public List<KioskStatusSummaryDto> ByStatus { get; set; } = new();
+    public List<KioskStatusSummaryDto> ByLifecycleStatus { get; set; } = new();
+    public List<KioskStatusSummaryDto> ByConnectivityStatus { get; set; } = new();
     public List<KioskStatusOverviewItemDto> Items { get; set; } = new();
 }
 
@@ -21,7 +22,8 @@ public class KioskStatusOverviewItemDto
     public Guid OrganizationId { get; set; }
     public Guid StoreId { get; set; }
     public string StoreName { get; set; } = null!;
-    public string Status { get; set; } = null!;
+    public string LifecycleStatus { get; set; } = null!;
+    public string ConnectivityStatus { get; set; } = null!;
     public DateTimeOffset? LastHeartbeatAt { get; set; }
     public string? LastEventSeverity { get; set; }
     public DateTimeOffset? LastEventAt { get; set; }

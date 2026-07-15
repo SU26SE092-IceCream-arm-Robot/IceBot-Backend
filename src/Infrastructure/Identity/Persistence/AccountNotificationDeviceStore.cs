@@ -46,6 +46,17 @@ public sealed class AccountNotificationDeviceStore : IAccountNotificationDeviceS
             .ThenByDescending(device => device.LastSeenAt)
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<AccountNotificationDevice>> ListActiveByAccountIdAsync(
+        Guid accountId,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.AccountNotificationDevices
+            .Where(device =>
+                device.AccountId == accountId &&
+                device.InvalidatedAt == null &&
+                device.PushToken != null)
+            .OrderBy(device => device.Id)
+            .ToListAsync(cancellationToken);
+
     public Task AddAsync(AccountNotificationDevice device, CancellationToken cancellationToken = default) =>
         _dbContext.AccountNotificationDevices.AddAsync(device, cancellationToken).AsTask();
 

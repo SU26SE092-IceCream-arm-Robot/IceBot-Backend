@@ -18,7 +18,9 @@ public interface IInventoryReadinessEvaluator
 public sealed record InventoryReadinessRouteInput(
     Guid ExecutionRouteId,
     string RouteCode,
+    Guid ProductId,
     Guid RecipeId,
+    IReadOnlySet<string> SupportedOptionCodes,
     Guid? ProductOrganizationId,
     Guid? ProductStoreId,
     Guid? ProductKioskId,

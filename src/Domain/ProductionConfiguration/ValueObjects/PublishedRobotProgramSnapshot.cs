@@ -18,4 +18,7 @@ public sealed record PublishedRobotArtifactSnapshot(
     string StorageKey,
     string RuntimeTargetCode,
     string MachineModelCode,
-    long ContentLengthBytes);
+    long ContentLengthBytes,
+    Guid? TechnicalContractId = null,
+    string? TechnicalContractChecksum = null,
+    string? RequiredOptionCode = null);

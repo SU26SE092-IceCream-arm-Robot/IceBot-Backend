@@ -6,4 +6,5 @@ public sealed record ControllerArtifactSetItemSnapshot(
     Guid ExecutionRouteId, Guid RobotProgramId, string RobotProgramManifestChecksum,
     Guid RobotArtifactId, string ArtifactChecksum, string StorageKey,
     string RuntimeTargetCode, string MachineModelCode, Guid? DeviceId,
-    long ContentLengthBytes, int RunOrder, int ParametersSchemaVersion, string? ParametersJson);
+    long ContentLengthBytes, int RunOrder, int ParametersSchemaVersion, string? ParametersJson,
+    string? RequiredOptionCode = null);

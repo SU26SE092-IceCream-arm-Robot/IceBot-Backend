@@ -32,7 +32,8 @@ public sealed class ProductionExecutionProjectionTests
         var record = ProductionExecutionRecord.Create(
             Guid.NewGuid(), Guid.NewGuid(), KioskExecutionProfile.LowCostController,
             Guid.NewGuid(), Guid.NewGuid(), 1, now, now, now,
-            ProductionExecutionStatus.Accepted, PhysicalOutputState.Unknown, Guid.NewGuid());
+            ProductionExecutionStatus.Accepted, PhysicalOutputState.Unknown, Guid.NewGuid(),
+            Guid.NewGuid(), 1, 1);
 
         var applied = record.ApplyObservation(
             Guid.NewGuid(), 2, now.AddSeconds(1), now.AddSeconds(1), now.AddSeconds(2),

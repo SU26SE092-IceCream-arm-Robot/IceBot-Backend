@@ -131,7 +131,8 @@ public sealed class RetrySyncDeadLetterCommandHandler
     {
         public Guid? CommandId { get; init; } public string ReportType { get; init; } = ""; public string Status { get; init; } = "";
         public long SequenceNumber { get; init; } public DateTimeOffset EdgeCreatedAt { get; init; } public DateTimeOffset? ExecutorReportedAt { get; init; }
-        public Guid? DeploymentId { get; init; } public Guid? SourceProductionJobId { get; init; } public Guid? WorkcellId { get; init; } public Guid? ControllerId { get; init; }
+        public Guid? DeploymentId { get; init; } public Guid? SourceProductionJobId { get; init; } public Guid? OrderItemId { get; init; }
+        public int? ProductionUnitNo { get; init; } public int? ProductionUnitQuantity { get; init; } public Guid? WorkcellId { get; init; } public Guid? ControllerId { get; init; }
         public string? ExecutionPlanChecksum { get; init; } public long? ActiveSetVersion { get; init; } public string? ActiveSetChecksum { get; init; }
         public Guid? SourceConfigurationReleaseId { get; init; } public string? ReleaseChecksum { get; init; } public bool? PhysicalOutputMayHaveOccurred { get; init; }
         public string? ErrorCode { get; init; } public string? ErrorMessage { get; init; } public string? PayloadJson { get; init; }
@@ -141,6 +142,7 @@ public sealed class RetrySyncDeadLetterCommandHandler
             KioskId = kioskId, EndpointId = endpointId, CommandId = CommandId!.Value, SourceEventId = eventId,
             SequenceNumber = SequenceNumber, EdgeCreatedAt = EdgeCreatedAt, ExecutorReportedAt = ExecutorReportedAt,
             ReportType = ReportType, Status = Status, DeploymentId = DeploymentId, SourceProductionJobId = SourceProductionJobId,
+            OrderItemId = OrderItemId, ProductionUnitNo = ProductionUnitNo, ProductionUnitQuantity = ProductionUnitQuantity,
             WorkcellId = WorkcellId, ControllerId = ControllerId, ExecutionPlanChecksum = ExecutionPlanChecksum,
             ActiveSetVersion = ActiveSetVersion, ActiveSetChecksum = ActiveSetChecksum, SourceConfigurationReleaseId = SourceConfigurationReleaseId,
             ReleaseChecksum = ReleaseChecksum, PhysicalOutputMayHaveOccurred = PhysicalOutputMayHaveOccurred, ErrorCode = ErrorCode,

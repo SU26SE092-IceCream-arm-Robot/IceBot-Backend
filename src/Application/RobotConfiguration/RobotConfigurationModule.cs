@@ -5,6 +5,7 @@ using Application.RobotConfiguration.Artifacts.Queries;
 using Application.RobotConfiguration.Programs.Commands;
 using Application.RobotConfiguration.Programs.Queries;
 using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.ArtifactContracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.RobotConfiguration;
@@ -14,6 +15,7 @@ public static class RobotConfigurationModule
     public static IServiceCollection AddRobotConfigurationModule(this IServiceCollection services)
     {
         services.AddScoped<ArtifactUploadContentService>();
+        services.AddScoped<ArtifactPublicationValidator>();
         services.AddScoped<UploadRobotArtifactCommandHandler>();
         services.AddScoped<BulkUploadRobotArtifactsCommandHandler>();
         services.AddScoped<BulkPublishRobotArtifactsCommandHandler>();
@@ -28,6 +30,7 @@ public static class RobotConfigurationModule
         services.AddScoped<UpdateRobotProgramCommandHandler>();
         services.AddScoped<ListRobotArtifactsQueryHandler>();
         services.AddScoped<GetRobotArtifactQueryHandler>();
+        services.AddScoped<GetRobotArtifactUsageQueryHandler>();
         services.AddScoped<CreateRobotArtifactReviewUrlQueryHandler>();
         services.AddScoped<ListRobotProgramsQueryHandler>();
         services.AddScoped<GetRobotProgramQueryHandler>();
@@ -40,6 +43,8 @@ public static class RobotConfigurationModule
         services.AddScoped<RetireRobotArtifactTemplateCommandHandler>();
         services.AddScoped<DiscardDraftRobotArtifactTemplateCommandHandler>();
         services.AddScoped<CloneRobotArtifactTemplateCommandHandler>();
+        services.AddScoped<RobotArtifactTechnicalContractHandlers>();
+        services.AddScoped<AssignRobotArtifactTechnicalContractHandler>();
 
         return services;
     }

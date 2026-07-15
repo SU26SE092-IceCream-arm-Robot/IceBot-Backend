@@ -92,7 +92,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             edgeCommand.RejectIfExpired(command.ObservedAt))
         {
             var previousStatus = order.Status;
-            if (order.Status == OrderStatus.ReadyForExecution)
+            if (order.Status == OrderStatus.ReadyForFulfillment)
             {
                 order.MarkExecutionRejected("Execution command expired before executor acceptance.");
                 await _store.AddOrderStatusHistoryAsync(new OrderStatusHistory

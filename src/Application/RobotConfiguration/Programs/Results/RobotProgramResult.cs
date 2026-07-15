@@ -56,6 +56,7 @@ public sealed class RobotProgramResult
                         RobotArtifactId = artifact.RobotArtifactId,
                         RunOrder = artifact.RunOrder,
                         ParametersJson = artifact.ParametersJson,
+                        RequiredOptionCode = artifact.RequiredOptionCode,
                         ArtifactCode = snapshot?.ArtifactCode,
                         ArtifactName = snapshot?.ArtifactName,
                         FileName = snapshot?.FileName,
@@ -74,6 +75,7 @@ public sealed class RobotProgramArtifactResult
     public Guid RobotArtifactId { get; init; }
     public int RunOrder { get; init; }
     public string? ParametersJson { get; init; }
+    public string? RequiredOptionCode { get; init; }
     public string? ArtifactCode { get; init; }
     public string? ArtifactName { get; init; }
     public string? FileName { get; init; }

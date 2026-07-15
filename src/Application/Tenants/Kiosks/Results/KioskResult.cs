@@ -16,7 +16,6 @@ public sealed class KioskResult
     public decimal? Longitude { get; set; }
     public DateTimeOffset? InstalledAt { get; set; }
     public DateTimeOffset? LastOnlineAt { get; set; }
-    public bool SupportsOfflineMode { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 }

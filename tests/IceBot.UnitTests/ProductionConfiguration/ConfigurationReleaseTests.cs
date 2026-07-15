@@ -31,7 +31,7 @@ public sealed class ConfigurationReleaseTests
 
         var exception = Assert.Throws<DomainRuleException>(() =>
             release.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(),
-                new Dictionary<Guid, PublishedRobotProgramSnapshot>(), Bundle()));
+                new Dictionary<Guid, PublishedRobotProgramSnapshot>()));
 
         Assert.Equal("Cannot publish a configuration release without execution routes.", exception.Message);
         Assert.Equal(ConfigurationReleaseStatus.Draft, release.Status);
@@ -49,6 +49,7 @@ public sealed class ConfigurationReleaseTests
                 "DEFAULT",
                 0,
                 null,
+                Array.Empty<string>(),
                 (IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)>)
                 [
                     (Guid.NewGuid(), 1, "ROBOT_ARM")
@@ -57,7 +58,7 @@ public sealed class ConfigurationReleaseTests
 
         var exception = Assert.Throws<DomainRuleException>(() =>
             release.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(),
-                new Dictionary<Guid, PublishedRobotProgramSnapshot>(), Bundle()));
+                new Dictionary<Guid, PublishedRobotProgramSnapshot>()));
 
         Assert.Equal("Configuration release bindings require published robot program snapshots.", exception.Message);
         Assert.Equal(ConfigurationReleaseStatus.Draft, release.Status);
@@ -78,6 +79,7 @@ public sealed class ConfigurationReleaseTests
                 "DEFAULT",
                 0,
                 null,
+                new[] { "oreo" },
                 (IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)>)
                 [(programId, 1, "ROBOT_ARM")]
             )
@@ -100,6 +102,7 @@ public sealed class ConfigurationReleaseTests
         Assert.Contains("\"ExecutionRoutes\"", content.Json);
         Assert.Contains($"\"BundleEntryName\":\"artifacts/{artifactId:D}.lua\"", content.Json);
         Assert.Contains("\"ContentLengthBytes\":123", content.Json);
+        Assert.Contains("\"SupportedOptionCodes\":[\"OREO\"]", content.Json);
         Assert.DoesNotContain("FullEdgeBundle", content.Json);
     }
 
@@ -112,7 +115,6 @@ public sealed class ConfigurationReleaseTests
         var storage = Substitute.For<IArtifactObjectStorage>();
         var handler = new PublishConfigurationReleaseCommandHandler(
             store,
-            new FullEdgeReleaseBundleService(storage),
             ReadinessGuard());
 
         var result = await handler.HandleAsync(new PublishConfigurationReleaseCommand
@@ -133,9 +135,6 @@ public sealed class ConfigurationReleaseTests
             Arg.Any<Stream>(),
             Arg.Any<CancellationToken>());
     }
-
-    private static FullEdgeReleaseBundleDescriptor Bundle() =>
-        new(1, "robot-artifacts/release-bundles/test.zip", new string('a', 64), 100, 1);
 
     private static ProductionInventoryReadinessGuard ReadinessGuard() => new(
         Substitute.For<IInventoryReadinessEvaluator>(),

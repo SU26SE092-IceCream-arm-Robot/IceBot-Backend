@@ -20,6 +20,9 @@ public sealed class RobotArtifactResult
     public DateTimeOffset ExportedAt { get; init; }
     public string? Description { get; init; }
     public string? MetadataJson { get; init; }
+    public Guid? TechnicalContractId { get; init; }
+    public string? TechnicalContractChecksum { get; init; }
+    public bool HasTechnicalContract { get; init; }
 
     public static RobotArtifactResult FromEntity(RobotArtifact artifact)
     {
@@ -38,7 +41,11 @@ public sealed class RobotArtifactResult
             Status = artifact.Status.ToString(),
             ExportedAt = artifact.ExportedAt,
             Description = artifact.Description,
-            MetadataJson = artifact.MetadataJson
+            MetadataJson = artifact.MetadataJson,
+            TechnicalContractId = artifact.TechnicalContractId,
+            TechnicalContractChecksum = artifact.TechnicalContractChecksum,
+            HasTechnicalContract = artifact.TechnicalContractId.HasValue &&
+                !string.IsNullOrWhiteSpace(artifact.TechnicalContractChecksum)
         };
     }
 }

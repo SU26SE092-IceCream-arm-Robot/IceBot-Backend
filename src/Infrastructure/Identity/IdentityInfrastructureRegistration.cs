@@ -1,5 +1,6 @@
 using Application.Identity.Abstractions;
 using Application.Identity.NotificationDevices.Abstractions;
+using Application.Identity.NotificationDevices.Delivery;
 using Infrastructure.Firebase;
 using Infrastructure.Identity.Bootstrap;
 using Infrastructure.Identity.ExternalAuth;
@@ -16,6 +17,7 @@ public static class IdentityInfrastructureRegistration
     {
         services.AddScoped<IIdentityAccountStore, IdentityAccountStore>();
         services.AddScoped<IAccountNotificationDeviceStore, AccountNotificationDeviceStore>();
+        services.AddScoped<IAccountPushNotificationSender, FirebaseAccountPushNotificationSender>();
         services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
         services.AddScoped<IPasswordResetRequestStore, PasswordResetRequestStore>();
         services.AddScoped<IAccountInvitationStore, AccountInvitationStore>();

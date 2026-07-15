@@ -102,6 +102,9 @@ public static class ScopeRoleSets
     public static readonly string[] DeploymentRead = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] ReleaseDeploy = ["SystemAdmin", "OrgAdmin", "Manager"];
     public static readonly string[] ReleaseRollback = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] PackageRead = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] PackageInstall = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] PackageFork = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OperationsView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] OperationsDiagnostics = ["SystemAdmin", "Technician"];
     public static readonly string[] DashboardView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];

@@ -142,6 +142,23 @@ public sealed class InventoryStore : IInventoryStore
             .ThenBy(item => item.StepOrder)
             .ToListAsync(cancellationToken);
 
+    public Task<List<ProductOption>> ListSupportedProductOptionsAsync(
+        IReadOnlyCollection<Guid> productIds,
+        IReadOnlyCollection<string> optionCodes,
+        CancellationToken cancellationToken = default)
+    {
+        if (productIds.Count == 0 || optionCodes.Count == 0)
+            return Task.FromResult(new List<ProductOption>());
+        var normalizedCodes = optionCodes.Select(code => code.Trim().ToUpper()).Distinct().ToArray();
+        return _dbContext.ProductOptions.AsNoTracking()
+            .Include(option => option.OptionGroup)
+            .Include(option => option.IngredientRequirements.Where(requirement => requirement.DeletedAt == null))
+                .ThenInclude(requirement => requirement.Ingredient)
+            .Where(option => productIds.Contains(option.OptionGroup.ProductId) &&
+                normalizedCodes.Contains(option.Code.ToUpper()) && option.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> DispenserIdentityExistsAsync(
         Guid deviceId,
         string containerCode,

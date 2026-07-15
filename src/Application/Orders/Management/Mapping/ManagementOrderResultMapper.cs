@@ -83,6 +83,7 @@ internal static class ManagementOrderResultMapper
                     ProductVariantCode = item.ProductVariantCodeSnapshot,
                     ProductVariantName = item.ProductVariantNameSnapshot,
                     RecipeVersion = item.RecipeVersionSnapshot,
+                    FulfillmentType = item.FulfillmentType,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     DiscountAmount = item.DiscountAmount,

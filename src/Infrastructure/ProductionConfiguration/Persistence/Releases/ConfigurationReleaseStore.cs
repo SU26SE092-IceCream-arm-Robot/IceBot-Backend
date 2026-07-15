@@ -149,7 +149,10 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         var query = _dbContext.ConfigurationReleases.WhereNotDeleted();
         if (asNoTracking) query = query.AsNoTracking();
         return query.Include(release => release.ExecutionRoutes).ThenInclude(route => route.ProductVariant).ThenInclude(variant => variant.Product)
+                .ThenInclude(product => product.OptionGroups).ThenInclude(group => group.ProductOptions)
+                .ThenInclude(option => option.IngredientRequirements).ThenInclude(requirement => requirement.Ingredient)
             .Include(release => release.ExecutionRoutes).ThenInclude(route => route.Recipe)
+                .ThenInclude(recipe => recipe.RecipeItems).ThenInclude(item => item.Ingredient)
             .Include(release => release.ExecutionRoutes).ThenInclude(route => route.RobotBindings).ThenInclude(binding => binding.RobotProgram);
     }
 

@@ -90,7 +90,8 @@ public sealed class PlaceOrderCommandHandler
                 return ApiResult<OrderResult>.Fail("Kiosk not found.", 404);
             }
 
-            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk);
+            var connectivity = await _orderStore.GetKioskConnectivityAsync(kiosk.Id, ct);
+            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk, connectivity);
             if (salesAvailabilityError is not null)
             {
                 return ApiResult<OrderResult>.Fail(salesAvailabilityError, 409);
@@ -199,15 +200,6 @@ public sealed class PlaceOrderCommandHandler
                     }
                 }
 
-                if (productVariant.FulfillmentType == FulfillmentType.MachineProduced)
-                {
-                    var hasActiveProductionRoute = await _orderStore.HasActiveProductionRouteAsync(kiosk.Id, productVariant.Id, recipe!.Id, ct);
-                    if (!hasActiveProductionRoute)
-                    {
-                        return ApiResult<OrderResult>.Fail($"Menu item '{menuItem.DisplayName}' does not have an active production route for this kiosk.", 409);
-                    }
-                }
-
                 var selectableOptions = await _orderStore.ListMenuItemProductOptionsAsync(menuItem.Id, ct);
                 var selectedOptionIds = itemRequest.SelectedOptions
                     .Select(option => option.ProductOptionId)
@@ -225,6 +217,32 @@ public sealed class PlaceOrderCommandHandler
                     .OrderBy(option => option.OptionGroupId)
                     .ThenBy(option => option.DisplayOrder)
                     .ToArray();
+                if (productVariant.FulfillmentType == FulfillmentType.Packaged && selectedOptions.Any(option =>
+                        option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting))
+                {
+                    return ApiResult<OrderResult>.Fail(
+                        $"Packaged menu item '{menuItem.DisplayName}' cannot use production-affecting options. Use a product variant for physical packaged choices.",
+                        409);
+                }
+                if (productVariant.FulfillmentType == FulfillmentType.MachineProduced)
+                {
+                    var routePolicy = await _orderStore.GetActiveProductionRouteOptionPolicyAsync(
+                        kiosk.Id, productVariant.Id, recipe!.Id, ct);
+                    if (routePolicy is null)
+                    {
+                        return ApiResult<OrderResult>.Fail(
+                            $"Menu item '{menuItem.DisplayName}' does not have an active production route for this kiosk.", 409);
+                    }
+
+                    var unsupportedOptions = selectedOptions.Where(option =>
+                        option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting &&
+                        !routePolicy.SupportedOptionCodes.Contains(option.Code)).ToArray();
+                    if (unsupportedOptions.Length > 0)
+                    {
+                        return ApiResult<OrderResult>.Fail(
+                            $"One or more selected options are not supported by the active production route for '{menuItem.DisplayName}'.", 409);
+                    }
+                }
                 var optionIngredientRequirements = await _orderStore.ListProductOptionIngredientRequirementsAsync(
                     selectedOptions.Select(option => option.ProductOptionId).ToArray(), ct);
                 if (optionIngredientRequirements.Any(requirement => !requirement.IsIngredientActive))
@@ -245,6 +263,7 @@ public sealed class PlaceOrderCommandHandler
                     productVariant.Code,
                     productVariant.DisplayName ?? productVariant.Name,
                     recipe?.Version,
+                    productVariant.FulfillmentType,
                     itemRequest.Quantity,
                     menuItem.Price + optionUnitPriceDelta,
                     menuItem.DiscountAmount,
@@ -260,7 +279,8 @@ public sealed class PlaceOrderCommandHandler
                         selectedOption.OptionGroupCode,
                         selectedOption.Code,
                         selectedOption.Name,
-                        selectedOption.PriceDelta);
+                        selectedOption.PriceDelta,
+                        selectedOption.ExecutionImpact);
                     snapshot.OrderItemId = orderItem.Id;
                     snapshot.CreatedAt = now;
                     foreach (var requirement in optionIngredientRequirements

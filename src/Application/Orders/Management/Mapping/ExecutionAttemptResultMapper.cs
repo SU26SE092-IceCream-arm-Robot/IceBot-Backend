@@ -45,6 +45,9 @@ internal static class ExecutionAttemptResultMapper
         {
             Id = record.Id,
             SourceProductionJobId = record.SourceProductionJobId,
+            OrderItemId = record.OrderItemId,
+            ProductionUnitNo = record.ProductionUnitNo,
+            ProductionUnitQuantity = record.ProductionUnitQuantity,
             WorkcellId = record.WorkcellId,
             ControllerId = record.ControllerId,
             ExecutionPlanChecksum = record.ExecutionPlanChecksum,

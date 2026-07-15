@@ -6,6 +6,7 @@ using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
 using Application.SalesCatalog.ReadModels;
 using Application.Orders.PlaceOrder.ReadModels;
+using Domain.Devices.Connectivity;
 
 namespace Application.Orders.Abstractions;
 
@@ -24,6 +25,7 @@ public interface IOrderStore
         CancellationToken cancellationToken = default);
 
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<KioskConnectivityProjection?> GetKioskConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default);
 
@@ -35,7 +37,7 @@ public interface IOrderStore
         IReadOnlyCollection<Guid> productOptionIds,
         CancellationToken cancellationToken = default);
 
-    Task<bool> HasActiveProductionRouteAsync(
+    Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
@@ -77,6 +79,16 @@ public interface IOrderStore
         Guid orderId,
         int pageNumber,
         int pageSize,
+        CancellationToken cancellationToken = default);
+
+    Task<OrderItemStatusHistory?> GetOrderItemStatusHistoryBySourceEventIdAsync(
+        Guid orderItemId,
+        Guid sourceEventId,
+        CancellationToken cancellationToken = default);
+
+    Task AcquireFulfillmentEventLockAsync(
+        Guid orderItemId,
+        Guid sourceEventId,
         CancellationToken cancellationToken = default);
 
     Task<int> CountExecutionAttemptsAsync(
@@ -126,6 +138,8 @@ public interface IOrderStore
     Task AddOrderAsync(Order order, CancellationToken cancellationToken = default);
 
     Task AddOrderStatusHistoryAsync(OrderStatusHistory history, CancellationToken cancellationToken = default);
+
+    Task AddOrderItemStatusHistoryAsync(OrderItemStatusHistory history, CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 

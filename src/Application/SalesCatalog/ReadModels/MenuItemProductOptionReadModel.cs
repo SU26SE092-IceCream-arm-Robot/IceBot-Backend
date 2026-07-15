@@ -16,6 +16,11 @@ public sealed record MenuItemProductOptionReadModel(
     string Name,
     string? Description,
     decimal PriceDelta,
+    ProductOptionExecutionImpact ExecutionImpact,
     bool IsAvailable,
     bool IsDefault,
     int DisplayOrder);
+
+public sealed record ActiveProductionRouteOptionPolicy(
+    Guid ExecutionRouteId,
+    IReadOnlySet<string> SupportedOptionCodes);

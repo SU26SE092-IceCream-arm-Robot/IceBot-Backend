@@ -140,7 +140,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
             OrganizationId = organizationId,
             ProgramId = programId,
             Artifacts = request.Artifacts.Select(item => new RobotProgramArtifactInput(
-                item.RobotArtifactId, item.RunOrder, 1, item.ParametersJson)).ToArray()
+                item.RobotArtifactId, item.RunOrder, 1, item.ParametersJson, item.RequiredOptionCode)).ToArray()
         };
         var result = await _replaceArtifactsHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -229,4 +229,7 @@ public sealed class RobotProgramArtifactRequest
     public int RunOrder { get; init; }
 
     public string? ParametersJson { get; init; }
+
+    [StringLength(100)]
+    public string? RequiredOptionCode { get; init; }
 }

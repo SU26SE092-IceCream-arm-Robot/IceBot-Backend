@@ -56,10 +56,11 @@ public sealed class BulkUploadRobotArtifactTemplatesCommandHandler
 
         if (response.FailedCount == items.Count)
         {
+            var statusCode = items.All(item => item.StatusCode == 503) ? 503 : 400;
             return new ApiResult<BulkRobotArtifactTemplateUploadResult>
             {
                 Succeeded = false,
-                StatusCode = 400,
+                StatusCode = statusCode,
                 Message = "All template uploads failed.",
                 Data = response
             };

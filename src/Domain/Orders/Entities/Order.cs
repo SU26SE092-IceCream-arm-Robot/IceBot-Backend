@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Catalog.Enums;
 using Domain.Orders.Enums;
 using Domain.Tenants.Entities;
 
@@ -89,6 +90,7 @@ public partial class Order : BusinessEntity, IStoreScoped
         string productVariantCodeSnapshot,
         string productVariantNameSnapshot,
         int? recipeVersionSnapshot,
+        FulfillmentType fulfillmentType,
         int quantity,
         decimal unitPrice,
         decimal discountAmount = 0,
@@ -115,6 +117,7 @@ public partial class Order : BusinessEntity, IStoreScoped
             productVariantCodeSnapshot,
             productVariantNameSnapshot,
             recipeVersionSnapshot,
+            fulfillmentType,
             quantity,
             unitPrice,
             discountAmount,
@@ -193,7 +196,7 @@ public partial class Order : BusinessEntity, IStoreScoped
 
         if (Status == OrderStatus.PendingPayment)
         {
-            Status = OrderStatus.ReadyForExecution;
+            Status = OrderStatus.ReadyForFulfillment;
         }
         else if (Status == OrderStatus.Cancelled)
         {
@@ -223,9 +226,9 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public void MarkExecutionRejected(string? notes = null)
     {
-        if (Status is not (OrderStatus.Paid or OrderStatus.ReadyForExecution or OrderStatus.Accepted))
+        if (Status is not (OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted))
         {
-            throw new DomainRuleException("Only paid or execution-ready orders can be rejected by execution.");
+            throw new DomainRuleException("Only paid or fulfillment-ready orders can be rejected by execution.");
         }
 
         Status = OrderStatus.ExecutionRejected;
@@ -234,9 +237,9 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public void MarkAccepted()
     {
-        if (Status != OrderStatus.ReadyForExecution)
+        if (Status != OrderStatus.ReadyForFulfillment)
         {
-            throw new DomainRuleException("Only execution-ready orders can be accepted by an executor.");
+            throw new DomainRuleException("Only fulfillment-ready orders can be accepted.");
         }
 
         Status = OrderStatus.Accepted;
@@ -258,11 +261,28 @@ public partial class Order : BusinessEntity, IStoreScoped
         Notes = notes ?? Notes;
     }
 
+    public void MarkFulfillmentIssue(string? notes = null)
+    {
+        if (PaymentStatus != PaymentStatus.Paid)
+        {
+            throw new DomainRuleException("Only paid orders can enter fulfillment issue review.");
+        }
+
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled or OrderStatus.Refunded or
+            OrderStatus.Compensated or OrderStatus.RefundRequired)
+        {
+            throw new DomainRuleException("A terminal order cannot enter fulfillment issue review.");
+        }
+
+        Status = OrderStatus.FulfillmentIssue;
+        Notes = notes ?? Notes;
+    }
+
     public void MarkPreparing()
     {
-        if (Status is not (OrderStatus.ReadyForExecution or OrderStatus.Accepted))
+        if (Status is not (OrderStatus.ReadyForFulfillment or OrderStatus.Accepted))
         {
-            throw new DomainRuleException("Only execution-ready or accepted orders can be prepared.");
+            throw new DomainRuleException("Only fulfillment-ready or accepted orders can be prepared.");
         }
 
         Status = OrderStatus.Preparing;
@@ -270,9 +290,10 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public void Complete(DateTimeOffset completedAt)
     {
-        if (Status is OrderStatus.Cancelled or OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)
+        if (Status is OrderStatus.Cancelled or OrderStatus.Failed or OrderStatus.ExecutionRejected or
+            OrderStatus.RefundRequired or OrderStatus.FulfillmentIssue)
         {
-            throw new DomainRuleException("Cannot complete a cancelled, failed, rejected, or refund-required order.");
+            throw new DomainRuleException("Cannot complete an order with a terminal status or unresolved fulfillment issue.");
         }
 
         Status = OrderStatus.Completed;
@@ -297,7 +318,7 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Only a paid execution-rejected order can be prepared for redispatch.");
         }
 
-        Status = OrderStatus.ReadyForExecution;
+        Status = OrderStatus.ReadyForFulfillment;
     }
 
     public void Cancel(DateTimeOffset cancelledAt, string? notes = null)

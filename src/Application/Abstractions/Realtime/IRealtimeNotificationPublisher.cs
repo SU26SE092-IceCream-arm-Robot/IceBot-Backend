@@ -5,6 +5,7 @@ namespace Application.Abstractions.Realtime;
 public interface IRealtimeNotificationPublisher
 {
     Task PublishOrderStatusChangedAsync(OrderStatusChangedEvent evt, CancellationToken ct = default);
+    Task PublishOrderItemFulfillmentChangedAsync(OrderItemFulfillmentChangedEvent evt, CancellationToken ct = default);
     Task PublishOrderExecutionObservationChangedAsync(OrderExecutionObservationChangedEvent evt, CancellationToken ct = default);
     Task PublishPaymentStatusChangedAsync(PaymentStatusChangedEvent evt, CancellationToken ct = default);
     Task PublishKioskStatusChangedAsync(KioskStatusChangedEvent evt, CancellationToken ct = default);

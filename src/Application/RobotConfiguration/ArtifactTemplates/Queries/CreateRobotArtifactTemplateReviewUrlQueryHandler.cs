@@ -36,15 +36,27 @@ public sealed class CreateRobotArtifactTemplateReviewUrlQueryHandler
             return ApiResult<RobotArtifactReviewUrlResult>.Fail("Robot artifact template not found.", 404);
         }
 
-        var url = await _storage.CreateReadUrlAsync(template.StorageKey, cancellationToken);
-        return ApiResult<RobotArtifactReviewUrlResult>.Success(new RobotArtifactReviewUrlResult
+        try
         {
-            RobotArtifactId = template.Id,
-            Url = url.Url,
-            ExpiresAt = url.ExpiresAt,
-            Checksum = template.Checksum,
-            ContentLengthBytes = template.ContentLengthBytes
-        });
+            var url = await _storage.CreateReadUrlAsync(template.StorageKey, cancellationToken);
+            return ApiResult<RobotArtifactReviewUrlResult>.Success(new RobotArtifactReviewUrlResult
+            {
+                RobotArtifactId = template.Id,
+                Url = url.Url,
+                ExpiresAt = url.ExpiresAt,
+                Checksum = template.Checksum,
+                ContentLengthBytes = template.ContentLengthBytes
+            });
+        }
+        catch (ArtifactObjectNotFoundException)
+        {
+            return ApiResult<RobotArtifactReviewUrlResult>.Fail("Robot artifact template object is unavailable.", 409);
+        }
+        catch (ArtifactObjectStorageUnavailableException)
+        {
+            return ApiResult<RobotArtifactReviewUrlResult>.Fail(
+                "Artifact object storage is temporarily unavailable.", 503);
+        }
     }
 
     private static bool CanReadTemplates(CurrentUserContext userContext) =>

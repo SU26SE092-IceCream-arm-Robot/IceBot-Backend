@@ -185,7 +185,7 @@ internal static class PermissionMatrixRules
         new()
         {
             Policy = "orders.manage",
-            Description = "Manage orders (cancel unpaid, flag refund-required) within allowed scope.",
+            Description = "Manage order lifecycle and manual/packaged item fulfillment within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
             ScopeRequired = true
         },
@@ -375,6 +375,34 @@ internal static class PermissionMatrixRules
             Policy = "release.rollback",
             Description = "Deploy a previously validated release to assigned kiosks as rollback.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "package.read",
+            Description = "Read production package catalog and installation state within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "package.manage",
+            Description = "Author and publish global production package versions.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "package.install",
+            Description = "Install production packages within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "package.fork",
+            Description = "Fork package-managed technical configuration within assigned organization.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         }
     };

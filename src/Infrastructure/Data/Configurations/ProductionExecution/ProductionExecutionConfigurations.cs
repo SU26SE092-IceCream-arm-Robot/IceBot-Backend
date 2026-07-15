@@ -54,6 +54,8 @@ internal sealed class ProductionExecutionRecordConfiguration : IEntityTypeConfig
     {
         entity.ToTable("ProductionExecutionRecords");
         entity.HasIndex(x => new { x.SourceCommandId, x.SourceProductionJobId }).IsUnique();
+        entity.HasIndex(x => new { x.SourceCommandId, x.OrderItemId, x.ProductionUnitNo }).IsUnique();
+        entity.HasOne<OrderItem>().WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
         entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.SourceExecutorId, x.LastAppliedSourceEventId }).IsUnique();
         entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.Status, x.LastExecutorReportedAt });
         entity.HasOne(x => x.KioskExecutionEndpoint)

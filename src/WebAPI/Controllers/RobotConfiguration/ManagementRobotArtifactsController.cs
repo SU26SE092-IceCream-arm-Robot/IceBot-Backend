@@ -87,6 +87,20 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpGet("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/usage")]
+    [Authorize(Policy = "artifact.read")]
+    public async Task<IActionResult> GetUsage(
+        Guid organizationId,
+        Guid artifactId,
+        [FromServices] GetRobotArtifactUsageQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(
+            new GetRobotArtifactUsageQuery(User.GetUserContext(), organizationId, artifactId),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("organizations/{organizationId:guid}/robot-artifacts/bulk")]
     [Authorize(Policy = "artifact.upload")]
     [Consumes("multipart/form-data")]
@@ -126,7 +140,8 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
                     MachineModelCode = item.MachineModelCode,
                     ExportedAt = item.ExportedAt,
                     Description = item.Description,
-                    MetadataJson = item.MetadataJson
+                    MetadataJson = item.MetadataJson,
+                    TechnicalContractId = item.TechnicalContractId
                 };
             }).ToArray();
 
@@ -305,4 +320,5 @@ public sealed class BulkUploadRobotArtifactManifestItemRequest
     public string? Description { get; init; }
 
     public string? MetadataJson { get; init; }
+    public Guid? TechnicalContractId { get; init; }
 }

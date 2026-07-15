@@ -40,7 +40,6 @@ public sealed class OrderItemResult
 
     public List<OrderItemOptionResult> SelectedOptions { get; set; } = new();
 
-    [System.Text.Json.Serialization.JsonIgnore]
     public OrderItemStatus Status { get; set; }
 }
 

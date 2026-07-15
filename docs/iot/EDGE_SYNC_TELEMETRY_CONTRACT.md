@@ -165,14 +165,12 @@ The request uses the same HTTPS execution-endpoint authentication as command pul
 
 Connectivity state machine:
 
-- A current `Offline` heartbeat transitions only `KioskStatus.Active -> KioskStatus.Offline`.
-- A current `Online` or `Degraded` heartbeat transitions only `KioskStatus.Offline -> KioskStatus.Active`, and only while the parent organization and store remain active.
-- A stale lower-sequence heartbeat is retained for history and returned with `stale=true`; it never rewinds `KioskStatus` or `LastOnlineAt`.
-- The reconciliation job transitions `Active -> Offline` with connectivity `Unreachable` after `EdgeTelemetryIngestion__HeartbeatTimeoutSeconds` without an accepted heartbeat.
-- Connectivity automation never changes `Provisioning`, `Maintenance`, `Disabled`, or `Retired` kiosks.
-- Manual management updates cannot set `Offline` or recover `Offline -> Active`; those transitions belong to accepted heartbeat evidence and timeout reconciliation.
+- A current heartbeat updates `KioskConnectivityProjection` to `Online`, `Degraded`, or `Unreachable` and never mutates `KioskStatus` lifecycle.
+- A stale lower-sequence heartbeat is retained for history and returned with `stale=true`; it never rewinds connectivity or `LastOnlineAt`.
+- The reconciliation job transitions a previously observed connectivity projection to `Unreachable` after `EdgeTelemetryIngestion__HeartbeatTimeoutSeconds` without an accepted heartbeat.
+- Lifecycle management and connectivity observation are independent; an `Active` kiosk may be `Unreachable`, and a `Maintenance` kiosk may still report `Online`.
 - Heartbeat ingest and timeout reconciliation use the same per-kiosk serialized boundary and recheck current state inside it.
-- `KioskStatusChanged` is published only after a committed status transition. Duplicate heartbeats and unchanged states do not publish an event.
+- `KioskStatusChanged` is published only after a committed lifecycle or connectivity transition. Duplicate heartbeats and unchanged projections do not publish an event.
 
 ### Execution Readiness And Capability Projection
 

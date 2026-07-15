@@ -73,6 +73,7 @@ public sealed class ManagementOrderItemResult
     public string ProductVariantCode { get; init; } = null!;
     public string ProductVariantName { get; init; } = null!;
     public int? RecipeVersion { get; init; }
+    public Domain.Catalog.Enums.FulfillmentType FulfillmentType { get; init; }
     public int Quantity { get; init; }
     public decimal UnitPrice { get; init; }
     public decimal DiscountAmount { get; init; }

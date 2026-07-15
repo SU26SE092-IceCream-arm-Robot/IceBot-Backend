@@ -2,12 +2,14 @@ using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 using Application.SalesCatalog.ReadModels;
+using Domain.Devices.Connectivity;
 
 namespace Application.SalesCatalog.Abstractions;
 
 public interface IMenuStore
 {
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<KioskConnectivityProjection?> GetKioskConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<int> CountMenusAsync(
         string? search,
@@ -40,7 +42,7 @@ public interface IMenuStore
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
-    Task<bool> HasActiveProductionRouteAsync(
+    Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,

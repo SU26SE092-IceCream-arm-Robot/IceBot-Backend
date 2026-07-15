@@ -107,6 +107,58 @@ public sealed class OrderQueries
     }
 
     [Authorize(Policy = "orders.view")]
+    public async Task<FulfillmentQueuePage> GetFulfillmentQueue(
+        Guid? kioskId,
+        Domain.Catalog.Enums.FulfillmentType? fulfillmentType,
+        OrderItemStatus? itemStatus,
+        DateTimeOffset? paidFrom,
+        DateTimeOffset? paidTo,
+        bool? includeTerminal,
+        int? pageNumber,
+        int? pageSize,
+        ClaimsPrincipal claimsPrincipal,
+        [Service] ListFulfillmentQueueQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new ListFulfillmentQueueQuery
+        {
+            UserContext = claimsPrincipal.GetUserContext(),
+            KioskId = kioskId,
+            FulfillmentType = fulfillmentType,
+            ItemStatus = itemStatus,
+            PaidFrom = paidFrom,
+            PaidTo = paidTo,
+            IncludeTerminal = includeTerminal ?? false,
+            PageNumber = pageNumber ?? 1,
+            PageSize = pageSize ?? 20
+        }, cancellationToken);
+
+        EnsureSucceeded(result, "Failed to retrieve fulfillment queue.");
+        return new FulfillmentQueuePage(result.Data?.ToArray() ?? [], ToPageInfo(result.Pagination));
+    }
+
+    [Authorize(Policy = "orders.view")]
+    public async Task<OrderItemStatusHistoryPage> GetOrderItemStatusHistory(
+        Guid orderItemId,
+        int? pageNumber,
+        int? pageSize,
+        ClaimsPrincipal claimsPrincipal,
+        [Service] GetOrderItemStatusHistoryQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(new GetOrderItemStatusHistoryQuery
+        {
+            OrderItemId = orderItemId,
+            UserContext = claimsPrincipal.GetUserContext(),
+            PageNumber = pageNumber ?? 1,
+            PageSize = pageSize ?? 20
+        }, cancellationToken);
+
+        EnsureSucceeded(result, "Failed to retrieve order item status history.");
+        return new OrderItemStatusHistoryPage(result.Data?.ToArray() ?? [], ToPageInfo(result.Pagination));
+    }
+
+    [Authorize(Policy = "orders.view")]
     public async Task<OrderOverviewResult> GetOrderOverview(
         DateTimeOffset? from,
         DateTimeOffset? to,

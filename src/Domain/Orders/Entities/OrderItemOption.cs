@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Catalog.Enums;
 
 namespace Domain.Orders.Entities;
 
@@ -18,6 +19,8 @@ public class OrderItemOption : BusinessEntity
 
     public decimal UnitPriceDelta { get; set; }
 
+    public ProductOptionExecutionImpact ExecutionImpact { get; set; }
+
     public int Quantity { get; set; } = 1;
 
     public decimal TotalPriceDelta { get; set; }
@@ -33,7 +36,8 @@ public class OrderItemOption : BusinessEntity
         string optionGroupCode,
         string code,
         string name,
-        decimal unitPriceDelta)
+        decimal unitPriceDelta,
+        ProductOptionExecutionImpact executionImpact)
     {
         if (productOptionId == Guid.Empty || optionGroupId <= 0)
         {
@@ -58,6 +62,7 @@ public class OrderItemOption : BusinessEntity
             CodeSnapshot = code.Trim(),
             NameSnapshot = name.Trim(),
             UnitPriceDelta = unitPriceDelta,
+            ExecutionImpact = executionImpact,
             Quantity = 1,
             TotalPriceDelta = unitPriceDelta
         };

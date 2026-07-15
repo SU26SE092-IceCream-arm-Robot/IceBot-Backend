@@ -13,7 +13,7 @@ public static class OrderStatusProjector
         OrderExecutionRecord? executionRecord,
         PaymentTransactionStatus? latestTransactionStatus = null)
     {
-        if ((order.Status is OrderStatus.Paid or OrderStatus.ReadyForExecution or OrderStatus.Accepted or OrderStatus.Preparing) &&
+        if ((order.Status is OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted or OrderStatus.Preparing) &&
             executionRecord is not null)
         {
             var executionProjection = executionRecord.CustomerExecutionStatus switch
@@ -61,7 +61,7 @@ public static class OrderStatusProjector
             return ("WaitingForPayment", "Waiting for payment. Please scan the QR code.", true, false);
         }
 
-        if (order.Status is OrderStatus.Paid or OrderStatus.ReadyForExecution or OrderStatus.Accepted or OrderStatus.Preparing)
+        if (order.Status is OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted or OrderStatus.Preparing)
         {
             return ("Preparing", "Payment successful. Preparing your order.", false, false);
         }
@@ -85,6 +85,11 @@ public static class OrderStatusProjector
             return ("Cancelled", "Order cancelled.", false, false);
         }
 
+        if (order.Status == OrderStatus.FulfillmentIssue)
+        {
+            return ("SupportRequired", "Part of your order could not be fulfilled. Staff are reviewing it.", false, true);
+        }
+
         if (order.Status is OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)
         {
             return ("RefundRequired", "Order execution failed. Please contact staff for support.", false, true);
@@ -106,7 +111,7 @@ public static class OrderStatusProjector
     public static (string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport) ProjectFromTransaction(PaymentTransactionStatus transactionStatus, Order order)
     {
         if (order.PaymentStatus == PaymentStatus.Paid ||
-            order.Status is OrderStatus.Paid or OrderStatus.ReadyForExecution or OrderStatus.Accepted or OrderStatus.Preparing or OrderStatus.Ready or OrderStatus.Completed)
+            order.Status is OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted or OrderStatus.Preparing or OrderStatus.Ready or OrderStatus.Completed)
         {
             return ProjectFromOrder(order);
         }

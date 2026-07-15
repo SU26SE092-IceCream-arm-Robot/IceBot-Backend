@@ -27,15 +27,18 @@ public sealed class DeploymentReleaseLifecycleTests
         var releaseStore = Substitute.For<IConfigurationReleaseStore>();
         releaseStore.GetPublishedReleaseForDeploymentAsync(release.Id, Arg.Any<CancellationToken>())
             .Returns(release);
+        var command = Command(release.Id, rollbackTargetId: null);
+        deploymentStore.GetEndpointForDeploymentAsync(command.KioskExecutionEndpointId, Arg.Any<CancellationToken>())
+            .Returns(Endpoint(command, release.OrganizationId));
         var handler = CreateHandler(deploymentStore, releaseStore);
 
-        var result = await handler.HandleAsync(Command(release.Id, rollbackTargetId: null));
+        var result = await handler.HandleAsync(command);
 
         Assert.False(result.Succeeded);
         Assert.Equal(400, result.StatusCode);
         Assert.Contains("retired releases are available only through rollback", result.Message);
-        await deploymentStore.DidNotReceive().GetEndpointForDeploymentAsync(
-            Arg.Any<Guid>(),
+        await deploymentStore.Received(1).GetEndpointForDeploymentAsync(
+            command.KioskExecutionEndpointId,
             Arg.Any<CancellationToken>());
     }
 
@@ -88,4 +91,26 @@ public sealed class DeploymentReleaseLifecycleTests
         Selections = [new DeployLowCostArtifactSelection(Guid.NewGuid(), Guid.NewGuid())],
         RollbackTargetDeploymentId = rollbackTargetId
     };
+
+    private static KioskExecutionEndpoint Endpoint(
+        DeployLowCostArtifactSetCommand command,
+        Guid organizationId)
+    {
+        var endpoint = KioskExecutionEndpoint.CreateProvisioning(
+            command.KioskId,
+            "LOW-COST",
+            KioskExecutionProfile.LowCostController,
+            ExecutionEndpointAuthenticationMode.SignedCommandTls);
+        endpoint.Id = command.KioskExecutionEndpointId;
+        TestData.SetProperty(endpoint, nameof(KioskExecutionEndpoint.ControllerId), Guid.NewGuid());
+        TestData.SetProperty(endpoint, nameof(KioskExecutionEndpoint.Kiosk), new Domain.Tenants.Entities.Kiosk
+        {
+            Id = command.KioskId,
+            OrganizationId = organizationId,
+            StoreId = Guid.NewGuid(),
+            Code = "KIOSK",
+            Name = "Kiosk"
+        });
+        return endpoint;
+    }
 }

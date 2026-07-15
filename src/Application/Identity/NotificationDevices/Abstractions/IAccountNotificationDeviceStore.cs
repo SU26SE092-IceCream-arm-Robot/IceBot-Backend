@@ -18,6 +18,10 @@ public interface IAccountNotificationDeviceStore
         Guid accountId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<AccountNotificationDevice>> ListActiveByAccountIdAsync(
+        Guid accountId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(AccountNotificationDevice device, CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

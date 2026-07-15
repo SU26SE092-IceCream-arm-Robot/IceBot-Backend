@@ -4,6 +4,7 @@ using Domain.Devices.Catalog;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.ExecutionEndpoints.Projections;
 using Domain.Devices.Telemetry;
+using Domain.Devices.Connectivity;
 using Domain.Identity.Entities;
 using Domain.Identity.ValueObjects;
 using Domain.Inventory.Entities;
@@ -21,6 +22,20 @@ using Domain.Tenants.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace Infrastructure.Data.Configurations.Devices;
+
+internal sealed class KioskConnectivityProjectionConfiguration : IEntityTypeConfiguration<KioskConnectivityProjection>
+{
+    public void Configure(EntityTypeBuilder<KioskConnectivityProjection> entity)
+    {
+        entity.ToTable("KioskConnectivityProjections");
+        entity.HasIndex(x => x.KioskId).IsUnique();
+        entity.HasIndex(x => new { x.Status, x.LastObservedAt });
+        entity.HasOne<Domain.Tenants.Entities.Kiosk>()
+            .WithMany()
+            .HasForeignKey(x => x.KioskId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
 
 internal sealed class DeviceEventConfiguration : IEntityTypeConfiguration<DeviceEvent>
 {

@@ -41,7 +41,8 @@ public sealed class BulkUploadRobotArtifactsCommandHandler
                     Content = item.Content,
                     ExportedAt = item.ExportedAt,
                     Description = item.Description,
-                    MetadataJson = item.MetadataJson
+                    MetadataJson = item.MetadataJson,
+                    TechnicalContractId = item.TechnicalContractId
                 },
                 cancellationToken);
 
@@ -82,10 +83,11 @@ public sealed class BulkUploadRobotArtifactsCommandHandler
 
         if (succeededCount == 0)
         {
+            var statusCode = results.All(item => item.StatusCode == 503) ? 503 : 400;
             return new ApiResult<BulkRobotArtifactUploadResult>
             {
                 Succeeded = false,
-                StatusCode = 400,
+                StatusCode = statusCode,
                 Message = "All robot artifact uploads failed.",
                 Data = response
             };

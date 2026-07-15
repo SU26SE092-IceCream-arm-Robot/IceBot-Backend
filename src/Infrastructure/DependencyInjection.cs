@@ -20,9 +20,11 @@ using Application.Operations.Abstractions;
 using Application.Operations.OperationLogs.Abstractions;
 using Application.EdgeIntegration.Abstractions;
 using Application.ProductionConfiguration.Deployments.Abstractions;
+using Application.ProductionConfiguration.Deployments.Queries;
 using Application.ProductionConfiguration.Releases.Abstractions;
 using Application.ProductionConfiguration.Routes.Abstractions;
 using Application.RobotConfiguration.Artifacts.Abstractions;
+using Application.RobotConfiguration.Artifacts.Queries;
 using Application.RobotConfiguration.Programs.Abstractions;
 using Infrastructure.Catalog;
 using Infrastructure.Dashboard.Persistence;
@@ -40,9 +42,14 @@ using Infrastructure.ProductionConfiguration.Persistence.Deployments;
 using Infrastructure.ProductionConfiguration.Persistence.Releases;
 using Infrastructure.ProductionConfiguration.Persistence.Routes;
 using Infrastructure.ProductionConfiguration.ObjectStorage;
+using Infrastructure.ProductionPackages;
+using Application.ProductionPackages;
+using Application.ProductionPackages.Installation;
 using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
 using Infrastructure.RobotConfiguration.Artifacts.Persistence;
 using Infrastructure.RobotConfiguration.Programs.Persistence;
+using Infrastructure.RobotConfiguration.ArtifactContracts;
+using Application.RobotConfiguration.ArtifactContracts;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
 using Infrastructure.Sync;
@@ -151,11 +158,17 @@ namespace Infrastructure
             services.AddHostedService<RobotArtifactObjectStorageStartupValidator>();
             services.AddHostedService<RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotArtifactStore, RobotArtifactStore>();
+            services.AddScoped<IRobotArtifactUsageReader, RobotArtifactUsageReader>();
             services.AddScoped<IRobotProgramStore, RobotProgramStore>();
             services.AddScoped<IRobotArtifactTemplateStore, RobotArtifactTemplateStore>();
+            services.AddScoped<IRobotArtifactTechnicalContractStore, RobotArtifactTechnicalContractStore>();
             services.AddScoped<IConfigurationReleaseStore, ConfigurationReleaseStore>();
             services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
             services.AddScoped<IConfigurationDeploymentStore, ConfigurationDeploymentStore>();
+            services.AddScoped<IConfigurationDeploymentArtifactReader, ConfigurationDeploymentArtifactReader>();
+            services.AddScoped<IProductionPackageStore, ProductionPackageStore>();
+            services.AddScoped<IProductionPackageInstallationStore, ProductionPackageInstallationStore>();
+            services.AddScoped<Application.ProductionPackages.Workspace.IProductionPackageWorkspaceStore, ProductionPackageWorkspaceStore>();
             services.AddOptions<Application.ProductionConfiguration.Deployments.LowCostControllerCapacityOptions>()
                 .Bind(config.GetSection(Application.ProductionConfiguration.Deployments.LowCostControllerCapacityOptions.SectionName))
                 .Validate(options => options.MaxArtifactCount > 0 && options.MaxArtifactStorageBytes > 0,

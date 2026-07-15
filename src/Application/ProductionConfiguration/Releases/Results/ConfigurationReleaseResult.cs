@@ -46,6 +46,8 @@ public sealed class ConfigurationReleaseResult
                     RouteCode = route.RouteCode,
                     Priority = route.Priority,
                     RequiredCapabilitiesJson = route.RequiredCapabilitiesJson,
+                    SupportedOptionCodes = route.GetSupportedOptionCodes(),
+                    ProductionDefinitionChecksum = route.ProductionDefinitionChecksum,
                     RobotBindings = route.RobotBindings
                         .OrderBy(binding => binding.BindingOrder)
                         .Select(binding => new ExecutionRouteRobotBindingResult
@@ -73,6 +75,8 @@ public sealed class ExecutionRouteResult
     public string RouteCode { get; init; } = string.Empty;
     public int Priority { get; init; }
     public string? RequiredCapabilitiesJson { get; init; }
+    public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
+    public string? ProductionDefinitionChecksum { get; init; }
     public IReadOnlyCollection<ExecutionRouteRobotBindingResult> RobotBindings { get; init; } = Array.Empty<ExecutionRouteRobotBindingResult>();
 }
 

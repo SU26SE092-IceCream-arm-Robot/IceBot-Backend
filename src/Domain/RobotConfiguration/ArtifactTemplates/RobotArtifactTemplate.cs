@@ -17,6 +17,8 @@ public sealed class RobotArtifactTemplate : BusinessEntity
     public DateTimeOffset ExportedAt { get; private set; }
     public string? Description { get; private set; }
     public string? MetadataJson { get; private set; }
+    public Guid? TechnicalContractId { get; private set; }
+    public string? TechnicalContractChecksum { get; private set; }
 
     private RobotArtifactTemplate() { }
 
@@ -31,7 +33,9 @@ public sealed class RobotArtifactTemplate : BusinessEntity
         long contentLengthBytes,
         DateTimeOffset exportedAt,
         string? description = null,
-        string? metadataJson = null)
+        string? metadataJson = null,
+        Guid? technicalContractId = null,
+        string? technicalContractChecksum = null)
     {
         if (contentLengthBytes <= 0) throw new DomainRuleException("Robot artifact template content length must be greater than zero.");
         var normalizedFileName = RequireText(fileName, "Robot artifact template file name");
@@ -53,13 +57,27 @@ public sealed class RobotArtifactTemplate : BusinessEntity
             ContentLengthBytes = contentLengthBytes,
             ExportedAt = exportedAt,
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
-            MetadataJson = metadataJson
+            MetadataJson = metadataJson,
+            TechnicalContractId = technicalContractId,
+            TechnicalContractChecksum = string.IsNullOrWhiteSpace(technicalContractChecksum) ? null : technicalContractChecksum.Trim()
         };
+    }
+
+    public void AssignTechnicalContract(Guid technicalContractId, string checksum)
+    {
+        if (Status != RobotArtifactStatus.Draft)
+            throw new DomainRuleException("Only Draft artifact templates can change technical contract.");
+        if (technicalContractId == Guid.Empty || string.IsNullOrWhiteSpace(checksum))
+            throw new DomainRuleException("Published technical contract identity and checksum are required.");
+        TechnicalContractId = technicalContractId;
+        TechnicalContractChecksum = checksum.Trim();
     }
 
     public void Publish()
     {
         if (Status != RobotArtifactStatus.Draft) throw new DomainRuleException("Only draft robot artifact templates can be published.");
+        if (!TechnicalContractId.HasValue || string.IsNullOrWhiteSpace(TechnicalContractChecksum))
+            throw new DomainRuleException("A published technical contract is required before publishing a robot artifact template.");
         Status = RobotArtifactStatus.Published;
     }
 

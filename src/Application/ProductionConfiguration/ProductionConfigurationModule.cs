@@ -6,6 +6,7 @@ using Application.ProductionConfiguration.Deployments.Queries;
 using Application.ProductionConfiguration.Readiness.Queries;
 using Application.ProductionConfiguration.Releases.Services;
 using Application.ProductionConfiguration.Readiness.Services;
+using Application.ProductionConfiguration.Deployments.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.ProductionConfiguration;
@@ -17,6 +18,9 @@ public static class ProductionConfigurationModule
         services.AddScoped<PublishConfigurationReleaseCommandHandler>();
         services.AddScoped<FullEdgeReleaseBundleService>();
         services.AddScoped<ProductionInventoryReadinessGuard>();
+        services.AddScoped<ProductionDefinitionPublicationService>();
+        services.AddScoped<DeploymentValidationService>();
+        services.AddScoped<DeploymentValidationPreviewHandler>();
         services.AddScoped<RetireConfigurationReleaseCommandHandler>();
         services.AddScoped<DiscardDraftConfigurationReleaseCommandHandler>();
         services.AddScoped<DeployFullEdgeConfigurationCommandHandler>();
@@ -29,6 +33,7 @@ public static class ProductionConfigurationModule
         services.AddScoped<GetConfigurationInventoryReadinessQueryHandler>();
         services.AddScoped<ListConfigurationDeploymentsQueryHandler>();
         services.AddScoped<GetConfigurationDeploymentQueryHandler>();
+        services.AddScoped<GetConfigurationDeploymentArtifactsQueryHandler>();
         services.AddScoped<RollbackConfigurationDeploymentCommandHandler>();
         services.AddScoped<ReconcileExpiredDeploymentCommandsCommandHandler>();
         services.AddScoped<ReconcileAcceptedDeploymentReportTimeoutsCommandHandler>();

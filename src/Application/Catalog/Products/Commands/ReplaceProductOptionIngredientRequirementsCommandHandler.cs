@@ -23,6 +23,9 @@ public sealed class ReplaceProductOptionIngredientRequirementsCommandHandler(IPr
         if (option is null) return ApiResult<ProductOptionResult>.Fail("Product option not found.", 404);
 
         var items = command.Request.Items;
+        if (items.Count > 0 && option.ExecutionImpact != Domain.Catalog.Enums.ProductOptionExecutionImpact.ProductionAffecting)
+            return ApiResult<ProductOptionResult>.Fail(
+                "Ingredient execution requirements are allowed only for production-affecting options.", 409);
         if (items.Any(item => item.IngredientId == Guid.Empty || item.Quantity <= 0 ||
                               string.IsNullOrWhiteSpace(item.Unit) || string.IsNullOrWhiteSpace(item.RequiredWorkcellCapabilityCode)))
             return ApiResult<ProductOptionResult>.Fail("Each option ingredient requires an ingredient, positive quantity, unit, and workcell capability.");

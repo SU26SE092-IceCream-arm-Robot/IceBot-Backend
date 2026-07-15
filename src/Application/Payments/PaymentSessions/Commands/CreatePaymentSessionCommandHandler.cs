@@ -79,7 +79,8 @@ public sealed class CreatePaymentSessionCommandHandler
                 return ApiResult<PaymentSessionResult>.Fail("Order is already paid.", 409);
             }
 
-            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(order.Kiosk);
+            var connectivity = await _paymentStore.GetKioskConnectivityAsync(order.KioskId, ct);
+            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(order.Kiosk, connectivity);
             if (salesAvailabilityError is not null)
             {
                 return ApiResult<PaymentSessionResult>.Fail(salesAvailabilityError, 409);

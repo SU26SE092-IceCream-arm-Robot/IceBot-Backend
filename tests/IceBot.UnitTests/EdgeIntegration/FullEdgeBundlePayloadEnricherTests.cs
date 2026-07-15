@@ -14,6 +14,26 @@ namespace IceBot.UnitTests.EdgeIntegration;
 public sealed class FullEdgeBundlePayloadEnricherTests
 {
     [Fact]
+    public async Task InvalidDeploymentPayloadIsRejectedBeforeDelivery()
+    {
+        var storage = Substitute.For<IArtifactObjectStorage>();
+        var command = EdgeCommand.Create(
+            EdgeCommandType.DeployConfiguration,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "{invalid-json",
+            DateTimeOffset.UtcNow,
+            deploymentId: Guid.NewGuid(),
+            deploymentKind: DeploymentCommandTargetKind.FullEdgeConfiguration);
+
+        var exception = await Assert.ThrowsAsync<InvalidArtifactCommandPayloadException>(
+            () => new ArtifactCommandPayloadEnricher(storage).EnrichAsync(command));
+
+        Assert.Contains(command.Id.ToString(), exception.Message, StringComparison.Ordinal);
+        await storage.DidNotReceive().CreateReadUrlAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task FullEdgeDeploymentGetsBundleAndIndividualArtifactDownloadUrls()
     {
         var storage = Substitute.For<IArtifactObjectStorage>();

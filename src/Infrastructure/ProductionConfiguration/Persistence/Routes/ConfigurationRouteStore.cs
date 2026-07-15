@@ -18,6 +18,8 @@ public sealed class ConfigurationRouteStore : IConfigurationRouteStore
         CancellationToken cancellationToken = default) =>
         await _dbContext.ProductVariants.AsNoTracking()
             .Include(variant => variant.Product)
+                .ThenInclude(product => product.OptionGroups)
+                    .ThenInclude(group => group.ProductOptions)
             .Where(variant => ids.Contains(variant.Id))
             .ToListAsync(cancellationToken);
 

@@ -145,7 +145,9 @@ public sealed class ExecutionReportStore :
 
     public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders.FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+        return _dbContext.Orders
+            .Include(order => order.OrderItems)
+            .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     }
 
     public Task AddOrderStatusHistoryAsync(
@@ -163,6 +165,13 @@ public sealed class ExecutionReportStore :
             .Include(state => state.Kiosk)
             .Include(state => state.Ingredient)
             .FirstOrDefaultAsync(state => state.Id == dispenserStateId, cancellationToken);
+    }
+
+    public Task AddOrderItemStatusHistoryAsync(
+        OrderItemStatusHistory history,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OrderItemStatusHistories.AddAsync(history, cancellationToken).AsTask();
     }
 
     public async Task<bool> IsIngredientExpectedForOrderItemAsync(
