@@ -53,4 +53,20 @@ public sealed class ArtifactStorageIntegrationTests
             storage.ReadBytesAsync(key, 1024));
     }
 
+    [IntegrationFact]
+    public async Task ImmutableCopy_MissingSourceUsesTypedNotFoundContract()
+    {
+        var storage = _fixture.CreateObjectStorage(autoCreateBucket: true);
+        var sourceKey = $"robot-artifacts/integration/missing/{Guid.NewGuid():N}.lua";
+        var destinationKey = $"robot-artifacts/integration/copy/{Guid.NewGuid():N}.lua";
+
+        var exception = await Assert.ThrowsAsync<ArtifactObjectNotFoundException>(() =>
+            storage.CopyImmutableAsync(
+                sourceKey,
+                new ArtifactObjectWriteRequest(destinationKey, "text/x-lua", 1, new string('0', 64))));
+
+        Assert.Equal(sourceKey, exception.StorageKey);
+        Assert.False(await storage.ExistsAsync(destinationKey));
+    }
+
 }

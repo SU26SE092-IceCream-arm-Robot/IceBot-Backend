@@ -170,6 +170,16 @@ Reason: duplicate refund is a high-risk financial bug.
 
 `EdgeCommand.Id` is the dispatch identity. A delivery retry keeps the same command id; a new approved execution retry creates a new command id and dispatch attempt number.
 
+Cloud allocates delivery-attempt numbers inside a transaction serialized by the
+target execution endpoint. Command ACK, execution report, and timeout reconciliation
+serialize by `EdgeCommand.Id`; any of those paths that changes an order also acquires
+the shared `OrderId` workflow lock. Manual/Packaged fulfillment and initial dispatch
+use that same order lock. This lock ordering prevents duplicate provisional execution
+records and lost mixed-order aggregation updates across backend instances.
+Payment-session creation, signed payment application, payment reconciliation, and
+order cancellation/refund-required decisions use the same order lock, so a payment
+cannot be applied from a stale pre-cancellation order snapshot.
+
 Recommended constraints:
 
 - `EdgeCommand.OrderId + DispatchAttemptNo`
@@ -177,6 +187,31 @@ Recommended constraints:
 - executor report identity scoped to its stable runtime/controller identity before Cloud projections are updated
 
 Reason: delivery retry must not rerun physical work, and Cloud projections must not accept duplicated executor evidence.
+
+### Production Package Upgrade
+
+Upgrade execute uses `OrganizationId + IdempotencyKey`. The same key is valid
+only for the same source installation, target package version, selected Product
+source keys, and `PreviewChecksum`. A different payload returns conflict.
+
+Only one active Upgrade may own a source installation. Its successor installation
+uses a deterministic internal idempotency key and a persisted materialization
+identity suffix, so retry cannot create different staging Product or RobotProgram
+identities.
+
+The Upgrade persists `TargetInstallationId` immediately after successor
+materialization and before preparation evidence is finalized. A Failed Upgrade
+may resume only with the original payload and reuses that installation. A
+terminal retry returns the existing result even after the source installation
+has been superseded; it does not rebuild preview from current state.
+
+Rollback uses one deterministic idempotency key per Upgrade, execution endpoint,
+and rollback attempt number. Successful endpoint requests are persisted
+individually. Retrying a partially requested rollback sends only missing
+endpoint requests, then waits for every resulting deployment to become Active
+before restoring Cloud menu and Catalog bindings. An observed Failed deployment
+permits the next audited attempt; unknown or non-terminal observation does not.
+Each endpoint is limited to three attempts.
 
 ### DeviceEvent
 
@@ -292,7 +327,9 @@ Retry is recommended for:
 - `SyncEventInbox`: retry event processing.
 - `PaymentTransaction`: retry provider calls with the same provider idempotency key.
 - `PaymentCallback`: retry internal callback processing.
-- `Refund`: retry provider refund with the same idempotency key.
+- `Refund`: the current manual workflow retries only the backend command with the
+  same idempotency key. It does not call or retry a provider refund. Provider
+  refund retry requires a separately approved provider contract and workflow.
 - `EdgeCommand`: retry delivery using the same command id while it remains unexpired.
 - `DeviceEvent` and `OperationLog`: retry publish/sync, not the original physical action.
 

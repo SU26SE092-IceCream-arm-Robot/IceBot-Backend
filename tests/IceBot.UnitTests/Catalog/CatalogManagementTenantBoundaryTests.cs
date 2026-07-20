@@ -6,6 +6,7 @@ using Application.Identity.Tokens.Claims;
 using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.Menus.Commands;
 using Application.SalesCatalog.Menus.Requests;
+using Application.Shared.Ownership;
 using Application.Tenants;
 using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
@@ -44,7 +45,8 @@ public sealed class CatalogManagementTenantBoundaryTests
         var store = Substitute.For<IProductStore>();
         store.GetProductByIdAsync(product.Id, false, Arg.Any<CancellationToken>()).Returns(product);
 
-        var result = await new UpdateProductCommandHandler(store).HandleAsync(new UpdateProductCommand
+        var result = await new UpdateProductCommandHandler(
+            store, Substitute.For<ITechnicalResourceMutationPolicy>()).HandleAsync(new UpdateProductCommand
         {
             Scope = new ProductManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
             ProductId = product.Id,
@@ -53,6 +55,30 @@ public sealed class CatalogManagementTenantBoundaryTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(404, result.StatusCode);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateProduct_RejectsTechnicalIdentityChange_WhenPackageManaged()
+    {
+        var organizationId = Guid.NewGuid();
+        var product = ProductFor(organizationId);
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(product.Id, false, Arg.Any<CancellationToken>()).Returns(product);
+        var ownership = Substitute.For<ITechnicalResourceMutationPolicy>();
+        ownership.ValidateDefinitionMutationAsync(TechnicalResourceKind.Product, product.Id,
+                Arg.Any<CancellationToken>())
+            .Returns("Package-managed technical configuration must be forked before its definition can be changed.");
+
+        var result = await new UpdateProductCommandHandler(store, ownership).HandleAsync(new UpdateProductCommand
+        {
+            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+            ProductId = product.Id,
+            Request = new UpdateProductRequest { Code = "CHANGED" }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
         await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

@@ -7,6 +7,25 @@ namespace Application.Payments.PaymentSessions.Support;
 
 internal static class PaymentNotificationApplier
 {
+    public static string? ValidateNotification(
+        PaymentTransaction paymentTransaction,
+        ProviderPaymentNotification notification)
+    {
+        if (!notification.IsPaid)
+        {
+            return null;
+        }
+
+        if (!notification.PaidAmount.HasValue)
+        {
+            return "Paid webhook amount is required.";
+        }
+
+        return notification.PaidAmount.Value == paymentTransaction.Amount
+            ? null
+            : "Paid webhook amount does not match the payment transaction amount.";
+    }
+
     public static void ApplyNotification(PaymentTransaction paymentTransaction, ProviderPaymentNotification notification)
     {
         paymentTransaction.ProviderPaymentLinkId = notification.ProviderPaymentLinkId ?? paymentTransaction.ProviderPaymentLinkId;
@@ -52,8 +71,7 @@ internal static class PaymentNotificationApplier
                 return;
             }
 
-            paymentTransaction.Cancel(DateTimeOffset.UtcNow);
-            paymentTransaction.Status = PaymentTransactionStatus.Expired;
+            paymentTransaction.MarkExpired(DateTimeOffset.UtcNow);
             if (CanMarkOrderPaymentCancelled(paymentTransaction.Order.PaymentStatus))
             {
                 paymentTransaction.Order.MarkPaymentCancelled();

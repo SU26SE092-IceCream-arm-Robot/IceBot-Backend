@@ -101,6 +101,18 @@ The `IceBot.Payments.PayOS` meter adds provider-specific failure classification 
 | --- | --- | --- | --- |
 | `icebot.mqtt.wakeup.publish.attempts` | Counter | MQTT wake-up outcomes, including disabled/succeeded/failed | `outcome`, `command.type` |
 | `icebot.payos.request.failures` | Counter | Final PayOS timeout, open-circuit, or transient failures | `provider`, `operation`, `failure.kind` |
+| `icebot.payment_session.reconciliation.outcomes` | Counter | Recovery outcomes for incomplete provider-session creation responses | `outcome` |
+| `icebot.payment_session.interventions` | Counter | Sessions requiring operator investigation after terminal reconciliation outcomes | `intervention` |
+| `icebot.payment_session.reconciliation.pending_age` | Histogram (seconds) | Age of an incomplete session when a reconciliation attempt starts | none |
+| `icebot.production_package.upgrade.preview` | Counter | Upgrade preview outcomes | `outcome`, `has_blockers` |
+| `icebot.production_package.upgrade.materialization` | Counter | Successor materialization outcomes | `outcome` |
+| `icebot.production_package.upgrade.cutover` | Counter | Cutover outcomes | `outcome` |
+| `icebot.production_package.upgrade.rollback_attempt` | Counter | Created rollback deployment attempts | `profile`, `attempt_no` |
+| `icebot.production_package.upgrade.rollback` | Counter | Aggregate rollback outcomes | `outcome` |
+| `icebot.production_package.upgrade.rollback_pending_age` | Histogram (seconds) | Age of an upgrade waiting for rollback activation | none |
+| `icebot.notification_delivery.outcomes` | Counter | Durable push delivery outcomes | `status`, `notification.type` |
+| `icebot.notification_delivery.processing_lag` | Histogram (seconds) | Time from scheduled attempt to worker claim | none |
+| `icebot.notification_delivery.due_batch_size` | Histogram | Number of due deliveries selected per scan | none |
 | `icebot.edge.command.pull.latency` | Histogram (seconds) | Durable command creation until it is returned by command pull | `command.type` |
 | `icebot.edge.command.ack.latency` | Histogram (seconds) | Command delivery until Cloud receives the first state-changing ACK | `command.type`, `ack.status` |
 | `icebot.edge.execution.report.lag` | Histogram (seconds) | Executor-reported timestamp until Cloud receives a new report | `report.type` |
@@ -114,12 +126,23 @@ Rules:
 - Duplicate ACKs and duplicate execution reports do not add latency/transition measurements.
 - The stale/unreachable gauge is refreshed from PostgreSQL every 30 seconds; it is not an in-memory lifecycle counter.
 - IDs such as command, order, kiosk, endpoint, or device must never be metric tags. Use traces/logs for entity-level investigation.
+- Production-package upgrade tags are bounded outcomes only. Endpoint and upgrade identities remain in the typed detail/audit read model.
+- Notification metrics use bounded status/type tags only. Delivery, account, kiosk, and tenant identifiers remain in diagnostics reads and logs.
 - PayOS `failure.kind` is bounded to `timeout`, `circuit_open`, and `transient`; HTTP payment-creation `POST` requests are not retried.
+- Payment-session reconciliation uses the persisted provider order code. `AwaitingWebhook` means provider lookup reported paid while Cloud is still waiting for the signed webhook; it must be investigated through order-scoped payment diagnostics rather than treated as fulfillment success.
+- Alert on any sustained increase of `icebot.payment_session.interventions`, especially `AwaitingWebhook`, `IdentityMismatch`, and `AmountMismatch`. Use the tenant-scoped intervention queue to identify affected orders; metric tags intentionally contain no payment or order IDs.
 - MQTT disabled is an explicit outcome, not a publish failure. Alert only on `outcome=failed` when MQTT is expected to be enabled.
 
 Suggested initial alerts:
 
 - sustained increase of MQTT `failed` outcomes;
+- any `icebot.payment_session.interventions{intervention="IdentityMismatch"}` or
+  `{intervention="AmountMismatch"}` occurrence;
+- sustained non-zero
+  `icebot.payment_session.interventions{intervention="AwaitingWebhook"}` or
+  `{intervention="RetryExhausted"}`;
+- payment-session reconciliation pending-age p95 above the configured stale and
+  retry budget;
 - p95 pull or ACK latency above the command expiry budget;
 - p95 report lag above the report reconciliation threshold;
 - non-zero Unreachable gauge for a sustained interval;

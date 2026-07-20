@@ -39,7 +39,9 @@ internal sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration
         entity.ToTable("PaymentTransactions");
         entity.HasIndex(x => x.TransactionNumber).IsUnique();
         entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
-        entity.HasIndex(x => x.ProviderOrderCode).HasFilter("\"ProviderOrderCode\" IS NOT NULL");
+        entity.HasIndex(x => new { x.Provider, x.ProviderOrderCode })
+            .IsUnique()
+            .HasFilter("\"ProviderOrderCode\" IS NOT NULL");
         entity.HasIndex(x => x.ProviderTransactionId).HasFilter("\"ProviderTransactionId\" IS NOT NULL");
         entity.Property(x => x.ProviderOrderCode).HasMaxLength(100);
         entity.Property(x => x.ProviderPaymentLinkId).HasMaxLength(200);

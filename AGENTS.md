@@ -102,6 +102,37 @@ This is the main implementation repository for IceBot backend work.
 - Scan for stale identifiers before finishing; prefer `rg`.
 - Re-run build after code changes.
 
+## Vertical Slice Completion Gate
+
+Apply this gate before changing a workflow that crosses multiple modules,
+aggregate boundaries, persistence operations, or external dependencies.
+Use [Vertical Slice Review](docs/process/VERTICAL_SLICE_REVIEW.md) as the
+worksheet, invariant matrix, failure-scenario catalog, and evidence standard.
+
+1. Freeze the requested scope before editing. Record what is included, what is
+   excluded, and which public contracts or data models may change. Do not expand
+   the architecture during the final review pass.
+2. Define the complete vertical-slice invariants before implementation. Check at
+   least lifecycle/state transitions, concurrency, tenancy, idempotency,
+   transaction boundaries, external I/O, compensation/cleanup, and retry
+   behavior. Mark an item not applicable only with a concrete reason.
+3. Write the relevant failure scenarios before editing code. Include concurrent
+   requests, retries after partial success, stale state, external dependency
+   failure, and cleanup after database or object-storage failure when applicable.
+4. Implement the frozen slice in one coherent pass. Do not deliver a sequence of
+   disconnected patches that each handles only the latest observed symptom.
+5. After implementation, review the final diff independently against the frozen
+   scope, invariants, and failure scenarios. This review is a verification pass,
+   not permission to introduce new architecture or broaden the task.
+6. Call the slice complete only when every applicable invariant has code or
+   contract coverage and every material failure scenario has verification
+   evidence. Build success alone is not completion evidence. If any item remains
+   unverified, state it explicitly and do not report the slice as complete.
+
+For narrow, local changes, use the smallest applicable subset of this gate. Do
+not turn documentation-only work or isolated mechanical fixes into unnecessary
+process overhead.
+
 ## Verification
 
 Preferred final check in the full workspace after meaningful backend code/API/domain changes:

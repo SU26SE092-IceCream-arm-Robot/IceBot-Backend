@@ -3,6 +3,7 @@ using Domain.Identity.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using Domain.Identity.Enums;
 
 namespace Infrastructure.Identity.Persistence;
 
@@ -53,7 +54,8 @@ public sealed class AccountNotificationDeviceStore : IAccountNotificationDeviceS
             .Where(device =>
                 device.AccountId == accountId &&
                 device.InvalidatedAt == null &&
-                device.PushToken != null)
+                device.PushToken != null &&
+                device.Account.Status == AccountStatus.Active)
             .OrderBy(device => device.Id)
             .ToListAsync(cancellationToken);
 
@@ -64,6 +66,8 @@ public sealed class AccountNotificationDeviceStore : IAccountNotificationDeviceS
         _dbContext.SaveChangesAsync(cancellationToken);
 
     public async Task<T> ExecuteRegistrationTransactionAsync<T>(
+        Guid accountId,
+        Guid installationId,
         string pushTokenHash,
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default)
@@ -75,9 +79,17 @@ public sealed class AccountNotificationDeviceStore : IAccountNotificationDeviceS
                 IsolationLevel.Serializable,
                 cancellationToken);
 
-            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"SELECT pg_advisory_xact_lock(hashtext({pushTokenHash}))",
-                cancellationToken);
+            var lockKeys = new[]
+            {
+                $"notification-installation:{accountId:D}:{installationId:D}",
+                $"notification-token:{pushTokenHash}"
+            };
+            foreach (var lockKey in lockKeys.Order(StringComparer.Ordinal))
+            {
+                await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+                    cancellationToken);
+            }
 
             var result = await action(cancellationToken);
             await transaction.CommitAsync(cancellationToken);

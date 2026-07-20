@@ -75,8 +75,9 @@ public sealed class EdgeControllerContractIntegrationTests
         Assert.False(installed.Data.Duplicate);
 
         var activeEventId = Guid.NewGuid();
-        var active = await ReportAsync(graph, activeEventId, 2, "Active");
-        var duplicate = await ReportAsync(graph, activeEventId, 2, "Active");
+        var activeAt = DateTimeOffset.UtcNow;
+        var active = await ReportAsync(graph, activeEventId, 2, "Active", edgeCreatedAt: activeAt);
+        var duplicate = await ReportAsync(graph, activeEventId, 2, "Active", edgeCreatedAt: activeAt);
 
         Assert.True(active.Succeeded);
         Assert.True(active.Data!.Applied);
@@ -115,8 +116,11 @@ public sealed class EdgeControllerContractIntegrationTests
         await AcknowledgeAsync(graph, "Accepted");
 
         var sourceEventId = Guid.NewGuid();
-        var failed = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch", "Downloaded bytes did not match the manifest.");
-        var duplicate = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch", "Downloaded bytes did not match the manifest.");
+        var failedAt = DateTimeOffset.UtcNow;
+        var failed = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch",
+            "Downloaded bytes did not match the manifest.", failedAt);
+        var duplicate = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch",
+            "Downloaded bytes did not match the manifest.", failedAt);
 
         Assert.True(failed.Succeeded);
         Assert.True(failed.Data!.Applied);
@@ -173,7 +177,8 @@ public sealed class EdgeControllerContractIntegrationTests
         long sequenceNumber,
         string status,
         string? errorCode = null,
-        string? errorMessage = null)
+        string? errorMessage = null,
+        DateTimeOffset? edgeCreatedAt = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
         var reportStore = new ExecutionReportStore(dbContext);
@@ -188,10 +193,12 @@ public sealed class EdgeControllerContractIntegrationTests
             CommandId = graph.CommandId,
             SourceEventId = sourceEventId,
             SequenceNumber = sequenceNumber,
-            EdgeCreatedAt = DateTimeOffset.UtcNow,
+            EdgeCreatedAt = edgeCreatedAt ?? DateTimeOffset.UtcNow,
             ReportType = "Deployment",
             Status = status,
             DeploymentId = graph.DeploymentId,
+            SourceConfigurationReleaseId = graph.ReleaseId,
+            ReleaseChecksum = graph.ReleaseChecksum,
             ErrorCode = errorCode,
             ErrorMessage = errorMessage
         });
@@ -286,7 +293,8 @@ public sealed class EdgeControllerContractIntegrationTests
         dbContext.AddRange(deployment, command);
         await dbContext.SaveChangesAsync();
 
-        return new DeploymentGraph(kiosk.Id, endpoint.Id, deployment.Id, command.Id, checksum);
+        return new DeploymentGraph(
+            kiosk.Id, endpoint.Id, deployment.Id, command.Id, release.Id, releaseChecksum, checksum);
     }
 
     private static string Sha256(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
@@ -305,5 +313,7 @@ public sealed class EdgeControllerContractIntegrationTests
         Guid EndpointId,
         Guid DeploymentId,
         Guid CommandId,
+        Guid ReleaseId,
+        string ReleaseChecksum,
         string ArtifactChecksum);
 }

@@ -37,6 +37,9 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
 
     public string ProviderCode => "PayOS";
 
+    public string CreateProviderOrderCode(Guid paymentTransactionId) =>
+        GenerateOrderCode(paymentTransactionId).ToString(CultureInfo.InvariantCulture);
+
     public async Task<ProviderPaymentSession> CreatePaymentSessionAsync(
         PaymentTransaction paymentTransaction,
         Order order,
@@ -45,7 +48,11 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         EnsureConfigured();
 
         var amount = decimal.ToInt32(decimal.Round(paymentTransaction.Amount, 0, MidpointRounding.AwayFromZero));
-        var orderCode = GenerateOrderCode(paymentTransaction.Id);
+        if (!long.TryParse(paymentTransaction.ProviderOrderCode, NumberStyles.None, CultureInfo.InvariantCulture, out var orderCode) ||
+            orderCode <= 0)
+        {
+            throw new InvalidOperationException("Payment transaction provider order code is invalid.");
+        }
         var description = SanitizeDescription($"IceBot {order.OrderNumber}");
         var expiresAt = _options.ExpireMinutes > 0
             ? DateTimeOffset.UtcNow.AddMinutes(_options.ExpireMinutes)
@@ -83,52 +90,146 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         catch (TimeoutRejectedException)
         {
             PayOsResilienceMetrics.RecordTimeout();
-            throw;
+            throw new ProviderPaymentSessionCreationException(
+                "PayOS payment-session creation timed out.",
+                outcomeUnknown: true);
         }
         catch (BrokenCircuitException)
         {
             PayOsResilienceMetrics.RecordCircuitOpen();
+            throw new ProviderPaymentSessionCreationException(
+                "PayOS payment-session creation was blocked by the open circuit.",
+                outcomeUnknown: false);
+        }
+        catch (HttpRequestException ex)
+        {
+            PayOsResilienceMetrics.RecordTransientFailure();
+            throw new ProviderPaymentSessionCreationException(
+                "PayOS payment-session creation failed at transport level.",
+                outcomeUnknown: true,
+                ex);
+        }
+
+        using (response)
+        {
+            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                if ((int)response.StatusCode is 408 or 429 or >= 500)
+                {
+                    PayOsResilienceMetrics.RecordTransientFailure();
+                }
+
+                _logger.LogError("PayOS create payment link failed. Status={StatusCode}, Body={Body}", response.StatusCode, responseJson);
+                throw new ProviderPaymentSessionCreationException(
+                    "PayOS create payment link failed.",
+                    outcomeUnknown: (int)response.StatusCode is 408 or 429 or >= 500);
+            }
+
+            var apiResponse = JsonSerializer.Deserialize<PayOsApiResponse<PaymentLinkData>>(responseJson, JsonOptions);
+            if (apiResponse?.Code != "00" || apiResponse.Data is null)
+            {
+                var message = apiResponse?.Description ?? "Invalid PayOS response.";
+                _logger.LogError("PayOS create payment link returned error: {Message}. Body={Body}", message, responseJson);
+                throw new ProviderPaymentSessionCreationException(message, outcomeUnknown: false);
+            }
+
+            if (apiResponse.Data.OrderCode != orderCode ||
+                (string.IsNullOrWhiteSpace(apiResponse.Data.CheckoutUrl) &&
+                 string.IsNullOrWhiteSpace(apiResponse.Data.QrCode)))
+            {
+                _logger.LogError("PayOS create payment link returned incomplete data. Body={Body}", responseJson);
+                throw new ProviderPaymentSessionCreationException(
+                    "PayOS returned an invalid or incomplete payment session.",
+                    outcomeUnknown: true);
+            }
+
+            return new ProviderPaymentSession
+            {
+                ProviderOrderCode = apiResponse.Data.OrderCode.ToString(CultureInfo.InvariantCulture),
+                ProviderPaymentLinkId = apiResponse.Data.PaymentLinkId,
+                CheckoutUrl = apiResponse.Data.CheckoutUrl,
+                QrCodePayload = apiResponse.Data.QrCode,
+                ExpiresAt = expiresAt,
+                ProviderStatus = apiResponse.Data.Status,
+                RawResponseJson = responseJson
+            };
+        }
+    }
+
+    public async Task<ProviderPaymentSession?> GetPaymentSessionAsync(
+        string providerOrderCode,
+        CancellationToken cancellationToken = default)
+    {
+        EnsureConfigured();
+        if (!long.TryParse(providerOrderCode, NumberStyles.None, CultureInfo.InvariantCulture, out var expectedOrderCode) ||
+            expectedOrderCode <= 0)
+        {
+            throw new InvalidOperationException("Payment transaction provider order code is invalid.");
+        }
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await _httpClient.GetAsync(
+                $"v2/payment-requests/{Uri.EscapeDataString(providerOrderCode)}",
+                cancellationToken);
+        }
+        catch (TimeoutRejectedException)
+        {
+            PayOsResilienceMetrics.RecordTimeout("get_payment_session");
+            throw;
+        }
+        catch (BrokenCircuitException)
+        {
+            PayOsResilienceMetrics.RecordCircuitOpen("get_payment_session");
             throw;
         }
         catch (HttpRequestException)
         {
-            PayOsResilienceMetrics.RecordTransientFailure();
+            PayOsResilienceMetrics.RecordTransientFailure("get_payment_session");
             throw;
         }
 
         using (response)
         {
-        var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
-
-        if (!response.IsSuccessStatusCode)
-        {
-            if ((int)response.StatusCode is 408 or 429 or >= 500)
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                PayOsResilienceMetrics.RecordTransientFailure();
+                return null;
             }
 
-            _logger.LogError("PayOS create payment link failed. Status={StatusCode}, Body={Body}", response.StatusCode, responseJson);
-            throw new InvalidOperationException("PayOS create payment link failed.");
-        }
+            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                if ((int)response.StatusCode is 408 or 429 or >= 500)
+                {
+                    PayOsResilienceMetrics.RecordTransientFailure("get_payment_session");
+                }
 
-        var apiResponse = JsonSerializer.Deserialize<PayOsApiResponse<PaymentLinkData>>(responseJson, JsonOptions);
-        if (apiResponse?.Code != "00" || apiResponse.Data is null)
-        {
-            var message = apiResponse?.Description ?? "Invalid PayOS response.";
-            _logger.LogError("PayOS create payment link returned error: {Message}. Body={Body}", message, responseJson);
-            throw new InvalidOperationException(message);
-        }
+                throw new InvalidOperationException("PayOS get payment link failed.");
+            }
 
-        return new ProviderPaymentSession
-        {
-            ProviderOrderCode = apiResponse.Data.OrderCode.ToString(CultureInfo.InvariantCulture),
-            ProviderPaymentLinkId = apiResponse.Data.PaymentLinkId,
-            CheckoutUrl = apiResponse.Data.CheckoutUrl,
-            QrCodePayload = apiResponse.Data.QrCode,
-            ExpiresAt = expiresAt,
-            ProviderStatus = apiResponse.Data.Status,
-            RawResponseJson = responseJson
-        };
+            var apiResponse = JsonSerializer.Deserialize<PayOsApiResponse<PaymentLinkInformationData>>(
+                responseJson,
+                JsonOptions);
+            if (apiResponse?.Code != "00" || apiResponse.Data is null ||
+                apiResponse.Data.OrderCode != expectedOrderCode)
+            {
+                throw new InvalidOperationException("PayOS returned invalid payment-link information.");
+            }
+
+            return new ProviderPaymentSession
+            {
+                ProviderOrderCode = apiResponse.Data.OrderCode.ToString(CultureInfo.InvariantCulture),
+                ProviderPaymentLinkId = apiResponse.Data.PaymentLinkId,
+                CheckoutUrl = apiResponse.Data.CheckoutUrl,
+                QrCodePayload = apiResponse.Data.QrCode,
+                ProviderStatus = apiResponse.Data.Status,
+                Amount = apiResponse.Data.Amount,
+                PaidAmount = apiResponse.Data.AmountPaid,
+                RawResponseJson = responseJson
+            };
         }
     }
 

@@ -10,6 +10,7 @@ using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.RobotConfiguration.Artifacts.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Infrastructure.Concurrency;
 
 namespace IceBot.IntegrationTests.RobotConfiguration;
 
@@ -69,7 +70,8 @@ public sealed class ArtifactUploadIntegrationTests
         Application.RobotConfiguration.Storage.Abstractions.IArtifactObjectStorage storage) =>
         new(
             new RobotArtifactStore(dbContext),
-            new ArtifactUploadContentService(storage, NullLogger<ArtifactUploadContentService>.Instance));
+            new ArtifactUploadContentService(storage, NullLogger<ArtifactUploadContentService>.Instance),
+            new PostgresTechnicalResourceMutationCoordinator(dbContext));
 
     private static UploadRobotArtifactCommand UploadCommand(Guid organizationId, string code, string fileName)
     {

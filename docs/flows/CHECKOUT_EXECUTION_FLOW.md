@@ -28,7 +28,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 6. Tablet checks runtime projection freshness:
    now - generatedAt <= 5-15 seconds.
 7. Tablet calls Cloud Backend to place order.
-8. Cloud validates kiosk, Store opening hours in `Store.TimeZone`, menu item, and basic idempotency. A Store that closes after a runtime-menu snapshot was issued rejects the order with `409`.
+8. Cloud re-evaluates kiosk, Store opening hours in `Store.TimeZone`, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found.
 9. Cloud creates:
    - Order
    - OrderItems
@@ -37,6 +37,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 11. Cloud creates:
    - PaymentTransaction
    - provider payment session
+   Cloud persists the deterministic provider order code before calling the provider. A retry reconciles that same provider identity and must not create a second provider session.
 12. Cloud returns:
    - checkoutUrl
    - qrCodePayload
@@ -69,6 +70,22 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 ```
 
 Payment success and robot execution are separate concerns. Tablet can show payment success before Edge accepts the executable command.
+
+If the provider accepted session creation but the original response was lost, a background reconciliation worker queries the persisted provider order code and restores the checkout URL or QR payload. This read-side recovery never replaces webhook verification: a provider lookup reporting `PAID` remains pending until a signed webhook authoritatively commits payment and order state. Reconciliation failures and exhausted retries are available through the scoped payment diagnostics read.
+
+A known provider rejection marks the payment attempt failed and allows a new customer attempt. A timeout, transport failure, transient provider response, or incomplete successful response has an unknown creation outcome: Cloud keeps the transaction pending, schedules read-side reconciliation, and does not issue another create request. Operators use the scoped intervention queue and audited manual reconcile command when automatic recovery is exhausted or a signed webhook remains missing.
+
+The intervention queue, automatic reconciliation, and manual reconcile command
+share one eligibility policy. A pending provider session is eligible when its
+checkout instructions are missing or its local expiry has been reached. An old
+checkout URL or QR payload does not hide an expired session from the queue.
+
+When reconciliation reaches manual intervention, Cloud also enqueues one durable
+`payment_intervention` push per scoped Staff/Manager recipient, falling back to
+the organization OrgAdmin. The identity is `(PaymentTransactionId,
+InterventionCode, RecipientAccountId)`. The push recalls an absent operator but
+does not change payment or Order state; the intervention queue and manual
+reconcile API remain authoritative.
 
 ## Post-Payment Fan-Out
 
@@ -189,6 +206,17 @@ Latest attempt DeliveryFailed
 
 `ExecutorBusy` stays on the same attempt and is redelivered. `RefundRequired`, possible physical output, production `Failed`, and `RequiresManualIntervention` are support/refund paths, not automatic retry paths. The configured maximum attempt count is enforced inside the same order-level transaction.
 
+Cloud serializes every payment/fulfillment mutation that can change or authorize use
+of an `Order` aggregate by `OrderId`. This includes payment-session creation, signed
+payment application, payment reconciliation, cancellation/refund-required decisions,
+initial dispatch, Manual/Packaged item events, execute-order ACK, production reports,
+and timeout reconciliation. ACK, report, and timeout
+mutations are also serialized by `EdgeCommand.Id`, so stale or duplicate transport
+events cannot create two execution projections or overwrite a newer command state.
+Command pull delivery-attempt allocation is serialized by execution endpoint; a
+concurrent pull retry keeps the same `EdgeCommand.Id` and receives the next distinct
+delivery-attempt number.
+
 Execution-attempt detail exposes the ordered delivery history for that command, command-expiry timeout provenance, the redispatch actor/reason, and references to the immediately previous and next dispatch attempts. This keeps transport retries inside one dispatch attempt distinct from an operator-created redispatch attempt.
 
 MQTT payloads should stay small. Edge must pull command details from Cloud.
@@ -222,7 +250,19 @@ Check:
 10. Cloud returns accepted/duplicate/rejected result.
 ```
 
+For Manual/Packaged lines with a configured preparation time, Cloud projects
+`ExpectedReadyAt = PaidAt + effective preparation time`. Once overdue, a
+background reconciliation job creates at most one durable reminder per eligible
+recipient for that payment occurrence. It prefers scoped Staff/Manager accounts
+and falls back to the organization OrgAdmin. The reminder does not advance or
+fail the item; management fulfillment commands remain authoritative.
+
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
+
+Mixed fulfillment is one aggregate workflow even though individual lines have
+different authorities. Concurrent completion of Manual, Packaged, and
+MachineProduced lines must reload and aggregate the order under the same order lock;
+the last completing line transitions the order to `Completed` exactly once.
 
 Every production report must match the configuration release id and checksum embedded in its accepted execute-order command. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. A source production job is permanently bound to its first reported order item and production-unit range. Each stock-evidence item identifies its `OrderItemId`; Cloud validates the ingredient against that line's immutable recipe or option snapshot. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
 

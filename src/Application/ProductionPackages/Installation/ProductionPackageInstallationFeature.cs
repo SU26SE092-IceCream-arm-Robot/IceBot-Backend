@@ -1,6 +1,4 @@
 using System.Text.Json;
-using System.Security.Cryptography;
-using System.Text;
 using Application.Identity.Tokens.Claims;
 using Application.RobotConfiguration.Storage.Abstractions;
 using Application.RobotConfiguration.Storage.Services;
@@ -16,6 +14,7 @@ using Domain.RobotConfiguration.ArtifactContracts;
 using Domain.RobotConfiguration.ArtifactTemplates;
 using Domain.RobotConfiguration.Artifacts;
 using Domain.RobotConfiguration.Programs;
+using Application.Shared.Concurrency;
 
 namespace Application.ProductionPackages.Installation;
 
@@ -25,6 +24,10 @@ public interface IProductionPackageInstallationStore
     Task<ProductionPackageInstallation?> FindByIdempotencyKeyAsync(Guid organizationId, string key, CancellationToken cancellationToken);
     Task<ProductionPackageInstallation?> GetAsync(Guid organizationId, Guid installationId, CancellationToken cancellationToken);
     Task<ProductionPackageInstallation?> GetForEditAsync(Guid organizationId, Guid installationId, CancellationToken cancellationToken);
+    Task<bool> TryRestartFailedAsync(
+        Guid organizationId, Guid installationId, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<ProductionPackageInstallationStatus?> GetCurrentStatusAsync(
+        Guid organizationId, Guid installationId, CancellationToken cancellationToken);
     Task<int> CountAsync(Guid organizationId, ProductionPackageInstallationStatus? status, Guid? storeId,
         Guid? kioskId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ProductionPackageInstallation>> ListAsync(Guid organizationId,
@@ -33,7 +36,30 @@ public interface IProductionPackageInstallationStore
     Task<ProductionPackageInstallationInsertResult> InsertOrGetAsync(ProductionPackageInstallation installation, CancellationToken cancellationToken);
     Task MarkFailedAsync(Guid organizationId, Guid installationId, string failureCode,
         string failureMessage, CancellationToken cancellationToken);
+    Task<ProductionPackageMaterializationRepairResult> RestoreSoftDeletedMaterializationsAsync(
+        Guid organizationId, Guid installationId, Guid actorId, CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
+    Task<IReadOnlyList<RobotArtifact>> ListArtifactsByCodesAsync(
+        Guid organizationId,
+        IReadOnlyCollection<string> artifactCodes,
+        CancellationToken cancellationToken);
+    Task<IReadOnlySet<Guid>> ListPackageManagedArtifactIdsAsync(
+        IReadOnlyCollection<Guid> artifactIds,
+        CancellationToken cancellationToken);
+    Task<ProductionPackageForkGraph?> GetForkGraphAsync(
+        Guid organizationId,
+        Guid installationId,
+        bool tracked,
+        CancellationToken cancellationToken);
+    Task<bool> HasActiveUpgradeAsync(
+        Guid organizationId,
+        Guid installationId,
+        CancellationToken cancellationToken);
+    Task PersistForkAsync(
+        ProductionPackageInstallation installation,
+        IReadOnlyCollection<RobotArtifact> artifacts,
+        IReadOnlyCollection<RobotProgramArtifact> removedProgramArtifacts,
+        CancellationToken cancellationToken);
     Task<ConfigurationRelease> PersistMaterializedGraphAsync(
         ProductionPackageInstallation installation,
         IReadOnlyCollection<Product> products,
@@ -46,6 +72,32 @@ public interface IProductionPackageInstallationStore
 
 public sealed record ProductionPackageInstallationInsertResult(bool Created, ProductionPackageInstallation Installation);
 
+public sealed record ProductionPackageForkGraph(
+    ProductionPackageInstallation Installation,
+    IReadOnlyCollection<RobotArtifact> Artifacts,
+    IReadOnlyCollection<RobotProgram> Programs,
+    IReadOnlySet<Guid> SharedPackageManagedArtifactIds);
+
+public sealed record ProductionPackageMaterializationExpectation(
+    ProductionPackageResourceKind ResourceKind,
+    string? SourceKey,
+    Guid? ExpectedTargetId = null,
+    int ExpectedCount = 1);
+
+public sealed record ProductionPackageMaterializationRepairResult(
+    IReadOnlyCollection<ProductionPackageMaterializationRepairItem> Restored,
+    IReadOnlyCollection<ProductionPackageMaterializationRepairIssue> Issues);
+
+public sealed record ProductionPackageMaterializationRepairItem(
+    string ResourceKind, string SourceKey, string TargetKey);
+
+public sealed record ProductionPackageMaterializationRepairIssue(
+    string ResourceKind, string SourceKey, string TargetKey, string Code);
+
+public sealed record ProductionPackageRepairResult(
+    Guid InstallationId,
+    IReadOnlyCollection<ProductionPackageMaterializationRepairItem> RestoredResources);
+
 public sealed class InstallProductionPackageCommand
 {
     public required CurrentUserContext UserContext { get; init; }
@@ -56,6 +108,7 @@ public sealed class InstallProductionPackageCommand
     public Guid PackageVersionId { get; init; }
     public required string IdempotencyKey { get; init; }
     public IReadOnlyCollection<string> ProductSourceKeys { get; init; } = [];
+    internal string? MaterializationIdentitySuffix { get; init; }
 }
 
 public sealed record ProductionPackageInstallationResult(
@@ -91,35 +144,92 @@ public sealed record ProductionPackageInstallationPreview(
     IReadOnlyCollection<string> RouteCodes,
     IReadOnlyCollection<string> Warnings);
 
+public static class ProductionPackageMaterializationExpectationBuilder
+{
+    public static IReadOnlyCollection<ProductionPackageMaterializationExpectation> Build(
+        ProductionPackageInstallation installation)
+    {
+        var selectedProductKeys = installation.GetSelectedProductSourceKeys().ToHashSet(StringComparer.Ordinal);
+        var version = installation.PackageVersion;
+        var selectedProducts = version.Products.Where(x => selectedProductKeys.Contains(x.SourceKey)).ToArray();
+        if (selectedProducts.Length != selectedProductKeys.Count)
+            throw new DomainRuleException("Installation product selection no longer matches its immutable package version.");
+
+        var expected = new List<ProductionPackageMaterializationExpectation>();
+        foreach (var definition in selectedProducts)
+        {
+            var product = ProductionPackageProductSnapshotCodec.Deserialize(definition.ProductSnapshotJson).Product;
+            expected.Add(new(ProductionPackageResourceKind.Product, definition.SourceKey));
+            foreach (var variant in product.Variants)
+            {
+                expected.Add(new(ProductionPackageResourceKind.ProductVariant,
+                    SourceKey($"{definition.SourceKey}:VARIANT:{variant.Code}")));
+                expected.AddRange(variant.Recipes.Select(recipe => new ProductionPackageMaterializationExpectation(
+                    ProductionPackageResourceKind.Recipe,
+                    SourceKey($"{definition.SourceKey}:VARIANT:{variant.Code}:RECIPE:{recipe.Code}"))));
+            }
+            expected.AddRange(product.OptionGroups.SelectMany(group => group.Options)
+                .Select(option => new ProductionPackageMaterializationExpectation(
+                    ProductionPackageResourceKind.ProductOption,
+                    SourceKey($"{definition.SourceKey}:OPTION:{option.Code}"))));
+        }
+
+        var selection = ProductionPackageInstallationSelectionRules.Resolve(version, selectedProductKeys);
+        expected.AddRange(selection.Artifacts.Select(artifact => new ProductionPackageMaterializationExpectation(
+            ProductionPackageResourceKind.RobotArtifact, artifact.SourceKey)));
+        expected.AddRange(selection.Routes
+            .Select(route => new ProductionPackageMaterializationExpectation(
+                ProductionPackageResourceKind.RobotProgram, route.RouteCode)));
+        if (!installation.DraftConfigurationReleaseId.HasValue)
+            throw new DomainRuleException("Installed package installation has no Draft configuration release identity.");
+        expected.Add(new(ProductionPackageResourceKind.ConfigurationRelease, null,
+            installation.DraftConfigurationReleaseId));
+        return expected;
+    }
+
+    private static string SourceKey(string value) => value.Trim().ToUpperInvariant();
+}
+
 public sealed class ProductionPackageInstallationService(
     IProductionPackageStore packages,
     IProductionPackageInstallationStore installations,
     IArtifactObjectStorage objectStorage,
-    ArtifactUploadContentService contentService)
+    ArtifactUploadContentService contentService,
+    ArtifactPublicationValidator publicationValidator,
+    ITechnicalResourceMutationCoordinator mutationCoordinator)
 {
     public async Task<ApiResult<ProductionPackageInstallationPreview>> PreviewAsync(
         CurrentUserContext user, Guid organizationId, Guid packageId, Guid versionId,
-        IReadOnlyCollection<string> selectedProductSourceKeys, CancellationToken cancellationToken)
+        Guid? storeId, Guid? kioskId, IReadOnlyCollection<string> selectedProductSourceKeys,
+        CancellationToken cancellationToken)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageRead, user, organizationId, null, null))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageRead, user, organizationId, storeId, kioskId))
             return ApiResult<ProductionPackageInstallationPreview>.Fail("Access denied.", 403);
+        if (!await installations.ScopeExistsAsync(organizationId, storeId, kioskId, cancellationToken))
+            return ApiResult<ProductionPackageInstallationPreview>.Fail("Package installation scope was not found.", 404);
         var version = await packages.GetVersionAsync(packageId, versionId, false, cancellationToken);
         if (version is null || version.Status != ProductionPackageVersionStatus.Published || string.IsNullOrWhiteSpace(version.ManifestChecksum))
             return ApiResult<ProductionPackageInstallationPreview>.Fail("Published package version not found.", 404);
-        var selected = selectedProductSourceKeys.Count == 0
-            ? version.Products.Select(x => x.SourceKey).ToHashSet(StringComparer.Ordinal)
-            : selectedProductSourceKeys.Select(x => x.Trim().ToUpperInvariant()).ToHashSet(StringComparer.Ordinal);
-        if (selected.Any(x => version.Products.All(product => product.SourceKey != x)))
-            return ApiResult<ProductionPackageInstallationPreview>.Fail("One or more selected package products do not exist.", 400);
+        IReadOnlySet<string> selected;
+        try
+        {
+            selected = ProductionPackageInstallationRequestRules.ResolveSelectedProductKeys(
+                version, selectedProductSourceKeys);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<ProductionPackageInstallationPreview>.Fail(ex.Message, 400);
+        }
         try
         {
             var contracts = await packages.LoadTechnicalContractsAsync(
                 version.Artifacts.Select(x => x.TechnicalContractId).Distinct().ToArray(), cancellationToken);
             ProductionPackageDefinitionValidator.Validate(version, contracts);
+            var selection = ProductionPackageInstallationSelectionRules.Resolve(version, selected);
             return ApiResult<ProductionPackageInstallationPreview>.Success(new ProductionPackageInstallationPreview(
                 version.Id, version.ManifestChecksum, selected.Order().ToArray(),
-                version.Programs.Select(x => x.BlueprintCode).Order().ToArray(),
-                version.Routes.Where(x => selected.Contains(x.ProductSourceKey)).Select(x => x.RouteCode).Order().ToArray(),
+                selection.Programs.Select(x => x.BlueprintCode).Order().ToArray(),
+                selection.Routes.Select(x => x.RouteCode).Order().ToArray(),
                 ["Package installation creates Draft technical configuration and requires review before publication."]));
         }
         catch (DomainRuleException ex)
@@ -143,12 +253,19 @@ public sealed class ProductionPackageInstallationService(
         if (version is null || version.Status != ProductionPackageVersionStatus.Published || string.IsNullOrWhiteSpace(version.ManifestChecksum))
             return ApiResult<ProductionPackageInstallationResult>.Fail("Published production package version not found.", 404);
 
-        var selectedKeys = command.ProductSourceKeys.Count == 0
-            ? version.Products.Select(x => x.SourceKey).ToHashSet(StringComparer.Ordinal)
-            : command.ProductSourceKeys.Select(x => x.Trim().ToUpperInvariant()).ToHashSet(StringComparer.Ordinal);
-        if (selectedKeys.Any(x => version.Products.All(product => product.SourceKey != x)))
-            return ApiResult<ProductionPackageInstallationResult>.Fail("One or more selected package products do not exist.", 400);
-        var requestChecksum = ComputeRequestChecksum(command, version, selectedKeys);
+        IReadOnlySet<string> selectedKeys;
+        try
+        {
+            selectedKeys = ProductionPackageInstallationRequestRules.ResolveSelectedProductKeys(
+                version, command.ProductSourceKeys);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<ProductionPackageInstallationResult>.Fail(ex.Message, 400);
+        }
+        var requestChecksum = ProductionPackageInstallationRequestRules.ComputeRequestChecksum(
+            command.OrganizationId, command.StoreId, command.KioskId, version, selectedKeys,
+            command.MaterializationIdentitySuffix);
         var validationContracts = await packages.LoadTechnicalContractsAsync(
             version.Artifacts.Select(x => x.TechnicalContractId).Distinct().ToArray(), cancellationToken);
         try { ProductionPackageDefinitionValidator.Validate(version, validationContracts); }
@@ -164,15 +281,24 @@ public sealed class ProductionPackageInstallationService(
             if (existing.Status != ProductionPackageInstallationStatus.Failed)
                 return ApiResult<ProductionPackageInstallationResult>.Success(ProductionPackageInstallationResult.From(existing),
                     "Existing package installation returned.");
-            existing.Restart(DateTimeOffset.UtcNow);
-            installation = existing;
-            await installations.SaveChangesAsync(cancellationToken);
+            var restarted = await installations.TryRestartFailedAsync(
+                command.OrganizationId, existing.Id, DateTimeOffset.UtcNow, cancellationToken);
+            var restartedInstallation = await installations.GetForEditAsync(
+                command.OrganizationId, existing.Id, cancellationToken);
+            if (restartedInstallation is null)
+                return ApiResult<ProductionPackageInstallationResult>.Fail(
+                    "Package installation disappeared while retrying.", 409);
+            installation = restartedInstallation;
+            if (!restarted)
+                return ApiResult<ProductionPackageInstallationResult>.Success(
+                    ProductionPackageInstallationResult.From(installation),
+                    "Concurrent package installation retry returned.");
         }
         else
         {
             installation = ProductionPackageInstallation.Start(command.OrganizationId, command.StoreId, command.KioskId,
                 version.Id, version.ManifestChecksum, requestChecksum, command.IdempotencyKey,
-                selectedKeys.ToArray(), DateTimeOffset.UtcNow);
+                selectedKeys.ToArray(), DateTimeOffset.UtcNow, command.MaterializationIdentitySuffix);
             installation.CreatedByAccountId = command.UserContext.AccountId;
             var inserted = await installations.InsertOrGetAsync(installation, cancellationToken);
             if (!inserted.Created)
@@ -189,35 +315,112 @@ public sealed class ProductionPackageInstallationService(
         installation.MarkMaterializing();
         await installations.SaveChangesAsync(cancellationToken);
 
-        var copiedKeys = new List<string>();
+        await using var preparedObjects = new UncommittedArtifactObjectSet(contentService);
         try
         {
-            var productDefinitions = version.Products.Where(x => selectedKeys.Contains(x.SourceKey)).ToArray();
-            if (productDefinitions.Length != selectedKeys.Count)
-                throw new DomainRuleException("One or more selected package products do not exist.");
+            var selection = ProductionPackageInstallationSelectionRules.Resolve(version, selectedKeys);
+            var selectedRoutes = selection.Routes;
+            var selectedArtifacts = selection.Artifacts;
+            var artifactCodes = selectedArtifacts.Select(artifact => artifact.SourceKey).Distinct().ToArray();
+            var observedArtifacts = await installations.ListArtifactsByCodesAsync(
+                command.OrganizationId, artifactCodes, cancellationToken);
+            var observedPackageManagedIds = await installations.ListPackageManagedArtifactIdsAsync(
+                observedArtifacts.Select(artifact => artifact.Id).ToArray(), cancellationToken);
+            var observedTemplates = await packages.LoadArtifactTemplatesAsync(
+                selectedArtifacts.Select(x => x.RobotArtifactTemplateId).ToArray(), cancellationToken);
+            var observedContracts = await packages.LoadTechnicalContractsAsync(
+                version.Artifacts.Select(x => x.TechnicalContractId).ToArray(), cancellationToken);
+            ProductionPackageDefinitionValidator.Validate(version, observedContracts);
+            var preparedArtifacts = await ProductionPackageArtifactPreparation.PrepareAsync(
+                command.OrganizationId, command.UserContext.AccountId, selectedArtifacts, observedTemplates,
+                observedContracts, observedArtifacts, observedPackageManagedIds, objectStorage,
+                publicationValidator, preparedObjects, cancellationToken);
+            var mutationResources = selectedArtifacts
+                .SelectMany(artifact => new[]
+                {
+                    TechnicalResourceMutationIdentity.ArtifactDefinition(command.OrganizationId, artifact.SourceKey),
+                    TechnicalResourceMutationIdentity.Template(artifact.RobotArtifactTemplateId),
+                    TechnicalResourceMutationIdentity.Contract(artifact.TechnicalContractId)
+                })
+                .Concat(selectedRoutes.Select(route => TechnicalResourceMutationIdentity.ProgramDefinition(
+                    command.OrganizationId, command.StoreId, command.KioskId, null,
+                    ProductionPackageInstallationMaterializer.PackageProgramCode(
+                        version.Version, route.RouteCode, command.MaterializationIdentitySuffix))))
+                .Concat(observedArtifacts.Select(artifact =>
+                    TechnicalResourceMutationIdentity.Artifact(artifact.Id)))
+                .Append(TechnicalResourceMutationIdentity.PackageInstallation(installation.Id))
+                .ToArray();
 
-            var optionImpacts = ProductionPackageDefinitionValidator.ResolveOptionExecutionImpacts(
-                version, validationContracts);
-            var products = MaterializeProducts(command, installation, productDefinitions, optionImpacts);
-            var templates = await packages.LoadArtifactTemplatesAsync(version.Artifacts.Select(x => x.RobotArtifactTemplateId).ToArray(), cancellationToken);
-            var contracts = await packages.LoadTechnicalContractsAsync(version.Artifacts.Select(x => x.TechnicalContractId).ToArray(), cancellationToken);
-            var artifacts = await MaterializeArtifactsAsync(command, installation, version, templates, contracts, copiedKeys, cancellationToken);
-            var programsAndCompositions = ComposePrograms(command, installation, version, products, artifacts,
-                contracts, optionImpacts);
+            async Task<ApiResult<ProductionPackageInstallationResult>> MaterializeLockedAsync(CancellationToken ct)
+            {
+                var currentStatus = await installations.GetCurrentStatusAsync(
+                    command.OrganizationId, installation.Id, ct);
+                if (currentStatus is ProductionPackageInstallationStatus.Installed or
+                    ProductionPackageInstallationStatus.Superseded)
+                {
+                    await preparedObjects.CompensateAsync();
+                    var completed = await installations.GetAsync(command.OrganizationId, installation.Id, ct)
+                        ?? throw new DomainRuleException("Completed package installation could not be reloaded.");
+                    return ApiResult<ProductionPackageInstallationResult>.Success(
+                        ProductionPackageInstallationResult.From(completed),
+                        "Existing package installation returned.");
+                }
+                if (currentStatus.HasValue && currentStatus != ProductionPackageInstallationStatus.Materializing)
+                    throw new DomainRuleException(
+                        $"Package installation is {currentStatus.Value} and cannot materialize.");
 
-            var release = await installations.PersistMaterializedGraphAsync(
-                installation, products.Select(x => x.Product).ToArray(), artifacts.Values.ToArray(),
-                programsAndCompositions.Programs.Values.ToArray(), programsAndCompositions.Compositions,
-                releaseNumber => CreateRelease(command, installation, version, releaseNumber, products,
-                    programsAndCompositions.Programs, optionImpacts), cancellationToken);
-            return ApiResult<ProductionPackageInstallationResult>.Success(
-                ProductionPackageInstallationResult.From(installation), "Production package installed as Draft configuration.", 201);
+                var productDefinitions = version.Products.Where(x => selectedKeys.Contains(x.SourceKey)).ToArray();
+                if (productDefinitions.Length != selectedKeys.Count)
+                    throw new DomainRuleException("One or more selected package products do not exist.");
+
+                var templates = await packages.LoadArtifactTemplatesAsync(
+                    selectedArtifacts.Select(x => x.RobotArtifactTemplateId).ToArray(), ct);
+                var contracts = await packages.LoadTechnicalContractsAsync(
+                    version.Artifacts.Select(x => x.TechnicalContractId).ToArray(), ct);
+                ProductionPackageDefinitionValidator.Validate(version, contracts);
+
+                var existingArtifacts = await installations.ListArtifactsByCodesAsync(
+                    command.OrganizationId, artifactCodes, ct);
+                if (!observedArtifacts.Select(artifact => artifact.Id).ToHashSet()
+                        .SetEquals(existingArtifacts.Select(artifact => artifact.Id)))
+                {
+                    throw new DomainRuleException(
+                        "Organization artifact identities changed while package installation was waiting; retry installation.");
+                }
+                var packageManagedArtifactIds = await installations.ListPackageManagedArtifactIdsAsync(
+                    existingArtifacts.Select(artifact => artifact.Id).ToArray(), ct);
+
+                var optionImpacts = ProductionPackageDefinitionValidator.ResolveOptionExecutionImpacts(
+                    version, contracts);
+                var products = ProductionPackageInstallationMaterializer.MaterializeProducts(
+                    command, installation, productDefinitions, optionImpacts);
+                var artifacts = ProductionPackageInstallationMaterializer.MaterializeArtifacts(
+                    installation, selectedArtifacts, templates, contracts, existingArtifacts,
+                    packageManagedArtifactIds, preparedArtifacts);
+                var programsAndCompositions = ProductionPackageInstallationMaterializer.ComposePrograms(
+                    command, installation, version, products, artifacts.All, contracts, optionImpacts);
+
+                await installations.PersistMaterializedGraphAsync(
+                    installation, products.Select(x => x.Product).ToArray(), artifacts.Created,
+                    programsAndCompositions.Programs.Values.ToArray(), programsAndCompositions.Compositions,
+                    releaseNumber => ProductionPackageInstallationMaterializer.CreateRelease(
+                        command, installation, version, releaseNumber, products,
+                        programsAndCompositions.Programs, optionImpacts), ct);
+                preparedObjects.Commit();
+                return ApiResult<ProductionPackageInstallationResult>.Success(
+                    ProductionPackageInstallationResult.From(installation),
+                    "Production package installed as Draft configuration.", 201);
+            }
+
+            return mutationResources.Length == 0
+                ? await MaterializeLockedAsync(cancellationToken)
+                : await mutationCoordinator.ExecuteAsync(
+                    mutationResources, MaterializeLockedAsync, cancellationToken);
         }
         catch (Exception ex) when (ex is DomainRuleException or ArtifactObjectNotFoundException or
                                    ArtifactObjectIntegrityException or ArtifactObjectStorageUnavailableException or
                                    Microsoft.EntityFrameworkCore.DbUpdateException)
         {
-            foreach (var key in copiedKeys) await contentService.DeleteUncommittedObjectAsync(key);
             await installations.MarkFailedAsync(command.OrganizationId, installation.Id,
                 "PackageMaterializationFailed", ex.Message, CancellationToken.None);
             return ApiResult<ProductionPackageInstallationResult>.Fail(ex.Message, ex is ArtifactObjectStorageUnavailableException ? 503 : 409);
@@ -227,12 +430,13 @@ public sealed class ProductionPackageInstallationService(
     public async Task<ApiResult<ProductionPackageInstallationResult>> GetAsync(CurrentUserContext user,
         Guid organizationId, Guid installationId, CancellationToken cancellationToken)
     {
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageRead, user, organizationId, null, null))
-            return ApiResult<ProductionPackageInstallationResult>.Fail("Access denied.", 403);
         var installation = await installations.GetAsync(organizationId, installationId, cancellationToken);
-        return installation is null
-            ? ApiResult<ProductionPackageInstallationResult>.Fail("Package installation not found.", 404)
-            : ApiResult<ProductionPackageInstallationResult>.Success(ProductionPackageInstallationResult.From(installation));
+        if (installation is null)
+            return ApiResult<ProductionPackageInstallationResult>.Fail("Package installation not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageRead, user, organizationId,
+                installation.StoreId, installation.KioskId))
+            return ApiResult<ProductionPackageInstallationResult>.Fail("Access denied.", 403);
+        return ApiResult<ProductionPackageInstallationResult>.Success(ProductionPackageInstallationResult.From(installation));
     }
 
     public async Task<PagedResult<ProductionPackageInstallationResult>> ListAsync(CurrentUserContext user,
@@ -279,7 +483,8 @@ public sealed class ProductionPackageInstallationService(
             PackageId = installation.PackageVersion.ProductionPackageId,
             PackageVersionId = installation.PackageVersionId,
             IdempotencyKey = installation.IdempotencyKey,
-            ProductSourceKeys = installation.GetSelectedProductSourceKeys()
+            ProductSourceKeys = installation.GetSelectedProductSourceKeys(),
+            MaterializationIdentitySuffix = installation.MaterializationIdentitySuffix
         }, cancellationToken);
     }
 
@@ -288,295 +493,161 @@ public sealed class ProductionPackageInstallationService(
     {
         if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageFork, user, organizationId, null, null))
             return ApiResult<ProductionPackageInstallationResult>.Fail("Access denied.", 403);
-        var installation = await installations.GetForEditAsync(organizationId, installationId, cancellationToken);
-        if (installation is null) return ApiResult<ProductionPackageInstallationResult>.Fail("Package installation not found.", 404);
+        var observed = await installations.GetForkGraphAsync(
+            organizationId, installationId, tracked: false, cancellationToken);
+        if (observed is null)
+            return ApiResult<ProductionPackageInstallationResult>.Fail("Package installation not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageFork, user, organizationId,
+                observed.Installation.StoreId, observed.Installation.KioskId))
+            return ApiResult<ProductionPackageInstallationResult>.Fail("Access denied.", 403);
+        if (observed.Installation.Status != ProductionPackageInstallationStatus.Installed ||
+            observed.Installation.OwnershipMode != ProductionPackageOwnershipMode.PackageManaged)
+            return ApiResult<ProductionPackageInstallationResult>.Fail(
+                "Only an Installed package-managed configuration can be forked.", 409);
+        if (await installations.HasActiveUpgradeAsync(organizationId, installationId, cancellationToken))
+            return ApiResult<ProductionPackageInstallationResult>.Fail(
+                "A package installation participating in an active upgrade cannot be forked.", 409);
+
+        var stagedBySourceArtifactId = new Dictionary<Guid, RobotArtifact>();
+        await using var preparedObjects = new UncommittedArtifactObjectSet(contentService);
         try
         {
-            installation.Fork();
-            installation.UpdatedByAccountId = user.AccountId;
-            await installations.SaveChangesAsync(cancellationToken);
-            return ApiResult<ProductionPackageInstallationResult>.Success(ProductionPackageInstallationResult.From(installation),
-                "Package-managed configuration converted to an organization fork.");
-        }
-        catch (DomainRuleException ex) { return ApiResult<ProductionPackageInstallationResult>.Fail(ex.Message, 409); }
-    }
+            var copyableSharedArtifactIds = observed.SharedPackageManagedArtifactIds
+                .Where(artifactId => observed.Programs
+                    .Where(program => program.RobotProgramArtifacts.Any(item => item.RobotArtifactId == artifactId))
+                    .All(program => program.Status == RobotProgramStatus.Draft))
+                .ToHashSet();
+            foreach (var source in observed.Artifacts
+                         .Where(artifact => copyableSharedArtifactIds.Contains(artifact.Id)))
+            {
+                await publicationValidator.ValidateAsync(source, cancellationToken);
+                var cloneId = Guid.NewGuid();
+                var destination = $"robot-artifacts/{organizationId:D}/{cloneId:D}/{source.Checksum}.lua";
+                preparedObjects.Track(destination);
+                await objectStorage.CopyImmutableAsync(source.StorageKey,
+                    new ArtifactObjectWriteRequest(destination, "application/octet-stream",
+                        source.ContentLengthBytes, source.Checksum), cancellationToken);
+                var clone = RobotArtifact.CreateDraft(
+                    organizationId,
+                    ProductionPackageInstallationMaterializer.ForkArtifactCode(source.ArtifactCode, installationId),
+                    source.ArtifactName,
+                    destination,
+                    source.FileName,
+                    source.Checksum,
+                    source.RuntimeTargetCode,
+                    source.MachineModelCode,
+                    source.ContentLengthBytes,
+                    source.ExportedAt,
+                    source.Description,
+                    source.MetadataJson,
+                    source.SourceRobotArtifactTemplateId,
+                    source.TechnicalContractId,
+                    source.TechnicalContractChecksum);
+                clone.Id = cloneId;
+                clone.CreatedByAccountId = user.AccountId;
+                stagedBySourceArtifactId.Add(source.Id, clone);
+            }
 
-    private static IReadOnlyCollection<MaterializedProduct> MaterializeProducts(
-        InstallProductionPackageCommand command, ProductionPackageInstallation installation,
-        IReadOnlyCollection<ProductionPackageProductDefinition> definitions,
-        IReadOnlyDictionary<Guid, ProductOptionExecutionImpact> optionImpacts)
-    {
-        var now = DateTimeOffset.UtcNow;
-        var scopeType = TenantScopeResolver.Resolve(command.StoreId, command.KioskId);
-        var result = new List<MaterializedProduct>();
-        foreach (var definition in definitions)
+            var resources = observed.Artifacts.Select(artifact => TechnicalResourceMutationIdentity.Artifact(artifact.Id))
+                .Concat(observed.Programs.Select(program => TechnicalResourceMutationIdentity.Program(program.Id)))
+                .Concat(stagedBySourceArtifactId.Values.Select(artifact =>
+                    TechnicalResourceMutationIdentity.ArtifactDefinition(organizationId, artifact.ArtifactCode)))
+                .Append(new TechnicalResourceMutationIdentity("ProductionPackageInstallation", installationId.ToString("D")))
+                .ToArray();
+
+            return await mutationCoordinator.ExecuteAsync(resources, async ct =>
+            {
+                var current = await installations.GetForkGraphAsync(
+                    organizationId, installationId, tracked: true, ct)
+                    ?? throw new DomainRuleException("Package installation disappeared while forking.");
+                if (await installations.HasActiveUpgradeAsync(organizationId, installationId, ct))
+                    throw new DomainRuleException(
+                        "A package installation participating in an active upgrade cannot be forked.");
+                if (!observed.Artifacts.Select(x => x.Id).ToHashSet().SetEquals(current.Artifacts.Select(x => x.Id)) ||
+                    !observed.Programs.Select(x => x.Id).ToHashSet().SetEquals(current.Programs.Select(x => x.Id)) ||
+                    !observed.SharedPackageManagedArtifactIds.SetEquals(current.SharedPackageManagedArtifactIds))
+                    throw new DomainRuleException(
+                        "Package technical ownership changed while the fork was being prepared; retry the fork.");
+
+                var removedProgramArtifacts = new List<RobotProgramArtifact>();
+                foreach (var program in current.Programs)
+                {
+                    var replacements = program.RobotProgramArtifacts
+                        .OrderBy(item => item.RunOrder)
+                        .Select(item => (
+                            stagedBySourceArtifactId.TryGetValue(item.RobotArtifactId, out var clone)
+                                ? clone.Id
+                                : item.RobotArtifactId,
+                            item.RunOrder,
+                            item.ParametersJson,
+                            item.ParametersSchemaVersion,
+                            item.RequiredOptionCode))
+                        .ToArray();
+                    removedProgramArtifacts.AddRange(program.ReplaceArtifacts(replacements));
+                    program.UpdatedByAccountId = user.AccountId;
+                }
+
+                foreach (var materialization in current.Installation.Materializations
+                             .Where(item => item.ResourceKind == ProductionPackageResourceKind.RobotArtifact &&
+                                 Guid.TryParse(item.TargetKey, out var sourceId) &&
+                                 stagedBySourceArtifactId.ContainsKey(sourceId)))
+                {
+                    var sourceId = Guid.Parse(materialization.TargetKey);
+                    var clone = stagedBySourceArtifactId[sourceId];
+                    materialization.Retarget(clone.Id.ToString("D"), clone.Checksum);
+                }
+
+                current.Installation.Fork();
+                current.Installation.UpdatedByAccountId = user.AccountId;
+                await installations.PersistForkAsync(
+                    current.Installation,
+                    stagedBySourceArtifactId.Values.ToArray(),
+                    removedProgramArtifacts,
+                    ct);
+                preparedObjects.Commit();
+                return ApiResult<ProductionPackageInstallationResult>.Success(
+                    ProductionPackageInstallationResult.From(current.Installation),
+                    "Package-managed configuration converted to an organization fork.");
+            }, cancellationToken);
+        }
+        catch (Exception ex) when (ex is DomainRuleException or ArtifactObjectNotFoundException or
+                                   ArtifactObjectIntegrityException or ArtifactObjectStorageUnavailableException or
+                                   Microsoft.EntityFrameworkCore.DbUpdateException)
         {
-            var source = ProductionPackageProductSnapshotCodec.Deserialize(definition.ProductSnapshotJson).Product;
-            var product = new Product
-            {
-                OrganizationId = command.OrganizationId, StoreId = command.StoreId, KioskId = command.KioskId,
-                TemplateProductId = source.Id, CategoryId = source.CategoryId, Code = source.Code, Name = source.Name,
-                DisplayName = source.DisplayName, Description = source.Description, ProductType = source.ProductType,
-                BasePrice = source.BasePrice, Currency = source.Currency, IsAvailable = false,
-                PreparationTimeSeconds = source.PreparationTimeSeconds, ImageUrl = source.ImageUrl,
-                ScopeType = scopeType, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
-            };
-            var variants = new Dictionary<Guid, ProductVariant>();
-            var recipesByCode = new Dictionary<string, Recipe>(StringComparer.Ordinal);
-            var recipeRequirements = new Dictionary<string, IReadOnlyCollection<IngredientQuantityRequirement>>(StringComparer.Ordinal);
-            var optionRequirementsByCode = new Dictionary<string, IReadOnlyCollection<IngredientQuantityRequirement>>(
-                StringComparer.Ordinal);
-            foreach (var variantSource in source.Variants)
-            {
-                var variant = new ProductVariant
-                {
-                    ProductId = product.Id, Code = variantSource.Code, Name = variantSource.Name,
-                    DisplayName = variantSource.DisplayName, Description = variantSource.Description,
-                    VariantType = variantSource.VariantType, FulfillmentType = variantSource.FulfillmentType,
-                    SizeCode = variantSource.SizeCode, BasePrice = variantSource.BasePrice, Currency = source.Currency,
-                    IsAvailable = false, DisplayOrder = variantSource.DisplayOrder,
-                    PreparationTimeSeconds = variantSource.PreparationTimeSeconds, ImageUrl = variantSource.ImageUrl,
-                    CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
-                };
-                product.ProductVariants.Add(variant);
-                variants[variantSource.Id] = variant;
-                foreach (var recipeSource in variantSource.Recipes)
-                {
-                    var currentRecipeRequirements = new List<IngredientQuantityRequirement>();
-                    var recipe = new Recipe
-                    {
-                        OrganizationId = command.OrganizationId, StoreId = command.StoreId, KioskId = command.KioskId,
-                        ProductVariantId = variant.Id, TemplateRecipeId = recipeSource.Id, Code = recipeSource.Code,
-                        Name = recipeSource.Name, Version = 1, Status = RecipeStatus.Draft,
-                        IsDefault = recipeSource.IsDefault, YieldQuantity = recipeSource.YieldQuantity, Unit = recipeSource.Unit,
-                        EstimatedDurationSeconds = recipeSource.EstimatedDurationSeconds, EffectiveFrom = recipeSource.EffectiveFrom,
-                        EffectiveTo = recipeSource.EffectiveTo, InstructionsSchemaVersion = recipeSource.InstructionsSchemaVersion,
-                        InstructionsJson = recipeSource.InstructionsJson, ScopeType = scopeType,
-                        CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
-                    };
-                    foreach (var item in recipeSource.Items)
-                    {
-                        recipe.RecipeItems.Add(new RecipeItem { RecipeId = recipe.Id, IngredientId = item.IngredientId,
-                            Quantity = item.Quantity, Unit = item.Unit, StepOrder = item.StepOrder, IsOptional = item.IsOptional,
-                            Notes = item.Notes, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId });
-                        currentRecipeRequirements.Add(new IngredientQuantityRequirement(item.IngredientCode, item.Quantity, item.Unit, null));
-                    }
-                    variant.Recipes.Add(recipe);
-                    var recipeKey = RecipeLookupKey(variant.Code, recipe.Code);
-                    if (!recipesByCode.TryAdd(recipeKey, recipe))
-                        throw new DomainRuleException("Package Product snapshot contains duplicate Recipe codes within one variant.");
-                    recipeRequirements.Add(recipeKey, currentRecipeRequirements);
-                    installation.AddMaterialization(ProductionPackageResourceKind.Recipe,
-                        $"{definition.SourceKey}:RECIPE:{recipeSource.Code}", recipe.Id.ToString("D"));
-                }
-                installation.AddMaterialization(ProductionPackageResourceKind.ProductVariant,
-                    $"{definition.SourceKey}:VARIANT:{variantSource.Code}", variant.Id.ToString("D"));
-            }
-
-            foreach (var groupSource in source.OptionGroups)
-            {
-                var group = new OptionGroup { ProductId = product.Id, Code = groupSource.Code, Name = groupSource.Name,
-                    Description = groupSource.Description, SelectionType = groupSource.SelectionType,
-                    MinSelections = groupSource.MinSelections, MaxSelections = groupSource.MaxSelections,
-                    IsRequired = groupSource.IsRequired, IsActive = groupSource.IsActive,
-                    DisplayOrder = groupSource.DisplayOrder, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId };
-                foreach (var optionSource in groupSource.Options)
-                {
-                    var currentOptionRequirements = new List<IngredientQuantityRequirement>();
-                    var option = new ProductOption { OptionGroupId = group.Id, TemplateProductOptionId = optionSource.Id,
-                        Code = optionSource.Code, Name = optionSource.Name, Description = optionSource.Description,
-                        PriceDelta = optionSource.PriceDelta, ExecutionImpact = optionImpacts[optionSource.Id],
-                        IsDefault = optionSource.IsDefault, IsAvailable = false,
-                        DisplayOrder = optionSource.DisplayOrder, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId };
-                    foreach (var requirement in optionSource.IngredientRequirements)
-                    {
-                        option.IngredientRequirements.Add(new ProductOptionIngredientRequirement
-                        {
-                            IngredientId = requirement.IngredientId, Quantity = requirement.Quantity, Unit = requirement.Unit,
-                            RequiredWorkcellCapabilityCode = requirement.RequiredWorkcellCapabilityCode,
-                            CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
-                        });
-                        currentOptionRequirements.Add(new IngredientQuantityRequirement(
-                            requirement.IngredientCode, requirement.Quantity, requirement.Unit,
-                            optionSource.Code.Trim().ToUpperInvariant()));
-                    }
-                    optionRequirementsByCode.Add(optionSource.Code.Trim().ToUpperInvariant(), currentOptionRequirements);
-                    group.ProductOptions.Add(option);
-                    installation.AddMaterialization(ProductionPackageResourceKind.ProductOption,
-                        $"{definition.SourceKey}:OPTION:{optionSource.Code}", option.Id.ToString("D"));
-                }
-                product.OptionGroups.Add(group);
-            }
-            installation.AddMaterialization(ProductionPackageResourceKind.Product, definition.SourceKey, product.Id.ToString("D"));
-            result.Add(new MaterializedProduct(definition.SourceKey, product, recipesByCode,
-                recipeRequirements, optionRequirementsByCode));
+            return ApiResult<ProductionPackageInstallationResult>.Fail(
+                ex.Message, ex is ArtifactObjectStorageUnavailableException ? 503 : 409);
         }
-        return result;
     }
 
-    private async Task<Dictionary<string, RobotArtifact>> MaterializeArtifactsAsync(
-        InstallProductionPackageCommand command, ProductionPackageInstallation installation,
-        ProductionPackageVersion version, IReadOnlyCollection<RobotArtifactTemplate> templates,
-        IReadOnlyCollection<RobotArtifactTechnicalContract> contracts, ICollection<string> copiedKeys,
+    public async Task<ApiResult<ProductionPackageRepairResult>> RepairAsync(
+        CurrentUserContext user, Guid organizationId, Guid installationId,
         CancellationToken cancellationToken)
     {
-        var templatesById = templates.ToDictionary(x => x.Id);
-        var contractsById = contracts.ToDictionary(x => x.Id);
-        var result = new Dictionary<string, RobotArtifact>(StringComparer.Ordinal);
-        foreach (var definition in version.Artifacts)
-        {
-            if (!templatesById.TryGetValue(definition.RobotArtifactTemplateId, out var template) ||
-                template.Status != RobotArtifactStatus.Published || template.Checksum != definition.ArtifactChecksum ||
-                !contractsById.TryGetValue(definition.TechnicalContractId, out var contract) ||
-                contract.Status != RobotArtifactContractStatus.Published || contract.ContractChecksum != definition.TechnicalContractChecksum)
-                throw new DomainRuleException("Package artifact source no longer matches its immutable definition.");
+        var installation = await installations.GetForEditAsync(organizationId, installationId, cancellationToken);
+        if (installation is null)
+            return ApiResult<ProductionPackageRepairResult>.Fail("Package installation not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageInstall, user, organizationId,
+                installation.StoreId, installation.KioskId))
+            return ApiResult<ProductionPackageRepairResult>.Fail("Access denied.", 403);
+        if (installation.Status != ProductionPackageInstallationStatus.Installed ||
+            installation.OwnershipMode != ProductionPackageOwnershipMode.PackageManaged)
+            return ApiResult<ProductionPackageRepairResult>.Fail(
+                "Only an Installed package-managed configuration can be repaired.", 409);
 
-            var artifactId = Guid.NewGuid();
-            var destination = $"robot-artifacts/{command.OrganizationId:D}/{artifactId:D}/{template.Checksum}.lua";
-            await objectStorage.CopyImmutableAsync(template.StorageKey,
-                new ArtifactObjectWriteRequest(destination, "application/octet-stream", template.ContentLengthBytes, template.Checksum), cancellationToken);
-            copiedKeys.Add(destination);
-            var artifact = RobotArtifact.CreateDraft(command.OrganizationId, definition.SourceKey,
-                template.TemplateName, destination, template.FileName, template.Checksum, template.RuntimeTargetCode,
-                template.MachineModelCode, template.ContentLengthBytes, template.ExportedAt, template.Description,
-                template.MetadataJson, template.Id, contract.Id, contract.ContractChecksum);
-            artifact.Id = artifactId;
-            artifact.CreatedByAccountId = command.UserContext.AccountId;
-            result.Add(definition.SourceKey, artifact);
-            installation.AddMaterialization(ProductionPackageResourceKind.RobotArtifact,
-                definition.SourceKey, artifact.Id.ToString("D"), artifact.Checksum);
+        var repair = await installations.RestoreSoftDeletedMaterializationsAsync(
+            organizationId, installationId, user.AccountId, cancellationToken);
+        if (repair.Issues.Count > 0)
+        {
+            var issueCodes = string.Join(", ", repair.Issues.Select(x => x.Code).Distinct(StringComparer.Ordinal));
+            return ApiResult<ProductionPackageRepairResult>.Fail(
+                    $"Package materializations cannot be repaired automatically: {issueCodes}.", 409)
+                .AddDetail("issues", repair.Issues);
         }
-        return result;
+        return ApiResult<ProductionPackageRepairResult>.Success(
+            new ProductionPackageRepairResult(installationId, repair.Restored),
+            repair.Restored.Count == 0
+                ? "Package materialization targets are already active."
+                : "Soft-deleted package materialization targets were restored in place.");
     }
 
-    private static ComposedPrograms ComposePrograms(
-        InstallProductionPackageCommand command, ProductionPackageInstallation installation,
-        ProductionPackageVersion version, IReadOnlyCollection<MaterializedProduct> products,
-        IReadOnlyDictionary<string, RobotArtifact> artifacts,
-        IReadOnlyCollection<RobotArtifactTechnicalContract> contracts,
-        IReadOnlyDictionary<Guid, ProductOptionExecutionImpact> optionImpacts)
-    {
-        var contractById = contracts.ToDictionary(x => x.Id);
-        var artifactDefinitions = version.Artifacts.ToDictionary(x => x.SourceKey, StringComparer.Ordinal);
-        var programs = new Dictionary<string, RobotProgram>(StringComparer.Ordinal);
-        var compositions = new List<ProductionComposition>();
-        var selectedProductKeys = products.Select(x => x.SourceKey).ToHashSet(StringComparer.Ordinal);
-        foreach (var route in version.Routes.Where(x => selectedProductKeys.Contains(x.ProductSourceKey))
-                     .OrderBy(x => x.Priority).ThenBy(x => x.RouteCode))
-        {
-            var blueprint = version.Programs.Single(x => x.BlueprintCode == route.ProgramBlueprintCode);
-            var product = products.Single(x => x.SourceKey == route.ProductSourceKey);
-            var recipeKey = RecipeLookupKey(route.ProductVariantSourceKey, route.RecipeSourceKey);
-            if (!product.RecipesByCode.TryGetValue(recipeKey, out var recipe) ||
-                !product.RecipeRequirementsByCode.TryGetValue(recipeKey, out var recipeRequirements))
-                throw new DomainRuleException($"Package route {route.RouteCode} references an unknown Recipe source key.");
-
-            var orderedSlots = ProductionPackageDefinitionValidator.OrderSlots(blueprint, artifactDefinitions, contractById);
-            var productDefinition = version.Products.Single(definition => definition.SourceKey == route.ProductSourceKey);
-            var supportedOptionCodes = ProductionPackageDefinitionValidator.ResolveSupportedOptionCodes(
-                route, productDefinition.ProductSnapshotJson, optionImpacts);
-            var optionRequirements = supportedOptionCodes
-                .SelectMany(code => product.OptionRequirementsByCode.TryGetValue(code, out var requirements)
-                    ? requirements
-                    : throw new DomainRuleException($"Package route {route.RouteCode} references an unknown supported option code."));
-            ProductionPackageDefinitionValidator.ValidateEffects(orderedSlots, artifactDefinitions, contractById,
-                recipeRequirements.Concat(optionRequirements)
-                    .Select(x => new IngredientRequirement(x.IngredientCode, x.Quantity, x.Unit, x.OptionCode)).ToArray());
-            var program = RobotProgram.CreateDraft($"PKG_{version.Version}_{route.RouteCode}",
-                $"{blueprint.BlueprintCode} / {route.RouteCode}", TenantScopeResolver.Resolve(command.StoreId, command.KioskId),
-                command.OrganizationId, command.StoreId, command.KioskId,
-                description: $"Generated from package version {version.Version}, route {route.RouteCode}.");
-            program.CreatedByAccountId = command.UserContext.AccountId;
-            var order = 1;
-            foreach (var slot in orderedSlots)
-                program.AddArtifact(artifacts[slot.ArtifactSourceKey].Id, order++,
-                    requiredOptionCode: ResolveRequiredOptionCode(
-                        contractById[artifactDefinitions[slot.ArtifactSourceKey].TechnicalContractId]));
-            programs.Add(route.RouteCode, program);
-            installation.AddMaterialization(ProductionPackageResourceKind.RobotProgram,
-                route.RouteCode, program.Id.ToString("D"));
-
-            var input = JsonSerializer.Serialize(new { version.Id, version.ManifestChecksum, route.RouteCode,
-                ProductVariantId = recipe.ProductVariantId, RecipeId = recipe.Id, blueprint.RuntimeTargetCode,
-                blueprint.MachineModelCode, SupportedOptionCodes = supportedOptionCodes.Order(StringComparer.Ordinal),
-                Slots = orderedSlots.Select(x => new { x.SlotCode, x.RequiredEffectCode,
-                    ArtifactId = artifacts[x.ArtifactSourceKey].Id, artifacts[x.ArtifactSourceKey].Checksum }) });
-            var report = JsonSerializer.Serialize(new { IsValid = true, RequiresUserAcknowledgement = true,
-                Warnings = new[] { "Physical behavior has not been proven on the target kiosk." },
-                OrderedEffects = orderedSlots.Select(x => x.RequiredEffectCode) });
-            var composition = ProductionComposition.Create(installation.Id, command.OrganizationId,
-                recipe.ProductVariantId, recipe.Id, null, blueprint.RuntimeTargetCode, blueprint.MachineModelCode,
-                input, true, report);
-            composition.Apply(program.Id);
-            compositions.Add(composition);
-        }
-        return new ComposedPrograms(programs, compositions);
-    }
-
-    private static ConfigurationRelease CreateRelease(InstallProductionPackageCommand command,
-        ProductionPackageInstallation installation, ProductionPackageVersion version, long releaseNumber,
-        IReadOnlyCollection<MaterializedProduct> products, IReadOnlyDictionary<string, RobotProgram> programs,
-        IReadOnlyDictionary<Guid, ProductOptionExecutionImpact> optionImpacts)
-    {
-        var release = ConfigurationRelease.CreateDraft(command.OrganizationId, releaseNumber);
-        release.CreatedByAccountId = command.UserContext.AccountId;
-        var selectedProductKeys = products.Select(x => x.SourceKey).ToHashSet(StringComparer.Ordinal);
-        release.ReplaceRoutes(version.Routes.Where(x => selectedProductKeys.Contains(x.ProductSourceKey))
-            .OrderBy(x => x.Priority).ThenBy(x => x.RouteCode).Select(routeDefinition =>
-        {
-            var product = products.Single(x => x.SourceKey == routeDefinition.ProductSourceKey);
-            if (!product.RecipesByCode.TryGetValue(
-                    RecipeLookupKey(routeDefinition.ProductVariantSourceKey, routeDefinition.RecipeSourceKey), out var recipe))
-                throw new DomainRuleException("Package route Recipe source key was not materialized.");
-            var capabilityCode = ProductionPackageDefinitionValidator.ValidateSingleCapability(
-                routeDefinition.RequiredCapabilitiesJson);
-            IReadOnlyCollection<(Guid, int, string)> bindings =
-                [(programs[routeDefinition.RouteCode].Id, 1, capabilityCode)];
-            var productDefinition = version.Products.Single(x => x.SourceKey == routeDefinition.ProductSourceKey);
-            var supportedOptionCodes = ProductionPackageDefinitionValidator.ResolveSupportedOptionCodes(
-                routeDefinition, productDefinition.ProductSnapshotJson, optionImpacts);
-            return (recipe.ProductVariantId, recipe.Id, routeDefinition.RouteCode, routeDefinition.Priority,
-                (string?)routeDefinition.RequiredCapabilitiesJson,
-                (IReadOnlyCollection<string>)supportedOptionCodes.Order(StringComparer.Ordinal).ToArray(), bindings);
-        }));
-        return release;
-    }
-
-    private static string? ResolveRequiredOptionCode(RobotArtifactTechnicalContract contract)
-    {
-        var optionCodes = contract.Effects.Where(x => !string.IsNullOrWhiteSpace(x.OptionCode))
-            .Select(x => x.OptionCode!).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
-        if (optionCodes.Length > 1)
-            throw new DomainRuleException("One artifact contract cannot be conditional on multiple product options in V1.");
-        if (optionCodes.Length == 1 && contract.Effects.Any(x => string.IsNullOrWhiteSpace(x.OptionCode)))
-            throw new DomainRuleException("An option-conditional artifact cannot also declare unconditional effects.");
-        return optionCodes.SingleOrDefault()?.Trim().ToUpperInvariant();
-    }
-
-    private static string ComputeRequestChecksum(InstallProductionPackageCommand command,
-        ProductionPackageVersion version, IReadOnlyCollection<string> selectedKeys)
-    {
-        var payload = JsonSerializer.Serialize(new
-        {
-            command.OrganizationId,
-            command.StoreId,
-            command.KioskId,
-            PackageVersionId = version.Id,
-            version.ManifestChecksum,
-            ProductSourceKeys = selectedKeys.OrderBy(x => x, StringComparer.Ordinal)
-        });
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
-    }
-
-    private sealed record MaterializedProduct(string SourceKey, Product Product,
-        IReadOnlyDictionary<string, Recipe> RecipesByCode,
-        IReadOnlyDictionary<string, IReadOnlyCollection<IngredientQuantityRequirement>> RecipeRequirementsByCode,
-        IReadOnlyDictionary<string, IReadOnlyCollection<IngredientQuantityRequirement>> OptionRequirementsByCode);
-    private sealed record IngredientQuantityRequirement(string IngredientCode, decimal Quantity, string Unit,
-        string? OptionCode);
-    private sealed record ComposedPrograms(IReadOnlyDictionary<string, RobotProgram> Programs,
-        IReadOnlyCollection<ProductionComposition> Compositions);
-
-    private static string RecipeLookupKey(string variantCode, string recipeCode) =>
-        $"{variantCode.Trim().ToUpperInvariant()}::{recipeCode.Trim().ToUpperInvariant()}";
 }

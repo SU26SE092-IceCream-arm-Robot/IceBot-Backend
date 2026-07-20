@@ -1,5 +1,6 @@
 using Application.Inventory.Abstractions;
 using Application.Inventory.Results;
+using Application.Inventory.Support;
 using Domain.Inventory.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -182,10 +183,22 @@ public sealed class InventoryStore : IInventoryStore
         Guid dispenserStateId,
         CancellationToken cancellationToken = default)
     {
-        var lockKey = $"inventory-dispenser:{dispenserStateId:N}";
+        var lockKey = InventoryConcurrency.DispenserLockKey(dispenserStateId);
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
             cancellationToken);
+    }
+
+    public async Task AcquireDeviceTopologyMutationLocksAsync(
+        IEnumerable<Guid> deviceIds,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var deviceId in deviceIds.Distinct().OrderBy(id => id))
+        {
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({InventoryConcurrency.DeviceTopologyLockKey(deviceId)}, 0))",
+                cancellationToken);
+        }
     }
 
     public Task AddDispenserStateAsync(IngredientDispenserState state, CancellationToken cancellationToken = default) =>
@@ -238,6 +251,14 @@ public sealed class InventoryStore : IInventoryStore
             .Include(state => state.Ingredient)
             .Where(state => state.DeviceId == deviceId && state.IsActive)
             .OrderBy(state => state.ContainerCode)
+            .ToListAsync(cancellationToken);
+
+    public Task<List<Guid>> ListActiveDispenserStateIdsByDeviceAsync(
+        Guid deviceId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.WhereNotDeleted()
+            .Where(state => state.DeviceId == deviceId && state.IsActive)
+            .Select(state => state.Id)
             .ToListAsync(cancellationToken);
 
     public Task AddTopologyChangeRecordAsync(
@@ -404,13 +425,29 @@ public sealed class InventoryStore : IInventoryStore
 
     public async Task<bool> TrySaveChangesAsync(CancellationToken cancellationToken = default)
     {
+        const string savepointName = "inventory_try_save";
+        var transaction = _dbContext.Database.CurrentTransaction;
+        if (transaction?.SupportsSavepoints == true)
+        {
+            await transaction.CreateSavepointAsync(savepointName, cancellationToken);
+        }
+
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
+            if (transaction?.SupportsSavepoints == true)
+            {
+                await transaction.ReleaseSavepointAsync(savepointName, cancellationToken);
+            }
             return true;
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
+            if (transaction?.SupportsSavepoints == true)
+            {
+                await transaction.RollbackToSavepointAsync(savepointName, cancellationToken);
+            }
+            _dbContext.ChangeTracker.Clear();
             return false;
         }
     }

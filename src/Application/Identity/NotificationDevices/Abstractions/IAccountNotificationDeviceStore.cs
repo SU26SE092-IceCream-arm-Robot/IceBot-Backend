@@ -27,6 +27,8 @@ public interface IAccountNotificationDeviceStore
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     Task<T> ExecuteRegistrationTransactionAsync<T>(
+        Guid accountId,
+        Guid installationId,
         string pushTokenHash,
         Func<CancellationToken, Task<T>> action,
         CancellationToken cancellationToken = default);

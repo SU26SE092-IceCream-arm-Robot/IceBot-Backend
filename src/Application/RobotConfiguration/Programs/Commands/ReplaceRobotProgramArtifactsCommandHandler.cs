@@ -10,6 +10,9 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
 using Application.RobotConfiguration.Programs.Mapping;
+using Application.Shared.Ownership;
+using Application.Shared.Concurrency;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace Application.RobotConfiguration.Programs.Commands;
 
@@ -17,13 +20,19 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
 {
     private readonly IRobotProgramStore _robotProgramStore;
     private readonly IRobotArtifactStore _robotArtifactStore;
+    private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
     public ReplaceRobotProgramArtifactsCommandHandler(
         IRobotProgramStore robotProgramStore,
-        IRobotArtifactStore robotArtifactStore)
+        IRobotArtifactStore robotArtifactStore,
+        ITechnicalResourceMutationPolicy technicalOwnership,
+        ITechnicalResourceMutationCoordinator mutationCoordinator)
     {
         _robotProgramStore = robotProgramStore;
         _robotArtifactStore = robotArtifactStore;
+        _technicalOwnership = technicalOwnership;
+        _mutations = mutationCoordinator;
     }
 
     public async Task<ApiResult<RobotProgramResult>> HandleAsync(
@@ -50,6 +59,22 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
             return ApiResult<RobotProgramResult>.Fail("Robot program artifact parameters must be valid JSON.", 400);
         }
 
+        var mutationResources = command.Artifacts
+            .Select(item => TechnicalResourceMutationIdentity.Artifact(item.RobotArtifactId))
+            .Append(TechnicalResourceMutationIdentity.Program(command.ProgramId))
+            .ToArray();
+
+        return await _mutations.ExecuteAsync(
+            mutationResources,
+            ct => ReplaceLockedAsync(command, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<RobotProgramResult>> ReplaceLockedAsync(
+        ReplaceRobotProgramArtifactsCommand command,
+        CancellationToken cancellationToken)
+    {
+
         var program = await _robotProgramStore.GetProgramForEditAsync(command.ProgramId, cancellationToken);
         if (program is null || program.OrganizationId != command.OrganizationId)
         {
@@ -72,6 +97,17 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
         {
             return ApiResult<RobotProgramResult>.Fail("One or more robot artifacts were not found.", 400);
         }
+
+        if (artifacts.Any(artifact => artifact.Status == RobotArtifactStatus.Retired))
+        {
+            return ApiResult<RobotProgramResult>.Fail(
+                "Retired robot artifacts cannot be assigned to a robot program.", 409);
+        }
+
+        var ownershipError = await _technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.RobotProgram, program.Id, cancellationToken);
+        if (ownershipError is not null)
+            return ApiResult<RobotProgramResult>.Fail(ownershipError, 409);
 
         try
         {

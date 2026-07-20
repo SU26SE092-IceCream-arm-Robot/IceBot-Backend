@@ -6,6 +6,7 @@ using Domain.RobotConfiguration.Programs;
 using Application.RobotConfiguration.Programs.Abstractions;
 using Application.RobotConfiguration.Programs.Results;
 using Application.Shared.Wrappers;
+using Application.Shared.Concurrency;
 using Application.Tenants;
 using Domain.Common;
 using Domain.RobotConfiguration.Artifacts;
@@ -16,10 +17,14 @@ namespace Application.RobotConfiguration.Programs.Commands;
 public sealed class CreateRobotProgramCommandHandler
 {
     private readonly IRobotProgramStore _robotProgramStore;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
-    public CreateRobotProgramCommandHandler(IRobotProgramStore robotProgramStore)
+    public CreateRobotProgramCommandHandler(
+        IRobotProgramStore robotProgramStore,
+        ITechnicalResourceMutationCoordinator mutationCoordinator)
     {
         _robotProgramStore = robotProgramStore;
+        _mutations = mutationCoordinator;
     }
 
     public async Task<ApiResult<RobotProgramResult>> HandleAsync(
@@ -45,41 +50,49 @@ public sealed class CreateRobotProgramCommandHandler
         }
 
         var normalizedCode = command.Code.Trim().ToUpperInvariant();
-        if (await _robotProgramStore.ProgramCodeExistsAsync(
-                command.OrganizationId,
-                command.StoreId,
-                command.KioskId,
-                command.DeviceId,
-                normalizedCode,
-                cancellationToken: cancellationToken))
-        {
-            return ApiResult<RobotProgramResult>.Fail("Robot program code already exists in the selected scope.", 409);
-        }
+        return await _mutations.ExecuteAsync(
+            [TechnicalResourceMutationIdentity.ProgramDefinition(
+                command.OrganizationId, command.StoreId, command.KioskId, command.DeviceId, normalizedCode)],
+            async ct =>
+            {
+                if (await _robotProgramStore.ProgramCodeExistsAsync(
+                        command.OrganizationId,
+                        command.StoreId,
+                        command.KioskId,
+                        command.DeviceId,
+                        normalizedCode,
+                        cancellationToken: ct))
+                {
+                    return ApiResult<RobotProgramResult>.Fail(
+                        "Robot program code already exists in the selected scope.", 409);
+                }
 
-        try
-        {
-            var program = RobotProgram.CreateDraft(
-                normalizedCode,
-                command.Name,
-                scopeType,
-                command.OrganizationId,
-                command.StoreId,
-                command.KioskId,
-                command.DeviceId,
-                command.Description);
-            program.CreatedByAccountId = command.UserContext.AccountId;
+                try
+                {
+                    var program = RobotProgram.CreateDraft(
+                        normalizedCode,
+                        command.Name,
+                        scopeType,
+                        command.OrganizationId,
+                        command.StoreId,
+                        command.KioskId,
+                        command.DeviceId,
+                        command.Description);
+                    program.CreatedByAccountId = command.UserContext.AccountId;
 
-            await _robotProgramStore.AddProgramAsync(program, cancellationToken);
-            await _robotProgramStore.SaveChangesAsync(cancellationToken);
+                    await _robotProgramStore.AddProgramAsync(program, ct);
+                    await _robotProgramStore.SaveChangesAsync(ct);
 
-            return ApiResult<RobotProgramResult>.Success(
-                RobotProgramResult.FromEntity(program),
-                "Robot program draft created successfully.",
-                201);
-        }
-        catch (DomainRuleException ex)
-        {
-            return ApiResult<RobotProgramResult>.Fail(ex.Message, 400);
-        }
+                    return ApiResult<RobotProgramResult>.Success(
+                        RobotProgramResult.FromEntity(program),
+                        "Robot program draft created successfully.",
+                        201);
+                }
+                catch (DomainRuleException ex)
+                {
+                    return ApiResult<RobotProgramResult>.Fail(ex.Message, 400);
+                }
+            },
+            cancellationToken);
     }
 }

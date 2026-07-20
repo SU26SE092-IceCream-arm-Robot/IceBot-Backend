@@ -18,6 +18,7 @@ using Domain.Sync.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Devices.ExecutionEndpoints.Projections;
+using Application.Orders.Support;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -37,7 +38,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({$"order-execution-dispatch:{orderId:D}"}, 0));",
+            $"SELECT pg_advisory_xact_lock(hashtextextended({OrderWorkflowConcurrency.OrderLockKey(orderId)}, 0));",
             cancellationToken);
         var result = await action(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -114,7 +115,10 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
 
         var ids = await _dbContext.IngredientDispenserStates
             .Where(state => state.KioskId == kioskId && state.IsActive && ingredientIds.Contains(state.IngredientId))
-            .Where(state => state.Ingredient.IsActive && state.Device.Status == DeviceStatus.Online)
+            .Where(state =>
+                state.Ingredient.IsActive &&
+                state.Device.Status == DeviceStatus.Online &&
+                state.LevelToQuantityProfileJson != null)
             .Select(state => state.IngredientId)
             .Distinct()
             .ToListAsync(cancellationToken);

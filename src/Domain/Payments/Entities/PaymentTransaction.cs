@@ -163,6 +163,24 @@ public partial class PaymentTransaction : BusinessEntity
 
         CancelledAt = cancelledAt;
         Status = PaymentTransactionStatus.Cancelled;
+        ClearRetryState();
+    }
+
+    public void MarkExpired(DateTimeOffset expiredAt)
+    {
+        if (Status == PaymentTransactionStatus.Expired)
+        {
+            return;
+        }
+
+        if (Status is PaymentTransactionStatus.Paid or PaymentTransactionStatus.Refunded)
+        {
+            throw new DomainRuleException("Cannot expire a paid or refunded transaction.");
+        }
+
+        CancelledAt = expiredAt;
+        Status = PaymentTransactionStatus.Expired;
+        ClearRetryState();
     }
 
     public bool CanRetry => Status is PaymentTransactionStatus.Pending or PaymentTransactionStatus.Failed

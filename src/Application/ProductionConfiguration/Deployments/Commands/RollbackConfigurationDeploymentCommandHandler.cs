@@ -10,7 +10,13 @@ using Domain.Devices.Catalog;
 
 namespace Application.ProductionConfiguration.Deployments.Commands;
 
-public sealed class RollbackConfigurationDeploymentCommandHandler
+public interface IConfigurationDeploymentRollbackDispatcher
+{
+    Task<ApiResult<ConfigurationDeploymentRollbackResult>> HandleAsync(
+        RollbackConfigurationDeploymentCommand command, CancellationToken cancellationToken = default);
+}
+
+public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurationDeploymentRollbackDispatcher
 {
     private readonly IConfigurationDeploymentStore _store;
     private readonly DeployFullEdgeConfigurationCommandHandler _fullEdgeDeployHandler;

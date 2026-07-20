@@ -46,6 +46,7 @@ public sealed class MarkRefundProcessedCommandHandler
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
+            await _paymentStore.AcquireRefundLockAsync(command.RefundId, ct);
             var refund = await _paymentStore.GetRefundByIdAsync(command.RefundId, ct);
             if (refund is null)
             {
@@ -80,11 +81,18 @@ public sealed class MarkRefundProcessedCommandHandler
             var parsed = Mapping.RefundResultMapper.ParseReason(refund.Reason);
             var method = parsed.Method;
 
+            if (refund.Status == RefundStatus.Processed)
+            {
+                return ApiResult<RefundResult>.Success(
+                    Mapping.RefundResultMapper.ToResult(refund),
+                    "Refund was already marked as processed.");
+            }
+
             if (!string.Equals(method, "Voucher", StringComparison.OrdinalIgnoreCase) &&
-                !command.MoneyWasRefunded.HasValue)
+                command.MoneyWasRefunded is not true)
             {
                 return ApiResult<RefundResult>.Fail(
-                    "MoneyWasRefunded must be explicitly confirmed for a full money refund.",
+                    "MoneyWasRefunded must be true before completing a full money refund.",
                     400);
             }
 
@@ -103,11 +111,8 @@ public sealed class MarkRefundProcessedCommandHandler
             {
                 newStatus = OrderStatus.Refunded;
                 order.MarkRefunded();
-                if (command.MoneyWasRefunded is true)
-                {
-                    order.MarkPaymentRefunded();
-                    transaction.Status = PaymentTransactionStatus.Refunded;
-                }
+                order.MarkPaymentRefunded();
+                transaction.Status = PaymentTransactionStatus.Refunded;
             }
 
             order.UpdatedAt = now;

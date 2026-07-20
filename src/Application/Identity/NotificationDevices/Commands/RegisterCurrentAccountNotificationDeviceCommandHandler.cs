@@ -53,6 +53,8 @@ public sealed class RegisterCurrentAccountNotificationDeviceCommandHandler
         }
 
         return await _devices.ExecuteRegistrationTransactionAsync(
+            command.AccountId,
+            command.InstallationId,
             registration.PushTokenHash,
             async transactionToken =>
             {
@@ -68,9 +70,7 @@ public sealed class RegisterCurrentAccountNotificationDeviceCommandHandler
 
                 if (activeTokenOwner is not null && activeTokenOwner.Id != device?.Id)
                 {
-                    activeTokenOwner.InvalidatedAt = now;
-                    activeTokenOwner.InvalidationReason = "TokenReassigned";
-                    activeTokenOwner.UpdatedAt = now;
+                    activeTokenOwner.Invalidate("TokenReassigned", now);
                     activeTokenOwner.UpdatedByAccountId = command.AccountId;
                 }
 

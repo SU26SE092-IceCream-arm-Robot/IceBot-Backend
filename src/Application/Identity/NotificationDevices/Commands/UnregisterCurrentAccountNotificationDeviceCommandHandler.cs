@@ -31,9 +31,7 @@ public sealed class UnregisterCurrentAccountNotificationDeviceCommandHandler
         {
             if (device is not null)
             {
-                device.InvalidatedAt = DateTimeOffset.UtcNow;
-                device.InvalidationReason = "Unregistered";
-                device.UpdatedAt = DateTimeOffset.UtcNow;
+                device.Invalidate("Unregistered", DateTimeOffset.UtcNow);
                 device.UpdatedByAccountId = command.AccountId;
                 await _devices.SaveChangesAsync(cancellationToken);
             }

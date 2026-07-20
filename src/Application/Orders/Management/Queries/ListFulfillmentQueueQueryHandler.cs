@@ -1,5 +1,6 @@
 using Application.Orders.Management.Abstractions;
 using Application.Orders.Management.Results;
+using Application.Orders.Management.Rules;
 using Application.Shared.Wrappers;
 
 namespace Application.Orders.Management.Queries;
@@ -31,13 +32,20 @@ public sealed class ListFulfillmentQueueQueryHandler(IOrderFulfillmentReadStore 
             query.UserContext.AllowedOrganizationIds, query.UserContext.AllowedStoreIds,
             query.UserContext.AllowedKioskIds, pageNumber, pageSize, cancellationToken);
 
+        var observedAt = DateTimeOffset.UtcNow;
         return PagedResult<FulfillmentQueueItemResult>.Success(
-            rows.Select(row => new FulfillmentQueueItemResult(
-                row.OrderId, row.OrderNumber, row.OrderItemId, row.KioskId,
-                row.ProductName, row.ProductVariantName, row.Quantity, row.FulfillmentType,
-                row.ItemStatus, row.PaidAt, row.PreparationTimeSeconds,
-                row.SelectedOptions.Select(option => new FulfillmentQueueOptionResult(
-                    option.GroupCode, option.Code, option.Name)).ToArray())),
+            rows.Select(row =>
+            {
+                var sla = FulfillmentSlaRules.Project(
+                    row.PaidAt, row.PreparationTimeSeconds, row.ItemStatus, observedAt);
+                return new FulfillmentQueueItemResult(
+                    row.OrderId, row.OrderNumber, row.OrderItemId, row.KioskId,
+                    row.ProductName, row.ProductVariantName, row.Quantity, row.FulfillmentType,
+                    row.ItemStatus, row.PaidAt, row.PreparationTimeSeconds,
+                    sla.ExpectedReadyAt, sla.Status,
+                    row.SelectedOptions.Select(option => new FulfillmentQueueOptionResult(
+                        option.GroupCode, option.Code, option.Name)).ToArray());
+            }),
             totalCount, pageNumber, pageSize);
     }
 }

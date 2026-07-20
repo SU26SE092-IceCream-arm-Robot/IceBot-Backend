@@ -4,10 +4,13 @@ using Application.Catalog.Products.Results;
 using Application.Catalog.Products.Rules;
 using Application.Catalog.Products.Support;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 
 namespace Application.Catalog.Products.Commands;
 
-public sealed class UpdateProductOptionCommandHandler(IProductStore products)
+public sealed class UpdateProductOptionCommandHandler(
+    IProductStore products,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<ProductOptionResult>> HandleAsync(UpdateProductOptionCommand command, CancellationToken ct = default)
     {
@@ -22,6 +25,13 @@ public sealed class UpdateProductOptionCommandHandler(IProductStore products)
             request.ExecutionImpact);
         if (error is not null) return ApiResult<ProductOptionResult>.Fail(error);
         var code = ProductNormalizer.NormalizeCode(request.Code);
+        if (!string.Equals(code, option.Code, StringComparison.Ordinal) ||
+            request.ExecutionImpact != option.ExecutionImpact)
+        {
+            var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+                TechnicalResourceKind.ProductOption, option.Id, ct);
+            if (ownershipError is not null) return ApiResult<ProductOptionResult>.Fail(ownershipError, 409);
+        }
         if (await products.ProductOptionCodeExistsAsync(option.OptionGroupId, code, option.Id, ct))
             return ApiResult<ProductOptionResult>.Fail("Product option code already exists in this group.", 409);
         if (request.IsDefault && !option.IsDefault && await products.HasOtherDefaultOptionAsync(option.OptionGroupId, option.Id, ct))

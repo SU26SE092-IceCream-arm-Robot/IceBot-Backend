@@ -3,12 +3,15 @@ using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Catalog.Products.Rules;
 using Application.Catalog.Products.Support;
+using Application.Shared.Ownership;
 using Application.Shared.Wrappers;
 using Domain.Catalog.Entities;
 
 namespace Application.Catalog.Products.Commands;
 
-public sealed class CreateOptionGroupCommandHandler(IProductStore products)
+public sealed class CreateOptionGroupCommandHandler(
+    IProductStore products,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<OptionGroupResult>> HandleAsync(CreateOptionGroupCommand command, CancellationToken ct = default)
     {
@@ -16,6 +19,9 @@ public sealed class CreateOptionGroupCommandHandler(IProductStore products)
         if (product is null) return ApiResult<OptionGroupResult>.Fail("Product not found.", 404);
         var access = ProductManagementCommandRules.ValidateExisting<OptionGroupResult>(command.Scope, product);
         if (access is not null) return access;
+        var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.Product, product.Id, ct);
+        if (ownershipError is not null) return ApiResult<OptionGroupResult>.Fail(ownershipError, 409);
 
         var request = command.Request;
         var error = ProductOptionRequestValidator.ValidateGroup(request.Code, request.Name, request.SelectionType, request.MinSelections, request.MaxSelections, request.IsRequired);

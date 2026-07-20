@@ -3,11 +3,14 @@ using Application.Catalog.Recipes.Mapping;
 using Application.Catalog.Recipes.Results;
 using Application.Catalog.Recipes.Rules;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 using Domain.Common;
 
 namespace Application.Catalog.Recipes.Commands;
 
-public sealed class UpdateRecipeCommandHandler(ICatalogAuthoringStore catalog)
+public sealed class UpdateRecipeCommandHandler(
+    ICatalogAuthoringStore catalog,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<RecipeResult>> HandleAsync(UpdateRecipeCommand command, CancellationToken ct = default)
     {
@@ -16,6 +19,9 @@ public sealed class UpdateRecipeCommandHandler(ICatalogAuthoringStore catalog)
         if (error is not null) return error;
         var recipe = await catalog.GetRecipeAsync(variant!.Id, command.RecipeId, false, ct);
         if (recipe is null) return ApiResult<RecipeResult>.Fail("Recipe not found.", 404);
+        var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.Recipe, recipe.Id, ct);
+        if (ownershipError is not null) return ApiResult<RecipeResult>.Fail(ownershipError, 409);
 
         var request = command.Request;
         var validationError = RecipeAuthoringRules.ValidateRecipe(

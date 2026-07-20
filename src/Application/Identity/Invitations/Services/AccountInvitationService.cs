@@ -45,27 +45,32 @@ public sealed class AccountInvitationService
             return ApiResult<AccountInvitationResult>.Fail("Account email is required.");
         }
 
-        var activeInvitations = await _invitationStore.GetActiveInvitationsByAccountIdAsync(account.Id, cancellationToken);
-        var now = DateTimeOffset.UtcNow;
+        var created = await _invitationStore.ExecuteCreationTransactionAsync(
+            account.Id,
+            async transactionToken =>
+            {
+                var activeInvitations = await _invitationStore.GetActiveInvitationsByAccountIdAsync(
+                    account.Id, transactionToken);
+                var now = DateTimeOffset.UtcNow;
+                foreach (var activeInvitation in activeInvitations) activeInvitation.RevokedAt = now;
 
-        foreach (var activeInvitation in activeInvitations)
-        {
-            activeInvitation.RevokedAt = now;
-        }
-
-        var rawToken = AccountInvitationTokenHelper.CreateToken();
-        var invitation = new AccountInvitation
-        {
-            AccountId = account.Id,
-            TokenHash = AccountInvitationTokenHelper.HashToken(rawToken),
-            InvitedAt = now,
-            ExpiresAt = now.Add(TokenLifetime),
-            InvitedByAccountId = invitedByAccountId,
-            Purpose = "AccountInvitation"
-        };
-
-        await _invitationStore.AddAsync(invitation, cancellationToken);
-        await _invitationStore.SaveChangesAsync(cancellationToken);
+                var rawToken = AccountInvitationTokenHelper.CreateToken();
+                var invitation = new AccountInvitation
+                {
+                    AccountId = account.Id,
+                    TokenHash = AccountInvitationTokenHelper.HashToken(rawToken),
+                    InvitedAt = now,
+                    ExpiresAt = now.Add(TokenLifetime),
+                    InvitedByAccountId = invitedByAccountId,
+                    Purpose = "AccountInvitation"
+                };
+                await _invitationStore.AddAsync(invitation, transactionToken);
+                await _invitationStore.SaveChangesAsync(transactionToken);
+                return (Invitation: invitation, RawToken: rawToken);
+            },
+            cancellationToken);
+        var invitation = created.Invitation;
+        var rawToken = created.RawToken;
 
         var invitationUrl = AccountInvitationUrlBuilder.BuildInvitationUrl(rawToken, _emailOptions.Value.InvitationBaseUrl);
         var emailSent = false;

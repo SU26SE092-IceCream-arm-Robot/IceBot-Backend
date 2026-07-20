@@ -37,7 +37,10 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         Func<long, ConfigurationRelease> releaseFactory,
         CancellationToken cancellationToken = default)
     {
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var ownsTransaction = _dbContext.Database.CurrentTransaction is null;
+        await using var transaction = ownsTransaction
+            ? await _dbContext.Database.BeginTransactionAsync(cancellationToken)
+            : null;
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({organizationId.ToString("D")}, 0));", cancellationToken);
         var maximum = await _dbContext.ConfigurationReleases.WhereNotDeleted()
@@ -47,7 +50,8 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         var release = releaseFactory((maximum ?? 0) + 1);
         await _dbContext.ConfigurationReleases.AddAsync(release, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+        if (transaction is not null)
+            await transaction.CommitAsync(cancellationToken);
         return release;
     }
 

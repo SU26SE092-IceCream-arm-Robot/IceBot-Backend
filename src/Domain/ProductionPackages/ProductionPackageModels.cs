@@ -7,7 +7,15 @@ namespace Domain.ProductionPackages;
 
 public enum ProductionPackageStatus { Active = 0, Retired = 1 }
 public enum ProductionPackageVersionStatus { Draft = 0, Published = 1, Retired = 2 }
-public enum ProductionPackageInstallationStatus { Pending = 0, Materializing = 1, Installed = 2, Failed = 3, Superseded = 4 }
+public enum ProductionPackageInstallationStatus
+{
+    Pending = 0,
+    Materializing = 1,
+    Installed = 2,
+    Failed = 3,
+    Superseded = 4,
+    Abandoned = 5
+}
 public enum ProductionPackageOwnershipMode { PackageManaged = 0, OrganizationFork = 1 }
 public enum ProductionPackageResourceKind
 {
@@ -324,6 +332,7 @@ public sealed class ProductionPackageInstallation : BusinessEntity
     public string RequestChecksum { get; private set; } = null!;
     public string SelectedProductSourceKeysJson { get; private set; } = null!;
     public string IdempotencyKey { get; private set; } = null!;
+    public string? MaterializationIdentitySuffix { get; private set; }
     public ProductionPackageInstallationStatus Status { get; private set; }
     public ProductionPackageOwnershipMode OwnershipMode { get; private set; }
     public Guid? DraftConfigurationReleaseId { get; private set; }
@@ -336,7 +345,8 @@ public sealed class ProductionPackageInstallation : BusinessEntity
     private ProductionPackageInstallation() { }
     public static ProductionPackageInstallation Start(Guid organizationId, Guid? storeId, Guid? kioskId,
         Guid versionId, string manifestChecksum, string requestChecksum, string idempotencyKey,
-        IReadOnlyCollection<string> selectedProductSourceKeys, DateTimeOffset now)
+        IReadOnlyCollection<string> selectedProductSourceKeys, DateTimeOffset now,
+        string? materializationIdentitySuffix = null)
     {
         if (organizationId == Guid.Empty || versionId == Guid.Empty || string.IsNullOrWhiteSpace(manifestChecksum) ||
             string.IsNullOrWhiteSpace(requestChecksum) || string.IsNullOrWhiteSpace(idempotencyKey) ||
@@ -347,6 +357,7 @@ public sealed class ProductionPackageInstallation : BusinessEntity
             OrganizationId = organizationId, StoreId = storeId, KioskId = kioskId,
             PackageVersionId = versionId, PackageManifestChecksum = manifestChecksum.Trim(),
             RequestChecksum = requestChecksum.Trim(), IdempotencyKey = idempotencyKey.Trim(),
+            MaterializationIdentitySuffix = ProductionPackage.NormalizeOptional(materializationIdentitySuffix),
             SelectedProductSourceKeysJson = JsonSerializer.Serialize(selectedProductSourceKeys
                 .Select(x => ProductionPackage.RequireCode(x, "Selected product source key"))
                 .OrderBy(x => x, StringComparer.Ordinal).Distinct().ToArray()),
@@ -375,6 +386,9 @@ public sealed class ProductionPackageInstallation : BusinessEntity
     public void Complete(Guid releaseId, DateTimeOffset now) { if (Status != ProductionPackageInstallationStatus.Materializing || releaseId == Guid.Empty) throw new DomainRuleException("Materializing installation and Draft release are required."); DraftConfigurationReleaseId = releaseId; Status = ProductionPackageInstallationStatus.Installed; CompletedAt = now; }
     public void Fail(string code, string message, DateTimeOffset now)
     {
+        if (Status is not ProductionPackageInstallationStatus.Pending and
+            not ProductionPackageInstallationStatus.Materializing)
+            throw new DomainRuleException("Only pending or materializing package installations can fail.");
         _materializations.Clear();
         FailureCode = ProductionPackage.RequireCode(code, "Installation failure code");
         FailureMessage = ProductionPackage.RequireText(message, "Installation failure message");
@@ -393,6 +407,26 @@ public sealed class ProductionPackageInstallation : BusinessEntity
         Status = ProductionPackageInstallationStatus.Pending;
     }
     public void Fork() { if (Status != ProductionPackageInstallationStatus.Installed) throw new DomainRuleException("Only Installed package configurations can be forked."); OwnershipMode = ProductionPackageOwnershipMode.OrganizationFork; }
+    public void Supersede()
+    {
+        if (Status != ProductionPackageInstallationStatus.Installed)
+            throw new DomainRuleException("Only an Installed package configuration can be superseded.");
+        Status = ProductionPackageInstallationStatus.Superseded;
+    }
+    public void RestoreFromSuperseded()
+    {
+        if (Status != ProductionPackageInstallationStatus.Superseded)
+            throw new DomainRuleException("Only a Superseded package configuration can be restored.");
+        Status = ProductionPackageInstallationStatus.Installed;
+    }
+    public void Abandon()
+    {
+        if (Status == ProductionPackageInstallationStatus.Abandoned) return;
+        if (Status is not ProductionPackageInstallationStatus.Installed and
+            not ProductionPackageInstallationStatus.Failed)
+            throw new DomainRuleException("Only an Installed or Failed successor installation can be abandoned.");
+        Status = ProductionPackageInstallationStatus.Abandoned;
+    }
 }
 
 public sealed class ProductionPackageMaterialization : BusinessEntity
@@ -409,6 +443,12 @@ public sealed class ProductionPackageMaterialization : BusinessEntity
         ResourceKind = kind, SourceKey = ProductionPackage.RequireCode(sourceKey, "Materialization source key"),
         TargetKey = ProductionPackage.RequireText(targetKey, "Materialization target key"), TargetChecksum = ProductionPackage.NormalizeOptional(checksum)
     };
+
+    public void Retarget(string targetKey, string? checksum = null)
+    {
+        TargetKey = ProductionPackage.RequireText(targetKey, "Materialization target key");
+        TargetChecksum = ProductionPackage.NormalizeOptional(checksum);
+    }
 }
 
 public sealed class ProductionComposition : BusinessEntity

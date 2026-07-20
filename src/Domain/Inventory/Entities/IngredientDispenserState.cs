@@ -135,6 +135,25 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         Guid? sourceEventId = null,
         IngredientLevelStatus? reportedLevelAfter = null)
     {
+        return ConsumeWithEvidence(
+            quantity,
+            occurredAt,
+            reportedBalanceAfter: null,
+            referenceType,
+            referenceId,
+            sourceEventId,
+            reportedLevelAfter);
+    }
+
+    public StockMovement ConsumeWithEvidence(
+        decimal quantity,
+        DateTimeOffset occurredAt,
+        decimal? reportedBalanceAfter,
+        string? referenceType = null,
+        Guid? referenceId = null,
+        Guid? sourceEventId = null,
+        IngredientLevelStatus? reportedLevelAfter = null)
+    {
         EnsureActive();
         if (quantity <= 0)
         {
@@ -142,14 +161,35 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         }
 
         var previousEstimate = EstimatedQuantity;
-        if (EstimatedQuantity.HasValue)
+        if (previousEstimate.HasValue)
         {
-            if (EstimatedQuantity.Value < quantity)
+            if (previousEstimate.Value < quantity)
             {
                 throw new DomainRuleException("Not enough estimated ingredient quantity in dispenser.");
             }
 
-            EstimatedQuantity -= quantity;
+            var expectedBalanceAfter = previousEstimate.Value - quantity;
+            if (reportedBalanceAfter.HasValue && reportedBalanceAfter.Value != expectedBalanceAfter)
+            {
+                throw new DomainRuleException(
+                    "Reported stock balance does not match the dispenser estimate after consumption.");
+            }
+
+            EstimatedQuantity = expectedBalanceAfter;
+        }
+        else if (reportedBalanceAfter.HasValue)
+        {
+            if (reportedBalanceAfter.Value < 0)
+            {
+                throw new DomainRuleException("Reported stock balance cannot be negative.");
+            }
+
+            if (CapacityQuantity.HasValue && reportedBalanceAfter.Value > CapacityQuantity.Value)
+            {
+                throw new DomainRuleException("Reported stock balance exceeds dispenser capacity.");
+            }
+
+            EstimatedQuantity = reportedBalanceAfter.Value;
         }
 
         if (reportedLevelAfter.HasValue)

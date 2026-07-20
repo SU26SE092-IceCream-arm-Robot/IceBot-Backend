@@ -18,6 +18,7 @@ public sealed record MenuItemProductOptionReadModel(
     decimal PriceDelta,
     ProductOptionExecutionImpact ExecutionImpact,
     bool IsAvailable,
+    bool AreIngredientRequirementsActive,
     bool IsDefault,
     int DisplayOrder);
 

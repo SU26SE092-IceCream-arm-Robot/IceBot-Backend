@@ -28,6 +28,7 @@ using Domain.ProductionExecution.Projections;
 using Domain.ProductionConfiguration.Entities;
 using Domain.RobotConfiguration.Artifacts;
 using Domain.RobotConfiguration.ArtifactContracts;
+using Domain.RobotConfiguration.AuthoringImports;
 using Domain.ProductionPackages;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
@@ -115,6 +116,7 @@ public class IceBotDbContext : DbContext
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<Store> Stores => Set<Store>();
     public DbSet<Kiosk> Kiosks => Set<Kiosk>();
+    public DbSet<FranchiseOnboarding> FranchiseOnboardings => Set<FranchiseOnboarding>();
 
     public DbSet<DeviceType> DeviceTypes => Set<DeviceType>();
     public DbSet<DeviceModel> DeviceModels => Set<DeviceModel>();
@@ -167,6 +169,8 @@ public class IceBotDbContext : DbContext
     public DbSet<RobotArtifactDeclaredEffect> RobotArtifactDeclaredEffects => Set<RobotArtifactDeclaredEffect>();
     public DbSet<RobotArtifactOrderingConstraint> RobotArtifactOrderingConstraints => Set<RobotArtifactOrderingConstraint>();
     public DbSet<RobotProgramArtifact> RobotProgramArtifacts => Set<RobotProgramArtifact>();
+    public DbSet<RobotAuthoringImport> RobotAuthoringImports => Set<RobotAuthoringImport>();
+    public DbSet<RobotAuthoringImportItem> RobotAuthoringImportItems => Set<RobotAuthoringImportItem>();
     public DbSet<ProductionPackage> ProductionPackages => Set<ProductionPackage>();
     public DbSet<ProductionPackageVersion> ProductionPackageVersions => Set<ProductionPackageVersion>();
     public DbSet<ProductionPackageProductDefinition> ProductionPackageProductDefinitions => Set<ProductionPackageProductDefinition>();
@@ -176,6 +180,13 @@ public class IceBotDbContext : DbContext
     public DbSet<ProductionPackageRouteBlueprint> ProductionPackageRouteBlueprints => Set<ProductionPackageRouteBlueprint>();
     public DbSet<ProductionPackageInstallation> ProductionPackageInstallations => Set<ProductionPackageInstallation>();
     public DbSet<ProductionPackageMaterialization> ProductionPackageMaterializations => Set<ProductionPackageMaterialization>();
+    public DbSet<ProductionPackageUpgrade> ProductionPackageUpgrades => Set<ProductionPackageUpgrade>();
+    public DbSet<ProductionPackageUpgradeMenuChange> ProductionPackageUpgradeMenuChanges => Set<ProductionPackageUpgradeMenuChange>();
+    public DbSet<ProductionPackageUpgradeMenuOptionChange> ProductionPackageUpgradeMenuOptionChanges => Set<ProductionPackageUpgradeMenuOptionChange>();
+    public DbSet<ProductionPackageUpgradeEndpointTarget> ProductionPackageUpgradeEndpointTargets => Set<ProductionPackageUpgradeEndpointTarget>();
+    public DbSet<ProductionPackageUpgradeRollbackAttempt> ProductionPackageUpgradeRollbackAttempts => Set<ProductionPackageUpgradeRollbackAttempt>();
+    public DbSet<ProductionPackageUpgradeCatalogIdentityChange> ProductionPackageUpgradeCatalogIdentityChanges => Set<ProductionPackageUpgradeCatalogIdentityChange>();
+    public DbSet<ProductionPackageUpgradeAvailabilityChange> ProductionPackageUpgradeAvailabilityChanges => Set<ProductionPackageUpgradeAvailabilityChange>();
     public DbSet<ProductionComposition> ProductionCompositions => Set<ProductionComposition>();
     public DbSet<ConfigurationRelease> ConfigurationReleases => Set<ConfigurationRelease>();
     public DbSet<ExecutionRoute> ExecutionRoutes => Set<ExecutionRoute>();
@@ -189,6 +200,7 @@ public class IceBotDbContext : DbContext
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<MaintenanceTicket> MaintenanceTickets => Set<MaintenanceTicket>();
     public DbSet<OperationLog> OperationLogs => Set<OperationLog>();
+    public DbSet<NotificationDelivery> NotificationDeliveries => Set<NotificationDelivery>();
     public DbSet<SyncEventInbox> SyncEventInbox => Set<SyncEventInbox>();
     public DbSet<ProductionEventCheckpoint> ProductionEventCheckpoints => Set<ProductionEventCheckpoint>();
     public DbSet<EdgeStateSummary> EdgeStateSummaries => Set<EdgeStateSummary>();

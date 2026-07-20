@@ -3,6 +3,8 @@ using Infrastructure.Payments.Options;
 using Infrastructure.Payments.Bootstrap;
 using Infrastructure.Payments.Persistence;
 using Infrastructure.Payments.Providers.PayOS;
+using Infrastructure.Payments.Jobs;
+using Application.Payments.PaymentSessions.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -28,6 +30,15 @@ public static class PaymentsInfrastructureModule
                     options.CircuitBreakerBreakDurationSeconds >= 1,
                 "PayOS resilience settings are invalid.")
             .ValidateOnStart();
+        services.AddOptions<PaymentSessionReconciliationOptions>()
+            .Bind(config.GetSection(PaymentSessionReconciliationOptions.SectionName))
+            .Validate(options =>
+                    options.IntervalSeconds is >= 5 and <= 3600 &&
+                    options.StaleAfterSeconds is >= 5 and <= 3600 &&
+                    options.RetryDelaySeconds is >= 5 and <= 3600 &&
+                    options.BatchSize is >= 1 and <= 500,
+                "Payment-session reconciliation settings are invalid.")
+            .ValidateOnStart();
 
         services.AddHttpClient<PayOsPaymentGateway>((serviceProvider, client) =>
             {
@@ -39,8 +50,11 @@ public static class PaymentsInfrastructureModule
             .AddPayOsResilience(resilienceSettings);
 
         services.AddScoped<IPaymentStore, PaymentStore>();
+        services.AddScoped<IPaymentInterventionNotificationRecipientStore,
+            PaymentInterventionNotificationRecipientStore>();
         services.AddScoped<IPaymentGateway>(provider => provider.GetRequiredService<PayOsPaymentGateway>());
         services.AddHostedService<PaymentMethodCatalogHostedService>();
+        services.AddHostedService<PaymentSessionReconciliationJob>();
 
         return services;
     }

@@ -92,6 +92,7 @@ public static class ScopeRoleSets
     public static readonly string[] OrdersView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff"];
     public static readonly string[] OrdersManage = ["SystemAdmin", "OrgAdmin", "Manager", "Staff"];
     public static readonly string[] RefundsManage = ["SystemAdmin", "Manager", "Staff"];
+    public static readonly string[] PaymentsManage = ["SystemAdmin", "Manager"];
     public static readonly string[] DevicesManage = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] ArtifactRead = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] ArtifactUpload = ["SystemAdmin", "OrgAdmin"];
@@ -107,5 +108,6 @@ public static class ScopeRoleSets
     public static readonly string[] PackageFork = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OperationsView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] OperationsDiagnostics = ["SystemAdmin", "Technician"];
+    public static readonly string[] NotificationsManage = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] DashboardView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
 }

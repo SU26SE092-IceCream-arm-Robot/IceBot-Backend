@@ -48,6 +48,7 @@ public partial class AccountNotificationDevice : BusinessEntity
 
         InvalidatedAt = invalidatedAt;
         InvalidationReason = reason.Trim();
+        PushToken = null;
         UpdatedAt = invalidatedAt;
     }
 }

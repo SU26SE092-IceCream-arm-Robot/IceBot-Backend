@@ -63,7 +63,9 @@ public sealed class OrderFulfillmentReadStore(IceBotDbContext dbContext) : IOrde
                 item.FulfillmentType,
                 item.Status,
                 item.Order.PaidAt,
-                item.MenuItem.PreparationTimeSeconds ?? item.ProductVariant.PreparationTimeSeconds))
+                item.MenuItem.PreparationTimeSeconds ??
+                item.ProductVariant.PreparationTimeSeconds ??
+                item.Product.PreparationTimeSeconds))
             .ToListAsync(cancellationToken);
 
         var itemIds = rows.Select(row => row.OrderItemId).ToArray();
@@ -151,7 +153,10 @@ public sealed class OrderFulfillmentReadStore(IceBotDbContext dbContext) : IOrde
             item.Order.Status != OrderStatus.Compensated);
 
         if (!includeTerminal)
-            query = query.Where(item => item.Status != OrderItemStatus.Completed && item.Status != OrderItemStatus.Cancelled);
+            query = query.Where(item =>
+                item.Status != OrderItemStatus.Completed &&
+                item.Status != OrderItemStatus.Cancelled &&
+                item.Status != OrderItemStatus.Failed);
         if (kioskId.HasValue) query = query.Where(item => item.Order.KioskId == kioskId.Value);
         if (fulfillmentType.HasValue) query = query.Where(item => item.FulfillmentType == fulfillmentType.Value);
         if (itemStatus.HasValue) query = query.Where(item => item.Status == itemStatus.Value);

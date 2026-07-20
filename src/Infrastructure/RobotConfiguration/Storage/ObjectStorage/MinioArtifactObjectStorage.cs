@@ -221,7 +221,7 @@ public sealed class MinioArtifactObjectStorage : IArtifactObjectStorage
     {
         await EnsureReadyAsync(cancellationToken);
         if (!await ExistsAsync(sourceStorageKey, cancellationToken))
-            throw new InvalidOperationException("Source artifact object does not exist.");
+            throw new ArtifactObjectNotFoundException(sourceStorageKey);
         if (await ExistsAsync(destination.StorageKey, cancellationToken))
             throw new ArtifactObjectAlreadyExistsException(destination.StorageKey);
 

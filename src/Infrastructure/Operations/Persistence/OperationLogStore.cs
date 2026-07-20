@@ -16,6 +16,12 @@ public sealed class OperationLogStore : IOperationLogStore
         _dbContext = dbContext;
     }
 
+    public Task AddAsync(OperationLog operationLog, CancellationToken cancellationToken = default) =>
+        _dbContext.OperationLogs.AddAsync(operationLog, cancellationToken).AsTask();
+
+    public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+        _dbContext.SaveChangesAsync(cancellationToken);
+
     public Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
         _dbContext.Kiosks.WhereNotDeleted()
             .AsNoTracking()

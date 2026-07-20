@@ -2,6 +2,11 @@
 
 Use this checklist before backend handoff or deployment smoke testing when automated tests do not yet cover the rule.
 
+This file lists IceBot-specific business rules. For scope freezing, workflow
+mapping, invariant coverage, failure scenarios, and completion evidence, use
+[Vertical Slice Review](VERTICAL_SLICE_REVIEW.md). Do not copy the generic gate
+into each business-rule section.
+
 ## Search Keywords
 
 `critical rule checklist`, `manual backend verification`, `maintenance lifecycle`, `refund status`, `kiosk active sales`, `enum string`, `accounts read manage`, `payment webhook`
@@ -47,6 +52,8 @@ Verify:
 - Packaged items use only the packaged commands: idempotent `Pending -> Completed` through `fulfill`, or `Pending -> Failed` through `fail` with a required reason. They never enter `Accepted` or `Preparing`.
 - Machine-produced items reject management fulfillment commands and advance only from authenticated execution reports.
 - A mixed order completes only after every item is completed.
+- Every mutation that can aggregate or transition the same order uses the shared `OrderId` workflow lock; command ACK/report/timeout additionally serialize by `EdgeCommand.Id`.
+- Concurrent command pulls allocate delivery-attempt numbers under the target execution-endpoint lock while preserving the original `EdgeCommand.Id`.
 - A failed paid item creates `FulfillmentIssue`; remaining items may still progress and whole-order refund is never inferred automatically.
 - Manual and packaged fulfillment writes require `fulfillmentEventId`; same id and same payload is idempotent, while payload mismatch is rejected.
 - V1 manual/packaged transitions apply to the entire order line quantity; partial line fulfillment is unsupported.

@@ -9,6 +9,7 @@ using Domain.RobotConfiguration.Artifacts;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using IceBot.UnitTests.TestSupport;
+using Application.Shared.Concurrency;
 
 namespace IceBot.UnitTests.RobotConfiguration;
 
@@ -116,7 +117,10 @@ public sealed class BulkUploadRobotArtifactsTests
             storage,
             NullLogger<ArtifactUploadContentService>.Instance);
         return new BulkUploadRobotArtifactsCommandHandler(
-            new UploadRobotArtifactCommandHandler(store, contentService));
+            new UploadRobotArtifactCommandHandler(
+                store,
+                contentService,
+                InlineTechnicalResourceMutationCoordinator.Instance));
     }
 
     private static IRobotArtifactStore CreateStore(Guid organizationId)

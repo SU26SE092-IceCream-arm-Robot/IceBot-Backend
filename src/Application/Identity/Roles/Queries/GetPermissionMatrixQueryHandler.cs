@@ -254,6 +254,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "notifications.manage",
+            Description = "Requeue permanently failed notification deliveries within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "devices.view",
             Description = "View devices/hardware details within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },

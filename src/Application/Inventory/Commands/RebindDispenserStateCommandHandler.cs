@@ -32,6 +32,8 @@ public sealed class RebindDispenserStateCommandHandler(IInventoryStore inventory
         RebindDispenserStateCommand command,
         CancellationToken cancellationToken)
     {
+        await inventory.AcquireDeviceTopologyMutationLocksAsync(
+            [command.Request.DeviceId], cancellationToken);
         await inventory.AcquireDispenserMutationLockAsync(command.DispenserStateId, cancellationToken);
         var source = await inventory.GetDispenserStateByIdAsync(command.DispenserStateId, cancellationToken);
         if (source?.Kiosk is null)

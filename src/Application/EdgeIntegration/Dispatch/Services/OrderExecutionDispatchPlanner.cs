@@ -17,6 +17,7 @@ using Domain.Devices.ExecutionEndpoints;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.RobotConfiguration.Programs.Manifests;
+using Application.ProductionConfiguration.Routes.Support;
 
 namespace Application.EdgeIntegration.Dispatch.Services;
 
@@ -43,22 +44,12 @@ internal static class OrderExecutionDispatchPlanner
             : endpoint.ActiveArtifactSetReleaseChecksum;
         if (!releaseId.HasValue || string.IsNullOrWhiteSpace(releaseChecksum)) return null;
 
-        var selectedOptionIngredientIds = productionItems
-            .SelectMany(item => item.Options)
-            .SelectMany(option => option.IngredientRequirements)
-            .Select(requirement => requirement.IngredientId)
-            .Distinct()
-            .ToArray();
         var selectedOptionCapabilityCodes = productionItems
             .SelectMany(item => item.Options)
             .SelectMany(option => option.IngredientRequirements)
             .Select(requirement => requirement.RequiredWorkcellCapabilityCode)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (!selectedOptionCapabilityCodes.IsSubsetOf(availableCapabilities))
-            return null;
-        var readyOptionIngredients = await store.ListReadyIngredientIdsAsync(
-            endpoint.KioskId, selectedOptionIngredientIds, cancellationToken);
-        if (readyOptionIngredients.Count != selectedOptionIngredientIds.Length)
             return null;
 
         var release = await store.GetReleaseAsync(releaseId.Value, cancellationToken);
@@ -78,12 +69,25 @@ internal static class OrderExecutionDispatchPlanner
         }
 
         var routes = new List<OrderExecutionResolvedRoute>(productionItems.Count);
+        var requiredIngredientIds = productionItems
+            .SelectMany(item => item.Options)
+            .SelectMany(option => option.IngredientRequirements)
+            .Select(requirement => requirement.IngredientId)
+            .ToHashSet();
         foreach (var item in productionItems)
         {
             var route = release.ExecutionRoutes
                 .Where(candidate => candidate.ProductVariantId == item.ProductVariantId && candidate.RecipeId == item.RecipeId)
+                .Where(candidate => !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
+                    candidate.RequiredCapabilitiesJson))
                 .OrderBy(candidate => candidate.Priority).ThenBy(candidate => candidate.RouteCode).FirstOrDefault();
             if (route is null) return null;
+
+            if (!ProductionDefinitionIngredientReader.TryReadRequiredIngredientIds(
+                    route.ProductionDefinitionJson,
+                    out var recipeIngredientIds))
+                return null;
+            requiredIngredientIds.UnionWith(recipeIngredientIds);
 
             var supportedOptionCodes = route.GetSupportedOptionCodes().ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (item.Options.Any(option =>
@@ -104,6 +108,13 @@ internal static class OrderExecutionDispatchPlanner
 
             routes.Add(new OrderExecutionResolvedRoute(item.Id, route, bindings));
         }
+
+        var readyIngredientIds = await store.ListReadyIngredientIdsAsync(
+            endpoint.KioskId,
+            requiredIngredientIds.ToArray(),
+            cancellationToken);
+        if (readyIngredientIds.Count != requiredIngredientIds.Count)
+            return null;
 
         return new OrderExecutionDispatchCandidate(endpoint, release, activeSet, routes);
     }

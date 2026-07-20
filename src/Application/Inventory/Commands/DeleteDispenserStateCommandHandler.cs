@@ -10,6 +10,15 @@ public sealed class DeleteDispenserStateCommandHandler(IInventoryStore inventory
 {
     public async Task<ApiResult<bool>> HandleAsync(DeleteDispenserStateCommand command, CancellationToken ct = default)
     {
+        return await inventory.ExecuteInTransactionAsync(
+            cancellationToken => DeleteLockedAsync(command, cancellationToken), ct);
+    }
+
+    private async Task<ApiResult<bool>> DeleteLockedAsync(
+        DeleteDispenserStateCommand command,
+        CancellationToken ct)
+    {
+        await inventory.AcquireDispenserMutationLockAsync(command.DispenserStateId, ct);
         var state = await inventory.GetDispenserStateByIdAsync(command.DispenserStateId, ct);
         if (state?.Kiosk is null) return ApiResult<bool>.Fail("Dispenser state not found.", 404);
         if (state.KioskId != command.KioskId) return ApiResult<bool>.Fail("Dispenser state not found.", 404);

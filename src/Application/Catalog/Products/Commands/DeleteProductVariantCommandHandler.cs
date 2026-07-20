@@ -1,15 +1,20 @@
 using Application.Catalog.Abstractions;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 
 namespace Application.Catalog.Products.Commands;
 
 public sealed class DeleteProductVariantCommandHandler
 {
     private readonly IProductStore _products;
+    private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
 
-    public DeleteProductVariantCommandHandler(IProductStore products)
+    public DeleteProductVariantCommandHandler(
+        IProductStore products,
+        ITechnicalResourceMutationPolicy technicalOwnership)
     {
         _products = products;
+        _technicalOwnership = technicalOwnership;
     }
 
     public async Task<ApiResult<bool>> HandleAsync(
@@ -33,6 +38,10 @@ public sealed class DeleteProductVariantCommandHandler
         {
             return ApiResult<bool>.Fail("Product variant not found.", 404);
         }
+
+        var ownershipError = await _technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.ProductVariant, variant.Id, cancellationToken);
+        if (ownershipError is not null) return ApiResult<bool>.Fail(ownershipError, 409);
 
         variant.DeletedAt = DateTimeOffset.UtcNow;
         variant.DeletedByAccountId = command.DeletedByAccountId;

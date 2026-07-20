@@ -1,4 +1,5 @@
 using Application.Tenants.Abstractions;
+using Application.Tenants.Onboarding;
 using Infrastructure.Tenants.Persistence;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -12,6 +13,7 @@ public static class TenantsInfrastructureRegistration
         services.AddScoped<IStoreStore, StoreStore>();
         services.AddScoped<IKioskStore, KioskStore>();
         services.AddScoped<ITenantTreeStore, TenantTreeStore>();
+        services.AddScoped<IFranchiseOnboardingStore, FranchiseOnboardingStore>();
         return services;
     }
 }

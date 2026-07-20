@@ -24,6 +24,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | --- | --- | --- |
 | High-level backend architecture | [Architecture](../ARCHITECTURE.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Current work protocol, whether to edit, verification, migrations | [Working Protocol](process/WORKING_PROTOCOL.md) | [Documentation Rules](process/DOCUMENTATION_RULES.md) |
+| Wide scan, finding ledger, root-cause remediation, vertical-slice review, invariant checklist, pattern scan, failure scenarios, completion evidence | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) | [Working Protocol](process/WORKING_PROTOCOL.md), [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 | Deployment runtime config, environment variables, appsettings, health/info | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) | [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Observability, Serilog, OpenTelemetry, Aspire Dashboard, debug body logging, OTLP | [Observability](operations/OBSERVABILITY.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | Manual backend critical rule checks before handoff | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) | [Working Protocol](process/WORKING_PROTOCOL.md) |
@@ -67,6 +68,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `deploy`, `deployment`, `env`, `appsettings`, `JWT`, `SMTP`, `PayOS`, `Firebase`, `health`, `info` | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | `observability`, `Serilog`, `OpenTelemetry`, `Aspire`, `OTLP`, `trace`, `metric`, `debug body logging` | [Observability](operations/OBSERVABILITY.md), [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | `manual verification`, `critical rule`, `smoke checklist`, `maintenance lifecycle test`, `payment webhook test` | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
+| `wide scan`, `horizontal audit`, `finding ledger`, `root cause`, `pattern scan`, `vertical slice`, `invariant`, `failure path`, `scope freeze`, `completion evidence`, `poison item`, `independent diff review` | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) |
 | `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
 | `management accounts`, `role scope`, `RBAC`, `policy`, `role catalog`, `permission matrix`, `roles.view`, `role-scope-options.view`, `effective access`, `me access` | [Authorization Rules](api/AUTHORIZATION_RULES.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | `store`, `organization`, `kiosk`, `tenant scope`, `role scope options` | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
@@ -80,7 +82,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `maintenance ticket`, `support ticket`, `technician assignment`, `maintenance.create`, `maintenance.manage` | [Maintenance Ticket Flow](flows/MAINTENANCE_TICKET_FLOW.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `alert`, `actionable telemetry`, `acknowledge alert`, `resolve alert`, `alerts.manage` | [Alert Lifecycle Flow](flows/ALERT_LIFECYCLE_FLOW.md), [IoT Contract](iot/IOT_CONTRACT.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | `device management`, `devices`, `retire device`, `device status`, `DeviceType`, `DeviceModel`, `device catalog`, `device-catalog.read`, `device-catalog.manage`, `devices.view`, `devices.manage` | [API Surface Rules](api/API_SURFACE_RULES.md), section `Internal Management APIs`; [Authorization Rules](api/AUTHORIZATION_RULES.md); [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
-| `missing API`, `future API`, `planned API`, `alert API`, `robot job API`, `offline session`, `audit events`, `reports API` | [API Surface Rules](api/API_SURFACE_RULES.md), section `Planned / Missing API Surfaces` |
+| `current API`, `route ownership`, `REST`, `GraphQL`, `IoT endpoint` | [API Surface Rules](api/API_SURFACE_RULES.md) |
 | `soft delete`, `unique index`, `DeletedAt IS NULL` | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | `PayloadJson`, `SnapshotJson`, `ConfigJson`, `JSONB` | [JSON Field Rules](data/JSON_FIELD_RULES.md) |
 | `SyncEventInbox`, `NextRetryAt`, `LockedUntil`, `dead letter`, `retry audit` | [Idempotency and Retry Rules](data/IDEMPOTENCY_RETRY_RULES.md), [API Surface Rules](api/API_SURFACE_RULES.md) |

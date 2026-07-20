@@ -47,6 +47,35 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             return ApiResult<EdgeCommandAckResult>.Fail("Kiosk, execution endpoint, and command are required.", 400);
         }
 
+        var cloudReceivedAt = DateTimeOffset.UtcNow;
+        var outcome = await _edgeCommandStore.ExecuteSerializedAsync(
+            command.CommandId,
+            ct => AcknowledgeLockedAsync(command, cloudReceivedAt, ct),
+            cancellationToken);
+
+        if (outcome.Metric is not null)
+        {
+            IceBotEdgeMetrics.RecordCommandAck(
+                outcome.Metric.Latency,
+                outcome.Metric.CommandType,
+                outcome.Metric.AckStatus);
+        }
+
+        if (outcome.OrderStatusChanged is not null)
+        {
+            await _publisher.PublishOrderStatusChangedAsync(
+                outcome.OrderStatusChanged,
+                cancellationToken);
+        }
+
+        return outcome.Result;
+    }
+
+    private async Task<AcknowledgementOutcome> AcknowledgeLockedAsync(
+        AcknowledgeEdgeCommandCommand command,
+        DateTimeOffset cloudReceivedAt,
+        CancellationToken cancellationToken)
+    {
         var endpoint = await _edgeCommandStore.GetEndpointForCommandAuthAsync(command.EndpointId, cancellationToken);
         if (endpoint is null ||
             endpoint.KioskId != command.KioskId ||
@@ -54,32 +83,33 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             endpoint.CredentialBinding is null ||
             endpoint.CredentialBinding.Status != ExecutionEndpointCredentialBindingStatus.Active)
         {
-            return ApiResult<EdgeCommandAckResult>.Fail("Execution endpoint authentication failed.", 401);
+            return AcknowledgementOutcome.FromResult(
+                ApiResult<EdgeCommandAckResult>.Fail("Execution endpoint authentication failed.", 401));
         }
 
         var edgeCommand = await _edgeCommandStore.GetByIdAsync(command.CommandId, cancellationToken);
         if (edgeCommand is null || edgeCommand.KioskId != command.KioskId || edgeCommand.TargetExecutionEndpointId != command.EndpointId)
         {
-            return ApiResult<EdgeCommandAckResult>.Fail("Edge command not found.", 404);
+            return AcknowledgementOutcome.FromResult(
+                ApiResult<EdgeCommandAckResult>.Fail("Edge command not found.", 404));
         }
 
         if (command.PhysicalOutputMayHaveOccurred.HasValue &&
             (edgeCommand.CommandType != EdgeCommandType.ExecuteOrder ||
                 !string.Equals(command.AckStatus.Trim(), "Rejected", StringComparison.OrdinalIgnoreCase)))
         {
-            return ApiResult<EdgeCommandAckResult>.Fail(
-                "Physical-output evidence is supported only for rejected execute-order commands.", 400);
+            return AcknowledgementOutcome.FromResult(ApiResult<EdgeCommandAckResult>.Fail(
+                "Physical-output evidence is supported only for rejected execute-order commands.", 400));
         }
 
-        var cloudReceivedAt = DateTimeOffset.UtcNow;
         var observedAt = command.AcknowledgedAt ?? cloudReceivedAt;
         var allowedSkew = TimeSpan.FromSeconds(Math.Max(_options.MaxFutureClockSkewSeconds, 0));
         if (observedAt > cloudReceivedAt.Add(allowedSkew) ||
             observedAt < edgeCommand.CreatedAt.Subtract(allowedSkew) ||
             (edgeCommand.DeliveredAt.HasValue && observedAt < edgeCommand.DeliveredAt.Value.Subtract(allowedSkew)))
         {
-            return ApiResult<EdgeCommandAckResult>.Fail(
-                "Acknowledgement timestamp is outside the allowed command clock-skew window.", 400);
+            return AcknowledgementOutcome.FromResult(ApiResult<EdgeCommandAckResult>.Fail(
+                "Acknowledgement timestamp is outside the allowed command clock-skew window.", 400));
         }
         var priorStatus = edgeCommand.Status;
         var priorDeliveryAttemptCount = edgeCommand.DeliveryAttempts.Count;
@@ -88,12 +118,14 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
         OrderStatus? previousOrderStatus = null;
         if (edgeCommand.CommandType == EdgeCommandType.ExecuteOrder && edgeCommand.OrderId.HasValue)
         {
+            await _edgeCommandStore.AcquireOrderWorkflowLockAsync(edgeCommand.OrderId.Value, cancellationToken);
             order = await _edgeCommandStore.GetOrderForAcknowledgementAsync(
                 edgeCommand.OrderId.Value,
                 cancellationToken);
             if (order is null)
             {
-                return ApiResult<EdgeCommandAckResult>.Fail("Order for execute-order command was not found.", 409);
+                return AcknowledgementOutcome.FromResult(
+                    ApiResult<EdgeCommandAckResult>.Fail("Order for execute-order command was not found.", 409));
             }
 
             previousOrderStatus = order.Status;
@@ -112,7 +144,7 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
         }
         catch (Domain.Common.DomainRuleException ex)
         {
-            return ApiResult<EdgeCommandAckResult>.Fail(ex.Message, 400);
+            return AcknowledgementOutcome.FromResult(ApiResult<EdgeCommandAckResult>.Fail(ex.Message, 400));
         }
 
         var orderChanged = order is not null && previousOrderStatus != order.Status;
@@ -130,19 +162,11 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
 
         await _edgeCommandStore.SaveChangesAsync(cancellationToken);
 
-        if ((edgeCommand.Status != priorStatus || edgeCommand.DeliveryAttempts.Count != priorDeliveryAttemptCount) &&
-            deliveredAt.HasValue)
-        {
-            IceBotEdgeMetrics.RecordCommandAck(
-                cloudReceivedAt - deliveredAt.Value,
-                edgeCommand.CommandType.ToString(),
-                command.AckStatus.Trim());
-        }
-
+        OrderStatusChangedEvent? orderStatusChanged = null;
         if (orderChanged)
         {
             var projection = OrderStatusProjector.ProjectFromOrder(order!);
-            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
+            orderStatusChanged = new OrderStatusChangedEvent
             {
                 OrderId = order!.Id,
                 OrderNumber = order.OrderNumber,
@@ -158,12 +182,22 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
                 RequiresStaffSupport = projection.RequiresStaffSupport,
                 UpdatedAt = observedAt,
                 Version = 1
-            }, cancellationToken);
+            };
         }
 
-        return ApiResult<EdgeCommandAckResult>.Success(
-            EdgeCommandAckResult.FromCommand(edgeCommand),
-            "Edge command acknowledgement recorded successfully.");
+        var metric = (edgeCommand.Status != priorStatus ||
+                      edgeCommand.DeliveryAttempts.Count != priorDeliveryAttemptCount) && deliveredAt.HasValue
+            ? new AcknowledgementMetric(
+                cloudReceivedAt - deliveredAt.Value,
+                edgeCommand.CommandType.ToString(),
+                command.AckStatus.Trim())
+            : null;
+        return new AcknowledgementOutcome(
+            ApiResult<EdgeCommandAckResult>.Success(
+                EdgeCommandAckResult.FromCommand(edgeCommand),
+                "Edge command acknowledgement recorded successfully."),
+            metric,
+            orderStatusChanged);
     }
 
     private static void ApplyAck(EdgeCommand edgeCommand, AcknowledgeEdgeCommandCommand command, DateTimeOffset observedAt)
@@ -320,5 +354,16 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
             payload.ReleaseChecksum,
             acknowledgedAt);
         await _edgeCommandStore.AddOrderExecutionRecordAsync(record, cancellationToken);
+    }
+
+    private sealed record AcknowledgementMetric(TimeSpan Latency, string CommandType, string AckStatus);
+
+    private sealed record AcknowledgementOutcome(
+        ApiResult<EdgeCommandAckResult> Result,
+        AcknowledgementMetric? Metric,
+        OrderStatusChangedEvent? OrderStatusChanged)
+    {
+        public static AcknowledgementOutcome FromResult(ApiResult<EdgeCommandAckResult> result) =>
+            new(result, null, null);
     }
 }

@@ -141,7 +141,7 @@ public sealed class ManagementRobotArtifactTechnicalContractsController(
         var results = new List<RobotArtifactSidecarImportItemResult>(request.Items.Length);
         foreach (var item in request.Items)
         {
-            if (item.SchemaVersion != 1)
+            if (item.SchemaVersion is not 1 and not 2)
             {
                 results.Add(new RobotArtifactSidecarImportItemResult(
                     item.ArtifactCode, null, false, 400, "Unsupported IceBot sidecar schema version."));
@@ -259,6 +259,7 @@ public sealed class ManagementRobotArtifactTechnicalContractsController(
         OrganizationId = organizationId,
         ContractCode = request.ArtifactCode,
         ContractVersion = request.ContractVersion,
+        SchemaVersion = request.SchemaVersion,
         RuntimeTargetCode = request.RuntimeTargetCode,
         MachineModelCode = request.MachineModelCode,
         Effects = request.Effects.Select(ToEffect).ToArray(),
@@ -296,7 +297,7 @@ public class RobotArtifactTechnicalContractDefinitionRequest
 
 public sealed class RobotArtifactSidecarImportRequest : RobotArtifactTechnicalContractDefinitionRequest
 {
-    [Range(1, 1)] public int SchemaVersion { get; init; } = 1;
+    [Range(1, 2)] public int SchemaVersion { get; init; } = 1;
     [Required, StringLength(100)] public string ArtifactCode { get; init; } = string.Empty;
     [Range(1, int.MaxValue)] public int ContractVersion { get; init; } = 1;
     [Required, StringLength(100)] public string RuntimeTargetCode { get; init; } = string.Empty;

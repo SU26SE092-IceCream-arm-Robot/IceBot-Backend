@@ -38,6 +38,7 @@ public interface IDeploymentReportStore
 
 public interface IProductionExecutionReportStore
 {
+    Task AcquireOrderWorkflowLockAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task<ProductionExecutionRecord?> GetProductionExecutionRecordAsync(
         Guid sourceCommandId,
         Guid sourceProductionJobId,
@@ -53,8 +54,9 @@ public interface IProductionExecutionReportStore
 public interface IExecutionStockEvidenceStore
 {
     Task AcquireStockMovementLocksAsync(IEnumerable<Guid> sourceEventIds, CancellationToken cancellationToken = default);
+    Task AcquireDispenserMutationLocksAsync(IEnumerable<Guid> dispenserStateIds, CancellationToken cancellationToken = default);
     Task<IngredientDispenserState?> GetDispenserStateAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<bool> IsIngredientExpectedForOrderItemAsync(Guid orderId, Guid orderItemId, Guid ingredientId, CancellationToken cancellationToken = default);
-    Task<bool> StockMovementExistsAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
+    Task<StockMovement?> GetStockMovementBySourceEventIdAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
     Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
 }

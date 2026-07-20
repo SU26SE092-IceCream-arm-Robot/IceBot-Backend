@@ -7,6 +7,8 @@ using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.Orders.Support;
+using Application.EdgeIntegration.CommandDelivery.Services;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -17,6 +19,34 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
     public EdgeCommandStore(IceBotDbContext dbContext)
     {
         _dbContext = dbContext;
+    }
+
+    public async Task<T> ExecuteEndpointDeliverySerializedAsync<T>(
+        Guid endpointId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({EdgeCommandConcurrency.EndpointDeliveryLockKey(endpointId)}, 0));",
+            cancellationToken);
+        var result = await action(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
+    }
+
+    public async Task<T> ExecuteSerializedAsync<T>(
+        Guid commandId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({EdgeCommandConcurrency.CommandLockKey(commandId)}, 0));",
+            cancellationToken);
+        var result = await action(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
     }
 
     public Task<KioskExecutionEndpoint?> GetEndpointForCommandAuthAsync(
@@ -63,6 +93,13 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
             .Include(command => command.DeliveryAttempts)
             .FirstOrDefaultAsync(command => command.Id == commandId, cancellationToken);
     }
+
+    public Task AcquireOrderWorkflowLockAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({OrderWorkflowConcurrency.OrderLockKey(orderId)}, 0));",
+            cancellationToken);
 
     public Task<Order?> GetOrderForAcknowledgementAsync(
         Guid orderId,

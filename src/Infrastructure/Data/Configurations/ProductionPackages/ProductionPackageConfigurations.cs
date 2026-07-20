@@ -5,6 +5,7 @@ using Domain.ProductionConfiguration.Entities;
 using Domain.RobotConfiguration.ArtifactContracts;
 using Domain.RobotConfiguration.ArtifactTemplates;
 using Domain.RobotConfiguration.Programs;
+using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -124,6 +125,7 @@ internal sealed class ProductionPackageInstallationConfiguration : IEntityTypeCo
         entity.Property(x => x.RequestChecksum).HasMaxLength(64);
         entity.Property(x => x.SelectedProductSourceKeysJson).HasColumnType("jsonb");
         entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
+        entity.Property(x => x.MaterializationIdentitySuffix).HasMaxLength(40);
         entity.Property(x => x.FailureCode).HasMaxLength(100);
         entity.Property(x => x.FailureMessage).HasMaxLength(2000);
         entity.HasIndex(x => new { x.OrganizationId, x.IdempotencyKey }).IsUnique().HasFilter("\"DeletedAt\" IS NULL");
@@ -142,6 +144,130 @@ internal sealed class ProductionPackageInstallationConfiguration : IEntityTypeCo
     }
 }
 
+internal sealed class ProductionPackageUpgradeConfiguration : IEntityTypeConfiguration<ProductionPackageUpgrade>
+{
+    public void Configure(EntityTypeBuilder<ProductionPackageUpgrade> entity)
+    {
+        entity.ToTable("ProductionPackageUpgrades");
+        entity.Property(x => x.PreviewChecksum).HasMaxLength(64);
+        entity.Property(x => x.SourceManifestChecksum).HasMaxLength(64);
+        entity.Property(x => x.TargetManifestChecksum).HasMaxLength(64);
+        entity.Property(x => x.SelectedProductSourceKeysJson).HasColumnType("jsonb");
+        entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
+        entity.Property(x => x.FailureCode).HasMaxLength(100);
+        entity.Property(x => x.FailureMessage).HasMaxLength(2000);
+        entity.HasIndex(x => new { x.OrganizationId, x.IdempotencyKey }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasIndex(x => new { x.OrganizationId, x.SourceInstallationId, x.Status });
+        entity.HasIndex(x => new { x.OrganizationId, x.SourceInstallationId }).IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL AND \"Status\" IN (0, 1, 2, 3)");
+        entity.HasOne(x => x.SourceInstallation).WithMany().HasForeignKey(x => x.SourceInstallationId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.TargetPackageVersion).WithMany().HasForeignKey(x => x.TargetPackageVersionId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.TargetInstallation).WithMany().HasForeignKey(x => x.TargetInstallationId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.Navigation(x => x.MenuChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
+        entity.Navigation(x => x.EndpointTargets).UsePropertyAccessMode(PropertyAccessMode.Field);
+        entity.Navigation(x => x.CatalogIdentityChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
+        entity.Navigation(x => x.AvailabilityChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class ProductionPackageUpgradeAvailabilityChangeConfiguration : IEntityTypeConfiguration<ProductionPackageUpgradeAvailabilityChange>
+{
+    public void Configure(EntityTypeBuilder<ProductionPackageUpgradeAvailabilityChange> entity)
+    {
+        entity.ToTable("ProductionPackageUpgradeAvailabilityChanges");
+        entity.Property(x => x.ResourceSourceKey).HasMaxLength(300);
+        entity.HasIndex(x => new { x.UpgradeId, x.ResourceKind, x.SourceResourceId }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasOne(x => x.Upgrade).WithMany(x => x.AvailabilityChanges).HasForeignKey(x => x.UpgradeId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class ProductionPackageUpgradeMenuChangeConfiguration : IEntityTypeConfiguration<ProductionPackageUpgradeMenuChange>
+{
+    public void Configure(EntityTypeBuilder<ProductionPackageUpgradeMenuChange> entity)
+    {
+        entity.ToTable("ProductionPackageUpgradeMenuChanges");
+        entity.Property(x => x.BeforeBindingChecksum).HasMaxLength(64);
+        entity.Property(x => x.AfterBindingChecksum).HasMaxLength(64);
+        entity.HasIndex(x => new { x.UpgradeId, x.MenuItemId }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasOne(x => x.Upgrade).WithMany(x => x.MenuChanges).HasForeignKey(x => x.UpgradeId)
+            .OnDelete(DeleteBehavior.Cascade);
+        entity.HasOne<Menu>().WithMany().HasForeignKey(x => x.MenuId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<MenuItem>().WithMany().HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Restrict);
+        entity.Navigation(x => x.OptionChanges).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class ProductionPackageUpgradeMenuOptionChangeConfiguration : IEntityTypeConfiguration<ProductionPackageUpgradeMenuOptionChange>
+{
+    public void Configure(EntityTypeBuilder<ProductionPackageUpgradeMenuOptionChange> entity)
+    {
+        entity.ToTable("ProductionPackageUpgradeMenuOptionChanges");
+        entity.Property(x => x.OptionSourceKey).HasMaxLength(300);
+        entity.HasIndex(x => new { x.UpgradeMenuChangeId, x.OptionSourceKey }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasOne(x => x.UpgradeMenuChange).WithMany(x => x.OptionChanges)
+            .HasForeignKey(x => x.UpgradeMenuChangeId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class ProductionPackageUpgradeEndpointTargetConfiguration : IEntityTypeConfiguration<ProductionPackageUpgradeEndpointTarget>
+{
+    public void Configure(EntityTypeBuilder<ProductionPackageUpgradeEndpointTarget> entity)
+    {
+        entity.ToTable("ProductionPackageUpgradeEndpointTargets");
+        entity.HasIndex(x => new { x.UpgradeId, x.KioskExecutionEndpointId }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasOne(x => x.Upgrade).WithMany(x => x.EndpointTargets).HasForeignKey(x => x.UpgradeId)
+            .OnDelete(DeleteBehavior.Cascade);
+        entity.HasOne<KioskExecutionEndpoint>().WithMany().HasForeignKey(x => x.KioskExecutionEndpointId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.Navigation(x => x.RollbackAttempts).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class ProductionPackageUpgradeRollbackAttemptConfiguration : IEntityTypeConfiguration<ProductionPackageUpgradeRollbackAttempt>
+{
+    public void Configure(EntityTypeBuilder<ProductionPackageUpgradeRollbackAttempt> entity)
+    {
+        entity.ToTable("ProductionPackageUpgradeRollbackAttempts");
+        entity.Property(x => x.Reason).HasMaxLength(500);
+        entity.HasIndex(x => new { x.UpgradeEndpointTargetId, x.AttemptNo }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasIndex(x => x.DeploymentId).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasOne(x => x.UpgradeEndpointTarget).WithMany(x => x.RollbackAttempts)
+            .HasForeignKey(x => x.UpgradeEndpointTargetId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+internal sealed class ProductionPackageUpgradeCatalogIdentityChangeConfiguration : IEntityTypeConfiguration<ProductionPackageUpgradeCatalogIdentityChange>
+{
+    public void Configure(EntityTypeBuilder<ProductionPackageUpgradeCatalogIdentityChange> entity)
+    {
+        entity.ToTable("ProductionPackageUpgradeCatalogIdentityChanges");
+        entity.Property(x => x.ProductSourceKey).HasMaxLength(100);
+        entity.Property(x => x.SourceCodeBefore).HasMaxLength(100);
+        entity.Property(x => x.SourceCodeAfter).HasMaxLength(100);
+        entity.Property(x => x.TargetCodeBefore).HasMaxLength(100);
+        entity.Property(x => x.TargetCodeAfter).HasMaxLength(100);
+        entity.Property(x => x.BeforeChecksum).HasMaxLength(64);
+        entity.Property(x => x.AfterChecksum).HasMaxLength(64);
+        entity.HasIndex(x => new { x.UpgradeId, x.ProductSourceKey }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasOne(x => x.Upgrade).WithMany(x => x.CatalogIdentityChanges).HasForeignKey(x => x.UpgradeId)
+            .OnDelete(DeleteBehavior.Cascade);
+        entity.HasOne<Product>().WithMany().HasForeignKey(x => x.SourceProductId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Product>().WithMany().HasForeignKey(x => x.TargetProductId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class ProductionPackageMaterializationConfiguration : IEntityTypeConfiguration<ProductionPackageMaterialization>
 {
     public void Configure(EntityTypeBuilder<ProductionPackageMaterialization> entity)
@@ -151,6 +277,7 @@ internal sealed class ProductionPackageMaterializationConfiguration : IEntityTyp
         entity.Property(x => x.TargetKey).HasMaxLength(200);
         entity.Property(x => x.TargetChecksum).HasMaxLength(64);
         entity.HasIndex(x => new { x.InstallationId, x.ResourceKind, x.SourceKey }).IsUnique().HasFilter("\"DeletedAt\" IS NULL");
+        entity.HasIndex(x => new { x.ResourceKind, x.TargetKey }).HasFilter("\"DeletedAt\" IS NULL");
         entity.HasOne(x => x.Installation).WithMany(x => x.Materializations).HasForeignKey(x => x.InstallationId).OnDelete(DeleteBehavior.Cascade);
     }
 }

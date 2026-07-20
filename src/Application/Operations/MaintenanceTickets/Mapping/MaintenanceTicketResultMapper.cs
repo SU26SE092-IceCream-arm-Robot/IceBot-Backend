@@ -22,6 +22,7 @@ public static class MaintenanceTicketResultMapper
             DeviceId = ticket.DeviceId,
             OrderId = ticket.OrderId,
             DeviceEventId = ticket.DeviceEventId,
+            AlertId = ticket.AlertId,
             IssueCode = ticket.IssueCode,
             Title = ticket.Title,
             Description = ticket.Description,

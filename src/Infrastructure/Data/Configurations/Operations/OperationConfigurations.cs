@@ -45,6 +45,7 @@ internal sealed class MaintenanceTicketConfiguration : IEntityTypeConfiguration<
     {
         entity.ToTable("MaintenanceTickets");
         entity.HasIndex(x => x.TicketNumber).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasIndex(x => x.AlertId).IsUnique().HasFilter("\"AlertId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
         entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.Status, x.ReportedAt });
         entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
@@ -52,9 +53,33 @@ internal sealed class MaintenanceTicketConfiguration : IEntityTypeConfiguration<
         entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Order).WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.DeviceEvent).WithMany().HasForeignKey(x => x.DeviceEventId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.Alert).WithMany().HasForeignKey(x => x.AlertId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.AssignedToAccount).WithMany().HasForeignKey(x => x.AssignedToAccountId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.CreatedByAccount).WithMany().HasForeignKey(x => x.CreatedByAccountId).OnDelete(DeleteBehavior.Restrict);
 
+    }
+}
+
+internal sealed class NotificationDeliveryConfiguration : IEntityTypeConfiguration<NotificationDelivery>
+{
+    public void Configure(EntityTypeBuilder<NotificationDelivery> entity)
+    {
+        entity.ToTable("NotificationDeliveries");
+        entity.HasIndex(x => x.DeliveryKey).IsUnique();
+        entity.HasIndex(x => new { x.OrganizationId, x.Status, x.NextAttemptAt });
+        entity.HasIndex(x => new { x.NotificationType, x.SubjectId });
+        entity.Property(x => x.DeliveryKey).HasMaxLength(300);
+        entity.Property(x => x.NotificationType).HasMaxLength(100);
+        entity.Property(x => x.Title).HasMaxLength(500);
+        entity.Property(x => x.Body).HasMaxLength(2000);
+        entity.Property(x => x.LastErrorCode).HasMaxLength(100);
+        entity.Property(x => x.LastErrorMessage).HasMaxLength(2000);
+        entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Store>().WithMany().HasForeignKey(x => new { x.StoreId, x.OrganizationId })
+            .HasPrincipalKey(x => new { StoreId = (Guid?)x.Id, x.OrganizationId }).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Kiosk>().WithMany().HasForeignKey(x => new { x.KioskId, x.OrganizationId })
+            .HasPrincipalKey(x => new { KioskId = (Guid?)x.Id, x.OrganizationId }).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Account>().WithMany().HasForeignKey(x => x.RecipientAccountId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

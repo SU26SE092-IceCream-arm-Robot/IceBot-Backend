@@ -78,6 +78,11 @@ During editing:
 - update DI and docs when contracts change;
 - do not add future-facing infrastructure without a current use case.
 
+For a workflow that crosses layers, modules, persistence operations, jobs, or
+external dependencies, follow [Vertical Slice Review](VERTICAL_SLICE_REVIEW.md).
+Freeze scope and define lifecycle, tenancy, idempotency, concurrency,
+transaction, I/O, retry, cleanup, and retention invariants before editing.
+
 ## Refactor Rules
 
 Build success does not prove design fit.
@@ -211,6 +216,11 @@ A change is done when:
 - any skipped verification is stated explicitly;
 - remaining warnings or risks are reported.
 
+For a substantial vertical slice, completion additionally requires failure-path
+evidence for every applicable invariant and an independent review of the final
+diff against the frozen scope. Build success and happy-path coverage alone are
+not sufficient.
+
 ## Related Docs
 
 - [Documentation Rules](DOCUMENTATION_RULES.md)
@@ -219,3 +229,4 @@ A change is done when:
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](../architecture/DEPENDENCY_RULES.md)
 - [Naming Rules](NAMING_RULES.md)
+- [Vertical Slice Review](VERTICAL_SLICE_REVIEW.md)

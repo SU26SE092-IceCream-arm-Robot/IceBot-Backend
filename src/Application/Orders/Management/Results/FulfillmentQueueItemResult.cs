@@ -15,6 +15,17 @@ public sealed record FulfillmentQueueItemResult(
     OrderItemStatus ItemStatus,
     DateTimeOffset? PaidAt,
     int? PreparationTimeSeconds,
+    DateTimeOffset? ExpectedReadyAt,
+    FulfillmentSlaStatus SlaStatus,
     IReadOnlyCollection<FulfillmentQueueOptionResult> SelectedOptions);
 
 public sealed record FulfillmentQueueOptionResult(string GroupCode, string Code, string Name);
+
+public enum FulfillmentSlaStatus
+{
+    NotConfigured = 0,
+    OnTrack = 1,
+    DueSoon = 2,
+    Overdue = 3,
+    Terminal = 4
+}

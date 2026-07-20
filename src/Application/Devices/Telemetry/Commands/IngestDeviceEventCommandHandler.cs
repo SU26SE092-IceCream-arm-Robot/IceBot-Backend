@@ -1,4 +1,3 @@
-using Application.Devices.Connectivity.Abstractions;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Telemetry;
 using System.Text.Json;
@@ -11,6 +10,7 @@ using Domain.Common.Enums;
 using Domain.Devices.Catalog;
 using Domain.Operations.Entities;
 using Domain.Operations.Enums;
+using Application.Operations.Alerts.Notifications;
 using Microsoft.Extensions.Options;
 
 namespace Application.Devices.Telemetry.Commands;
@@ -21,17 +21,20 @@ public sealed class IngestDeviceEventCommandHandler
     private readonly IEdgeTelemetryIngestionStore _store;
     private readonly IAlertIngestionStore _alertStore;
     private readonly IRealtimeNotificationPublisher _publisher;
+    private readonly ICriticalOperationalAlertNotifier _criticalAlertNotifier;
     private readonly EdgeTelemetryIngestionOptions _options;
 
     public IngestDeviceEventCommandHandler(
         IEdgeTelemetryIngestionStore store,
         IAlertIngestionStore alertStore,
         IRealtimeNotificationPublisher publisher,
+        ICriticalOperationalAlertNotifier criticalAlertNotifier,
         IOptions<EdgeTelemetryIngestionOptions> options)
     {
         _store = store;
         _alertStore = alertStore;
         _publisher = publisher;
+        _criticalAlertNotifier = criticalAlertNotifier;
         _options = options.Value;
     }
 
@@ -139,6 +142,7 @@ public sealed class IngestDeviceEventCommandHandler
                 deviceEvent.OccurredAt + correlationWindow,
                 cancellationToken);
             var oldStatus = alert?.Status.ToString();
+            var oldSeverity = alert?.Severity;
 
             if (alert is null)
             {
@@ -182,6 +186,19 @@ public sealed class IngestDeviceEventCommandHandler
                 OccurrenceCount = alert.OccurrenceCount,
                 LastOccurredAt = alert.LastOccurredAt
             };
+
+            if (command.Severity == SeverityLevel.Critical && oldSeverity != SeverityLevel.Critical)
+            {
+                var criticalAlertNotification = new CriticalOperationalAlertNotification(
+                    alert.Id,
+                    device.Kiosk.OrganizationId,
+                    device.Kiosk.StoreId,
+                    command.KioskId,
+                    device.Id,
+                    alert.AlertCode,
+                    alert.Title);
+                await _criticalAlertNotifier.NotifyAsync(criticalAlertNotification, cancellationToken);
+            }
         }
 
         await _store.SaveChangesAsync(cancellationToken);

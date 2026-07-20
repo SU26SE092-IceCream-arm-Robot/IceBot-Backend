@@ -21,6 +21,7 @@ public interface IOrderExecutionTimeoutStore
         CancellationToken cancellationToken = default);
 
     Task<EdgeCommand?> GetCommandAsync(Guid sourceCommandId, CancellationToken cancellationToken = default);
+    Task AcquireOrderWorkflowLockAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task<OrderExecutionRecord?> GetOrderExecutionRecordAsync(Guid sourceCommandId, CancellationToken cancellationToken = default);
     Task<KioskHeartbeat?> GetLatestHeartbeatAsync(Guid kioskId, Guid sourceExecutorId, CancellationToken cancellationToken = default);

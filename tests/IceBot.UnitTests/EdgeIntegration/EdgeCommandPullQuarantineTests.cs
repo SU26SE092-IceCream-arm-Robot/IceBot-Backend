@@ -1,7 +1,9 @@
 using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.CommandDelivery.Commands;
 using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.EdgeIntegration.CommandDelivery.Results;
 using Application.RobotConfiguration.Storage.Abstractions;
+using Application.Shared.Wrappers;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
@@ -46,6 +48,12 @@ public sealed class EdgeCommandPullQuarantineTests
             deploymentKind: DeploymentCommandTargetKind.FullEdgeConfiguration);
 
         var store = Substitute.For<IEdgeCommandStore>();
+        store.ExecuteEndpointDeliverySerializedAsync(
+                endpoint.Id,
+                Arg.Any<Func<CancellationToken, Task<ApiResult<EdgeCommandPullResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.ArgAt<Func<CancellationToken, Task<ApiResult<EdgeCommandPullResult>>>>(1)(
+                call.ArgAt<CancellationToken>(2)));
         store.GetEndpointForCommandAuthAsync(endpoint.Id, Arg.Any<CancellationToken>()).Returns(endpoint);
         store.ListDispatchableAsync(kioskId, endpoint.Id, Arg.Any<int>(), Arg.Any<DateTimeOffset>(),
                 Arg.Any<CancellationToken>())

@@ -79,15 +79,19 @@ public sealed class RobotArtifactTechnicalContract : BusinessEntity
         string runtimeTargetCode,
         string machineModelCode,
         Guid? organizationId = null,
-        Guid? sourceContractId = null)
+        Guid? sourceContractId = null,
+        int schemaVersion = 1)
     {
         if (contractVersion <= 0)
             throw new DomainRuleException("Robot artifact technical contract version must be positive.");
+        if (schemaVersion is not 1 and not 2)
+            throw new DomainRuleException("Robot artifact technical contract schema version must be 1 or 2.");
 
         return new RobotArtifactTechnicalContract
         {
             OrganizationId = organizationId,
             SourceContractId = sourceContractId,
+            SchemaVersion = schemaVersion,
             ContractCode = RequireCode(contractCode, "Technical contract code"),
             ContractVersion = contractVersion,
             RuntimeTargetCode = RequireCode(runtimeTargetCode, "Runtime target code"),
@@ -207,18 +211,38 @@ public sealed class RobotArtifactDeclaredEffect : BusinessEntity
 
     internal static RobotArtifactDeclaredEffect Create(RobotArtifactEffectDefinition definition)
     {
+        if (!Enum.IsDefined(definition.EffectKind))
+            throw new DomainRuleException("Robot artifact effect kind is not supported.");
+        if (!Enum.IsDefined(definition.QuantityMode))
+            throw new DomainRuleException("Robot artifact quantity mode is not supported.");
+        var ingredientCode = NormalizeOptional(definition.IngredientCode);
+        var optionCode = NormalizeOptional(definition.OptionCode);
+        if (definition.EffectKind == RobotArtifactEffectKind.Ingredient && ingredientCode is null)
+            throw new DomainRuleException("Ingredient effects require an ingredient code.");
+        if (definition.EffectKind == RobotArtifactEffectKind.Option && optionCode is null)
+            throw new DomainRuleException("Option effects require an option code.");
+        if (definition.EffectKind is RobotArtifactEffectKind.System or RobotArtifactEffectKind.Motion &&
+            (ingredientCode is not null || optionCode is not null))
+            throw new DomainRuleException("System and motion effects cannot declare ingredient or option codes.");
+        if (definition.EffectKind is RobotArtifactEffectKind.System or RobotArtifactEffectKind.Motion &&
+            definition.QuantityMode != RobotArtifactQuantityMode.None)
+            throw new DomainRuleException("System and motion effects cannot declare production quantities.");
         if (definition.QuantityMode == RobotArtifactQuantityMode.FixedInArtifact &&
             (!definition.FixedQuantity.HasValue || definition.FixedQuantity <= 0 || string.IsNullOrWhiteSpace(definition.Unit)))
             throw new DomainRuleException("Fixed-in-artifact effects require positive quantity and unit.");
         if (definition.QuantityMode != RobotArtifactQuantityMode.FixedInArtifact && definition.FixedQuantity.HasValue)
             throw new DomainRuleException("Only fixed-in-artifact effects may declare a fixed quantity.");
+        if (definition.QuantityMode == RobotArtifactQuantityMode.None && !string.IsNullOrWhiteSpace(definition.Unit))
+            throw new DomainRuleException("Quantity-free effects cannot declare a unit.");
+        if (definition.QuantityMode == RobotArtifactQuantityMode.Parameterized && string.IsNullOrWhiteSpace(definition.Unit))
+            throw new DomainRuleException("Parameterized effects require a unit.");
 
         return new RobotArtifactDeclaredEffect
         {
             EffectCode = RobotArtifactTechnicalContract.RequireCode(definition.EffectCode, "Effect code"),
             EffectKind = definition.EffectKind,
-            IngredientCode = NormalizeOptional(definition.IngredientCode),
-            OptionCode = NormalizeOptional(definition.OptionCode),
+            IngredientCode = ingredientCode,
+            OptionCode = optionCode,
             QuantityMode = definition.QuantityMode,
             FixedQuantity = definition.FixedQuantity,
             Unit = string.IsNullOrWhiteSpace(definition.Unit) ? null : definition.Unit.Trim().ToLowerInvariant(),
@@ -240,10 +264,15 @@ public sealed class RobotArtifactOrderingConstraint : BusinessEntity
 
     private RobotArtifactOrderingConstraint() { }
 
-    internal static RobotArtifactOrderingConstraint Create(RobotArtifactOrderingConstraintDefinition definition) => new()
+    internal static RobotArtifactOrderingConstraint Create(RobotArtifactOrderingConstraintDefinition definition)
     {
-        ConstraintType = definition.ConstraintType,
-        Value = RobotArtifactTechnicalContract.RequireCode(definition.Value, "Ordering constraint value"),
-        SortHint = definition.SortHint
-    };
+        if (!Enum.IsDefined(definition.ConstraintType))
+            throw new DomainRuleException("Robot artifact ordering constraint type is not supported.");
+        return new RobotArtifactOrderingConstraint
+        {
+            ConstraintType = definition.ConstraintType,
+            Value = RobotArtifactTechnicalContract.RequireCode(definition.Value, "Ordering constraint value"),
+            SortHint = definition.SortHint
+        };
+    }
 }

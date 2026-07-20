@@ -12,18 +12,18 @@ public static class PayOsResilienceMetrics
         "{failure}",
         "PayOS request failures classified by bounded failure kind.");
 
-    public static void RecordTimeout() => Record("timeout");
+    public static void RecordTimeout(string operation = "create_payment_session") => Record(operation, "timeout");
 
-    public static void RecordCircuitOpen() => Record("circuit_open");
+    public static void RecordCircuitOpen(string operation = "create_payment_session") => Record(operation, "circuit_open");
 
-    public static void RecordTransientFailure() => Record("transient");
+    public static void RecordTransientFailure(string operation = "create_payment_session") => Record(operation, "transient");
 
-    private static void Record(string failureKind)
+    private static void Record(string operation, string failureKind)
     {
         Failures.Add(
             1,
             new KeyValuePair<string, object?>("provider", "PayOS"),
-            new KeyValuePair<string, object?>("operation", "create_payment_session"),
+            new KeyValuePair<string, object?>("operation", operation),
             new KeyValuePair<string, object?>("failure.kind", failureKind));
     }
 }

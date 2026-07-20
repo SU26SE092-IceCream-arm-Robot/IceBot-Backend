@@ -47,4 +47,7 @@ public sealed class RobotArtifactObjectStorageOptions
 
     [Range(1, 10000)]
     public int OrphanCleanupMaxDeletesPerRun { get; init; } = 100;
+
+    [Range(24, 2160)]
+    public int AuthoringImportRetentionHours { get; init; } = 168;
 }

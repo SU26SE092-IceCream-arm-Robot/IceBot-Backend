@@ -2,19 +2,25 @@ using Application.Catalog.Abstractions;
 using Application.Catalog.Recipes.Mapping;
 using Application.Catalog.Recipes.Results;
 using Application.Catalog.Recipes.Rules;
+using Application.Shared.Ownership;
 using Application.Shared.Wrappers;
 using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
 
 namespace Application.Catalog.Recipes.Commands;
 
-public sealed class CreateRecipeCommandHandler(ICatalogAuthoringStore catalog)
+public sealed class CreateRecipeCommandHandler(
+    ICatalogAuthoringStore catalog,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<RecipeResult>> HandleAsync(CreateRecipeCommand command, CancellationToken ct = default)
     {
         var (product, variant, error) = await RecipeAuthoringRules.ResolveAsync<RecipeResult>(
             catalog, command.Scope, command.ProductId, command.VariantId, ct);
         if (error is not null) return error;
+        var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.ProductVariant, variant!.Id, ct);
+        if (ownershipError is not null) return ApiResult<RecipeResult>.Fail(ownershipError, 409);
 
         var request = command.Request;
         var validationError = RecipeAuthoringRules.ValidateRecipe(

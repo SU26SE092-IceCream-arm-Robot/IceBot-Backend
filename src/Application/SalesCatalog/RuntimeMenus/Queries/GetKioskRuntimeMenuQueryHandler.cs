@@ -1,7 +1,6 @@
 using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.RuntimeMenus.Mapping;
 using Application.SalesCatalog.RuntimeMenus.Results;
-using Application.SalesCatalog.RuntimeMenus.Rules;
 using Application.SalesCatalog.ReadModels;
 using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
@@ -60,6 +59,10 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             candidates.Select(candidate => candidate.Item.Id).Distinct().ToArray(),
             cancellationToken);
         var optionsByMenuItem = optionRows.ToLookup(option => option.MenuItemId);
+        var optionGroupRows = await _menus.ListMenuItemOptionGroupsAsync(
+            candidates.Select(candidate => candidate.Item.Id).Distinct().ToArray(),
+            cancellationToken);
+        var optionGroupsByMenuItem = optionGroupRows.ToLookup(group => group.MenuItemId);
 
         var routePolicies = new Dictionary<(Guid ProductVariantId, Guid RecipeId),
             ActiveProductionRouteOptionPolicy?>();
@@ -112,8 +115,14 @@ public sealed class GetKioskRuntimeMenuQueryHandler
                     entry.Item.ProductVariant.FulfillmentType == Domain.Catalog.Enums.FulfillmentType.MachineProduced &&
                     entry.Item.RecipeId.HasValue &&
                     routePolicies.GetValueOrDefault((entry.Item.ProductVariantId, entry.Item.RecipeId.Value)) is not null;
-                return RuntimeMenuSellabilityRules.IsSellable(entry.Item, now, hasActiveProductionRoute) &&
-                       ProductOptionSelectionRules.IsSatisfiable(filteredOptionsByMenuItem[entry.Item.Id]);
+                return MenuItemSellabilityRules.Validate(
+                           entry.Item,
+                           kiosk,
+                           now,
+                           hasActiveProductionRoute) is null &&
+                       ProductOptionSelectionRules.IsSatisfiable(
+                           optionGroupsByMenuItem[entry.Item.Id].ToArray(),
+                           filteredOptionsByMenuItem[entry.Item.Id]);
             })
             .OrderBy(entry => entry.Menu.DisplayOrder)
             .ThenBy(entry => entry.Item.DisplayOrder)

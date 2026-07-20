@@ -6,6 +6,10 @@ namespace Application.Operations.OperationLogs.Abstractions;
 
 public interface IOperationLogStore
 {
+    Task AddAsync(OperationLog operationLog, CancellationToken cancellationToken = default);
+
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<int> CountAsync(

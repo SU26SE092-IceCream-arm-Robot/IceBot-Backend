@@ -41,12 +41,16 @@ public sealed class DataRetentionJob : BackgroundService
             var purger = scope.ServiceProvider.GetRequiredService<DataRetentionPurger>();
             var result = await purger.PurgeAsync(DateTimeOffset.UtcNow, cancellationToken);
             _logger.LogInformation(
-                "Retention purge deleted {Heartbeats} heartbeats, {DeviceEvents} device events, {OperationLogs} operation logs, {SyncInboxReceipts} processed inbox receipts, and {ExecutionRequestNonces} expired request nonces.",
+                "Retention purge deleted {Heartbeats} heartbeats, {DeviceEvents} device events, {OperationLogs} operation logs, {SyncInboxReceipts} processed inbox receipts, {ExecutionRequestNonces} expired request nonces, {RefreshTokens} refresh tokens, {PasswordResetRequests} password-reset requests, {AccountInvitations} invitations, and {NotificationDeliveries} terminal notification deliveries.",
                 result.Heartbeats,
                 result.DeviceEvents,
                 result.OperationLogs,
                 result.SyncInboxReceipts,
-                result.ExecutionRequestNonces);
+                result.ExecutionRequestNonces,
+                result.RefreshTokens,
+                result.PasswordResetRequests,
+                result.AccountInvitations,
+                result.NotificationDeliveries);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

@@ -9,6 +9,9 @@ using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.Orders.Support;
+using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.Inventory.Support;
 using System.Text.Json;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
@@ -32,7 +35,7 @@ public sealed class ExecutionReportStore :
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({$"execution-command:{commandId:D}"}, 0));",
+            $"SELECT pg_advisory_xact_lock(hashtextextended({EdgeCommandConcurrency.CommandLockKey(commandId)}, 0));",
             cancellationToken);
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({$"execution-report:{sourceExecutorId:D}:{sourceEventId:D}"}, 0));",
@@ -167,6 +170,25 @@ public sealed class ExecutionReportStore :
             .FirstOrDefaultAsync(state => state.Id == dispenserStateId, cancellationToken);
     }
 
+    public async Task AcquireDispenserMutationLocksAsync(
+        IEnumerable<Guid> dispenserStateIds,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var dispenserStateId in dispenserStateIds.Distinct().OrderBy(id => id))
+        {
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({InventoryConcurrency.DispenserLockKey(dispenserStateId)}, 0));",
+                cancellationToken);
+        }
+    }
+
+    public Task AcquireOrderWorkflowLockAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({OrderWorkflowConcurrency.OrderLockKey(orderId)}, 0));",
+            cancellationToken);
+
     public Task AddOrderItemStatusHistoryAsync(
         OrderItemStatusHistory history,
         CancellationToken cancellationToken = default)
@@ -219,11 +241,11 @@ public sealed class ExecutionReportStore :
             select optionRequirement.Id).AnyAsync(cancellationToken);
     }
 
-    public Task<bool> StockMovementExistsAsync(
+    public Task<StockMovement?> GetStockMovementBySourceEventIdAsync(
         Guid sourceEventId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.StockMovements.AnyAsync(
+        return _dbContext.StockMovements.AsNoTracking().FirstOrDefaultAsync(
             movement => movement.SourceEventId == sourceEventId,
             cancellationToken);
     }

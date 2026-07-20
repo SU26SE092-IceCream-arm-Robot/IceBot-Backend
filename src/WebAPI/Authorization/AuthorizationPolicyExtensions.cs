@@ -53,6 +53,7 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("operations.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("operations.diagnostics", "SystemAdmin", "Technician");
+        options.AddScopedRolePolicy("notifications.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
 
         options.AddScopedRolePolicy("devices.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("devices.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");

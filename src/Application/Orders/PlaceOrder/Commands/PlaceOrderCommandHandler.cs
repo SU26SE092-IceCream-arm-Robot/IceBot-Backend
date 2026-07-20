@@ -6,14 +6,12 @@ using Application.Orders.PlaceOrder.Results;
 using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Rules;
 using Application.Orders.PlaceOrder.Support;
+using Application.Orders.PlaceOrder.Services;
 using Application.Shared.Wrappers;
 using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
 using Application.Tenants.Stores;
-using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
-using Domain.SalesCatalog.Enums;
-using Application.SalesCatalog.Rules;
 
 namespace Application.Orders.PlaceOrder.Commands;
 
@@ -22,11 +20,16 @@ public sealed class PlaceOrderCommandHandler
     private const string DefaultCurrency = "VND";
     private readonly IOrderStore _orderStore;
     private readonly IRealtimeNotificationPublisher _publisher;
+    private readonly PlaceOrderItemAppender _itemAppender;
 
-    public PlaceOrderCommandHandler(IOrderStore orderStore, IRealtimeNotificationPublisher publisher)
+    public PlaceOrderCommandHandler(
+        IOrderStore orderStore,
+        IRealtimeNotificationPublisher publisher,
+        PlaceOrderItemAppender itemAppender)
     {
         _orderStore = orderStore;
         _publisher = publisher;
+        _itemAppender = itemAppender;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
@@ -122,184 +125,9 @@ public sealed class PlaceOrderCommandHandler
 
             foreach (var itemRequest in request.Items)
             {
-                var menuItem = await _orderStore.GetMenuItemByIdAsync(itemRequest.MenuItemId, ct);
-                if (menuItem is null)
-                {
-                    return ApiResult<OrderResult>.Fail($"Menu item '{itemRequest.MenuItemId}' not found.", 404);
-                }
-
-                var menu = menuItem.Menu;
-                var product = menuItem.Product;
-                var productVariant = menuItem.ProductVariant;
-                var recipe = menuItem.Recipe;
-
-                if (menu.Status != MenuStatus.Active)
-                {
-                    return ApiResult<OrderResult>.Fail($"Menu '{menu.Name}' is not active.", 409);
-                }
-
-                if (!PlaceOrderScopeRules.IsWithinEffectiveWindow(menu.EffectiveFrom, menu.EffectiveTo, now))
-                {
-                    return ApiResult<OrderResult>.Fail($"Menu '{menu.Name}' is not active at this time.", 409);
-                }
-
-                if (!menuItem.IsCurrentlySellable(now))
-                {
-                    return ApiResult<OrderResult>.Fail($"Menu item '{menuItem.DisplayName}' is not available.", 409);
-                }
-
-                if (!product.IsAvailable)
-                {
-                    return ApiResult<OrderResult>.Fail($"Product '{product.Name}' is not available.", 409);
-                }
-
-                if (!productVariant.IsAvailable)
-                {
-                    return ApiResult<OrderResult>.Fail($"Product variant '{productVariant.Name}' is not available.", 409);
-                }
-
-                if (productVariant.ProductId != product.Id)
-                {
-                    return ApiResult<OrderResult>.Fail("Menu item variant does not belong to the selected product.", 409);
-                }
-
-                if (!order.OrderItems.Any())
-                {
-                    order.SetCurrency(menuItem.Currency);
-                }
-                else if (!CurrencyMatches(order.Currency, menuItem.Currency))
-                {
-                    return ApiResult<OrderResult>.Fail("All order items must use the same currency.", 400);
-                }
-
-                if (!PlaceOrderScopeRules.MatchesScope(menu.OrganizationId, kiosk.OrganizationId) ||
-                    !PlaceOrderScopeRules.MatchesScope(menu.StoreId, kiosk.StoreId) ||
-                    !PlaceOrderScopeRules.MatchesScope(menu.KioskId, kiosk.Id))
-                {
-                    return ApiResult<OrderResult>.Fail($"Menu '{menu.Name}' is not available for this kiosk.", 409);
-                }
-
-                if (!PlaceOrderScopeRules.MatchesScope(product.OrganizationId, kiosk.OrganizationId) ||
-                    !PlaceOrderScopeRules.MatchesScope(product.StoreId, kiosk.StoreId) ||
-                    !PlaceOrderScopeRules.MatchesScope(product.KioskId, kiosk.Id))
-                {
-                    return ApiResult<OrderResult>.Fail($"Product '{product.Name}' is not available for this kiosk.", 409);
-                }
-
-                if (productVariant.FulfillmentType == FulfillmentType.MachineProduced && recipe is null)
-                {
-                    return ApiResult<OrderResult>.Fail($"Menu item '{menuItem.DisplayName}' requires a recipe.", 409);
-                }
-
-                if (recipe is not null)
-                {
-                    var recipeValidationError = RecipeValidationRules.ValidateRecipe(recipe, productVariant, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id, now);
-                    if (recipeValidationError is not null)
-                    {
-                        return ApiResult<OrderResult>.Fail(recipeValidationError, 409);
-                    }
-                }
-
-                var selectableOptions = await _orderStore.ListMenuItemProductOptionsAsync(menuItem.Id, ct);
-                var selectedOptionIds = itemRequest.SelectedOptions
-                    .Select(option => option.ProductOptionId)
-                    .ToArray();
-                var optionValidationError = ProductOptionSelectionRules.Validate(
-                    selectableOptions,
-                    selectedOptionIds);
-                if (optionValidationError is not null)
-                {
-                    return ApiResult<OrderResult>.Fail(optionValidationError, 409);
-                }
-
-                var selectedOptions = selectableOptions
-                    .Where(option => selectedOptionIds.Contains(option.ProductOptionId))
-                    .OrderBy(option => option.OptionGroupId)
-                    .ThenBy(option => option.DisplayOrder)
-                    .ToArray();
-                if (productVariant.FulfillmentType == FulfillmentType.Packaged && selectedOptions.Any(option =>
-                        option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting))
-                {
-                    return ApiResult<OrderResult>.Fail(
-                        $"Packaged menu item '{menuItem.DisplayName}' cannot use production-affecting options. Use a product variant for physical packaged choices.",
-                        409);
-                }
-                if (productVariant.FulfillmentType == FulfillmentType.MachineProduced)
-                {
-                    var routePolicy = await _orderStore.GetActiveProductionRouteOptionPolicyAsync(
-                        kiosk.Id, productVariant.Id, recipe!.Id, ct);
-                    if (routePolicy is null)
-                    {
-                        return ApiResult<OrderResult>.Fail(
-                            $"Menu item '{menuItem.DisplayName}' does not have an active production route for this kiosk.", 409);
-                    }
-
-                    var unsupportedOptions = selectedOptions.Where(option =>
-                        option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting &&
-                        !routePolicy.SupportedOptionCodes.Contains(option.Code)).ToArray();
-                    if (unsupportedOptions.Length > 0)
-                    {
-                        return ApiResult<OrderResult>.Fail(
-                            $"One or more selected options are not supported by the active production route for '{menuItem.DisplayName}'.", 409);
-                    }
-                }
-                var optionIngredientRequirements = await _orderStore.ListProductOptionIngredientRequirementsAsync(
-                    selectedOptions.Select(option => option.ProductOptionId).ToArray(), ct);
-                if (optionIngredientRequirements.Any(requirement => !requirement.IsIngredientActive))
-                {
-                    return ApiResult<OrderResult>.Fail("One or more selected options require an inactive ingredient.", 409);
-                }
-                var optionUnitPriceDelta = selectedOptions.Sum(option => option.PriceDelta);
-
-                var orderItem = order.AddItem(
-                    menuItem.Id,
-                    product.Id,
-                    productVariant.Id,
-                    recipe?.Id,
-                    menuItem.Code,
-                    menuItem.DisplayName,
-                    product.Code,
-                    product.DisplayName ?? product.Name,
-                    productVariant.Code,
-                    productVariant.DisplayName ?? productVariant.Name,
-                    recipe?.Version,
-                    productVariant.FulfillmentType,
-                    itemRequest.Quantity,
-                    menuItem.Price + optionUnitPriceDelta,
-                    menuItem.DiscountAmount,
-                    NormalizeOptional(itemRequest.ClientLineId),
-                    recipeSnapshotJson: recipe is null ? null : RecipeSnapshotBuilder.BuildRecipeSnapshotJson(recipe));
-
-                orderItem.CreatedAt = now;
-                foreach (var selectedOption in selectedOptions)
-                {
-                    var snapshot = OrderItemOption.Create(
-                        selectedOption.ProductOptionId,
-                        selectedOption.OptionGroupId,
-                        selectedOption.OptionGroupCode,
-                        selectedOption.Code,
-                        selectedOption.Name,
-                        selectedOption.PriceDelta,
-                        selectedOption.ExecutionImpact);
-                    snapshot.OrderItemId = orderItem.Id;
-                    snapshot.CreatedAt = now;
-                    foreach (var requirement in optionIngredientRequirements
-                                 .Where(requirement => requirement.ProductOptionId == selectedOption.ProductOptionId))
-                    {
-                        snapshot.IngredientRequirements.Add(new OrderItemOptionIngredientRequirement
-                        {
-                            OrderItemOptionId = snapshot.Id,
-                            IngredientId = requirement.IngredientId,
-                            IngredientCodeSnapshot = requirement.IngredientCode,
-                            IngredientNameSnapshot = requirement.IngredientName,
-                            QuantityPerOption = requirement.Quantity,
-                            Unit = requirement.Unit,
-                            RequiredWorkcellCapabilityCode = requirement.RequiredWorkcellCapabilityCode,
-                            CreatedAt = now
-                        });
-                    }
-                    orderItem.Options.Add(snapshot);
-                }
+                var itemFailure = await _itemAppender.AppendAsync(order, kiosk, itemRequest, now, ct);
+                if (itemFailure is not null)
+                    return ApiResult<OrderResult>.Fail(itemFailure.Message, itemFailure.StatusCode);
             }
 
             order.Place(now);
@@ -354,11 +182,6 @@ public sealed class PlaceOrderCommandHandler
         }
 
         return result;
-    }
-
-    private static bool CurrencyMatches(string orderCurrency, string productCurrency)
-    {
-        return string.Equals(orderCurrency, productCurrency, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string? NormalizeOptional(string? value)

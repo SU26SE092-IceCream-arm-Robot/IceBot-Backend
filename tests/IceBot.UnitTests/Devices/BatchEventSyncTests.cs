@@ -4,13 +4,13 @@ using Application.Devices.Telemetry;
 using Application.Devices.Catalog.Abstractions;
 using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
-using Application.Devices.Connectivity.Abstractions;
 using Application.Devices.Credentials.Abstractions;
 using Application.Devices.Catalog.Commands;
 using Application.Devices.ExecutionEndpoints.Commands;
 using Application.Devices.Telemetry.Commands;
 using Application.Devices.Connectivity.Commands;
 using Application.Devices.Credentials.Commands;
+using Application.Operations.Alerts.Notifications;
 using Domain.Sync.Entities;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -33,7 +33,8 @@ public sealed class BatchEventSyncTests
         var handler = new IngestBatchEventsCommandHandler(
             receiptStore,
             new IngestKioskHeartbeatCommandHandler(telemetryStore, publisher, options),
-            new IngestDeviceEventCommandHandler(telemetryStore, Substitute.For<IAlertIngestionStore>(), publisher, options),
+            new IngestDeviceEventCommandHandler(telemetryStore, Substitute.For<IAlertIngestionStore>(), publisher,
+                Substitute.For<ICriticalOperationalAlertNotifier>(), options),
             new IngestLocalOperationLogCommandHandler(telemetryStore, options),
             options,
             NullLogger<IngestBatchEventsCommandHandler>.Instance);

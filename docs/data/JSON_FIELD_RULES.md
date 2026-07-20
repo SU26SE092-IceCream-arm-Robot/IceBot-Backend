@@ -24,7 +24,7 @@ Fields:
 - `ExecutionRoute.RequiredCapabilitiesJson`
   - When present, this field must use schema version `1`: `{ "schemaVersion": 1, "requires": [{ "code": "...", "minVersion": "...", "required": true }] }`.
   - Codes must match capability codes already declared by the same route's robot bindings. Unknown fields are rejected.
-  - Cloud V1 still uses `ExecutionRouteRobotBinding.RequiredWorkcellCapabilityCode` as the online sellability/dispatch enforcement gate; this JSON is a bounded Edge-facing requirements payload.
+  - Cloud validates required codes against endpoint readiness. Endpoint readiness does not yet report capability versions, so a required `minVersion` makes the route unavailable to runtime-menu and checkout and produces `CapabilityVersionUnverifiable` for deployment/dispatch instead of being ignored.
 - `ExecutionRoute.SupportedOptionCodesJson`
   - Internal JSON storage for the normalized production-affecting option codes supported by one route.
   - Management APIs expose `supportedOptionCodes` as a typed string collection; clients do not send JSON.

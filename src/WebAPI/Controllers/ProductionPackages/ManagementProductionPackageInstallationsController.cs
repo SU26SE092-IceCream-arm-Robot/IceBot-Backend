@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Application.ProductionPackages.Installation;
 using Application.ProductionPackages.Workspace;
+using Application.ProductionPackages.Upgrades;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,7 +14,8 @@ namespace WebAPI.Controllers.ProductionPackages;
 [Route("api/v{version:apiVersion}/management/organizations/{organizationId:guid}/production-package-installations")]
 public sealed class ManagementProductionPackageInstallationsController(
     ProductionPackageInstallationService service,
-    ProductionPackageWorkspaceService workspaceService) : ControllerBase
+    ProductionPackageWorkspaceService workspaceService,
+    ProductionPackageUpgradeService upgradeService) : ControllerBase
 {
     [HttpGet]
     [Authorize(Policy = "package.read")]
@@ -32,7 +34,7 @@ public sealed class ManagementProductionPackageInstallationsController(
         [FromBody] PreviewProductionPackageRequest request, CancellationToken cancellationToken)
     {
         var result = await service.PreviewAsync(User.GetUserContext(), organizationId, request.PackageId,
-            request.PackageVersionId, request.ProductSourceKeys, cancellationToken);
+            request.PackageVersionId, request.StoreId, request.KioskId, request.ProductSourceKeys, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -88,12 +90,104 @@ public sealed class ManagementProductionPackageInstallationsController(
             cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
+
+    [HttpPost("{installationId:guid}/repair")]
+    [Authorize(Policy = "package.install")]
+    public async Task<IActionResult> Repair(Guid organizationId, Guid installationId,
+        CancellationToken cancellationToken)
+    {
+        var result = await service.RepairAsync(User.GetUserContext(), organizationId, installationId,
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{installationId:guid}/upgrades/preview")]
+    [Authorize(Policy = "package.read")]
+    public async Task<IActionResult> PreviewUpgrade(Guid organizationId, Guid installationId,
+        [FromBody] PreviewProductionPackageUpgradeRequest request, CancellationToken cancellationToken)
+    {
+        var result = await upgradeService.PreviewAsync(User.GetUserContext(), organizationId, installationId,
+            request.TargetPackageVersionId, request.ProductSourceKeys, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{installationId:guid}/upgrades")]
+    [Authorize(Policy = "package.install")]
+    public async Task<IActionResult> Upgrade(Guid organizationId, Guid installationId,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        [FromBody] ExecuteProductionPackageUpgradeRequest request, CancellationToken cancellationToken)
+    {
+        var result = await upgradeService.ExecuteAsync(new ExecuteProductionPackageUpgradeCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            SourceInstallationId = installationId,
+            TargetPackageVersionId = request.TargetPackageVersionId,
+            PreviewChecksum = request.PreviewChecksum,
+            IdempotencyKey = idempotencyKey,
+            ProductSourceKeys = request.ProductSourceKeys
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("{installationId:guid}/upgrades")]
+    [Authorize(Policy = "package.read")]
+    public async Task<IActionResult> ListUpgrades(Guid organizationId, Guid installationId,
+        [FromQuery] string? status, [FromQuery] int pageNumber = 1, [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await upgradeService.ListAsync(User.GetUserContext(), organizationId, installationId,
+            status, pageNumber, pageSize, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("{installationId:guid}/upgrades/{upgradeId:guid}")]
+    [Authorize(Policy = "package.read")]
+    public async Task<IActionResult> GetUpgrade(Guid organizationId, Guid installationId, Guid upgradeId,
+        CancellationToken cancellationToken)
+    {
+        var result = await upgradeService.GetAsync(User.GetUserContext(), organizationId, installationId,
+            upgradeId, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{installationId:guid}/upgrades/{upgradeId:guid}/cutover")]
+    [Authorize(Policy = "package.install")]
+    public async Task<IActionResult> CutoverUpgrade(Guid organizationId, Guid installationId, Guid upgradeId,
+        CancellationToken cancellationToken)
+    {
+        var result = await upgradeService.CutoverAsync(User.GetUserContext(), organizationId, installationId,
+            upgradeId, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{installationId:guid}/upgrades/{upgradeId:guid}/abandon")]
+    [Authorize(Policy = "package.install")]
+    public async Task<IActionResult> AbandonUpgrade(Guid organizationId, Guid installationId, Guid upgradeId,
+        [FromBody] AbandonProductionPackageUpgradeRequest request, CancellationToken cancellationToken)
+    {
+        var result = await upgradeService.AbandonAsync(User.GetUserContext(), organizationId, installationId,
+            upgradeId, request.Reason, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{installationId:guid}/upgrades/{upgradeId:guid}/rollback")]
+    [Authorize(Policy = "release.rollback")]
+    public async Task<IActionResult> RollbackUpgrade(Guid organizationId, Guid installationId, Guid upgradeId,
+        [FromBody] RollbackProductionPackageUpgradeRequest request, CancellationToken cancellationToken)
+    {
+        var result = await upgradeService.RollbackAsync(User.GetUserContext(), organizationId, installationId,
+            upgradeId, request.CommandExpiryAt, request.Reason, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
 }
 
 public sealed class PreviewProductionPackageRequest
 {
     public Guid PackageId { get; init; }
     public Guid PackageVersionId { get; init; }
+    public Guid? StoreId { get; init; }
+    public Guid? KioskId { get; init; }
     [MaxLength(100)] public IReadOnlyCollection<string> ProductSourceKeys { get; init; } = [];
 }
 
@@ -104,4 +198,28 @@ public sealed class InstallProductionPackageRequest
     public Guid? StoreId { get; init; }
     public Guid? KioskId { get; init; }
     [MaxLength(100)] public IReadOnlyCollection<string> ProductSourceKeys { get; init; } = [];
+}
+
+public sealed class PreviewProductionPackageUpgradeRequest
+{
+    public Guid TargetPackageVersionId { get; init; }
+    [MaxLength(100)] public IReadOnlyCollection<string> ProductSourceKeys { get; init; } = [];
+}
+
+public sealed class ExecuteProductionPackageUpgradeRequest
+{
+    public Guid TargetPackageVersionId { get; init; }
+    [Required, StringLength(64, MinimumLength = 64)] public string PreviewChecksum { get; init; } = null!;
+    [MaxLength(100)] public IReadOnlyCollection<string> ProductSourceKeys { get; init; } = [];
+}
+
+public sealed class RollbackProductionPackageUpgradeRequest
+{
+    public DateTimeOffset? CommandExpiryAt { get; init; }
+    [Required, StringLength(500)] public string Reason { get; init; } = null!;
+}
+
+public sealed class AbandonProductionPackageUpgradeRequest
+{
+    [Required, StringLength(500)] public string Reason { get; init; } = null!;
 }

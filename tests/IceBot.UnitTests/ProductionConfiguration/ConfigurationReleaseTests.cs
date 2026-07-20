@@ -115,7 +115,8 @@ public sealed class ConfigurationReleaseTests
         var storage = Substitute.For<IArtifactObjectStorage>();
         var handler = new PublishConfigurationReleaseCommandHandler(
             store,
-            ReadinessGuard());
+            ReadinessGuard(),
+            new ProductionDefinitionPublicationService());
 
         var result = await handler.HandleAsync(new PublishConfigurationReleaseCommand
         {

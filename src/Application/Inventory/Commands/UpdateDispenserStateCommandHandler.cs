@@ -13,6 +13,22 @@ public sealed class UpdateDispenserStateCommandHandler(IInventoryStore inventory
 {
     public async Task<ApiResult<DispenserStateResult>> HandleAsync(UpdateDispenserStateCommand command, CancellationToken ct = default)
     {
+        try
+        {
+            return await inventory.ExecuteInTransactionAsync(
+                cancellationToken => UpdateLockedAsync(command, cancellationToken), ct);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<DispenserStateResult>.Fail(ex.Message, 409);
+        }
+    }
+
+    private async Task<ApiResult<DispenserStateResult>> UpdateLockedAsync(
+        UpdateDispenserStateCommand command,
+        CancellationToken ct)
+    {
+        await inventory.AcquireDispenserMutationLockAsync(command.DispenserStateId, ct);
         var state = await inventory.GetDispenserStateByIdAsync(command.DispenserStateId, ct);
         if (state?.Kiosk is null) return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
         if (state.KioskId != command.KioskId) return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
@@ -30,31 +46,24 @@ public sealed class UpdateDispenserStateCommandHandler(IInventoryStore inventory
             (state.EstimatedQuantity.HasValue || await inventory.HasStockMovementsAsync(state.Id, ct)))
             return ApiResult<DispenserStateResult>.Fail(
                 "Dispenser unit cannot change after quantity or stock history exists. Retire it and create a new state.", 409);
-        try
-        {
-            var beforeCapacity = state.CapacityQuantity;
-            var beforeUnit = state.Unit;
-            state.ConfigureContainer(command.Request.CapacityQuantity, command.Request.Unit,
-                DispenserLevelQuantityProfileContract.Serialize(command.Request.LevelToQuantityProfile));
-            state.UpdatedAt = DateTimeOffset.UtcNow;
-            state.UpdatedByAccountId = command.UserContext.AccountId;
-            await inventory.AddTopologyChangeRecordAsync(
-                InventoryTopologyAuditFactory.Create(
-                    state,
-                    InventoryTopologyChangeType.ConfigurationUpdated,
-                    command.Request.Reason,
-                    command.UserContext.AccountId,
-                    state.UpdatedAt.Value,
-                    state.IsActive,
-                    beforeCapacity,
-                    beforeUnit),
-                ct);
-            await inventory.SaveChangesAsync(ct);
-            return ApiResult<DispenserStateResult>.Success(DispenserStateResultMapper.ToResult(state), "Dispenser configuration updated.");
-        }
-        catch (DomainRuleException ex)
-        {
-            return ApiResult<DispenserStateResult>.Fail(ex.Message, 409);
-        }
+        var beforeCapacity = state.CapacityQuantity;
+        var beforeUnit = state.Unit;
+        state.ConfigureContainer(command.Request.CapacityQuantity, command.Request.Unit,
+            DispenserLevelQuantityProfileContract.Serialize(command.Request.LevelToQuantityProfile));
+        state.UpdatedAt = DateTimeOffset.UtcNow;
+        state.UpdatedByAccountId = command.UserContext.AccountId;
+        await inventory.AddTopologyChangeRecordAsync(
+            InventoryTopologyAuditFactory.Create(
+                state,
+                InventoryTopologyChangeType.ConfigurationUpdated,
+                command.Request.Reason,
+                command.UserContext.AccountId,
+                state.UpdatedAt.Value,
+                state.IsActive,
+                beforeCapacity,
+                beforeUnit),
+            ct);
+        await inventory.SaveChangesAsync(ct);
+        return ApiResult<DispenserStateResult>.Success(DispenserStateResultMapper.ToResult(state), "Dispenser configuration updated.");
     }
 }

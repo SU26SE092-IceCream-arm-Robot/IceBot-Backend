@@ -209,6 +209,32 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
         return _dbContext.DeviceEvents.AnyAsync(de => de.Id == deviceEventId && de.KioskId == kioskId, cancellationToken);
     }
 
+    public Task<bool> CanAssignAccountAsync(
+        Guid accountId,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default)
+    {
+        if (accountId == Guid.Empty)
+        {
+            return Task.FromResult(false);
+        }
+
+        return _dbContext.AccountRoles.AsNoTracking().AnyAsync(accountRole =>
+            accountRole.AccountId == accountId &&
+            accountRole.IsActive &&
+            accountRole.Account.DeletedAt == null &&
+            accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+            (accountRole.Role.Code == "Technician" ||
+             accountRole.Role.Code == "Manager" ||
+             accountRole.Role.Code == "OrgAdmin") &&
+            (accountRole.KioskId == kioskId ||
+             accountRole.StoreId == storeId ||
+             accountRole.OrganizationId == organizationId),
+            cancellationToken);
+    }
+
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);

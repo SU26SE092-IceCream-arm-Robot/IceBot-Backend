@@ -2,6 +2,11 @@ using System.Text.Json;
 
 namespace Application.ProductionConfiguration.Routes.Support;
 
+public sealed record ExecutionRouteCapabilityRequirement(
+    string Code,
+    string? MinVersion,
+    bool Required);
+
 public static class ExecutionRouteRequiredCapabilitiesContract
 {
     private const int SchemaVersion = 1;
@@ -103,6 +108,41 @@ public static class ExecutionRouteRequiredCapabilitiesContract
         }
 
         return null;
+    }
+
+    public static IReadOnlyCollection<ExecutionRouteCapabilityRequirement> ParseValidated(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        using var document = JsonDocument.Parse(value);
+        return document.RootElement.GetProperty("requires").EnumerateArray()
+            .Select(requirement => new ExecutionRouteCapabilityRequirement(
+                requirement.GetProperty("code").GetString()!,
+                requirement.TryGetProperty("minVersion", out var minVersion)
+                    ? minVersion.GetString()
+                    : null,
+                !requirement.TryGetProperty("required", out var required) || required.GetBoolean()))
+            .ToArray();
+    }
+
+    public static bool HasUnverifiableRequiredVersion(string? value)
+    {
+        try
+        {
+            return ParseValidated(value)
+                .Any(requirement => requirement.Required && requirement.MinVersion is not null);
+        }
+        catch (JsonException)
+        {
+            return true;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+        catch (KeyNotFoundException)
+        {
+            return true;
+        }
     }
 
     private static string? ValidateRequirement(

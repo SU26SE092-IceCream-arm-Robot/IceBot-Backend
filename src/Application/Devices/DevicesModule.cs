@@ -22,11 +22,7 @@ public static class DevicesModule
         services.AddScoped<IngestDeviceEventCommandHandler>();
         services.AddScoped<IngestLocalOperationLogCommandHandler>();
         services.AddScoped<IngestBatchEventsCommandHandler>();
-        services.AddScoped<IngestProductionEventCommandHandler>();
-        services.AddScoped<IngestProductionEventsBatchCommandHandler>();
         services.AddScoped<IngestExecutionReadinessCommandHandler>();
-        services.AddScoped<IngestEdgeStateSummariesCommandHandler>();
-        services.AddScoped<GetProductionEventCheckpointQueryHandler>();
         services.AddScoped<ReconcileKioskConnectivityCommandHandler>();
 
         services.AddScoped<ListDevicesQueryHandler>();

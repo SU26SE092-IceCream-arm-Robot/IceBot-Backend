@@ -27,6 +27,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
     private readonly FullEdgeReleaseBundleService _bundleService;
     private readonly DeploymentValidationService? _deploymentValidation;
+    private readonly IConfigurationDeploymentPreviewService? _deploymentPreview;
 
     public DeployFullEdgeConfigurationCommandHandler(
         IConfigurationDeploymentStore deploymentStore,
@@ -55,6 +56,21 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         : this(deploymentStore, releaseStore, edgeCommandStore, wakeUpPublisher, inventoryReadiness, bundleService)
     {
         _deploymentValidation = deploymentValidation;
+    }
+
+    public DeployFullEdgeConfigurationCommandHandler(
+        IConfigurationDeploymentStore deploymentStore,
+        IConfigurationReleaseStore releaseStore,
+        IEdgeCommandStore edgeCommandStore,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        FullEdgeReleaseBundleService bundleService,
+        DeploymentValidationService deploymentValidation,
+        IConfigurationDeploymentPreviewService deploymentPreview)
+        : this(deploymentStore, releaseStore, edgeCommandStore, wakeUpPublisher, inventoryReadiness,
+            bundleService, deploymentValidation)
+    {
+        _deploymentPreview = deploymentPreview;
     }
 
     public async Task<ApiResult<KioskConfigurationDeploymentResult>> HandleAsync(
@@ -95,9 +111,9 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Access denied.", 403);
         }
 
-        var expectedValidationChecksum = _deploymentValidation is null
+        var expectedValidationChecksum = _deploymentPreview is null
             ? "legacy"
-            : command.ValidationReportChecksum.Trim();
+            : command.DeploymentPreviewChecksum.Trim();
         var idempotentResult = await GetIdempotentResultAsync(
             command,
             expectedValidationChecksum,
@@ -108,12 +124,44 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             return idempotentResult;
         }
 
-        var validationReport = _deploymentValidation?.Build(release, endpoint);
+        ConfigurationDeploymentEndpointPreview? endpointPreview = null;
+        if (_deploymentPreview is not null)
+        {
+            var previewResult = await _deploymentPreview.HandleAsync(
+                command.UserContext, command.KioskId, release.Id, endpoint.Id, [], cancellationToken,
+                allowRetiredRelease: command.IsRollback);
+            if (!previewResult.Succeeded || previewResult.Data is null)
+                return ApiResult<KioskConfigurationDeploymentResult>.Fail(
+                    previewResult.Message ?? "Deployment preview could not be rebuilt.",
+                    previewResult.StatusCode);
+            endpointPreview = previewResult.Data.Endpoints.SingleOrDefault(item => item.KioskExecutionEndpointId == endpoint.Id);
+            if (endpointPreview is null || !endpointPreview.IsEligible)
+                return ApiResult<KioskConfigurationDeploymentResult>
+                    .Fail("Deployment is no longer eligible. Preview the deployment again.", 409)
+                    .AddDetail("DeploymentPreview", (object?)endpointPreview ?? previewResult.Data);
+            if (command.IsRollback && string.IsNullOrWhiteSpace(command.DeploymentPreviewChecksum))
+                expectedValidationChecksum = endpointPreview.DeploymentChecksum;
+            else if (!string.Equals(endpointPreview.DeploymentChecksum,
+                         command.DeploymentPreviewChecksum.Trim(), StringComparison.Ordinal))
+                return ApiResult<KioskConfigurationDeploymentResult>
+                    .Fail("Deployment preview is missing or stale. Preview the deployment again.", 409)
+                    .AddDetail("DeploymentPreview", endpointPreview);
+        }
+
+        var validationReport = endpointPreview?.Validation ?? _deploymentValidation?.Build(release, endpoint);
         try
         {
             if (validationReport is not null)
-                DeploymentValidationService.ValidateAcknowledgement(validationReport,
-                    command.ValidationReportChecksum, command.AcknowledgeRemainingRisk);
+            {
+                if (endpointPreview is null)
+                    DeploymentValidationService.ValidateAcknowledgement(validationReport,
+                        command.DeploymentPreviewChecksum,
+                        command.AcknowledgeRemainingRisk || command.IsRollback);
+                else if (validationReport.RequiresAcknowledgement &&
+                         !command.AcknowledgeRemainingRisk && !command.IsRollback)
+                    throw new DomainRuleException(
+                        "Authorized organization acknowledgement is required for the remaining deployment risk.");
+            }
         }
         catch (DomainRuleException ex)
         {
@@ -203,7 +251,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                         command.IdempotencyKey.Trim(),
                         now,
                         command.UserContext.AccountId,
-                        validationReport?.Checksum ?? "legacy",
+                        expectedValidationChecksum,
                         validationReport?.RiskLevel ?? "Legacy",
                         JsonSerializer.Serialize(validationReport?.WarningCodes ?? []),
                         command.UserContext.AccountId,
@@ -213,7 +261,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
                         EdgeCommandType.DeployConfiguration,
                         deployment.KioskId,
                         deployment.KioskExecutionEndpointId,
-                        BuildDeployPayload(
+                        DeploymentCommandFactory.BuildFullEdgePayload(
                             deployment,
                             release,
                             bundle,
@@ -277,7 +325,8 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     {
         var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, cancellationToken);
         if (existing.ConfigurationReleaseId != command.ConfigurationReleaseId ||
-            existing.ValidationReportChecksum != expectedValidationChecksum ||
+            ((!command.IsRollback || !string.IsNullOrWhiteSpace(expectedValidationChecksum)) &&
+             existing.ValidationReportChecksum != expectedValidationChecksum) ||
             existingCommand is null ||
             existingCommand.RollbackTargetDeploymentId != command.RollbackTargetDeploymentId ||
             existingCommand.RequestedCommandExpiryAt != command.CommandExpiryAt)
@@ -294,61 +343,8 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     private Task TryPublishWakeUpAsync(
         ApiResult<KioskConfigurationDeploymentResult> result,
         CancellationToken cancellationToken) =>
-        result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId
-            ? _wakeUpPublisher.TryPublishAsync(
-                new EdgeCommandWakeUp(
-                    edgeCommandId,
-                    result.Data.KioskExecutionEndpointId,
-                    EdgeCommandType.DeployConfiguration,
-                    DateTimeOffset.UtcNow),
-                cancellationToken)
-            : Task.CompletedTask;
-
-    private static string BuildDeployPayload(
-        KioskConfigurationDeployment deployment,
-        ConfigurationRelease release,
-        FullEdgeReleaseBundleDescriptor fullEdgeBundle,
-        Guid? rollbackTargetDeploymentId,
-        DateTimeOffset? requestedCommandExpiryAt)
-    {
-        var artifacts = release.ExecutionRoutes
-            .SelectMany(route => route.RobotBindings)
-            .SelectMany(binding => RobotProgramManifestBuilder.Parse(
-                binding.RobotProgram.ProgramManifestJson
-                    ?? throw new DomainRuleException("Published robot program manifest is missing."))
-                .Artifacts)
-            .Select(programArtifact => programArtifact.RobotArtifact)
-            .GroupBy(artifact => artifact.Id)
-            .Select(group => group.First())
-            .OrderBy(artifact => artifact.Id)
-            .Select(artifact => new
-            {
-                RobotArtifactId = artifact.Id,
-                StorageKey = artifact.StorageKey,
-                ArtifactChecksum = artifact.Checksum,
-                artifact.RuntimeTargetCode,
-                artifact.MachineModelCode,
-                artifact.ContentLengthBytes
-            })
-            .ToArray();
-
-        var payload = new
-        {
-            DeploymentId = deployment.Id,
-            deployment.AttemptNo,
-            deployment.KioskId,
-            TargetExecutionEndpointId = deployment.KioskExecutionEndpointId,
-            deployment.ConfigurationReleaseId,
-            deployment.ReleaseChecksum,
-            RollbackTargetDeploymentId = rollbackTargetDeploymentId,
-            RequestedCommandExpiryAt = requestedCommandExpiryAt,
-            release.ReleaseManifestSchemaVersion,
-            release.ManifestJson,
-            FullEdgeBundle = fullEdgeBundle,
-            Artifacts = artifacts
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
+        DeploymentCommandWakeUp.TryPublishAsync(
+            result, item => item.EdgeCommandId, item => item.KioskExecutionEndpointId,
+            _wakeUpPublisher, cancellationToken);
 
 }

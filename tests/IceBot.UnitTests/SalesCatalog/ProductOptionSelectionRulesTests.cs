@@ -42,6 +42,38 @@ public sealed class ProductOptionSelectionRulesTests
         Assert.False(ProductOptionSelectionRules.IsSatisfiable([option]));
     }
 
+    [Fact]
+    public void IsSatisfiable_RejectsRequiredGroupWhoseOptionUsesInactiveIngredient()
+    {
+        var option = CreateOption(isRequired: true, minSelections: 1) with
+        {
+            AreIngredientRequirementsActive = false
+        };
+
+        Assert.False(ProductOptionSelectionRules.IsSatisfiable([option]));
+        Assert.Equal(
+            "One or more selected product options are unavailable for this menu item.",
+            ProductOptionSelectionRules.Validate([option], [option.ProductOptionId]));
+    }
+
+    [Fact]
+    public void IsSatisfiable_RejectsRequiredGroupWithoutAnyMenuMembership()
+    {
+        var group = CreateGroup(isRequired: true, minSelections: 1);
+
+        Assert.False(ProductOptionSelectionRules.IsSatisfiable([group], []));
+    }
+
+    [Fact]
+    public void Validate_RejectsMissingSelectionWhenRequiredGroupHasNoMenuMembership()
+    {
+        var group = CreateGroup(isRequired: true, minSelections: 1);
+
+        var error = ProductOptionSelectionRules.Validate([group], [], []);
+
+        Assert.Equal("Option group 'Toppings' requires at least 1 selection(s).", error);
+    }
+
     private static MenuItemProductOptionReadModel CreateOption(bool isRequired, int minSelections)
     {
         return new MenuItemProductOptionReadModel(
@@ -60,7 +92,19 @@ public sealed class ProductOptionSelectionRulesTests
             5000,
             ProductOptionExecutionImpact.ProductionAffecting,
             true,
+            true,
             false,
             1);
     }
+
+    private static MenuItemOptionGroupReadModel CreateGroup(bool isRequired, int minSelections) =>
+        new(
+            Guid.NewGuid(),
+            1,
+            "TOPPING",
+            "Toppings",
+            OptionSelectionType.Single,
+            minSelections,
+            1,
+            isRequired);
 }
