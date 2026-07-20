@@ -24,7 +24,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | --- | --- | --- |
 | High-level backend architecture | [Architecture](../ARCHITECTURE.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md), [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Current work protocol, whether to edit, verification, migrations | [Working Protocol](process/WORKING_PROTOCOL.md) | [Documentation Rules](process/DOCUMENTATION_RULES.md) |
-| Vertical-slice review, invariant checklist, failure scenarios, completion evidence | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) | [Working Protocol](process/WORKING_PROTOCOL.md), [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
+| Wide scan, finding ledger, root-cause remediation, vertical-slice review, invariant checklist, pattern scan, failure scenarios, completion evidence | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) | [Working Protocol](process/WORKING_PROTOCOL.md), [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 | Deployment runtime config, environment variables, appsettings, health/info | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) | [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Observability, Serilog, OpenTelemetry, Aspire Dashboard, debug body logging, OTLP | [Observability](operations/OBSERVABILITY.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | Manual backend critical rule checks before handoff | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) | [Working Protocol](process/WORKING_PROTOCOL.md) |
@@ -68,7 +68,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | `deploy`, `deployment`, `env`, `appsettings`, `JWT`, `SMTP`, `PayOS`, `Firebase`, `health`, `info` | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | `observability`, `Serilog`, `OpenTelemetry`, `Aspire`, `OTLP`, `trace`, `metric`, `debug body logging` | [Observability](operations/OBSERVABILITY.md), [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | `manual verification`, `critical rule`, `smoke checklist`, `maintenance lifecycle test`, `payment webhook test` | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
-| `vertical slice`, `invariant`, `failure path`, `scope freeze`, `completion evidence`, `poison item`, `independent diff review` | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) |
+| `wide scan`, `horizontal audit`, `finding ledger`, `root cause`, `pattern scan`, `vertical slice`, `invariant`, `failure path`, `scope freeze`, `completion evidence`, `poison item`, `independent diff review` | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) |
 | `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
 | `management accounts`, `role scope`, `RBAC`, `policy`, `role catalog`, `permission matrix`, `roles.view`, `role-scope-options.view`, `effective access`, `me access` | [Authorization Rules](api/AUTHORIZATION_RULES.md), [API Surface Rules](api/API_SURFACE_RULES.md) |
 | `store`, `organization`, `kiosk`, `tenant scope`, `role scope options` | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |

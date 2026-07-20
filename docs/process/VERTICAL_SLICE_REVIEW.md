@@ -7,7 +7,8 @@ of review is the workflow and its invariants, not an individual layer or file.
 ## Search Keywords
 
 `vertical slice review`, `workflow invariant`, `failure scenario`, `failure path`,
-`completion evidence`, `scope freeze`, `independent diff review`, `definition of done`
+`completion evidence`, `scope freeze`, `independent diff review`, `definition of done`,
+`wide scan`, `horizontal audit`, `finding ledger`, `pattern scan`, `root cause`
 
 ## When To Use
 
@@ -23,7 +24,81 @@ Use the full gate when a change affects one or more of:
 For a local mechanical change, use only the applicable checks. Documentation-only
 work does not require runtime evidence unless the user explicitly requests it.
 
+## Audit And Remediation Modes
+
+Keep broad inspection separate from implementation.
+
+### Wide Scan
+
+The purpose of a wide scan is coverage and anomaly discovery, not immediate
+remediation. Freeze the repository baseline first, then inspect multiple slices
+for weak points in:
+
+- API and message contracts;
+- validation, authorization, and tenant scope;
+- transaction, lifecycle, concurrency, and idempotency behavior;
+- mappings, database constraints, logging, and external dependencies;
+- missing, misleading, or happy-path-only tests.
+
+Do not interrupt the scan to repair each isolated finding. Record enough evidence
+to triage it:
+
+| Field | Required content |
+| --- | --- |
+| Finding ID | Stable identifier used through remediation |
+| Baseline | Commit/worktree state inspected |
+| Vertical slice and entry point | API, job, event, or command where it appears |
+| Invariant | Expected rule that may be violated |
+| Reproduction | Input, state, expected result, actual result, and reproducibility |
+| Evidence | File/line, trace, query, test, or database evidence |
+| Impact | Financial, physical, tenant, data, operational, or maintainability impact |
+| Classification | Suspected, Confirmed, Design Debt, or Deferred |
+| Pattern hint | Other slices or query shapes that may share the root cause |
+
+Use impact-based priority:
+
+- `P0`: money movement, physical action, tenant isolation, security, or data loss;
+- `P1`: lifecycle corruption, duplicate effects, concurrency, or permanently stuck workflow;
+- `P2`: contract mismatch, weak observability/recovery, or material maintenance debt;
+- `P3`: naming, layout, or duplication without incorrect behavior.
+
+Do not label a code smell as a confirmed bug without reproduction or a proven
+invariant violation.
+
+### Vertical Remediation
+
+After triage, select one finding and freeze its complete affected slice. Trace
+from the entry point through validation, authorization, application orchestration,
+domain transition, persistence, external I/O, projection, retry, cleanup, and
+tests. Determine where the violation begins and which boundary should have
+prevented it before choosing patch, refactor, or rewrite.
+
+Once the root cause is known, scan horizontally for the same pattern. For example,
+if the root cause is an unscoped `GetById` store method, inspect all stores and
+handlers using that query shape; do not repair only the endpoint that exposed it.
+Create a shared abstraction only when the instances enforce the same invariant
+and have the same ownership boundary.
+
+The operating loop is:
+
+```text
+Freeze baseline
+  -> wide scan without edits
+  -> findings ledger
+  -> confirm, classify, and prioritize
+  -> select and freeze one vertical slice
+  -> trace root cause and failure paths
+  -> repair the owning boundary
+  -> regression tests
+  -> horizontal same-pattern scan
+  -> independent final-diff review and preflight
+  -> close with evidence or record residual risk
+  -> return to the wide scan
+```
+
 ## Required Sequence
+
+This sequence applies after a finding has been selected for remediation:
 
 1. Freeze the scope before editing.
 2. Map the complete workflow from entry point to durable and external effects.
