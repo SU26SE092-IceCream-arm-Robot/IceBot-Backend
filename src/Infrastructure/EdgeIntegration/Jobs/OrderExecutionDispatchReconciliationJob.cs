@@ -56,20 +56,32 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
 
             foreach (var orderId in orderIds)
             {
-                using var itemScope = _scopeFactory.CreateScope();
-                var handler = itemScope.ServiceProvider.GetRequiredService<DispatchOrderExecutionCommandHandler>();
-                var result = await handler.HandleAsync(new DispatchOrderExecutionCommand
+                try
                 {
-                    OrderId = orderId,
-                    DispatchAttemptNo = 1
-                }, cancellationToken);
+                    using var itemScope = _scopeFactory.CreateScope();
+                    var handler = itemScope.ServiceProvider.GetRequiredService<DispatchOrderExecutionCommandHandler>();
+                    var result = await handler.HandleAsync(new DispatchOrderExecutionCommand
+                    {
+                        OrderId = orderId,
+                        DispatchAttemptNo = 1
+                    }, cancellationToken);
 
-                if (!result.Succeeded)
+                    if (!result.Succeeded)
+                    {
+                        _logger.LogWarning(
+                            "Order execution dispatch reconciliation deferred order {OrderId}: {Message}",
+                            orderId,
+                            result.Message);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    _logger.LogWarning(
-                        "Order execution dispatch reconciliation deferred order {OrderId}: {Message}",
-                        orderId,
-                        result.Message);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "Order execution dispatch reconciliation failed for order {OrderId}.", orderId);
                 }
             }
         }

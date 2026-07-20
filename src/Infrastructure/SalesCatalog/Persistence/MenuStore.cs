@@ -11,6 +11,7 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Application.SalesCatalog.ReadModels;
+using Application.ProductionConfiguration.Routes.Support;
 
 namespace Infrastructure.SalesCatalog.Persistence;
 
@@ -104,6 +105,8 @@ public sealed class MenuStore : IMenuStore
                 .ThenInclude(item => item.ProductVariant)
             .Include(menu => menu.MenuItems)
                 .ThenInclude(item => item.Recipe)
+                    .ThenInclude(recipe => recipe!.RecipeItems)
+                        .ThenInclude(recipeItem => recipeItem.Ingredient)
             .Where(menu =>
                 menu.Status == MenuStatus.Active &&
                 (menu.EffectiveFrom == null || menu.EffectiveFrom <= now) &&
@@ -133,7 +136,7 @@ public sealed class MenuStore : IMenuStore
         Guid recipeId,
         CancellationToken cancellationToken = default)
     {
-        var route = await _dbContext.ExecutionEndpointReadinessProjections
+        var routes = await _dbContext.ExecutionEndpointReadinessProjections
             .AsNoTracking()
             .Where(readiness =>
                 readiness.KioskId == kioskId &&
@@ -158,8 +161,11 @@ public sealed class MenuStore : IMenuStore
                     route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
                         capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
             .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
-            .Select(route => new { route.Id, route.SupportedOptionCodesJson })
-            .FirstOrDefaultAsync(cancellationToken);
+            .Select(route => new { route.Id, route.SupportedOptionCodesJson, route.RequiredCapabilitiesJson })
+            .ToListAsync(cancellationToken);
+        var route = routes.FirstOrDefault(candidate =>
+            !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
+                candidate.RequiredCapabilitiesJson));
         return route is null ? null : new ActiveProductionRouteOptionPolicy(route.Id,
             (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
                 .ToHashSet(StringComparer.OrdinalIgnoreCase));
@@ -256,6 +262,31 @@ public sealed class MenuStore : IMenuStore
         return ProjectMenuItemOptions(menuItemIds).ToListAsync(cancellationToken);
     }
 
+    public Task<List<MenuItemOptionGroupReadModel>> ListMenuItemOptionGroupsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (menuItemIds.Count == 0)
+        {
+            return Task.FromResult(new List<MenuItemOptionGroupReadModel>());
+        }
+
+        return (from menuItem in _dbContext.MenuItems.AsNoTracking()
+                join optionGroup in _dbContext.OptionGroups.AsNoTracking()
+                    on menuItem.ProductId equals optionGroup.ProductId
+                where menuItemIds.Contains(menuItem.Id) && optionGroup.IsActive
+                select new MenuItemOptionGroupReadModel(
+                    menuItem.Id,
+                    optionGroup.Id,
+                    optionGroup.Code,
+                    optionGroup.Name,
+                    optionGroup.SelectionType,
+                    optionGroup.MinSelections,
+                    optionGroup.MaxSelections,
+                    optionGroup.IsRequired))
+            .ToListAsync(cancellationToken);
+    }
+
     private IQueryable<MenuItemProductOptionReadModel> ProjectMenuItemOptions(IReadOnlyCollection<Guid> menuItemIds)
     {
         return from membership in _dbContext.MenuItemProductOptions.AsNoTracking()
@@ -279,6 +310,8 @@ public sealed class MenuStore : IMenuStore
                    option.PriceDelta,
                    option.ExecutionImpact,
                    option.IsAvailable,
+                   !_dbContext.ProductOptionIngredientRequirements.Any(requirement =>
+                       requirement.ProductOptionId == option.Id && !requirement.Ingredient.IsActive),
                    option.IsDefault,
                    option.DisplayOrder);
     }

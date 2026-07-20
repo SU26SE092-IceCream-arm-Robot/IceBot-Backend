@@ -6,6 +6,10 @@ using Application.RobotConfiguration.Programs.Commands;
 using Application.RobotConfiguration.Programs.Queries;
 using Application.RobotConfiguration.Storage.Services;
 using Application.RobotConfiguration.ArtifactContracts;
+using Application.RobotConfiguration.AuthoringImports;
+using Application.RobotConfiguration.AuthoringImports.ReleaseLinkage;
+using Application.RobotConfiguration.AuthoringImports.Composition;
+using Application.RobotConfiguration.AuthoringImports.Workspace;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.RobotConfiguration;
@@ -45,6 +49,11 @@ public static class RobotConfigurationModule
         services.AddScoped<CloneRobotArtifactTemplateCommandHandler>();
         services.AddScoped<RobotArtifactTechnicalContractHandlers>();
         services.AddScoped<AssignRobotArtifactTechnicalContractHandler>();
+        services.AddScoped<RobotAuthoringImportHandlers>();
+        services.AddScoped<RobotAuthoringImportValidator>();
+        services.AddScoped<CreateRobotAuthoringReleaseDraftCommandHandler>();
+        services.AddScoped<RobotAuthoringCompositionHandlers>();
+        services.AddScoped<RobotAuthoringWorkspaceHandler>();
 
         return services;
     }

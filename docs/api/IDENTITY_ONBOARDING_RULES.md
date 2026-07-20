@@ -161,6 +161,10 @@ Management can create a new invitation for an account that is still `Invited`.
 
 One account should have at most one active invitation.
 
+Invitation generation is serialized by account. Revoking prior active links and
+persisting the replacement link are one transaction; concurrent regeneration
+requests cannot leave multiple active invitation records.
+
 Route direction:
 
 ```text
@@ -212,6 +216,11 @@ user submits token and new password
 ```
 
 Invitation tokens must not activate accounts that are already `Active`, `Disabled`, or `Suspended`.
+
+Acceptance is serialized by token. Account activation, invitation acceptance,
+and revocation of existing refresh sessions commit in one transaction. A
+failure while revoking sessions rolls back activation instead of leaving a
+partially accepted account.
 
 Accepting a valid invitation token proves token possession. It does not always prove mailbox ownership.
 

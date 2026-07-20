@@ -3,7 +3,6 @@ using Domain.Devices.ExecutionEndpoints;
 using Application.Devices.Catalog.Abstractions;
 using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
-using Application.Devices.Connectivity.Abstractions;
 using Application.Devices.Credentials.Abstractions;
 using Domain.Devices.Catalog;
 using Domain.Tenants.Entities;

@@ -11,7 +11,7 @@ namespace Infrastructure.RobotConfiguration.Storage.Jobs;
 
 public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
 {
-    private const string ArtifactPrefix = "robot-artifact";
+    private static readonly string[] ManagedPrefixes = ["robot-artifact", "robot-authoring-imports"];
     private const long CleanupLockKey = 0x494345424F544F52L;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly RobotArtifactObjectStorageOptions _options;
@@ -83,34 +83,37 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
         var threshold = DateTimeOffset.UtcNow.AddHours(-_options.OrphanGracePeriodHours);
         var deletedCount = 0;
 
-        await foreach (var item in storage.ListAsync(ArtifactPrefix, cancellationToken))
+        foreach (var prefix in ManagedPrefixes)
         {
-            if (item.LastModifiedAt >= threshold || referencedKeys.Contains(item.StorageKey))
+            await foreach (var item in storage.ListAsync(prefix, cancellationToken))
             {
-                continue;
+                if (item.LastModifiedAt >= threshold || referencedKeys.Contains(item.StorageKey))
+                    continue;
+
+                try
+                {
+                    await storage.DeleteIfExistsAsync(item.StorageKey, cancellationToken);
+                    deletedCount++;
+                    _logger.LogInformation(
+                        "Deleted unreferenced robot configuration object {StorageKey} last modified at {LastModifiedAt}.",
+                        item.StorageKey,
+                        item.LastModifiedAt);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to delete unreferenced robot configuration object {StorageKey}.", item.StorageKey);
+                }
+
+                if (deletedCount >= _options.OrphanCleanupMaxDeletesPerRun)
+                {
+                    _logger.LogWarning(
+                        "Robot configuration object cleanup reached the per-run delete limit {DeleteLimit}.",
+                        _options.OrphanCleanupMaxDeletesPerRun);
+                    break;
+                }
             }
 
-            try
-            {
-                await storage.DeleteIfExistsAsync(item.StorageKey, cancellationToken);
-                deletedCount++;
-                _logger.LogInformation(
-                    "Deleted orphan robot artifact object {StorageKey} last modified at {LastModifiedAt}.",
-                    item.StorageKey,
-                    item.LastModifiedAt);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to delete orphan robot artifact object {StorageKey}.", item.StorageKey);
-            }
-
-            if (deletedCount >= _options.OrphanCleanupMaxDeletesPerRun)
-            {
-                _logger.LogWarning(
-                    "Robot artifact orphan cleanup reached the per-run delete limit {DeleteLimit}.",
-                    _options.OrphanCleanupMaxDeletesPerRun);
-                break;
-            }
+            if (deletedCount >= _options.OrphanCleanupMaxDeletesPerRun) break;
         }
 
         _logger.LogInformation(

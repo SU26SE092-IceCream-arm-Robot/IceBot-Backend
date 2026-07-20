@@ -6,6 +6,7 @@ using Application.RobotConfiguration.Storage.Abstractions;
 using Infrastructure.Devices.Connectivity.Jobs;
 using Infrastructure.Devices.Connectivity.Persistence;
 using Infrastructure.Devices.Telemetry.Persistence;
+using Infrastructure.Sync.Persistence;
 using Infrastructure.Devices.ExecutionEndpoints.Persistence;
 using Application.Abstractions.Persistence;
 using Application.Dashboard.Abstractions;
@@ -14,6 +15,7 @@ using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Connectivity.Abstractions;
 using Application.Devices.Credentials.Abstractions;
+using Application.Sync.Ingestion.Abstractions;
 using Application.Email;
 using Application.Inventory.Abstractions;
 using Application.Operations.Abstractions;
@@ -49,6 +51,9 @@ using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
 using Infrastructure.RobotConfiguration.Artifacts.Persistence;
 using Infrastructure.RobotConfiguration.Programs.Persistence;
 using Infrastructure.RobotConfiguration.ArtifactContracts;
+using Infrastructure.RobotConfiguration.AuthoringImports.Persistence;
+using Application.RobotConfiguration.AuthoringImports;
+using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.RobotConfiguration.ArtifactContracts;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
@@ -93,6 +98,12 @@ namespace Infrastructure
             services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure(config);
             services.AddOrdersInfrastructure();
+            services.AddOptions<Application.Orders.Management.Automation.FulfillmentReminderOptions>()
+                .Bind(config.GetSection(Application.Orders.Management.Automation.FulfillmentReminderOptions.SectionName))
+                .Validate(options => options.IntervalSeconds > 0 && options.BatchSize is >= 1 and <= 500,
+                    "Fulfillment reminder settings are invalid.")
+                .ValidateOnStart();
+            services.AddHostedService<Orders.Jobs.FulfillmentReminderJob>();
             services.AddPaymentsInfrastructure(config);
             services.AddSalesCatalogInfrastructure();
             services.AddTenantsInfrastructure();
@@ -105,6 +116,8 @@ namespace Infrastructure
                         options.DeviceEventDays > 0 &&
                         options.OperationLogDays > 0 &&
                         options.ProcessedSyncInboxDays > 0 &&
+                        options.ExpiredIdentityCredentialDays > 0 &&
+                        options.NotificationDeliveryDays > 0 &&
                         options.BatchSize > 0 &&
                         options.MaxBatchesPerRun > 0,
                     "Data retention settings must be positive.")
@@ -136,6 +149,37 @@ namespace Infrastructure
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();
             services.AddScoped<IAlertStore, AlertStore>();
+            services.AddScoped<Application.Operations.Alerts.Automation.IInventoryAlertAutomationStore,
+                InventoryAlertAutomationStore>();
+            services.AddOptions<Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions>()
+                .Bind(config.GetSection(Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions.SectionName))
+                .Validate(options =>
+                        options.IntervalSeconds > 0 && options.BatchSize is >= 1 and <= 500 &&
+                        options.MaxBatchesPerRun > 0,
+                    "Inventory alert automation settings are invalid.")
+                .ValidateOnStart();
+            services.AddScoped(provider => new Application.Operations.Alerts.Automation.InventoryAlertReconciler(
+                provider.GetRequiredService<Application.Operations.Alerts.Automation.IInventoryAlertAutomationStore>(),
+                provider.GetRequiredService<Application.Abstractions.Realtime.IRealtimeNotificationPublisher>(),
+                provider.GetRequiredService<Application.Operations.Alerts.Notifications.IInventoryOperationalAlertNotifier>(),
+                provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions>>().Value));
+            services.AddHostedService<Operations.Jobs.InventoryAlertReconciliationJob>();
+            services.AddScoped<Application.Operations.Alerts.Notifications.IOperationalAlertNotificationRecipientStore,
+                CriticalAlertNotificationRecipientStore>();
+            services.AddScoped<Application.Operations.Alerts.Notifications.INotificationDeliveryStore,
+                NotificationDeliveryStore>();
+            services.AddScoped<Application.Operations.Notifications.Diagnostics.INotificationDeliveryReadStore,
+                NotificationDeliveryReadStore>();
+            services.AddScoped<Application.Operations.Notifications.IMaintenanceAssignmentNotificationRecipientStore,
+                MaintenanceAssignmentNotificationRecipientStore>();
+            services.AddOptions<Operations.Notifications.NotificationDeliveryOptions>()
+                .Bind(config.GetSection(Operations.Notifications.NotificationDeliveryOptions.SectionName))
+                .Validate(options =>
+                        options.IntervalSeconds > 0 && options.BatchSize is >= 1 and <= 500 &&
+                        options.ProcessingTimeoutSeconds > 0 && options.BaseRetryDelaySeconds > 0,
+                    "Notification delivery settings are invalid.")
+                .ValidateOnStart();
+            services.AddHostedService<Operations.Notifications.NotificationDeliveryJob>();
             services.AddScoped<IOperationLogStore, OperationLogStore>();
             services.AddOptions<RobotArtifactObjectStorageOptions>()
                 .Bind(config.GetSection(RobotArtifactObjectStorageOptions.SectionName))
@@ -149,7 +193,8 @@ namespace Infrastructure
                         options.ReadRetryDelayMilliseconds is >= 1 and <= 10000 &&
                         options.OrphanGracePeriodHours is >= 1 and <= 720 &&
                         options.OrphanCleanupIntervalHours is >= 1 and <= 168 &&
-                        options.OrphanCleanupMaxDeletesPerRun is >= 1 and <= 10000,
+                        options.OrphanCleanupMaxDeletesPerRun is >= 1 and <= 10000 &&
+                        options.AuthoringImportRetentionHours is >= 24 and <= 2160,
                     "Robot artifact object storage settings are invalid.")
                 .ValidateOnStart();
             services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
@@ -162,13 +207,35 @@ namespace Infrastructure
             services.AddScoped<IRobotProgramStore, RobotProgramStore>();
             services.AddScoped<IRobotArtifactTemplateStore, RobotArtifactTemplateStore>();
             services.AddScoped<IRobotArtifactTechnicalContractStore, RobotArtifactTechnicalContractStore>();
+            services.AddScoped<IRobotAuthoringImportStore, RobotAuthoringImportStore>();
+            services.AddScoped<IRobotAuthoringCompositionStore, RobotAuthoringCompositionStore>();
+            services.AddScoped<Application.Shared.Concurrency.ITechnicalResourceMutationCoordinator,
+                Concurrency.PostgresTechnicalResourceMutationCoordinator>();
             services.AddScoped<IConfigurationReleaseStore, ConfigurationReleaseStore>();
             services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
-            services.AddScoped<IConfigurationDeploymentStore, ConfigurationDeploymentStore>();
+            services.AddScoped<ConfigurationDeploymentStore>();
+            services.AddScoped<IConfigurationDeploymentStore>(provider =>
+                provider.GetRequiredService<ConfigurationDeploymentStore>());
+            services.AddScoped<IConfigurationDeploymentObservationReader>(provider =>
+                provider.GetRequiredService<ConfigurationDeploymentStore>());
             services.AddScoped<IConfigurationDeploymentArtifactReader, ConfigurationDeploymentArtifactReader>();
+            services.AddScoped<Application.ProductionConfiguration.Deployments.Notifications.IDeploymentFailureNotificationStore,
+                DeploymentFailureNotificationStore>();
             services.AddScoped<IProductionPackageStore, ProductionPackageStore>();
             services.AddScoped<IProductionPackageInstallationStore, ProductionPackageInstallationStore>();
+            services.AddScoped<Application.ProductionPackages.Upgrades.IProductionPackageUpgradeStore, ProductionPackageUpgradeStore>();
+            services.AddOptions<ProductionPackages.Jobs.ProductionPackageUpgradeReconciliationOptions>()
+                .Bind(config.GetSection(
+                    ProductionPackages.Jobs.ProductionPackageUpgradeReconciliationOptions.SectionName))
+                .Validate(options => options.IntervalSeconds is >= 10 and <= 3600 &&
+                                     options.MaterializingTimeoutMinutes is >= 1 and <= 1440 &&
+                                     options.BatchSize is >= 1 and <= 500,
+                    "Production package upgrade reconciliation settings are invalid.")
+                .ValidateOnStart();
+            services.AddHostedService<ProductionPackages.Jobs.ProductionPackageUpgradeReconciliationJob>();
             services.AddScoped<Application.ProductionPackages.Workspace.IProductionPackageWorkspaceStore, ProductionPackageWorkspaceStore>();
+            services.AddScoped<Application.ProductionPackages.Ownership.IProductionPackageTechnicalOwnershipStore,
+                ProductionPackageTechnicalOwnershipStore>();
             services.AddOptions<Application.ProductionConfiguration.Deployments.LowCostControllerCapacityOptions>()
                 .Bind(config.GetSection(Application.ProductionConfiguration.Deployments.LowCostControllerCapacityOptions.SectionName))
                 .Validate(options => options.MaxArtifactCount > 0 && options.MaxArtifactStorageBytes > 0,
@@ -182,6 +249,12 @@ namespace Infrastructure
             services.Configure<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions>(
                 config.GetSection(ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationOptions.SectionName));
             services.AddHostedService<ProductionConfiguration.Jobs.DeploymentTimeoutReconciliationJob>();
+            services.AddOptions<Application.ProductionConfiguration.Deployments.Notifications.DeploymentFailureNotificationOptions>()
+                .Bind(config.GetSection(Application.ProductionConfiguration.Deployments.Notifications.DeploymentFailureNotificationOptions.SectionName))
+                .Validate(options => options.IntervalSeconds > 0 && options.BatchSize is >= 1 and <= 500,
+                    "Deployment failure notification settings are invalid.")
+                .ValidateOnStart();
+            services.AddHostedService<ProductionConfiguration.Jobs.DeploymentFailureNotificationJob>();
             services.AddScoped<IEdgeCommandStore, EdgeCommandStore>();
             services.AddScoped<IOrderExecutionDispatchStore, OrderExecutionDispatchStore>();
             services.AddScoped<IOrderExecutionTimeoutStore, OrderExecutionTimeoutStore>();

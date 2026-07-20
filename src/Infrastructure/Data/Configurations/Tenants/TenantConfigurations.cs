@@ -18,6 +18,7 @@ using Domain.Sync.DeadLetters;
 using Domain.Sync.Entities;
 using Domain.Sync.Ingestion;
 using Domain.Tenants.Entities;
+using Domain.ProductionPackages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 namespace Infrastructure.Data.Configurations.Tenants;
@@ -63,5 +64,41 @@ internal sealed class KioskConfiguration : IEntityTypeConfiguration<Kiosk>
             .HasForeignKey(x => x.StoreId)
             .OnDelete(DeleteBehavior.Restrict);
 
+    }
+}
+
+internal sealed class FranchiseOnboardingConfiguration : IEntityTypeConfiguration<FranchiseOnboarding>
+{
+    public void Configure(EntityTypeBuilder<FranchiseOnboarding> entity)
+    {
+        entity.ToTable("FranchiseOnboardings");
+        entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
+        entity.Property(x => x.RequestChecksum).HasMaxLength(64);
+        entity.Property(x => x.RequestJson).Metadata.SetMaxLength(null);
+        entity.Property(x => x.FailureCode).HasMaxLength(100);
+        entity.Property(x => x.FailureMessage).HasMaxLength(1000);
+        entity.HasIndex(x => new { x.OrganizationId, x.IdempotencyKey })
+            .IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasIndex(x => new { x.OrganizationId, x.Status, x.UpdatedAt });
+        entity.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(x => x.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Store>()
+            .WithMany()
+            .HasForeignKey(x => x.StoreId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Kiosk>()
+            .WithMany()
+            .HasForeignKey(x => x.KioskId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ProductionPackageInstallation>()
+            .WithMany()
+            .HasForeignKey(x => x.PackageInstallationId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasIndex(x => x.PackageInstallationId)
+            .IsUnique()
+            .HasFilter(EfModelConfigurationConstants.NotNullAndActive(nameof(FranchiseOnboarding.PackageInstallationId)));
     }
 }

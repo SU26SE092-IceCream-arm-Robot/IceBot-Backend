@@ -3,12 +3,15 @@ using Application.Catalog.Recipes.Mapping;
 using Application.Catalog.Recipes.Results;
 using Application.Catalog.Recipes.Rules;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
 
 namespace Application.Catalog.Recipes.Commands;
 
-public sealed class CreateRecipeVersionCommandHandler(ICatalogAuthoringStore catalog)
+public sealed class CreateRecipeVersionCommandHandler(
+    ICatalogAuthoringStore catalog,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<RecipeResult>> HandleAsync(CreateRecipeVersionCommand command, CancellationToken ct = default)
     {
@@ -18,6 +21,9 @@ public sealed class CreateRecipeVersionCommandHandler(ICatalogAuthoringStore cat
 
         var source = await catalog.GetRecipeAsync(variant!.Id, command.SourceRecipeId, cancellationToken: ct);
         if (source is null) return ApiResult<RecipeResult>.Fail("Recipe not found.", 404);
+        var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.Recipe, source.Id, ct);
+        if (ownershipError is not null) return ApiResult<RecipeResult>.Fail(ownershipError, 409);
         if (source.Status == RecipeStatus.Draft)
             return ApiResult<RecipeResult>.Fail("Edit the existing Draft instead of creating a new version.", 409);
 

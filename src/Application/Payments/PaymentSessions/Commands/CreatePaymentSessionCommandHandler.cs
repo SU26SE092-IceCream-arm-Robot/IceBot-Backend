@@ -2,6 +2,7 @@ using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Mapping;
 using Application.Payments.PaymentSessions.Results;
 using Application.Payments.PaymentSessions.Support;
+using Application.Payments.Providers;
 using Application.Shared.Wrappers;
 using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
@@ -49,6 +50,7 @@ public sealed class CreatePaymentSessionCommandHandler
         var createResult = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
             await _paymentStore.AcquirePaymentSessionLockAsync(orderId, ct);
+            await _paymentStore.AcquireOrderWorkflowLockAsync(orderId, ct);
 
             var order = await _paymentStore.GetOrderByIdAsync(orderId, ct);
             if (order is null)
@@ -68,7 +70,15 @@ public sealed class CreatePaymentSessionCommandHandler
                         409);
                 }
 
-                return existingByIdempotencyKey.CheckoutUrl is null &&
+                if (existingByIdempotencyKey.Status == PaymentTransactionStatus.Failed &&
+                    !HasPaymentInstructions(existingByIdempotencyKey))
+                {
+                    return ApiResult<PaymentSessionResult>.Fail(
+                        "The previous payment session creation failed. Retry with a new idempotency key.",
+                        409);
+                }
+
+                return !HasPaymentInstructions(existingByIdempotencyKey) &&
                     existingByIdempotencyKey.Status is PaymentTransactionStatus.Pending or PaymentTransactionStatus.Authorized
                     ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry with the same idempotency key.", 409)
                     : ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(existingByIdempotencyKey));
@@ -99,7 +109,7 @@ public sealed class CreatePaymentSessionCommandHandler
             var activeSession = await _paymentStore.GetActivePaymentTransactionByOrderIdAsync(order.Id, ct);
             if (activeSession is not null)
             {
-                return activeSession.CheckoutUrl is null
+                return !HasPaymentInstructions(activeSession)
                     ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry shortly.", 409)
                     : ApiResult<PaymentSessionResult>.Success(
                         PaymentSessionResultMapper.ToSessionResult(activeSession),
@@ -145,6 +155,7 @@ public sealed class CreatePaymentSessionCommandHandler
                     idempotencyKey
                 })
             };
+            paymentTransaction.ProviderOrderCode = _paymentGateway.CreateProviderOrderCode(paymentTransaction.Id);
 
             await _paymentStore.AddPaymentTransactionAsync(paymentTransaction, ct);
             await _paymentStore.SaveChangesAsync(ct);
@@ -186,6 +197,29 @@ public sealed class CreatePaymentSessionCommandHandler
 
             return ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(payment), "Payment session created.");
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (ProviderPaymentSessionCreationException ex)
+        {
+            var now = DateTimeOffset.UtcNow;
+            if (ex.OutcomeUnknown)
+            {
+                payment.MarkAttempted(now);
+                payment.ScheduleRetry(
+                    "PROVIDER_SESSION_CREATE_OUTCOME_UNKNOWN",
+                    ex.Message,
+                    now.AddSeconds(30));
+            }
+            else
+            {
+                payment.MarkFailed("PROVIDER_SESSION_CREATE_REJECTED", ex.Message, now);
+            }
+
+            await _paymentStore.SaveChangesAsync(cancellationToken);
+            return ApiResult<PaymentSessionResult>.Fail("Failed to create provider payment session.", 502);
+        }
         catch (Exception ex)
         {
             payment.MarkFailed("PROVIDER_SESSION_CREATE_FAILED", ex.Message, DateTimeOffset.UtcNow);
@@ -206,4 +240,8 @@ public sealed class CreatePaymentSessionCommandHandler
         string.Equals(transaction.Provider, _paymentGateway.ProviderCode, StringComparison.OrdinalIgnoreCase) &&
         transaction.Amount == expectedAmount &&
         string.Equals(transaction.Currency, expectedCurrency, StringComparison.OrdinalIgnoreCase);
+
+    private static bool HasPaymentInstructions(PaymentTransaction transaction) =>
+        !string.IsNullOrWhiteSpace(transaction.CheckoutUrl) ||
+        !string.IsNullOrWhiteSpace(transaction.QrCodePayload);
 }

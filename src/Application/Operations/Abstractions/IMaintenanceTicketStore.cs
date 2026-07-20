@@ -53,6 +53,13 @@ public interface IMaintenanceTicketStore
 
     Task<bool> DeviceEventBelongsToKioskAsync(Guid deviceEventId, Guid kioskId, CancellationToken cancellationToken = default);
 
+    Task<bool> CanAssignAccountAsync(
+        Guid accountId,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);

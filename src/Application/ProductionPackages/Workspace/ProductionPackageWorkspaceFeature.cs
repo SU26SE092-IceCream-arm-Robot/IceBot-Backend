@@ -30,6 +30,7 @@ public sealed record ProductionPackageWorkspaceResult(
     IReadOnlyCollection<WorkspaceResourceResult> ProductVariants,
     IReadOnlyCollection<WorkspaceOptionResult> Options,
     IReadOnlyCollection<WorkspaceResourceResult> Recipes,
+    IReadOnlyCollection<WorkspaceMenuResult> Menus,
     IReadOnlyCollection<WorkspaceArtifactResult> Artifacts,
     IReadOnlyCollection<WorkspaceProgramResult> Programs,
     WorkspaceReleaseResult? Release,
@@ -43,6 +44,10 @@ public sealed record WorkspaceResourceResult(Guid Id, string SourceKey, string C
 
 public sealed record WorkspaceOptionResult(Guid Id, string SourceKey, string GroupCode, string Code, string Name,
     string Status, string ExecutionImpact);
+
+public sealed record WorkspaceMenuResult(Guid Id, string Code, string Name, string Status,
+    Guid? StoreId, Guid? KioskId, IReadOnlyCollection<Guid> AssignedProductVariantIds,
+    IReadOnlyCollection<Guid> SellableProductVariantIds);
 
 public sealed record WorkspaceArtifactResult(Guid Id, string SourceKey, string Code, string Name, string Status,
     Guid? TechnicalContractId, bool TechnicalContractReady);
@@ -80,6 +85,7 @@ public sealed record WorkspaceActionResult(string Code, string ResourceType, Gui
 public sealed record WorkspaceActionContextResult(
     Guid? ProductId = null,
     Guid? ProductVariantId = null,
+    Guid? MenuId = null,
     long? OptionGroupId = null,
     Guid? KioskExecutionEndpointId = null,
     string? ExecutionProfile = null,

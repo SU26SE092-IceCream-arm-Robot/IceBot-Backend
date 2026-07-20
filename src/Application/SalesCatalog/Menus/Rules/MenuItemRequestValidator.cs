@@ -49,7 +49,7 @@ internal static class MenuItemRequestValidator
             var recipe = await menus.GetRecipeByIdAsync(recipeId.Value, cancellationToken);
             if (recipe is null) return "Recipe does not exist.";
             if (recipe.ProductVariantId != variant.Id) return "Recipe does not belong to product variant.";
-            if (recipe.OrganizationId.HasValue && recipe.OrganizationId != organizationId)
+            if (recipe.OrganizationId != organizationId)
                 return "Recipe does not belong to the menu organization.";
         }
 

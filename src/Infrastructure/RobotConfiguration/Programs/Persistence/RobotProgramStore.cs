@@ -158,19 +158,21 @@ public sealed class RobotProgramStore : IRobotProgramStore
             return RobotProgramDiscardOutcome.Referenced;
         }
 
-        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var artifactEntries = program.RobotProgramArtifacts
+            .Select(artifact => _dbContext.Entry(artifact))
+            .ToArray();
         _dbContext.RobotProgramArtifacts.RemoveRange(program.RobotProgramArtifacts);
         EntityEntry<RobotProgram> entry = _dbContext.RobotPrograms.Remove(program);
         try
         {
             await _dbContext.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
             return RobotProgramDiscardOutcome.Deleted;
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.ForeignKeyViolation })
         {
-            await transaction.RollbackAsync(cancellationToken);
             entry.State = EntityState.Unchanged;
+            foreach (var artifactEntry in artifactEntries)
+                artifactEntry.State = EntityState.Unchanged;
             return RobotProgramDiscardOutcome.Referenced;
         }
     }

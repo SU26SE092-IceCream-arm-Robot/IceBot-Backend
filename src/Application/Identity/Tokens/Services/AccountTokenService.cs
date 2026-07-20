@@ -3,6 +3,7 @@ using Application.Identity.Authentication.Results;
 using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
 using Domain.Identity.Entities;
+using Domain.Identity.Enums;
 
 namespace Application.Identity.Tokens.Services
 {
@@ -53,6 +54,12 @@ namespace Application.Identity.Tokens.Services
             if (account is null)
             {
                 return ApiResult<AuthenticatedAccountResult>.Fail("Account not found for this token.", 401);
+            }
+            if (account.Status != AccountStatus.Active)
+            {
+                await _refreshTokens.RevokeAllForAccountAsync(
+                    account.Id, "Account is not active", ipAddress, userAgent);
+                return ApiResult<AuthenticatedAccountResult>.Fail("Account is not active.", 401);
             }
 
             var roles = ResolveRoleClaims(account);

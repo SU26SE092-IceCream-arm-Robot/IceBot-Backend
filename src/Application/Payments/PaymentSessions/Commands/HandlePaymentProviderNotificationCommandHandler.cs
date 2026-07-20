@@ -62,6 +62,10 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         {
             return ApiResult<PaymentNotificationResult>.Fail(ex.Message, ex.StatusCode);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             return ApiResult<PaymentNotificationResult>.Fail(ex.Message, 400);
@@ -93,6 +97,14 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 await _paymentStore.AcquirePaymentCallbackLockAsync(
                     notification.Provider,
                     notification.ProviderEventId,
+                    ct);
+            }
+
+            if (!string.IsNullOrWhiteSpace(notification.ProviderOrderCode))
+            {
+                await _paymentStore.AcquireProviderPaymentLockAsync(
+                    notification.Provider,
+                    notification.ProviderOrderCode,
                     ct);
             }
 
@@ -133,6 +145,15 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
             if (paymentTransaction is null)
             {
                 return ApiResult<PaymentNotificationResult>.Fail("Payment transaction not found.", 404);
+            }
+
+            await _paymentStore.AcquireOrderWorkflowLockAsync(paymentTransaction.OrderId, ct);
+            await _paymentStore.ReloadOrderAsync(paymentTransaction.Order, ct);
+
+            var validationError = PaymentNotificationApplier.ValidateNotification(paymentTransaction, notification);
+            if (validationError is not null)
+            {
+                return ApiResult<PaymentNotificationResult>.Fail(validationError, 409);
             }
 
             var callback = new PaymentCallback

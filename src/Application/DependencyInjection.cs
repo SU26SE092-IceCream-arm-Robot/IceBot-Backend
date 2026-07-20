@@ -25,11 +25,7 @@ namespace Application
         {
             services.AddCatalogModule();
             services.AddDevicesModule();
-            services.AddScoped<ListSyncDeadLettersQueryHandler>();
-            services.AddScoped<GetSyncDeadLetterQueryHandler>();
-            services.AddScoped<ResolveSyncDeadLetterCommandHandler>();
-            services.AddScoped<IgnoreSyncDeadLetterCommandHandler>();
-            services.AddScoped<RetrySyncDeadLetterCommandHandler>();
+            services.AddSyncModule();
             services.AddEdgeIntegrationModule();
             services.AddIdentityApplication();
             services.AddInventoryModule();

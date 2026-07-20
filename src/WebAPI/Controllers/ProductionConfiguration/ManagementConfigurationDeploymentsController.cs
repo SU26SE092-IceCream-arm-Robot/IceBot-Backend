@@ -25,7 +25,7 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     private readonly RollbackConfigurationDeploymentCommandHandler _rollbackHandler;
     private readonly DeployFullEdgeConfigurationCommandHandler _fullEdgeHandler;
     private readonly DeployLowCostArtifactSetCommandHandler _lowCostHandler;
-    private readonly DeploymentValidationPreviewHandler _validationPreview;
+    private readonly ConfigurationDeploymentPreviewHandler _deploymentPreview;
 
     public ManagementConfigurationDeploymentsController(
         ListConfigurationDeploymentsQueryHandler listHandler,
@@ -33,14 +33,14 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
         RollbackConfigurationDeploymentCommandHandler rollbackHandler,
         DeployFullEdgeConfigurationCommandHandler fullEdgeHandler,
         DeployLowCostArtifactSetCommandHandler lowCostHandler,
-        DeploymentValidationPreviewHandler validationPreview)
+        ConfigurationDeploymentPreviewHandler deploymentPreview)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
         _rollbackHandler = rollbackHandler;
         _fullEdgeHandler = fullEdgeHandler;
         _lowCostHandler = lowCostHandler;
-        _validationPreview = validationPreview;
+        _deploymentPreview = deploymentPreview;
     }
 
     [HttpGet("configuration-deployments")]
@@ -130,19 +130,27 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
-            ValidationReportChecksum = request.ValidationReportChecksum,
+            DeploymentPreviewChecksum = request.DeploymentPreviewChecksum,
             AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("kiosks/{kioskId:guid}/configuration-deployments/validation-preview")]
+    [HttpPost("kiosks/{kioskId:guid}/configuration-deployments/preview")]
     [Authorize(Policy = "release.deploy")]
-    public async Task<IActionResult> PreviewValidation(Guid kioskId,
-        [FromBody] DeploymentValidationPreviewRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> PreviewDeployment(
+        Guid kioskId,
+        [FromBody] ConfigurationDeploymentPreviewRequest request,
+        CancellationToken cancellationToken)
     {
-        var result = await _validationPreview.HandleAsync(User.GetUserContext(), kioskId,
-            request.ConfigurationReleaseId, request.KioskExecutionEndpointId, cancellationToken);
+        var result = await _deploymentPreview.HandleAsync(
+            User.GetUserContext(),
+            kioskId,
+            request.ConfigurationReleaseId,
+            request.KioskExecutionEndpointId,
+            request.Selections.Select(item => new DeploymentPreviewSelection(
+                item.ExecutionRouteId, item.RobotProgramId)).ToArray(),
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -158,7 +166,7 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
-            ValidationReportChecksum = request.ValidationReportChecksum,
+            DeploymentPreviewChecksum = request.DeploymentPreviewChecksum,
             AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk,
             Selections = request.Selections.Select(item => new DeployLowCostArtifactSelection(
                 item.ExecutionRouteId, item.RobotProgramId)).ToArray()
@@ -175,17 +183,18 @@ public sealed class DeployFullEdgeConfigurationRequest
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
 
-    [Required]
-    public string ValidationReportChecksum { get; init; } = string.Empty;
+    [Required, StringLength(64, MinimumLength = 64)]
+    public string DeploymentPreviewChecksum { get; init; } = string.Empty;
 
     public bool AcknowledgeRemainingRisk { get; init; }
 
 }
 
-public sealed class DeploymentValidationPreviewRequest
+public sealed class ConfigurationDeploymentPreviewRequest
 {
     [Required] public Guid ConfigurationReleaseId { get; init; }
-    [Required] public Guid KioskExecutionEndpointId { get; init; }
+    public Guid? KioskExecutionEndpointId { get; init; }
+    public IReadOnlyCollection<DeployLowCostArtifactSetSelectionRequest> Selections { get; init; } = [];
 }
 
 public sealed class DeployLowCostArtifactSetRequest
@@ -196,8 +205,8 @@ public sealed class DeployLowCostArtifactSetRequest
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
 
-    [Required]
-    public string ValidationReportChecksum { get; init; } = string.Empty;
+    [Required, StringLength(64, MinimumLength = 64)]
+    public string DeploymentPreviewChecksum { get; init; } = string.Empty;
 
     public bool AcknowledgeRemainingRisk { get; init; }
 

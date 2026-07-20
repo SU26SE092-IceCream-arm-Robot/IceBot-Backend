@@ -5,6 +5,7 @@ using Application.Inventory.Mapping;
 using Application.Inventory.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
+using Domain.Common;
 
 namespace Application.Inventory.Commands;
 
@@ -31,63 +32,72 @@ public sealed class AdjustDispenserEstimateCommandHandler
         Guid finalOrgId = Guid.Empty;
         Guid finalStoreId = Guid.Empty;
 
-        var result = await _inventoryStore.ExecuteInTransactionAsync(async ct =>
+        ApiResult<DispenserStateResult> result;
+        try
         {
-            var state = await _inventoryStore.GetDispenserStateByIdAsync(command.DispenserStateId, ct);
-            if (state is null)
+            result = await _inventoryStore.ExecuteInTransactionAsync(async ct =>
             {
-                return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
-            }
-            if (state.KioskId != command.KioskId)
-            {
-                return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
-            }
-            if (!state.IsActive)
-            {
-                return ApiResult<DispenserStateResult>.Fail("Retired dispenser state cannot be adjusted.", 409);
-            }
+                await _inventoryStore.AcquireDispenserMutationLockAsync(command.DispenserStateId, ct);
+                var state = await _inventoryStore.GetDispenserStateByIdAsync(command.DispenserStateId, ct);
+                if (state is null)
+                {
+                    return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
+                }
+                if (state.KioskId != command.KioskId)
+                {
+                    return ApiResult<DispenserStateResult>.Fail("Dispenser state not found.", 404);
+                }
+                if (!state.IsActive)
+                {
+                    return ApiResult<DispenserStateResult>.Fail("Retired dispenser state cannot be adjusted.", 409);
+                }
 
-            var orgId = state.Kiosk?.OrganizationId;
-            var storeId = state.Kiosk?.StoreId;
-            var kioskId = state.KioskId;
+                var orgId = state.Kiosk?.OrganizationId;
+                var storeId = state.Kiosk?.StoreId;
+                var kioskId = state.KioskId;
 
-            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryManage,
-                command.UserContext,
-                orgId,
-                storeId,
-                kioskId))
-            {
-                return ApiResult<DispenserStateResult>.Fail("Access denied.", 403);
-            }
+                if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryManage,
+                    command.UserContext,
+                    orgId,
+                    storeId,
+                    kioskId))
+                {
+                    return ApiResult<DispenserStateResult>.Fail("Access denied.", 403);
+                }
 
-            finalOrgId = orgId ?? Guid.Empty;
-            finalStoreId = storeId ?? Guid.Empty;
+                finalOrgId = orgId ?? Guid.Empty;
+                finalStoreId = storeId ?? Guid.Empty;
 
-            var now = DateTimeOffset.UtcNow;
-            var reasonCode = string.IsNullOrWhiteSpace(command.ReasonCode) ? "ADJUST" : command.ReasonCode.Trim();
+                var now = DateTimeOffset.UtcNow;
+                var reasonCode = string.IsNullOrWhiteSpace(command.ReasonCode) ? "ADJUST" : command.ReasonCode.Trim();
 
-            // Perform domain action
-            var movement = state.AdjustEstimate(
-                command.EstimatedQuantity,
-                now,
-                reasonCode,
-                sourceEventId: null,
-                reportedLevelAfter: command.ReportedLevelAfter);
+                // Perform domain action
+                var movement = state.AdjustEstimate(
+                    command.EstimatedQuantity,
+                    now,
+                    reasonCode,
+                    sourceEventId: null,
+                    reportedLevelAfter: command.ReportedLevelAfter);
 
-            // Enrich movement properties
-            movement.Id = Guid.NewGuid();
-            movement.OrganizationId = orgId;
-            movement.StoreId = storeId;
-            movement.CreatedByAccountId = command.UserContext.AccountId;
-            movement.CreatedAt = now;
+                // Enrich movement properties
+                movement.Id = Guid.NewGuid();
+                movement.OrganizationId = orgId;
+                movement.StoreId = storeId;
+                movement.CreatedByAccountId = command.UserContext.AccountId;
+                movement.CreatedAt = now;
 
-            await _inventoryStore.AddStockMovementAsync(movement, ct);
-            await _inventoryStore.SaveChangesAsync(ct);
+                await _inventoryStore.AddStockMovementAsync(movement, ct);
+                await _inventoryStore.SaveChangesAsync(ct);
 
-            return ApiResult<DispenserStateResult>.Success(
-                DispenserStateResultMapper.ToResult(state),
-                "Dispenser estimate adjusted successfully.");
-        }, cancellationToken);
+                return ApiResult<DispenserStateResult>.Success(
+                    DispenserStateResultMapper.ToResult(state),
+                    "Dispenser estimate adjusted successfully.");
+            }, cancellationToken);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<DispenserStateResult>.Fail(ex.Message, 409);
+        }
 
         if (result.Succeeded && result.Data is not null)
         {
@@ -98,7 +108,7 @@ public sealed class AdjustDispenserEstimateCommandHandler
                 OrganizationId = finalOrgId,
                 StoreId = finalStoreId,
                 IngredientName = result.Data.IngredientName,
-                EstimatedQuantity = result.Data.EstimatedQuantity ?? 0,
+                EstimatedQuantity = result.Data.EstimatedQuantity,
                 Unit = result.Data.Unit,
                 Status = result.Data.CurrentLevelStatus.ToString(),
                 UpdatedAt = result.Data.LastMeasuredAt,

@@ -40,6 +40,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
     private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
     private readonly DeploymentValidationService? _deploymentValidation;
+    private readonly IConfigurationDeploymentPreviewService? _deploymentPreview;
 
     public DeployLowCostArtifactSetCommandHandler(
         IConfigurationDeploymentStore deploymentStore,
@@ -68,6 +69,21 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         : this(deploymentStore, releaseStore, edgeCommandStore, capacity, wakeUpPublisher, inventoryReadiness)
     {
         _deploymentValidation = deploymentValidation;
+    }
+
+    public DeployLowCostArtifactSetCommandHandler(
+        IConfigurationDeploymentStore deploymentStore,
+        IConfigurationReleaseStore releaseStore,
+        IEdgeCommandStore edgeCommandStore,
+        IOptions<LowCostControllerCapacityOptions> capacity,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        DeploymentValidationService deploymentValidation,
+        IConfigurationDeploymentPreviewService deploymentPreview)
+        : this(deploymentStore, releaseStore, edgeCommandStore, capacity, wakeUpPublisher,
+            inventoryReadiness, deploymentValidation)
+    {
+        _deploymentPreview = deploymentPreview;
     }
 
     public async Task<ApiResult<ControllerArtifactSetDeploymentResult>> HandleAsync(
@@ -130,9 +146,9 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Access denied.", 403);
         }
 
-        var expectedValidationChecksum = _deploymentValidation is null
+        var expectedValidationChecksum = _deploymentPreview is null
             ? "legacy"
-            : command.ValidationReportChecksum.Trim();
+            : command.DeploymentPreviewChecksum.Trim();
         var idempotentResult = await GetIdempotentResultAsync(
             command,
             expectedValidationChecksum,
@@ -151,12 +167,46 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 400);
         }
 
-        var validationReport = _deploymentValidation?.Build(release, endpoint);
+        ConfigurationDeploymentEndpointPreview? endpointPreview = null;
+        if (_deploymentPreview is not null)
+        {
+            var selections = command.Selections.Select(item => new DeploymentPreviewSelection(
+                item.ExecutionRouteId, item.RobotProgramId)).ToArray();
+            var previewResult = await _deploymentPreview.HandleAsync(
+                command.UserContext, command.KioskId, release.Id, endpoint.Id, selections, cancellationToken,
+                allowRetiredRelease: command.IsRollback);
+            if (!previewResult.Succeeded || previewResult.Data is null)
+                return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
+                    previewResult.Message ?? "Deployment preview could not be rebuilt.",
+                    previewResult.StatusCode);
+            endpointPreview = previewResult.Data.Endpoints.SingleOrDefault(item => item.KioskExecutionEndpointId == endpoint.Id);
+            if (endpointPreview is null || !endpointPreview.IsEligible)
+                return ApiResult<ControllerArtifactSetDeploymentResult>
+                    .Fail("Deployment is no longer eligible. Preview the deployment again.", 409)
+                    .AddDetail("DeploymentPreview", (object?)endpointPreview ?? previewResult.Data);
+            if (command.IsRollback && string.IsNullOrWhiteSpace(command.DeploymentPreviewChecksum))
+                expectedValidationChecksum = endpointPreview.DeploymentChecksum;
+            else if (!string.Equals(endpointPreview.DeploymentChecksum,
+                         command.DeploymentPreviewChecksum.Trim(), StringComparison.Ordinal))
+                return ApiResult<ControllerArtifactSetDeploymentResult>
+                    .Fail("Deployment preview is missing or stale. Preview the deployment again.", 409)
+                    .AddDetail("DeploymentPreview", endpointPreview);
+        }
+
+        var validationReport = endpointPreview?.Validation ?? _deploymentValidation?.Build(release, endpoint);
         try
         {
             if (validationReport is not null)
-                DeploymentValidationService.ValidateAcknowledgement(validationReport,
-                    command.ValidationReportChecksum, command.AcknowledgeRemainingRisk);
+            {
+                if (endpointPreview is null)
+                    DeploymentValidationService.ValidateAcknowledgement(validationReport,
+                        command.DeploymentPreviewChecksum,
+                        command.AcknowledgeRemainingRisk || command.IsRollback);
+                else if (validationReport.RequiresAcknowledgement &&
+                         !command.AcknowledgeRemainingRisk && !command.IsRollback)
+                    throw new DomainRuleException(
+                        "Authorized organization acknowledgement is required for the remaining deployment risk.");
+            }
         }
         catch (DomainRuleException ex)
         {
@@ -205,50 +255,51 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 var activeSetVersion = await _deploymentStore.GetNextControllerActiveSetVersionAsync(endpoint.ControllerId.Value, ct);
                 try
                 {
-            var items = MaterializeItems(endpoint, release, command.Selections);
+                    var items = DeploymentCommandFactory.MaterializeLowCostItems(endpoint, release, command.Selections);
 
-            var deployment = ControllerArtifactSetDeployment.CreatePending(
-                endpoint.KioskId,
-                endpoint.Kiosk.OrganizationId,
-                endpoint.Id,
-                endpoint.ControllerId!.Value,
-                release.Id,
-                release.ReleaseChecksum!,
-                activeSetVersion,
-                command.IdempotencyKey.Trim(),
-                _capacity.MaxArtifactCount,
-                _capacity.MaxArtifactStorageBytes,
-                command.UserContext.AccountId,
-                now,
-                items,
-                validationReport?.Checksum ?? "legacy",
-                validationReport?.RiskLevel ?? "Legacy",
-                JsonSerializer.Serialize(validationReport?.WarningCodes ?? []),
-                command.UserContext.AccountId,
-                now);
+                    var deployment = ControllerArtifactSetDeployment.CreatePending(
+                        endpoint.KioskId,
+                        endpoint.Kiosk.OrganizationId,
+                        endpoint.Id,
+                        endpoint.ControllerId!.Value,
+                        release.Id,
+                        release.ReleaseChecksum!,
+                        activeSetVersion,
+                        command.IdempotencyKey.Trim(),
+                        _capacity.MaxArtifactCount,
+                        _capacity.MaxArtifactStorageBytes,
+                        command.UserContext.AccountId,
+                        now,
+                        items,
+                        expectedValidationChecksum,
+                        validationReport?.RiskLevel ?? "Legacy",
+                        JsonSerializer.Serialize(validationReport?.WarningCodes ?? []),
+                        command.UserContext.AccountId,
+                        now);
 
-            var edgeCommand = EdgeCommand.Create(
-                EdgeCommandType.DeployConfiguration,
-                deployment.KioskId,
-                deployment.KioskExecutionEndpointId,
-                BuildDeployPayload(deployment, command.RollbackTargetDeploymentId, command.CommandExpiryAt),
-                now,
-                commandExpiryAt: commandExpiryAt,
-                deploymentId: deployment.Id,
-                deploymentKind: DeploymentCommandTargetKind.LowCostArtifactSet,
-                rollbackTargetDeploymentId: command.RollbackTargetDeploymentId,
-                requestedCommandExpiryAt: command.CommandExpiryAt);
+                    var edgeCommand = EdgeCommand.Create(
+                        EdgeCommandType.DeployConfiguration,
+                        deployment.KioskId,
+                        deployment.KioskExecutionEndpointId,
+                        DeploymentCommandFactory.BuildLowCostPayload(
+                            deployment, command.RollbackTargetDeploymentId, command.CommandExpiryAt),
+                        now,
+                        commandExpiryAt: commandExpiryAt,
+                        deploymentId: deployment.Id,
+                        deploymentKind: DeploymentCommandTargetKind.LowCostArtifactSet,
+                        rollbackTargetDeploymentId: command.RollbackTargetDeploymentId,
+                        requestedCommandExpiryAt: command.CommandExpiryAt);
 
-            edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
+                    edgeCommand.CreatedByAccountId = command.UserContext.AccountId;
 
-            await _deploymentStore.AddControllerArtifactSetDeploymentAsync(deployment, ct);
-            await _edgeCommandStore.AddAsync(edgeCommand, ct);
-            await _deploymentStore.SaveChangesAsync(ct);
+                    await _deploymentStore.AddControllerArtifactSetDeploymentAsync(deployment, ct);
+                    await _edgeCommandStore.AddAsync(edgeCommand, ct);
+                    await _deploymentStore.SaveChangesAsync(ct);
 
-            return ApiResult<ControllerArtifactSetDeploymentResult>.Success(
-                ControllerArtifactSetDeploymentResult.FromEntity(deployment, edgeCommand.Id),
-                "Controller artifact-set deployment requested successfully.",
-                201);
+                    return ApiResult<ControllerArtifactSetDeploymentResult>.Success(
+                        ControllerArtifactSetDeploymentResult.FromEntity(deployment, edgeCommand.Id),
+                        "Controller artifact-set deployment requested successfully.",
+                        201);
                 }
                 catch (DomainRuleException ex)
                 {
@@ -290,8 +341,9 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     {
         var existingCommand = await _edgeCommandStore.GetByDeploymentIdAsync(existing.Id, cancellationToken);
         if (existing.SourceConfigurationReleaseId != command.ConfigurationReleaseId ||
-            existing.ValidationReportChecksum != expectedValidationChecksum ||
-            !SelectionsMatch(existing, command.Selections) ||
+            ((!command.IsRollback || !string.IsNullOrWhiteSpace(expectedValidationChecksum)) &&
+             existing.ValidationReportChecksum != expectedValidationChecksum) ||
+            !DeploymentCommandFactory.LowCostSelectionsMatch(existing, command.Selections) ||
             existingCommand is null ||
             existingCommand.RollbackTargetDeploymentId != command.RollbackTargetDeploymentId ||
             existingCommand.RequestedCommandExpiryAt != command.CommandExpiryAt)
@@ -308,129 +360,8 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private Task TryPublishWakeUpAsync(
         ApiResult<ControllerArtifactSetDeploymentResult> result,
         CancellationToken cancellationToken) =>
-        result.Succeeded && result.Data?.EdgeCommandId is Guid edgeCommandId
-            ? _wakeUpPublisher.TryPublishAsync(
-                new EdgeCommandWakeUp(
-                    edgeCommandId,
-                    result.Data.KioskExecutionEndpointId,
-                    EdgeCommandType.DeployConfiguration,
-                    DateTimeOffset.UtcNow),
-                cancellationToken)
-            : Task.CompletedTask;
-
-    private static string BuildDeployPayload(
-        ControllerArtifactSetDeployment deployment,
-        Guid? rollbackTargetDeploymentId,
-        DateTimeOffset? requestedCommandExpiryAt)
-    {
-        var payload = new
-        {
-            DeploymentId = deployment.Id,
-            deployment.KioskId,
-            TargetExecutionEndpointId = deployment.KioskExecutionEndpointId,
-            deployment.ControllerId,
-            ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
-            deployment.ReleaseChecksum,
-            RollbackTargetDeploymentId = rollbackTargetDeploymentId,
-            RequestedCommandExpiryAt = requestedCommandExpiryAt,
-            deployment.ActiveSetVersion,
-            deployment.ActiveSetChecksum,
-            deployment.MaxArtifactCount,
-            deployment.MaxArtifactStorageBytes,
-            deployment.RequestedArtifactCount,
-            deployment.RequestedArtifactStorageBytes,
-            Items = deployment.Items
-                .OrderBy(item => item.ExecutionRouteId)
-                .ThenBy(item => item.RobotProgramId)
-                .ThenBy(item => item.RunOrder)
-                .ThenBy(item => item.RobotArtifactId)
-                .Select(item => new
-                {
-                    item.ExecutionRouteId,
-                    item.RobotProgramId,
-                    item.RobotProgramManifestChecksum,
-                    item.RobotArtifactId,
-                    item.ArtifactChecksum,
-                    item.StorageKey,
-                    item.RuntimeTargetCode,
-                    item.MachineModelCode,
-                    item.DeviceId,
-                    item.ContentLengthBytes,
-                    item.RunOrder,
-                    item.ParametersSchemaVersion,
-                    item.ParametersJson,
-                    item.RequiredOptionCode
-                })
-                .ToArray()
-        };
-
-        return JsonSerializer.Serialize(payload);
-    }
-
-    private static bool SelectionsMatch(
-        ControllerArtifactSetDeployment existing,
-        IReadOnlyCollection<DeployLowCostArtifactSelection> requested)
-    {
-        var existingKeys = existing.Items
-            .Select(item => (item.ExecutionRouteId, item.RobotProgramId))
-            .Distinct()
-            .OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId)
-            .ToArray();
-        var requestedKeys = requested
-            .Select(item => (item.ExecutionRouteId, item.RobotProgramId))
-            .Distinct()
-            .OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId)
-            .ToArray();
-        return existingKeys.SequenceEqual(requestedKeys);
-    }
-
-    private static IReadOnlyCollection<ControllerArtifactSetItemSnapshot> MaterializeItems(
-        Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
-        ConfigurationRelease release,
-        IReadOnlyCollection<DeployLowCostArtifactSelection> selections)
-    {
-        var items = new List<ControllerArtifactSetItemSnapshot>(selections.Count);
-        foreach (var selection in selections)
-        {
-            var route = release.ExecutionRoutes.SingleOrDefault(item => item.Id == selection.ExecutionRouteId)
-                ?? throw new DomainRuleException("Selected active-set route does not belong to the source release.");
-            var binding = route.RobotBindings.SingleOrDefault(item => item.RobotProgramId == selection.RobotProgramId)
-                ?? throw new DomainRuleException("Selected active-set program does not belong to the source route.");
-            var program = binding.RobotProgram;
-            if (!AppliesToKiosk(route.ProductVariant.Product.OrganizationId, route.ProductVariant.Product.StoreId,
-                    route.ProductVariant.Product.KioskId, endpoint.Kiosk) ||
-                !AppliesToKiosk(route.Recipe.OrganizationId, route.Recipe.StoreId, route.Recipe.KioskId, endpoint.Kiosk) ||
-                !AppliesToKiosk(program.OrganizationId, program.StoreId, program.KioskId, endpoint.Kiosk))
-                throw new DomainRuleException("Selected route, recipe, and robot program must apply to the target kiosk scope.");
-
-            var programManifest = RobotProgramManifestBuilder.Parse(
-                program.ProgramManifestJson
-                    ?? throw new DomainRuleException("Selected robot program has no published artifact manifest."));
-            foreach (var programArtifact in programManifest.Artifacts.OrderBy(item => item.RunOrder))
-            {
-                var artifact = programArtifact.RobotArtifact;
-                if (!endpoint.SupportsRobotTarget(artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId))
-                    throw new DomainRuleException("Selected robot program contains an artifact that is not compatible with the controller endpoint.");
-
-                items.Add(new ControllerArtifactSetItemSnapshot(
-                    route.Id, program.Id, program.ProgramManifestChecksum!, artifact.Id, artifact.Checksum,
-                    artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId,
-                    artifact.ContentLengthBytes, programArtifact.RunOrder, programArtifact.ParametersSchemaVersion,
-                    programArtifact.Parameters?.ToJsonString(), programArtifact.RequiredOptionCode));
-            }
-        }
-        return items;
-    }
-
-    private static bool AppliesToKiosk(
-        Guid? organizationId,
-        Guid? storeId,
-        Guid? kioskId,
-        Domain.Tenants.Entities.Kiosk kiosk)
-    {
-        return (!organizationId.HasValue || organizationId == kiosk.OrganizationId) &&
-            (!storeId.HasValue || storeId == kiosk.StoreId) &&
-            (!kioskId.HasValue || kioskId == kiosk.Id);
-    }
+        DeploymentCommandWakeUp.TryPublishAsync(
+            result, item => item.EdgeCommandId, item => item.KioskExecutionEndpointId,
+            _wakeUpPublisher, cancellationToken);
 
 }

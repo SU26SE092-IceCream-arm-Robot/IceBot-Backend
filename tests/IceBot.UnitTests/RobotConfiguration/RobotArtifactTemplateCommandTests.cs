@@ -16,6 +16,7 @@ using Domain.RobotConfiguration.ArtifactContracts;
 using Application.RobotConfiguration.ArtifactContracts;
 using System.Security.Cryptography;
 using System.Text;
+using Application.Shared.Concurrency;
 
 namespace IceBot.UnitTests.RobotConfiguration;
 
@@ -37,6 +38,7 @@ public sealed class RobotArtifactTemplateCommandTests
             "FAIRINO_LUA_V1", "FR5", bytes.Length, DateTimeOffset.UtcNow,
             technicalContractId: contract.Id, technicalContractChecksum: contract.ContractChecksum);
         var store = Substitute.For<IRobotArtifactTemplateStore>();
+        store.GetByIdAsync(template.Id, false, Arg.Any<CancellationToken>()).Returns(template);
         store.GetByIdAsync(template.Id, true, Arg.Any<CancellationToken>()).Returns(template);
         var contractStore = Substitute.For<IRobotArtifactTechnicalContractStore>();
         contractStore.GetAsync(contract.Id, false, Arg.Any<CancellationToken>()).Returns(contract);
@@ -45,7 +47,8 @@ public sealed class RobotArtifactTemplateCommandTests
             .Returns(bytes);
         var handler = new PublishRobotArtifactTemplateCommandHandler(
             store,
-            new ArtifactPublicationValidator(contractStore, storage));
+            new ArtifactPublicationValidator(contractStore, storage),
+            InlineTechnicalResourceMutationCoordinator.Instance);
 
         var result = await handler.HandleAsync(new PublishRobotArtifactTemplateCommand(template.Id)
         {
@@ -96,7 +99,8 @@ public sealed class RobotArtifactTemplateCommandTests
             templateStore,
             storage,
             contentService,
-            contractStore);
+            contractStore,
+            InlineTechnicalResourceMutationCoordinator.Instance);
 
         var result = await handler.HandleAsync(new CloneRobotArtifactTemplateCommand
         {
@@ -145,13 +149,64 @@ public sealed class RobotArtifactTemplateCommandTests
             templateStore,
             storage,
             new ArtifactUploadContentService(storage, NullLogger<ArtifactUploadContentService>.Instance),
-            contractStore);
+            contractStore,
+            InlineTechnicalResourceMutationCoordinator.Instance);
 
         var result = await handler.HandleAsync(new CloneRobotArtifactTemplateCommand
         {
             UserContext = TestData.SystemAdmin(),
             OrganizationId = organizationId,
             TemplateId = template.Id,
+            ArtifactCode = "ORG_PREPARE",
+            ArtifactName = "Organization prepare"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        await storage.DidNotReceive().CopyImmutableAsync(
+            Arg.Any<string>(), Arg.Any<ArtifactObjectWriteRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Clone_RejectsTemplateRetiredAfterInitialObservation()
+    {
+        var organizationId = Guid.NewGuid();
+        var contract = RobotArtifactTechnicalContract.CreateDraft(
+            "PREPARE", 1, "FAIRINO_LUA_V1", "FR5");
+        contract.ReplaceDefinition(
+            [new RobotArtifactEffectDefinition("PREPARE_EXECUTE", RobotArtifactEffectKind.System, null, null,
+                RobotArtifactQuantityMode.None, null, null, null)],
+            []);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+
+        var observedTemplate = TestData.DraftTemplate();
+        observedTemplate.AssignTechnicalContract(contract.Id, contract.ContractChecksum!);
+        observedTemplate.Publish();
+        var lockedTemplate = TestData.DraftTemplate();
+        lockedTemplate.Id = observedTemplate.Id;
+        lockedTemplate.AssignTechnicalContract(contract.Id, contract.ContractChecksum!);
+        lockedTemplate.Publish();
+        lockedTemplate.Retire();
+
+        var templateStore = Substitute.For<IRobotArtifactTemplateStore>();
+        templateStore.GetByIdAsync(observedTemplate.Id, false, Arg.Any<CancellationToken>())
+            .Returns(observedTemplate, lockedTemplate);
+        var artifactStore = Substitute.For<IRobotArtifactStore>();
+        artifactStore.OrganizationExistsAsync(organizationId, Arg.Any<CancellationToken>()).Returns(true);
+        var storage = Substitute.For<IArtifactObjectStorage>();
+        var handler = new CloneRobotArtifactTemplateCommandHandler(
+            artifactStore,
+            templateStore,
+            storage,
+            new ArtifactUploadContentService(storage, NullLogger<ArtifactUploadContentService>.Instance),
+            Substitute.For<IRobotArtifactTechnicalContractStore>(),
+            InlineTechnicalResourceMutationCoordinator.Instance);
+
+        var result = await handler.HandleAsync(new CloneRobotArtifactTemplateCommand
+        {
+            UserContext = TestData.SystemAdmin(),
+            OrganizationId = organizationId,
+            TemplateId = observedTemplate.Id,
             ArtifactCode = "ORG_PREPARE",
             ArtifactName = "Organization prepare"
         });
@@ -174,6 +229,7 @@ public sealed class RobotArtifactTemplateCommandTests
         var template = TestData.DraftTemplate();
         template.AssignTechnicalContract(contract.Id, contract.ContractChecksum!);
         var templateStore = Substitute.For<IRobotArtifactTemplateStore>();
+        templateStore.GetByIdAsync(template.Id, false, Arg.Any<CancellationToken>()).Returns(template);
         templateStore.GetByIdAsync(template.Id, true, Arg.Any<CancellationToken>()).Returns(template);
         var contractStore = Substitute.For<IRobotArtifactTechnicalContractStore>();
         contractStore.GetAsync(contract.Id, false, Arg.Any<CancellationToken>()).Returns(contract);
@@ -183,7 +239,8 @@ public sealed class RobotArtifactTemplateCommandTests
                 template.StorageKey, template.ContentLengthBytes));
         var handler = new PublishRobotArtifactTemplateCommandHandler(
             templateStore,
-            new ArtifactPublicationValidator(contractStore, storage));
+            new ArtifactPublicationValidator(contractStore, storage),
+            InlineTechnicalResourceMutationCoordinator.Instance);
 
         var result = await handler.HandleAsync(new PublishRobotArtifactTemplateCommand(template.Id)
         {
@@ -207,7 +264,8 @@ public sealed class RobotArtifactTemplateCommandTests
         var contentService = new ArtifactUploadContentService(
             storage,
             NullLogger<ArtifactUploadContentService>.Instance);
-        var handler = new DiscardDraftRobotArtifactTemplateCommandHandler(store, contentService);
+        var handler = new DiscardDraftRobotArtifactTemplateCommandHandler(
+            store, contentService, InlineTechnicalResourceMutationCoordinator.Instance);
 
         var result = await handler.HandleAsync(new DiscardDraftRobotArtifactTemplateCommand(template.Id)
         {

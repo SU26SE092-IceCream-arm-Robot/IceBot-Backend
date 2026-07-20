@@ -126,6 +126,11 @@ public sealed class IngestExecutionReportCommandHandler
             return ApiResult<ExecutionReportIngestResult>.Fail("Accepted edge command not found for execution report.", 404);
         }
 
+        if (edgeCommand.CommandType == EdgeCommandType.ExecuteOrder && edgeCommand.OrderId.HasValue)
+        {
+            await _unitOfWork.AcquireOrderWorkflowLockAsync(edgeCommand.OrderId.Value, cancellationToken);
+        }
+
         var executorReportedAt = command.ExecutorReportedAt ?? command.EdgeCreatedAt;
         var inboxEvent = existingEvent ?? candidateInboxEvent;
         var processingContext = new ExecutionReportProcessingContext(

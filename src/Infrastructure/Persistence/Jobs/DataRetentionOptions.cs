@@ -10,6 +10,8 @@ public sealed class DataRetentionOptions
     public int DeviceEventDays { get; set; } = 90;
     public int OperationLogDays { get; set; } = 90;
     public int ProcessedSyncInboxDays { get; set; } = 180;
+    public int ExpiredIdentityCredentialDays { get; set; } = 30;
+    public int NotificationDeliveryDays { get; set; } = 90;
     public int BatchSize { get; set; } = 1000;
     public int MaxBatchesPerRun { get; set; } = 20;
 }

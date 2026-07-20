@@ -3,6 +3,8 @@ using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.Orders.Support;
+using Application.Payments.PaymentSessions.Support;
 
 namespace Infrastructure.Payments.Persistence;
 
@@ -54,6 +56,85 @@ public sealed class PaymentStore : IPaymentStore
             .Include(payment => payment.PaymentMethod)
             .FirstOrDefaultAsync(payment => payment.IdempotencyKey == idempotencyKey, cancellationToken);
     }
+
+    public Task<PaymentTransaction?> GetPaymentTransactionSnapshotAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.PaymentTransactions.WhereNotDeleted().AsNoTracking()
+            .FirstOrDefaultAsync(payment => payment.Id == id, cancellationToken);
+
+    public async Task<IReadOnlyList<Guid>> ListPendingPaymentSessionReconciliationIdsAsync(
+        DateTimeOffset requestedBefore,
+        DateTimeOffset retryDueAt,
+        int batchSize,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.PaymentTransactions.WhereNotDeleted().AsNoTracking()
+            .Where(PaymentSessionInterventionPolicy.BuildReconciliationCandidatePredicate(retryDueAt))
+            .Where(payment =>
+                payment.RequestedAt <= requestedBefore &&
+                payment.RetryCount < payment.MaxRetries &&
+                (!payment.NextRetryAt.HasValue || payment.NextRetryAt <= retryDueAt))
+            .OrderBy(payment => payment.NextRetryAt ?? payment.RequestedAt)
+            .ThenBy(payment => payment.Id)
+            .Select(payment => payment.Id)
+            .Take(Math.Clamp(batchSize, 1, 500))
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountPaymentSessionInterventionsAsync(
+        DateTimeOffset observedAt,
+        string? provider,
+        string? interventionCode,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default) =>
+        ApplyPaymentSessionInterventionFilters(
+                observedAt,
+                provider,
+                interventionCode,
+                organizationId,
+                storeId,
+                kioskId,
+                isSystemAdmin,
+                allowedOrganizationIds,
+                allowedStoreIds,
+                allowedKioskIds)
+            .CountAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<PaymentTransaction>> ListPaymentSessionInterventionsAsync(
+        DateTimeOffset observedAt,
+        string? provider,
+        string? interventionCode,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        await ApplyPaymentSessionInterventionFilters(
+                observedAt,
+                provider,
+                interventionCode,
+                organizationId,
+                storeId,
+                kioskId,
+                isSystemAdmin,
+                allowedOrganizationIds,
+                allowedStoreIds,
+                allowedKioskIds)
+            .OrderBy(payment => payment.NextRetryAt ?? payment.RequestedAt)
+            .ThenBy(payment => payment.Id)
+            .Skip((Math.Max(pageNumber, 1) - 1) * Math.Clamp(pageSize, 1, 100))
+            .Take(Math.Clamp(pageSize, 1, 100))
+            .ToListAsync(cancellationToken);
 
     public Task<Domain.Devices.Connectivity.KioskConnectivityProjection?> GetKioskConnectivityAsync(
         Guid kioskId,
@@ -110,17 +191,100 @@ public sealed class PaymentStore : IPaymentStore
             cancellationToken);
     }
 
+    public async Task<IReadOnlyList<PaymentTransaction>> ListPaymentTransactionsByOrderIdAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.PaymentTransactions.WhereNotDeleted().AsNoTracking()
+            .Where(payment => payment.OrderId == orderId)
+            .OrderByDescending(payment => payment.RequestedAt)
+            .ThenByDescending(payment => payment.Id)
+            .ToListAsync(cancellationToken);
+
     public Task AcquirePaymentSessionLockAsync(Guid orderId, CancellationToken cancellationToken = default) =>
         AcquireAdvisoryLockAsync($"payment-session:{orderId:N}", cancellationToken);
 
+    public Task AcquireOrderWorkflowLockAsync(Guid orderId, CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync(OrderWorkflowConcurrency.OrderLockKey(orderId), cancellationToken);
+
+    public Task ReloadOrderAsync(Order order, CancellationToken cancellationToken = default) =>
+        _dbContext.Entry(order).ReloadAsync(cancellationToken);
+
+    public Task AcquirePaymentTransactionLockAsync(
+        Guid paymentTransactionId,
+        CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync($"payment-transaction:{paymentTransactionId:N}", cancellationToken);
+
     public Task AcquireRefundRequestLockAsync(Guid paymentTransactionId, CancellationToken cancellationToken = default) =>
         AcquireAdvisoryLockAsync($"refund:{paymentTransactionId:N}", cancellationToken);
+
+    public Task AcquireRefundLockAsync(Guid refundId, CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync($"refund-lifecycle:{refundId:N}", cancellationToken);
 
     public Task AcquirePaymentCallbackLockAsync(
         string provider,
         string providerEventId,
         CancellationToken cancellationToken = default) =>
         AcquireAdvisoryLockAsync($"payment-callback:{provider}:{providerEventId}", cancellationToken);
+
+    public Task AcquireProviderPaymentLockAsync(
+        string provider,
+        string providerOrderCode,
+        CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync($"provider-payment:{provider}:{providerOrderCode}", cancellationToken);
+
+    private IQueryable<PaymentTransaction> ApplyPaymentSessionInterventionFilters(
+        DateTimeOffset observedAt,
+        string? provider,
+        string? interventionCode,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds)
+    {
+        var query = _dbContext.PaymentTransactions.WhereNotDeleted().AsNoTracking()
+            .Include(payment => payment.Order)
+            .Where(PaymentSessionInterventionPolicy.BuildQueuePredicate(observedAt));
+
+        if (!string.IsNullOrWhiteSpace(provider))
+        {
+            query = query.Where(payment => payment.Provider == provider.Trim());
+        }
+
+        if (!string.IsNullOrWhiteSpace(interventionCode))
+        {
+            query = query.Where(payment => payment.LastErrorCode == interventionCode.Trim());
+        }
+
+        if (organizationId.HasValue)
+        {
+            query = query.Where(payment => payment.Order.OrganizationId == organizationId.Value);
+        }
+
+        if (storeId.HasValue)
+        {
+            query = query.Where(payment => payment.Order.StoreId == storeId.Value);
+        }
+
+        if (kioskId.HasValue)
+        {
+            query = query.Where(payment => payment.Order.KioskId == kioskId.Value);
+        }
+
+        if (!isSystemAdmin)
+        {
+            query = query.Where(payment =>
+                (payment.Order.OrganizationId.HasValue &&
+                 allowedOrganizationIds.Contains(payment.Order.OrganizationId.Value)) ||
+                (payment.Order.StoreId.HasValue &&
+                 allowedStoreIds.Contains(payment.Order.StoreId.Value)) ||
+                allowedKioskIds.Contains(payment.Order.KioskId));
+        }
+
+        return query;
+    }
 
     public async Task AddPaymentMethodAsync(PaymentMethod paymentMethod, CancellationToken cancellationToken = default)
     {

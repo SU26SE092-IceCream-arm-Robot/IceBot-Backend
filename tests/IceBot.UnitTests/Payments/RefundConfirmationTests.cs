@@ -63,4 +63,54 @@ public sealed class RefundConfirmationTests
         Assert.Null(refund.ProcessedAt);
         await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
+
+    [Fact]
+    public async Task FullMoneyRefund_RejectsExplicitFalseConfirmation()
+    {
+        var order = new Order
+        {
+            Id = Guid.NewGuid(),
+            OrderNumber = "ORDER-2",
+            KioskId = Guid.NewGuid()
+        };
+        var transaction = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Order = order,
+            Provider = "manual",
+            Status = PaymentTransactionStatus.Paid
+        };
+        var refund = new Refund
+        {
+            Id = Guid.NewGuid(),
+            PaymentTransactionId = transaction.Id,
+            PaymentTransaction = transaction,
+            RefundNumber = "REFUND-2",
+            Amount = 10_000,
+            Reason = "Customer request",
+            Status = RefundStatus.Requested
+        };
+        var store = Substitute.For<IPaymentStore>();
+        store.GetRefundByIdAsync(refund.Id, Arg.Any<CancellationToken>()).Returns(refund);
+        store.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<ApiResult<RefundResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<RefundResult>>>>()(CancellationToken.None));
+        var handler = new MarkRefundProcessedCommandHandler(
+            store,
+            Substitute.For<IRealtimeNotificationPublisher>());
+
+        var result = await handler.HandleAsync(new MarkRefundProcessedCommand
+        {
+            RefundId = refund.Id,
+            UserContext = new CurrentUserContext { IsSystemAdmin = true },
+            MoneyWasRefunded = false
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Equal(RefundStatus.Requested, refund.Status);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
 }

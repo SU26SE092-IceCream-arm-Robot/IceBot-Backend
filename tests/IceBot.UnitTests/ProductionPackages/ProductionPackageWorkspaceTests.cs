@@ -1,5 +1,6 @@
 using Application.Identity.Tokens.Claims;
 using Application.ProductionPackages.Workspace;
+using Domain.Common;
 using Domain.ProductionPackages;
 using NSubstitute;
 
@@ -15,6 +16,22 @@ public sealed class ProductionPackageWorkspaceTests
             "retry-key", ["drink", "ICE_CREAM", "drink"], DateTimeOffset.UtcNow);
 
         Assert.Equal(["DRINK", "ICE_CREAM"], installation.GetSelectedProductSourceKeys());
+    }
+
+    [Fact]
+    public void InstalledInstallation_CannotBeDowngradedToFailed()
+    {
+        var installation = ProductionPackageInstallation.Start(
+            Guid.NewGuid(), null, null, Guid.NewGuid(), new string('a', 64), new string('b', 64),
+            "terminal-state", ["ICE_CREAM"], DateTimeOffset.UtcNow);
+        installation.MarkMaterializing();
+        installation.Complete(Guid.NewGuid(), DateTimeOffset.UtcNow);
+
+        var exception = Assert.Throws<DomainRuleException>(() =>
+            installation.Fail("LATE_FAILURE", "A concurrent request failed late.", DateTimeOffset.UtcNow));
+
+        Assert.Contains("pending or materializing", exception.Message);
+        Assert.Equal(ProductionPackageInstallationStatus.Installed, installation.Status);
     }
 
     [Fact]
@@ -62,7 +79,7 @@ public sealed class ProductionPackageWorkspaceTests
 
     private static ProductionPackageWorkspaceResult Workspace(Guid installationId, Guid organizationId,
         Guid storeId) => new(installationId, organizationId, storeId, null, "Installed", "PackageManaged",
-        Guid.NewGuid(), "PACKAGE", "Package", Guid.NewGuid(), 1, [], [], [], [], [], [], null,
+        Guid.NewGuid(), "PACKAGE", "Package", Guid.NewGuid(), 1, [], [], [], [], [], [], [], null,
         new WorkspaceTechnicalReadinessResult(false, false, false, null, []),
         new WorkspaceCommercialReadinessResult(false, []), [], [], []);
 }

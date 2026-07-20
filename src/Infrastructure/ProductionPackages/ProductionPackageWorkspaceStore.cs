@@ -1,4 +1,5 @@
 using Application.ProductionPackages.Workspace;
+using Application.ProductionPackages.Installation;
 using Application.Inventory.Abstractions;
 using Application.ProductionConfiguration.Readiness.Services;
 using Domain.Catalog.Enums;
@@ -28,9 +29,29 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
     {
         var installation = await db.ProductionPackageInstallations.AsNoTracking()
             .Include(x => x.PackageVersion).ThenInclude(x => x.ProductionPackage)
+            .Include(x => x.PackageVersion).ThenInclude(x => x.Products)
+            .Include(x => x.PackageVersion).ThenInclude(x => x.Artifacts)
+            .Include(x => x.PackageVersion).ThenInclude(x => x.Routes)
             .Include(x => x.Materializations)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Id == installationId, cancellationToken);
         if (installation is null) return null;
+
+        IReadOnlyCollection<WorkspaceBlockerResult> evidenceBlockers = [];
+        if (installation.Status == ProductionPackageInstallationStatus.Installed)
+        {
+            try
+            {
+                var expectations = ProductionPackageMaterializationExpectationBuilder.Build(installation);
+                evidenceBlockers = BuildMissingMaterializationEvidenceBlockers(
+                    expectations, installation.Materializations);
+            }
+            catch (Domain.Common.DomainRuleException ex)
+            {
+                evidenceBlockers = [new WorkspaceBlockerResult("InstallationSnapshotInvalid", ex.Message,
+                    "ProductionPackageInstallation", installation.Id)];
+            }
+        }
 
         var materializations = installation.Materializations
             .Where(x => Guid.TryParse(x.TargetKey, out _))
@@ -42,7 +63,7 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
                 $"Materialized {x.ResourceKind} '{x.SourceKey}' has an invalid target identity.",
                 x.ResourceKind.ToString())).ToArray();
 
-        var products = await db.Products.AsNoTracking()
+        var products = await db.Products.AsNoTracking().WhereNotDeleted()
             .Where(x => x.OrganizationId == organizationId &&
                 Ids(materializations, ProductionPackageResourceKind.Product).Contains(x.Id))
             .OrderBy(x => x.Code).ToListAsync(cancellationToken);
@@ -66,6 +87,13 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
             .Where(x => x.OrganizationId == organizationId &&
                 Ids(materializations, ProductionPackageResourceKind.RobotProgram).Contains(x.Id))
             .OrderBy(x => x.Code).ToListAsync(cancellationToken);
+        var menus = await db.Menus.AsNoTracking().Include(x => x.MenuItems)
+            .Where(x => x.OrganizationId == organizationId && x.Status != MenuStatus.Archived &&
+                ((x.StoreId == null && x.KioskId == null) ||
+                 (installation.StoreId.HasValue && x.StoreId == installation.StoreId && x.KioskId == null) ||
+                 (installation.KioskId.HasValue && x.KioskId == installation.KioskId)))
+            .OrderBy(x => x.DisplayOrder).ThenBy(x => x.Code)
+            .ToListAsync(cancellationToken);
 
         var contractIds = artifacts.Where(x => x.TechnicalContractId.HasValue)
             .Select(x => x.TechnicalContractId!.Value).Distinct().ToArray();
@@ -123,29 +151,30 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
             inventoryReady = inventoryResult?.IsReady == true;
         }
         var now = DateTimeOffset.UtcNow;
-        var menuVariantIds = variants.Count == 0
-            ? new HashSet<Guid>()
-            : (await db.MenuItems.AsNoTracking().Where(x =>
-                    variants.Select(v => v.Id).Contains(x.ProductVariantId) &&
-                    x.Status == MenuItemStatus.Active &&
-                    (x.EffectiveFrom == null || x.EffectiveFrom <= now) &&
-                    (x.EffectiveTo == null || x.EffectiveTo >= now) &&
-                    x.Menu.OrganizationId == organizationId && x.Menu.Status == MenuStatus.Active &&
-                    (x.Menu.EffectiveFrom == null || x.Menu.EffectiveFrom <= now) &&
-                    (x.Menu.EffectiveTo == null || x.Menu.EffectiveTo >= now) &&
-                    (x.Menu.StoreId == null || x.Menu.StoreId == installation.StoreId) &&
-                    (x.Menu.KioskId == null || x.Menu.KioskId == installation.KioskId))
-                .Select(x => x.ProductVariantId).Distinct().ToListAsync(cancellationToken)).ToHashSet();
+        var assignedVariantIds = menus.SelectMany(menu => menu.MenuItems)
+            .Select(item => item.ProductVariantId).ToHashSet();
+        var sellableVariantIds = menus.Where(menu => menu.Status == MenuStatus.Active &&
+                (menu.EffectiveFrom == null || menu.EffectiveFrom <= now) &&
+                (menu.EffectiveTo == null || menu.EffectiveTo >= now))
+            .SelectMany(menu => menu.MenuItems.Where(item => item.Status == MenuItemStatus.Active &&
+                (item.EffectiveFrom == null || item.EffectiveFrom <= now) &&
+                (item.EffectiveTo == null || item.EffectiveTo >= now)))
+            .Select(item => item.ProductVariantId).ToHashSet();
 
         var missingBlockers = BuildMissingResourceBlockers(materializations, products.Select(x => x.Id),
             variants.Select(x => x.Id), options.Select(x => x.Id), recipes.Select(x => x.Id),
             artifacts.Select(x => x.Id), programs.Select(x => x.Id), release?.Id);
         var blockers = BuildBlockers(installation.Status, products, variants, options, recipes, artifacts,
-            programs, release, endpointReady, deploymentActive, inventoryReady, menuVariantIds, technicallyReadyArtifactIds)
-            .Concat(missingBlockers).Concat(invalidMaterializationBlockers).ToArray();
+            programs, release, endpointReady, deploymentActive, inventoryReady, assignedVariantIds,
+            sellableVariantIds, technicallyReadyArtifactIds)
+            .Concat(missingBlockers).Concat(evidenceBlockers).Concat(invalidMaterializationBlockers).ToArray();
+        var hasMissingResources = missingBlockers.Count > 0 || evidenceBlockers.Count > 0 ||
+                                  invalidMaterializationBlockers.Length > 0;
         var actions = BuildActions(products, variants, options, recipes, artifacts, programs, release,
-            installation.Id, installation.Status, installation.KioskId, endpointReady, menuVariantIds, technicallyReadyArtifactIds,
-            missingBlockers.Count > 0 || invalidMaterializationBlockers.Length > 0, readyEndpoint, inventoryReady);
+            installation.Id, installation.Status, installation.OwnershipMode, installation.KioskId, endpointReady,
+            assignedVariantIds, sellableVariantIds, technicallyReadyArtifactIds,
+            hasMissingResources, readyEndpoint, inventoryReady,
+            menus, now);
 
         return new ProductionPackageWorkspaceResult(
             installation.Id, installation.OrganizationId, installation.StoreId, installation.KioskId,
@@ -165,6 +194,16 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
                 x.IsAvailable ? "Available" : "Unavailable", x.ExecutionImpact.ToString())).ToArray(),
             recipes.Select(x => new WorkspaceResourceResult(x.Id, SourceKey(materializations,
                 ProductionPackageResourceKind.Recipe, x.Id), x.Code, x.Name, x.Status.ToString())).ToArray(),
+            menus.Select(x => new WorkspaceMenuResult(x.Id, x.Code, x.Name, x.Status.ToString(), x.StoreId, x.KioskId,
+                x.MenuItems.Select(item => item.ProductVariantId).Distinct().ToArray(),
+                x.Status == MenuStatus.Active &&
+                (x.EffectiveFrom == null || x.EffectiveFrom <= now) &&
+                (x.EffectiveTo == null || x.EffectiveTo >= now)
+                    ? x.MenuItems.Where(item => item.Status == MenuItemStatus.Active &&
+                            (item.EffectiveFrom == null || item.EffectiveFrom <= now) &&
+                            (item.EffectiveTo == null || item.EffectiveTo >= now))
+                        .Select(item => item.ProductVariantId).Distinct().ToArray()
+                    : [])).ToArray(),
             artifacts.Select(x => new WorkspaceArtifactResult(x.Id, SourceKey(materializations,
                 ProductionPackageResourceKind.RobotArtifact, x.Id), x.ArtifactCode, x.ArtifactName,
                 x.Status.ToString(), x.TechnicalContractId,
@@ -211,7 +250,8 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
         bool endpointReady,
         bool deploymentActive,
         bool inventoryReady,
-        IReadOnlySet<Guid> menuVariantIds,
+        IReadOnlySet<Guid> assignedVariantIds,
+        IReadOnlySet<Guid> sellableVariantIds,
         IReadOnlySet<Guid> technicallyReadyArtifactIds)
     {
         var result = new List<WorkspaceBlockerResult>();
@@ -240,8 +280,11 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
         result.AddRange(variants.Where(x => !x.IsAvailable).Select(x =>
             new WorkspaceBlockerResult("VariantUnavailable", "Product variant is not available for sale.",
                 "ProductVariant", x.Id, WorkspaceReadinessImpact.Commercial)));
-        result.AddRange(variants.Where(x => !menuVariantIds.Contains(x.Id)).Select(x =>
+        result.AddRange(variants.Where(x => !assignedVariantIds.Contains(x.Id)).Select(x =>
             new WorkspaceBlockerResult("MenuAssignmentMissing", "Product variant is not assigned to a menu.",
+                "ProductVariant", x.Id, WorkspaceReadinessImpact.Commercial)));
+        result.AddRange(variants.Where(x => assignedVariantIds.Contains(x.Id) && !sellableVariantIds.Contains(x.Id)).Select(x =>
+            new WorkspaceBlockerResult("MenuAssignmentNotSellable", "Product variant menu assignment is not currently sellable.",
                 "ProductVariant", x.Id, WorkspaceReadinessImpact.Commercial)));
         result.AddRange(options.GroupBy(x => x.OptionGroupId).Where(group =>
         {
@@ -280,24 +323,40 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
         IReadOnlyCollection<RobotProgram> programs,
         Domain.ProductionConfiguration.Entities.ConfigurationRelease? release,
         Guid installationId, ProductionPackageInstallationStatus installationStatus,
-        Guid? kioskId, bool endpointReady, IReadOnlySet<Guid> menuVariantIds,
+        ProductionPackageOwnershipMode ownershipMode, Guid? kioskId, bool endpointReady,
+        IReadOnlySet<Guid> assignedVariantIds, IReadOnlySet<Guid> sellableVariantIds,
         IReadOnlySet<Guid> technicallyReadyArtifactIds, bool hasMissingResources,
-        KioskExecutionEndpoint? readyEndpoint, bool inventoryReady)
+        KioskExecutionEndpoint? readyEndpoint, bool inventoryReady,
+        IReadOnlyCollection<Domain.SalesCatalog.Entities.Menu> menus,
+        DateTimeOffset now)
     {
         var actions = new List<ClassifiedWorkspaceAction>();
+        if (installationStatus == ProductionPackageInstallationStatus.Superseded) return actions;
         var variantsById = variants.ToDictionary(variant => variant.Id);
+        var packageManaged = ownershipMode == ProductionPackageOwnershipMode.PackageManaged;
+        var hasTechnicalRecovery = artifacts.Any(x => x.Status is RobotArtifactStatus.Retired or RobotArtifactStatus.Disabled) ||
+            recipes.Any(x => x.Status == RecipeStatus.Retired) ||
+            programs.Any(x => x.Status == RobotProgramStatus.Retired) ||
+            release?.Status == ConfigurationReleaseStatus.Retired;
+        if (packageManaged && installationStatus == ProductionPackageInstallationStatus.Installed &&
+            hasMissingResources)
+            actions.Add(Action("RepairMaterializations", "ProductionPackageInstallation", installationId,
+                kind: WorkspaceActionKind.Recovery));
+        if (packageManaged && hasTechnicalRecovery)
+            actions.Add(Action("ForkInstallation", "ProductionPackageInstallation", installationId,
+                kind: WorkspaceActionKind.Recovery));
         if (installationStatus == ProductionPackageInstallationStatus.Failed)
             actions.Add(Action("RetryInstallation", "ProductionPackageInstallation", installationId,
                 kind: WorkspaceActionKind.Recovery));
         actions.AddRange(artifacts.Where(x => x.Status == RobotArtifactStatus.Draft)
             .Select(x => Action("PublishArtifact", "RobotArtifact", x.Id)));
         actions.AddRange(artifacts.Where(x => x.Status is RobotArtifactStatus.Retired or RobotArtifactStatus.Disabled)
-            .Select(x => Action("ReplaceArtifact", "RobotArtifact", x.Id, kind: WorkspaceActionKind.Recovery)));
+            .Select(x => TechnicalRecoveryAction("ReplaceArtifact", "RobotArtifact", x.Id, packageManaged)));
         actions.AddRange(recipes.Where(x => x.Status == RecipeStatus.Draft)
             .Select(x => Action("PublishRecipe", "Recipe", x.Id, context: RecipeContext(x, variantsById))));
         actions.AddRange(recipes.Where(x => x.Status == RecipeStatus.Retired)
-            .Select(x => Action("CreateRecipeVersion", "Recipe", x.Id, kind: WorkspaceActionKind.Recovery,
-                context: RecipeContext(x, variantsById))));
+            .Select(x => TechnicalRecoveryAction("CreateRecipeVersion", "Recipe", x.Id, packageManaged,
+                RecipeContext(x, variantsById))));
         var unpublishedArtifactIds = artifacts.Where(x => x.Status != RobotArtifactStatus.Published).Select(x => x.Id).ToHashSet();
         actions.AddRange(programs.Where(x => x.Status == RobotProgramStatus.Draft).Select(program =>
         {
@@ -309,7 +368,7 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
             return Action("PublishProgram", "RobotProgram", program.Id, blocked, codes);
         }));
         actions.AddRange(programs.Where(x => x.Status == RobotProgramStatus.Retired)
-            .Select(x => Action("ReplaceProgram", "RobotProgram", x.Id, kind: WorkspaceActionKind.Recovery)));
+            .Select(x => TechnicalRecoveryAction("ReplaceProgram", "RobotProgram", x.Id, packageManaged)));
         if (release?.Status == ConfigurationReleaseStatus.Draft)
         {
             var codes = new List<string>();
@@ -321,8 +380,8 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
             actions.Add(Action("PublishRelease", "ConfigurationRelease", release.Id, codes.Count > 0, codes));
         }
         if (release?.Status == ConfigurationReleaseStatus.Retired)
-            actions.Add(Action("CreateReplacementRelease", "ConfigurationRelease", release.Id,
-                kind: WorkspaceActionKind.Recovery));
+            actions.Add(TechnicalRecoveryAction("CreateReplacementRelease", "ConfigurationRelease", release.Id,
+                packageManaged));
         actions.AddRange(products.Where(x => !x.IsAvailable).Select(x => Action("EnableProduct", "Product", x.Id,
             context: new WorkspaceActionContextResult(ProductId: x.Id))));
         actions.AddRange(variants.Where(x => !x.IsAvailable).Select(x => Action("EnableVariant", "ProductVariant", x.Id,
@@ -337,9 +396,16 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
                     option.OptionGroup.IsActive, option.OptionGroup.IsRequired,
                     option.OptionGroup.MinSelections, option.IsAvailable)).ToArray())
             .Select(action => new ClassifiedWorkspaceAction(WorkspaceActionKind.Required, action)));
-        actions.AddRange(variants.Where(x => !menuVariantIds.Contains(x.Id)).Select(x =>
+        var eligibleMenuIds = menus.Select(menu => menu.Id).ToArray();
+        if (eligibleMenuIds.Length == 0 && variants.Any(x => !assignedVariantIds.Contains(x.Id)))
+            actions.Add(Action("CreateMenu", "ProductionPackageInstallation", installationId));
+        actions.AddRange(variants.Where(x => !assignedVariantIds.Contains(x.Id)).Select(x =>
             Action("AssignVariantToMenu", "ProductVariant", x.Id,
-                context: new WorkspaceActionContextResult(ProductId: x.ProductId, ProductVariantId: x.Id))));
+                blocked: eligibleMenuIds.Length == 0,
+                blockers: eligibleMenuIds.Length == 0 ? ["MenuMissing"] : [],
+                context: new WorkspaceActionContextResult(ProductId: x.ProductId, ProductVariantId: x.Id),
+                candidateResourceIds: eligibleMenuIds)));
+        actions.AddRange(BuildExistingMenuAssignmentActions(variants, menus, assignedVariantIds, sellableVariantIds, now));
         if (release is not null)
         {
             actions.AddRange(GetRouteOptionPolicyDeficits(variants, options, release).Select(deficit =>
@@ -367,9 +433,64 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
 
     private static ClassifiedWorkspaceAction Action(string code, string type, Guid id, bool blocked = false,
         IReadOnlyCollection<string>? blockers = null, WorkspaceActionKind kind = WorkspaceActionKind.Required,
-        WorkspaceActionContextResult? context = null, string? resourceKey = null) =>
+        WorkspaceActionContextResult? context = null, string? resourceKey = null,
+        IReadOnlyCollection<Guid>? candidateResourceIds = null) =>
         new(kind, new WorkspaceActionResult(code, type, id, blocked, blockers ?? [],
-            ResourceKey: resourceKey, Context: context));
+            ResourceKey: resourceKey, CandidateResourceIds: candidateResourceIds, Context: context));
+
+    private static ClassifiedWorkspaceAction TechnicalRecoveryAction(string code, string type, Guid id,
+        bool packageManaged, WorkspaceActionContextResult? context = null) =>
+        Action(code, type, id, packageManaged,
+            packageManaged ? ["PackageForkRequired"] : [], WorkspaceActionKind.Recovery, context);
+
+    private static IReadOnlyCollection<ClassifiedWorkspaceAction> BuildExistingMenuAssignmentActions(
+        IReadOnlyCollection<Domain.Catalog.Entities.ProductVariant> variants,
+        IReadOnlyCollection<Domain.SalesCatalog.Entities.Menu> menus,
+        IReadOnlySet<Guid> assignedVariantIds,
+        IReadOnlySet<Guid> sellableVariantIds,
+        DateTimeOffset now)
+    {
+        var actions = new List<ClassifiedWorkspaceAction>();
+        foreach (var variant in variants.Where(x => assignedVariantIds.Contains(x.Id) && !sellableVariantIds.Contains(x.Id)))
+        {
+            var assignment = menus.SelectMany(menu => menu.MenuItems
+                    .Where(item => item.ProductVariantId == variant.Id)
+                    .Select(item => (Menu: menu, Item: item)))
+                .OrderBy(x => MenuRepairPriority(x.Menu, x.Item, now))
+                .ThenBy(x => x.Menu.Id)
+                .ThenBy(x => x.Item.Id)
+                .First();
+            var context = new WorkspaceActionContextResult(variant.ProductId, variant.Id, assignment.Menu.Id);
+            if ((assignment.Menu.EffectiveFrom.HasValue && assignment.Menu.EffectiveFrom > now) ||
+                (assignment.Menu.EffectiveTo.HasValue && assignment.Menu.EffectiveTo < now))
+                actions.Add(Action("ReviewMenuAvailability", "Menu", assignment.Menu.Id, context: context));
+            else if (assignment.Menu.Status != MenuStatus.Active)
+                actions.Add(Action("ActivateMenu", "Menu", assignment.Menu.Id, context: context));
+            else if ((assignment.Item.EffectiveFrom.HasValue && assignment.Item.EffectiveFrom > now) ||
+                     (assignment.Item.EffectiveTo.HasValue && assignment.Item.EffectiveTo < now))
+                actions.Add(Action("ReviewMenuItemAvailability", "MenuItem", assignment.Item.Id, context: context));
+            else if (assignment.Item.Status != MenuItemStatus.Active)
+                actions.Add(Action("ActivateMenuItem", "MenuItem", assignment.Item.Id, context: context));
+            else
+                actions.Add(Action("ReviewMenuItemAvailability", "MenuItem", assignment.Item.Id, context: context));
+        }
+        return actions;
+    }
+
+    private static int MenuRepairPriority(Domain.SalesCatalog.Entities.Menu menu,
+        Domain.SalesCatalog.Entities.MenuItem item, DateTimeOffset now)
+    {
+        var menuEffective = (menu.EffectiveFrom == null || menu.EffectiveFrom <= now) &&
+                            (menu.EffectiveTo == null || menu.EffectiveTo >= now);
+        if (menu.Status == MenuStatus.Active && menuEffective)
+        {
+            var itemEffective = (item.EffectiveFrom == null || item.EffectiveFrom <= now) &&
+                                (item.EffectiveTo == null || item.EffectiveTo >= now);
+            if (item.Status != MenuItemStatus.Active && itemEffective) return 0;
+            return 1;
+        }
+        return menuEffective ? 2 : 3;
+    }
 
     private static WorkspaceActionContextResult RecipeContext(Domain.Catalog.Entities.Recipe recipe,
         IReadOnlyDictionary<Guid, Domain.Catalog.Entities.ProductVariant> variants)
@@ -451,6 +572,22 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
                 $"Materialized {x.Kind} '{x.SourceKey}' is missing or outside the installation tenant scope.",
                 x.Kind.ToString(), x.Id)).ToArray();
     }
+
+    private static IReadOnlyCollection<WorkspaceBlockerResult> BuildMissingMaterializationEvidenceBlockers(
+        IReadOnlyCollection<ProductionPackageMaterializationExpectation> expectations,
+        IReadOnlyCollection<ProductionPackageMaterialization> materializations) => expectations
+        .Where(expected => materializations.Count(row =>
+            row.ResourceKind == expected.ResourceKind &&
+            (expected.SourceKey is null || row.SourceKey == expected.SourceKey) &&
+            (!expected.ExpectedTargetId.HasValue ||
+             string.Equals(row.TargetKey, expected.ExpectedTargetId.Value.ToString("D"),
+                 StringComparison.OrdinalIgnoreCase))) < expected.ExpectedCount)
+        .Select(expected => new WorkspaceBlockerResult("MaterializationEvidenceMissing",
+            expected.ExpectedTargetId.HasValue
+                ? $"Materialization evidence for {expected.ResourceKind} target '{expected.ExpectedTargetId:D}' is missing or inconsistent."
+                : $"Materialization evidence for {expected.ResourceKind} '{expected.SourceKey}' is missing.",
+            expected.ResourceKind.ToString(), expected.ExpectedTargetId))
+        .ToArray();
 
     private sealed record MaterializedId(ProductionPackageResourceKind Kind, string SourceKey, Guid Id);
     private sealed record RouteOptionPolicyDeficit(

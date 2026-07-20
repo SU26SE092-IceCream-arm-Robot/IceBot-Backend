@@ -3,12 +3,15 @@ using Application.Catalog.Recipes.Mapping;
 using Application.Catalog.Recipes.Results;
 using Application.Catalog.Recipes.Rules;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 using Domain.Catalog.Enums;
 using Domain.Common;
 
 namespace Application.Catalog.Recipes.Commands;
 
-public sealed class SetRecipeStatusCommandHandler(ICatalogAuthoringStore catalog)
+public sealed class SetRecipeStatusCommandHandler(
+    ICatalogAuthoringStore catalog,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<RecipeResult>> HandleAsync(SetRecipeStatusCommand command, CancellationToken ct = default)
     {
@@ -24,6 +27,12 @@ public sealed class SetRecipeStatusCommandHandler(ICatalogAuthoringStore catalog
         if (command.Status == RecipeStatus.Active && recipe.IsDefault &&
             await catalog.HasOtherDefaultRecipeAsync(variant.Id, recipe.Id, ct))
             return ApiResult<RecipeResult>.Fail("Product variant already has a non-retired default recipe.", 409);
+        if (command.Status == RecipeStatus.Retired)
+        {
+            var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+                TechnicalResourceKind.Recipe, recipe.Id, ct);
+            if (ownershipError is not null) return ApiResult<RecipeResult>.Fail(ownershipError, 409);
+        }
 
         try
         {

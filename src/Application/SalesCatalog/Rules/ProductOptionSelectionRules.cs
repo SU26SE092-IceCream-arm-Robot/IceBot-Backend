@@ -9,6 +9,14 @@ public static class ProductOptionSelectionRules
         IReadOnlyCollection<MenuItemProductOptionReadModel> options,
         IReadOnlyCollection<Guid> selectedOptionIds)
     {
+        return Validate(BuildGroupDefinitions(options), options, selectedOptionIds);
+    }
+
+    public static string? Validate(
+        IReadOnlyCollection<MenuItemOptionGroupReadModel> groups,
+        IReadOnlyCollection<MenuItemProductOptionReadModel> options,
+        IReadOnlyCollection<Guid> selectedOptionIds)
+    {
         if (selectedOptionIds.Count != selectedOptionIds.Distinct().Count())
         {
             return "Selected product options must be unique.";
@@ -18,15 +26,14 @@ public static class ProductOptionSelectionRules
             .Where(option => selectedOptionIds.Contains(option.ProductOptionId))
             .ToArray();
 
-        if (selected.Length != selectedOptionIds.Count || selected.Any(option => !option.IsAvailable))
+        if (selected.Length != selectedOptionIds.Count || selected.Any(option => !IsSelectable(option)))
         {
             return "One or more selected product options are unavailable for this menu item.";
         }
 
-        foreach (var group in options.GroupBy(option => option.OptionGroupId))
+        foreach (var definition in groups)
         {
-            var definition = group.First();
-            var count = selected.Count(option => option.OptionGroupId == group.Key);
+            var count = selected.Count(option => option.OptionGroupId == definition.OptionGroupId);
             var minimum = definition.IsRequired ? Math.Max(1, definition.MinSelections) : definition.MinSelections;
             var maximum = definition.SelectionType == OptionSelectionType.Single
                 ? 1
@@ -48,13 +55,41 @@ public static class ProductOptionSelectionRules
 
     public static bool IsSatisfiable(IReadOnlyCollection<MenuItemProductOptionReadModel> options)
     {
-        return options.GroupBy(option => option.OptionGroupId).All(group =>
+        return IsSatisfiable(BuildGroupDefinitions(options), options);
+    }
+
+    public static bool IsSatisfiable(
+        IReadOnlyCollection<MenuItemOptionGroupReadModel> groups,
+        IReadOnlyCollection<MenuItemProductOptionReadModel> options)
+    {
+        return groups.All(definition =>
         {
-            var definition = group.First();
             var minimum = definition.IsRequired ? Math.Max(1, definition.MinSelections) : definition.MinSelections;
             var maximum = definition.SelectionType == OptionSelectionType.Single ? 1 : definition.MaxSelections;
-            var availableCount = group.Count(option => option.IsAvailable);
+            var availableCount = options.Count(option =>
+                option.OptionGroupId == definition.OptionGroupId && IsSelectable(option));
             return availableCount >= minimum && (maximum <= 0 || minimum <= maximum);
         });
     }
+
+    private static MenuItemOptionGroupReadModel[] BuildGroupDefinitions(
+        IReadOnlyCollection<MenuItemProductOptionReadModel> options) =>
+        options.GroupBy(option => option.OptionGroupId)
+            .Select(group =>
+            {
+                var option = group.First();
+                return new MenuItemOptionGroupReadModel(
+                    option.MenuItemId,
+                    option.OptionGroupId,
+                    option.OptionGroupCode,
+                    option.OptionGroupName,
+                    option.SelectionType,
+                    option.MinSelections,
+                    option.MaxSelections,
+                    option.IsRequired);
+            })
+            .ToArray();
+
+    public static bool IsSelectable(MenuItemProductOptionReadModel option) =>
+        option.IsAvailable && option.AreIngredientRequirementsActive;
 }

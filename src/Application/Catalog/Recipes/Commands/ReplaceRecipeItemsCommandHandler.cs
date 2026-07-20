@@ -3,12 +3,15 @@ using Application.Catalog.Recipes.Mapping;
 using Application.Catalog.Recipes.Results;
 using Application.Catalog.Recipes.Rules;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 using Domain.Catalog.Entities;
 using Domain.Common;
 
 namespace Application.Catalog.Recipes.Commands;
 
-public sealed class ReplaceRecipeItemsCommandHandler(ICatalogAuthoringStore catalog)
+public sealed class ReplaceRecipeItemsCommandHandler(
+    ICatalogAuthoringStore catalog,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<RecipeResult>> HandleAsync(ReplaceRecipeItemsCommand command, CancellationToken ct = default)
     {
@@ -17,6 +20,9 @@ public sealed class ReplaceRecipeItemsCommandHandler(ICatalogAuthoringStore cata
         if (error is not null) return error;
         var recipe = await catalog.GetRecipeAsync(variant!.Id, command.RecipeId, false, ct);
         if (recipe is null) return ApiResult<RecipeResult>.Fail("Recipe not found.", 404);
+        var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.Recipe, recipe.Id, ct);
+        if (ownershipError is not null) return ApiResult<RecipeResult>.Fail(ownershipError, 409);
 
         var validationError = RecipeAuthoringRules.ValidateItems(command.Request.Items);
         if (validationError is not null) return ApiResult<RecipeResult>.Fail(validationError);

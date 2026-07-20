@@ -4,11 +4,6 @@ using System.Text.Json;
 using Domain.Common;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.ProductionConfiguration.Entities;
-using Application.Identity.Tokens.Claims;
-using Application.ProductionConfiguration.Deployments.Abstractions;
-using Application.ProductionConfiguration.Releases.Abstractions;
-using Application.Shared.Wrappers;
-using Application.Tenants;
 
 namespace Application.ProductionConfiguration.Deployments.Services;
 
@@ -51,32 +46,5 @@ public sealed class DeploymentValidationService
             throw new DomainRuleException("Deployment validation report is missing or stale. Preview validation again.");
         if (report.RequiresAcknowledgement && !acknowledged)
             throw new DomainRuleException("Authorized organization acknowledgement is required for the remaining deployment risk.");
-    }
-}
-
-public sealed class DeploymentValidationPreviewHandler(
-    IConfigurationReleaseStore releases,
-    IConfigurationDeploymentStore deployments,
-    DeploymentValidationService validation)
-{
-    public async Task<ApiResult<DeploymentValidationReport>> HandleAsync(
-        CurrentUserContext user, Guid kioskId, Guid releaseId, Guid endpointId,
-        CancellationToken cancellationToken)
-    {
-        var release = await releases.GetPublishedReleaseForDeploymentAsync(releaseId, cancellationToken);
-        var endpoint = await deployments.GetEndpointForDeploymentAsync(endpointId, cancellationToken);
-        if (release is null || endpoint is null || endpoint.KioskId != kioskId)
-            return ApiResult<DeploymentValidationReport>.Fail("Release or execution endpoint not found.", 404);
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleaseDeploy, user,
-                endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, kioskId))
-            return ApiResult<DeploymentValidationReport>.Fail("Access denied.", 403);
-        try
-        {
-            return ApiResult<DeploymentValidationReport>.Success(validation.Build(release, endpoint));
-        }
-        catch (DomainRuleException ex)
-        {
-            return ApiResult<DeploymentValidationReport>.Fail(ex.Message, 409);
-        }
     }
 }

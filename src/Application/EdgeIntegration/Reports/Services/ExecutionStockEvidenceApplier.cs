@@ -22,9 +22,29 @@ internal static class ExecutionStockEvidenceApplier
         var endpoint = context.Endpoint;
         var edgeCommand = context.EdgeCommand;
         var notifications = context.Notifications;
+        await store.AcquireDispenserMutationLocksAsync(
+            command.StockMovements.Select(evidence => evidence.IngredientDispenserStateId),
+            cancellationToken);
+
         foreach (var evidence in command.StockMovements)
         {
-            if (await store.StockMovementExistsAsync(evidence.SourceEventId, cancellationToken)) continue;
+            var existingMovement = await store.GetStockMovementBySourceEventIdAsync(
+                evidence.SourceEventId, cancellationToken);
+            if (existingMovement is not null)
+            {
+                if (existingMovement.IngredientDispenserStateId != evidence.IngredientDispenserStateId ||
+                    existingMovement.Quantity != -evidence.QuantityConsumed ||
+                    existingMovement.ReferenceId != edgeCommand.OrderId ||
+                    existingMovement.OriginNodeId != context.SourceExecutorId ||
+                    existingMovement.IsEstimated != evidence.IsEstimated ||
+                    evidence.BalanceAfter.HasValue && existingMovement.BalanceAfter != evidence.BalanceAfter)
+                {
+                    throw new DomainRuleException(
+                        "Stock movement source event id was reused with different evidence.");
+                }
+
+                continue;
+            }
             var state = await store.GetDispenserStateAsync(evidence.IngredientDispenserStateId, cancellationToken)
                 ?? throw new DomainRuleException("Stock movement dispenser state was not found.");
             if (state.KioskId != endpoint.KioskId || state.Kiosk is null)
@@ -38,15 +58,17 @@ internal static class ExecutionStockEvidenceApplier
             }
 
             var occurredAt = evidence.OccurredAt ?? command.EdgeCreatedAt;
-            var balanceBefore = state.EstimatedQuantity;
-            if (evidence.BalanceAfter.HasValue)
-                state.RecordSensorLevel(state.CurrentLevelStatus, occurredAt, estimatedQuantity: evidence.BalanceAfter.Value);
-
-            var movement = StockMovement.Create(
-                state.Id, state.Kiosk.OrganizationId, state.Kiosk.StoreId, state.KioskId, state.DeviceId,
-                state.IngredientId, "CONSUME", -evidence.QuantityConsumed, balanceBefore, evidence.BalanceAfter, state.Unit,
-                occurredAt, "PRODUCTION_EXECUTION", "Order", edgeCommand.OrderId, evidence.SourceEventId,
-                evidence.IsEstimated);
+            var movement = state.ConsumeWithEvidence(
+                evidence.QuantityConsumed,
+                occurredAt,
+                evidence.BalanceAfter,
+                "Order",
+                edgeCommand.OrderId,
+                evidence.SourceEventId);
+            movement.OrganizationId = state.Kiosk.OrganizationId;
+            movement.StoreId = state.Kiosk.StoreId;
+            movement.ReasonCode = "PRODUCTION_EXECUTION";
+            movement.IsEstimated = evidence.IsEstimated;
             movement.OriginNodeId = context.SourceExecutorId;
             movement.Version = command.SequenceNumber;
             movement.CorrelationId = edgeCommand.OrderId;
@@ -58,7 +80,7 @@ internal static class ExecutionStockEvidenceApplier
                 DispenserStateId = state.Id, KioskId = state.KioskId!.Value,
                 OrganizationId = state.Kiosk.OrganizationId, StoreId = state.Kiosk.StoreId,
                 IngredientName = state.Ingredient.Name,
-                EstimatedQuantity = state.EstimatedQuantity ?? evidence.BalanceAfter ?? 0,
+                EstimatedQuantity = state.EstimatedQuantity,
                 Unit = state.Unit, Status = state.CurrentLevelStatus.ToString(), UpdatedAt = occurredAt, Version = 1
             });
         }

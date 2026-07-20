@@ -71,6 +71,10 @@ public interface IMenuStore
         IReadOnlyCollection<Guid> menuItemIds,
         CancellationToken cancellationToken = default);
 
+    Task<List<MenuItemOptionGroupReadModel>> ListMenuItemOptionGroupsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default);
+
     Task<bool> MenuCodeExistsAsync(
         Guid? organizationId,
         Guid? storeId,

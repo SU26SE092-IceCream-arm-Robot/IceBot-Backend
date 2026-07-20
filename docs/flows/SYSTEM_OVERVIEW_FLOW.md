@@ -58,7 +58,7 @@ Use transport by receiver and durability need, not by the broad label "realtime"
 | --- | --- | --- |
 | Cloud to human UI | SignalR | Realtime UI deltas, ephemeral state, dashboard invalidation, order/payment/ticket/status updates |
 | Cloud to Edge/Kiosk/Robot runtime | MQTT plus command pull / durable sync | Wake-up notifications, runtime command availability, device/robot event stream |
-| Edge/Kiosk to Cloud | REST batch sync or MQTT event notification | Heartbeats, device events, execution results, offline order sync evidence |
+| Edge/Kiosk to Cloud | REST batch sync or MQTT event notification | Heartbeats, device events, execution results, production-event checkpoints, and latest-state summaries |
 | Cloud to payment/external providers | HTTP SDK/webhook | Provider session creation, callback verification, external identity/email/payment operations |
 | Cloud internal async dispatch | Outbox/background worker | Reliable post-commit dispatch to MQTT, provider retry, sync fan-out, future durable realtime |
 | Snapshot/query/CRUD | REST/GraphQL | Initial state, detail reads, search/filter/list, commands, audit/history/reporting |

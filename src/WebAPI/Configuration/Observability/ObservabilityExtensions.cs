@@ -4,8 +4,11 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Sinks.OpenTelemetry;
 using Application.EdgeIntegration.Observability;
+using Application.ProductionPackages.Upgrades;
 using Infrastructure.Payments.Observability;
 using Infrastructure.Firebase;
+using Application.RobotConfiguration.AuthoringImports;
+using Infrastructure.Operations.Notifications;
 
 namespace WebAPI.Configuration.Observability;
 
@@ -77,6 +80,7 @@ public static class ObservabilityExtensions
             .WithTracing(tracing =>
             {
                 tracing
+                    .AddSource(RobotAuthoringImportObservability.InstrumentationName)
                     .AddAspNetCoreInstrumentation(options =>
                     {
                         // Filter out health and swagger noise
@@ -105,6 +109,9 @@ public static class ObservabilityExtensions
                     .AddMeter(IceBotEdgeMetrics.MeterName)
                     .AddMeter(PayOsResilienceMetrics.MeterName)
                     .AddMeter(FirebaseAccountPushNotificationSender.MeterName)
+                    .AddMeter(RobotAuthoringImportObservability.InstrumentationName)
+                    .AddMeter(ProductionPackageUpgradeMetrics.MeterName)
+                    .AddMeter(NotificationDeliveryMetrics.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();

@@ -12,15 +12,7 @@ public sealed class PublishConfigurationReleaseCommandHandler
 {
     private readonly IConfigurationReleaseStore _releaseStore;
     private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
-    private readonly ProductionDefinitionPublicationService? _productionDefinitions;
-
-    public PublishConfigurationReleaseCommandHandler(
-        IConfigurationReleaseStore releaseStore,
-        ProductionInventoryReadinessGuard inventoryReadiness)
-    {
-        _releaseStore = releaseStore;
-        _inventoryReadiness = inventoryReadiness;
-    }
+    private readonly ProductionDefinitionPublicationService _productionDefinitions;
 
     public PublishConfigurationReleaseCommandHandler(
         IConfigurationReleaseStore releaseStore,
@@ -50,7 +42,7 @@ public sealed class PublishConfigurationReleaseCommandHandler
         try
         {
             var snapshots = PublishedRobotProgramSnapshotFactory.CreateForPublication(release);
-            _productionDefinitions?.Build(release, snapshots);
+            _productionDefinitions.Build(release, snapshots);
             release.PreparePublication(command.UserContext.AccountId, snapshots);
             var readiness = await _inventoryReadiness.EvaluatePublishAsync(release, cancellationToken);
             if (readiness.IsBlocked)

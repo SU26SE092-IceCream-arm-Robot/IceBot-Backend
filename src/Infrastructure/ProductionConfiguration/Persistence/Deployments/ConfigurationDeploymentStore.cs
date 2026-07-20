@@ -4,6 +4,7 @@ using Domain.Devices.ExecutionEndpoints;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Sync.Enums;
+using Domain.Devices.ExecutionEndpoints.Projections;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -69,6 +70,28 @@ public sealed class ConfigurationDeploymentStore : IConfigurationDeploymentStore
             .Include(endpoint => endpoint.CredentialBinding)
             .Include(endpoint => endpoint.SupportedRobotTargets).ThenInclude(target => target.Device)
             .FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId && endpoint.Kiosk.DeletedAt == null, cancellationToken);
+
+    public async Task<IReadOnlyList<KioskExecutionEndpoint>> ListEndpointsForDeploymentAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.KioskExecutionEndpoints.WhereNotDeleted().AsNoTracking()
+            .Include(endpoint => endpoint.Kiosk)
+            .Include(endpoint => endpoint.CredentialBinding)
+            .Include(endpoint => endpoint.SupportedRobotTargets).ThenInclude(target => target.Device)
+            .Where(endpoint => endpoint.KioskId == kioskId && endpoint.Kiosk.DeletedAt == null)
+            .OrderBy(endpoint => endpoint.EndpointCode)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ExecutionEndpointReadinessProjection>> ListEndpointReadinessAsync(
+        IEnumerable<Guid> endpointIds,
+        CancellationToken cancellationToken = default)
+    {
+        var ids = endpointIds.Distinct().ToArray();
+        return await _dbContext.ExecutionEndpointReadinessProjections.AsNoTracking()
+            .Include(projection => projection.Capabilities)
+            .Where(projection => ids.Contains(projection.KioskExecutionEndpointId))
+            .ToListAsync(cancellationToken);
+    }
 
     public Task<bool> HasPendingFullEdgeDeploymentAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
         _dbContext.KioskConfigurationDeployments.AnyAsync(deployment => deployment.KioskId == kioskId &&

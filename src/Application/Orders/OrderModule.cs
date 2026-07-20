@@ -22,6 +22,7 @@ public static class OrderModule
         services.AddScoped<Management.Commands.RedispatchOrderExecutionCommandHandler>();
         services.AddScoped<Management.Commands.RecordManualOrderItemFulfillmentEventCommandHandler>();
         services.AddScoped<Management.Commands.SetPackagedOrderItemFulfillmentCommandHandler>();
+        services.AddScoped<Management.Automation.FulfillmentReminderService>();
 
         return services;
     }

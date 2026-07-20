@@ -97,6 +97,9 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | PayOS cancel URL | `PayOS__CancelUrl` | **P0 Feature** | Environment-specific public URL required for checkout cancellation. |
 | PayOS base URL | `PayOS__BaseUrl` | **P2** | Use the appsettings provider URL unless PayOS changes the endpoint or a test stub is used. |
 | PayOS resilience | `PayOS__Resilience__AttemptTimeoutSeconds`, `__TotalTimeoutSeconds`, `__CircuitBreakerFailureRatio`, `__CircuitBreakerMinimumThroughput`, `__CircuitBreakerSamplingDurationSeconds`, `__CircuitBreakerBreakDurationSeconds` | **P2** | Dependency-specific timeout and circuit settings. Payment-creation `POST` retry remains disabled. Settings are startup-validated. |
+| Enable payment-session reconciliation | `Payments__SessionReconciliation__Enabled` | **P1** | Keep the appsettings default `true` when PayOS checkout is enabled. The worker repairs responses lost after provider session creation without repeating the create `POST`. |
+| Payment-session reconciliation timing | `Payments__SessionReconciliation__IntervalSeconds`, `__StaleAfterSeconds`, `__RetryDelaySeconds` | **P2** | Start with the appsettings defaults. Increase the interval or delay only when provider rate limits require it. Settings are startup-validated. |
+| Payment-session reconciliation batch | `Payments__SessionReconciliation__BatchSize` | **P2** | Maximum pending transactions queried per scan; appsettings default is `50`. |
 
 ## Robot Artifact Storage
 
@@ -116,6 +119,7 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Orphan grace period | `RobotArtifacts__ObjectStorage__OrphanGracePeriodHours` | **P2** | Use appsettings default `24`. |
 | Orphan cleanup interval | `RobotArtifacts__ObjectStorage__OrphanCleanupIntervalHours` | **P2** | Use appsettings default `24`. |
 | Cleanup delete limit | `RobotArtifacts__ObjectStorage__OrphanCleanupMaxDeletesPerRun` | **P2** | Use appsettings default `100`. |
+| Authoring import staging retention | `RobotArtifacts__ObjectStorage__AuthoringImportRetentionHours` | **P2** | Use appsettings default `168` hours. The window applies to Applied import staging; Uploaded, Validated, and Failed imports retain staging while retry actions remain available. Discarded imports are eligible for cleanup after the orphan grace period. Import metadata/provenance remains in PostgreSQL after staging ZIP removal. |
 
 Object storage is validated before background jobs start. Connection failure, invalid credentials, or a missing bucket while `AutoCreateBucket=false` stops application startup. This prevents the API from reporting healthy while artifact upload and deployment are unavailable.
 
@@ -135,6 +139,9 @@ Object storage is validated before background jobs start. Connection failure, in
 | Low-cost artifact bytes | `LowCostControllerCapacity__MaxArtifactStorageBytes` | **P1** | Configure from controller storage capacity; default is 50 MiB. |
 | Release publish inventory policy | `ProductionInventoryReadiness__PublishPolicy` | **P1** | `Warn` by default. Use `Block` only when every applicable kiosk must be provisioned before release publication. |
 | Release deploy inventory policy | `ProductionInventoryReadiness__DeployPolicy` | **P1** | `Block` by default. `Warn` permits deployment while returning detailed readiness warnings. |
+| Upgrade reconciliation enabled | `ProductionPackageUpgrade__Reconciliation__Enabled` | **P1** | Keep enabled so crashed or abandoned materialization work cannot lock a source installation indefinitely. |
+| Upgrade materialization timeout | `ProductionPackageUpgrade__Reconciliation__MaterializingTimeoutMinutes` | **P1** | Maximum interval without persisted progress before a Materializing upgrade is marked Failed; default is `15`. |
+| Upgrade reconciliation schedule | `ProductionPackageUpgrade__Reconciliation__IntervalSeconds`, `__BatchSize` | **P2** | Defaults are `60` seconds and `100` candidates. Settings are startup-validated. |
 | Enable order execution dispatch | `OrderExecutionDispatch__Enabled` | **P1** | Keep enabled when paid machine-produced orders must be dispatched to Edge. |
 | Execute-order command expiry | `OrderExecutionDispatch__CommandExpiryMinutes` | **P1** | Review against kiosk queue and customer-wait policy; default is `30`. |
 | Active commands per endpoint | `OrderExecutionDispatch__MaxActiveCommandsPerEndpoint` | **P1** | Set from real Edge capacity; default is `20`. |
@@ -157,7 +164,15 @@ Object storage is validated before background jobs start. Connection failure, in
 | Retention schedule | `DataRetention__IntervalHours` | **P2** | Default `24` hours. The job runs once at startup, then on this interval. |
 | Raw telemetry retention | `DataRetention__HeartbeatDays`, `DataRetention__DeviceEventDays`, `DataRetention__OperationLogDays` | **P1** | Defaults: heartbeat `30`, device events `90`, operation logs `90` days. Ticket-referenced device events are protected. |
 | Processed inbox retention | `DataRetention__ProcessedSyncInboxDays` | **P1** | Default `180` days. Applies only to Processed/Ignored rows without a dead-letter reference. |
+| Expired identity credential retention | `DataRetention__ExpiredIdentityCredentialDays` | **P1** | Default `30` days after expiry for refresh tokens, password-reset requests, and account invitations. Active credentials are never purged. |
+| Notification delivery retention | `DataRetention__NotificationDeliveryDays` | **P1** | Default `90` days. Ordinary Delivered/PermanentFailure outbox rows are purged; pending/retryable rows and durable idempotency evidence for `deployment_failed`, `fulfillment_overdue`, and `payment_intervention` are retained. |
 | Retention work limits | `DataRetention__BatchSize`, `DataRetention__MaxBatchesPerRun` | **P1** | Defaults `1000` rows per SQL delete and `20` batches per entity per run. Tune against database load. |
+| Inventory alert automation | `InventoryAlertAutomation__Enabled`, `__IntervalSeconds`, `__BatchSize`, `__MaxBatchesPerRun` | **P1** | Enabled by default. Reconciles Low/Empty dispenser states with actionable alerts using bounded batches. |
+| Empty inventory ticket creation | `InventoryAlertAutomation__CreateMaintenanceTicketForEmpty` | **P1** | Default `true`; creates one alert-linked maintenance ticket for each Empty incident. |
+| Durable push delivery | `NotificationDelivery__Enabled`, `__IntervalSeconds`, `__BatchSize` | **P1** | Enabled by default. Disable only when Firebase delivery is intentionally unavailable; pending rows remain durable. |
+| Push retry policy | `NotificationDelivery__ProcessingTimeoutSeconds`, `__BaseRetryDelaySeconds` | **P1** | Defaults `120` and `30` seconds. Processing rows older than the timeout are reclaimed; transient failures use exponential delay. |
+| Fulfillment overdue reminders | `FulfillmentReminder__Enabled`, `__IntervalSeconds`, `__BatchSize` | **P1** | Enabled by default. Scans paid Manual/Packaged items with configured preparation time and enqueues one durable reminder per eligible recipient. It never changes order state. |
+| Deployment failure notifications | `DeploymentFailureNotification__Enabled`, `__IntervalSeconds`, `__BatchSize` | **P1** | Enabled by default. Reconciles committed failed Full Edge/Low-cost deployments into one durable notification per eligible recipient. |
 | Enable MQTT command wake-up | `EdgeCommandMqtt__Enabled` | **P1** | Default `false`; enable only when a broker and endpoint subscriptions are configured. Polling remains authoritative. |
 | MQTT broker host/port | `EdgeCommandMqtt__Host`, `EdgeCommandMqtt__Port` | **P0 Feature** | Required when MQTT wake-up is enabled. Defaults are `localhost:1883` for local development only. |
 | MQTT TLS | `EdgeCommandMqtt__UseTls` | **P0 Secret/Security** | Enable for production broker connections. Certificate trust uses the host OS trust store. |

@@ -81,6 +81,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             return null;
         }
 
+        await _store.AcquireOrderWorkflowLockAsync(edgeCommand.OrderId.Value, cancellationToken);
         var order = await _store.GetOrderAsync(edgeCommand.OrderId.Value, cancellationToken);
         if (order is null)
         {

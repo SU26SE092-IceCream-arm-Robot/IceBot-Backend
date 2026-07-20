@@ -1,15 +1,20 @@
 using Application.Catalog.Abstractions;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 
 namespace Application.Catalog.Products.Commands;
 
 public sealed class DeleteProductCommandHandler
 {
     private readonly IProductStore _products;
+    private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
 
-    public DeleteProductCommandHandler(IProductStore products)
+    public DeleteProductCommandHandler(
+        IProductStore products,
+        ITechnicalResourceMutationPolicy technicalOwnership)
     {
         _products = products;
+        _technicalOwnership = technicalOwnership;
     }
 
     public async Task<ApiResult<bool>> HandleAsync(
@@ -27,6 +32,10 @@ public sealed class DeleteProductCommandHandler
         {
             return accessError;
         }
+
+        var ownershipError = await _technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.Product, product.Id, cancellationToken);
+        if (ownershipError is not null) return ApiResult<bool>.Fail(ownershipError, 409);
 
         var now = DateTimeOffset.UtcNow;
         product.DeletedAt = now;

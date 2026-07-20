@@ -15,6 +15,7 @@ using Application.Tenants;
 using Domain.Common;
 using Domain.RobotConfiguration.Artifacts;
 using Domain.Catalog.Enums;
+using Application.Shared.Ownership;
 
 namespace Application.ProductionConfiguration.Routes.Commands;
 
@@ -22,13 +23,16 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
 {
     private readonly IConfigurationReleaseStore _releaseStore;
     private readonly IConfigurationRouteStore _routeStore;
+    private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
 
     public ReplaceConfigurationReleaseRoutesCommandHandler(
         IConfigurationReleaseStore releaseStore,
-        IConfigurationRouteStore routeStore)
+        IConfigurationRouteStore routeStore,
+        ITechnicalResourceMutationPolicy technicalOwnership)
     {
         _releaseStore = releaseStore;
         _routeStore = routeStore;
+        _technicalOwnership = technicalOwnership;
     }
 
     public async Task<ApiResult<ConfigurationReleaseResult>> HandleAsync(
@@ -51,6 +55,11 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
         {
             return ApiResult<ConfigurationReleaseResult>.Fail("Access denied.", 403);
         }
+
+        var ownershipError = await _technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.ConfigurationRelease, release.Id, cancellationToken);
+        if (ownershipError is not null)
+            return ApiResult<ConfigurationReleaseResult>.Fail(ownershipError, 409);
 
         var recipeIds = command.Routes.Select(route => route.RecipeId).Distinct().ToArray();
         var programIds = command.Routes.SelectMany(route => route.RobotBindings)

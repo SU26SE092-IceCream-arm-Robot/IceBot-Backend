@@ -38,6 +38,7 @@ public sealed class SetPackagedOrderItemFulfillmentCommandHandler(
         OrderItemFulfillmentChangedEvent? itemChangedEvent = null;
         var result = await orders.ExecuteInTransactionAsync(async ct =>
         {
+            await orders.AcquireOrderWorkflowLockAsync(command.OrderId, ct);
             var order = await orders.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null) return ApiResult<ManagementOrderDetailResult>.Fail("Order not found.", 404);
             if (!ScopeAccessRules.CanAccessScopedRow(

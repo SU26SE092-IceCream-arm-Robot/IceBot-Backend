@@ -28,6 +28,7 @@ using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.RobotConfiguration.Artifacts;
 using Domain.RobotConfiguration.ArtifactContracts;
+using Domain.RobotConfiguration.AuthoringImports;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.DeadLetters;
 using Domain.Sync.Entities;
@@ -95,5 +96,49 @@ internal sealed class RobotArtifactTemplateConfiguration : IEntityTypeConfigurat
         entity.Property(x => x.TechnicalContractChecksum).HasMaxLength(64);
         entity.HasOne<RobotArtifactTechnicalContract>().WithMany().HasForeignKey(x => x.TechnicalContractId).OnDelete(DeleteBehavior.Restrict);
 
+    }
+}
+
+internal sealed class RobotAuthoringImportConfiguration : IEntityTypeConfiguration<RobotAuthoringImport>
+{
+    public void Configure(EntityTypeBuilder<RobotAuthoringImport> entity)
+    {
+        entity.ToTable("RobotAuthoringImports");
+        entity.HasIndex(x => new { x.OrganizationId, x.IdempotencyKey }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasIndex(x => new { x.OrganizationId, x.ClientExportId, x.ImportChecksum });
+        entity.HasIndex(x => new { x.Status, x.CreatedAt });
+        entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
+        entity.Property(x => x.ImportChecksum).HasMaxLength(64);
+        entity.Property(x => x.ValidationReportJson).HasColumnType("jsonb");
+        entity.Property(x => x.ComposedOptionCodesJson).HasColumnType("jsonb");
+        entity.Property(x => x.CompositionPreviewChecksum).HasMaxLength(64);
+        entity.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Store>().WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Kiosk>().WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Device>().WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<RobotProgram>().WithMany().HasForeignKey(x => x.AppliedRobotProgramId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Recipe>().WithMany().HasForeignKey(x => x.ComposedRecipeId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ConfigurationRelease>().WithMany().HasForeignKey(x => x.LinkedConfigurationReleaseId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.Navigation(x => x.Items).UsePropertyAccessMode(PropertyAccessMode.Field);
+    }
+}
+
+internal sealed class RobotAuthoringImportItemConfiguration : IEntityTypeConfiguration<RobotAuthoringImportItem>
+{
+    public void Configure(EntityTypeBuilder<RobotAuthoringImportItem> entity)
+    {
+        entity.ToTable("RobotAuthoringImportItems");
+        entity.HasIndex(x => new { x.RobotAuthoringImportId, x.RunOrder }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasIndex(x => new { x.RobotAuthoringImportId, x.ArtifactCode }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.Property(x => x.LuaChecksum).HasMaxLength(64);
+        entity.Property(x => x.SidecarChecksum).HasMaxLength(64);
+        entity.HasOne(x => x.RobotAuthoringImport).WithMany(x => x.Items)
+            .HasForeignKey(x => x.RobotAuthoringImportId).OnDelete(DeleteBehavior.Cascade);
+        entity.HasOne<RobotArtifact>().WithMany().HasForeignKey(x => x.RobotArtifactId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<RobotArtifactTechnicalContract>().WithMany().HasForeignKey(x => x.TechnicalContractId).OnDelete(DeleteBehavior.Restrict);
     }
 }

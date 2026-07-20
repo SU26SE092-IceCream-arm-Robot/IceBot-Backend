@@ -9,6 +9,7 @@ using Domain.Common;
 using Domain.RobotConfiguration.Artifacts;
 using Application.RobotConfiguration.ArtifactContracts;
 using Domain.RobotConfiguration.ArtifactContracts;
+using Application.Shared.Concurrency;
 
 namespace Application.RobotConfiguration.Artifacts.Commands;
 
@@ -17,21 +18,17 @@ public sealed class UploadRobotArtifactCommandHandler
     private readonly IRobotArtifactStore _robotArtifactStore;
     private readonly ArtifactUploadContentService _contentService;
     private readonly IRobotArtifactTechnicalContractStore? _technicalContracts;
-
-    public UploadRobotArtifactCommandHandler(
-        IRobotArtifactStore robotArtifactStore,
-        ArtifactUploadContentService contentService)
-    {
-        _robotArtifactStore = robotArtifactStore;
-        _contentService = contentService;
-    }
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
     public UploadRobotArtifactCommandHandler(
         IRobotArtifactStore robotArtifactStore,
         ArtifactUploadContentService contentService,
-        IRobotArtifactTechnicalContractStore technicalContracts)
-        : this(robotArtifactStore, contentService)
+        ITechnicalResourceMutationCoordinator mutationCoordinator,
+        IRobotArtifactTechnicalContractStore? technicalContracts = null)
     {
+        _robotArtifactStore = robotArtifactStore;
+        _contentService = contentService;
+        _mutations = mutationCoordinator;
         _technicalContracts = technicalContracts;
     }
 
@@ -65,19 +62,6 @@ public sealed class UploadRobotArtifactCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("MetadataJson must be a valid JSON string.", 400);
         }
 
-        RobotArtifactTechnicalContract? technicalContract = null;
-        if (command.TechnicalContractId.HasValue)
-        {
-            if (_technicalContracts is null)
-                return ApiResult<RobotArtifactResult>.Fail("Technical contract validation is unavailable.", 503);
-            technicalContract = await _technicalContracts.GetAsync(command.TechnicalContractId.Value, false, cancellationToken);
-            if (technicalContract is null || technicalContract.Status != RobotArtifactContractStatus.Published ||
-                (technicalContract.OrganizationId.HasValue && technicalContract.OrganizationId != command.OrganizationId) ||
-                !string.Equals(technicalContract.RuntimeTargetCode, command.RuntimeTargetCode.Trim(), StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(technicalContract.MachineModelCode, command.MachineModelCode.Trim(), StringComparison.OrdinalIgnoreCase))
-                return ApiResult<RobotArtifactResult>.Fail("Published compatible technical contract not found.", 400);
-        }
-
         BufferedArtifactContent bufferedContent;
         try
         {
@@ -92,8 +76,41 @@ public sealed class UploadRobotArtifactCommandHandler
         }
 
         await using var _ = bufferedContent;
-        var checksum = bufferedContent.Checksum;
         var normalizedArtifactCode = NormalizeCode(command.ArtifactCode);
+        var mutationResources = new List<TechnicalResourceMutationIdentity>
+        {
+            TechnicalResourceMutationIdentity.ArtifactDefinition(command.OrganizationId, normalizedArtifactCode)
+        };
+        if (command.TechnicalContractId.HasValue)
+            mutationResources.Add(TechnicalResourceMutationIdentity.Contract(command.TechnicalContractId.Value));
+
+        return await _mutations.ExecuteAsync(
+            mutationResources,
+            ct => UploadLockedAsync(command, bufferedContent, normalizedArtifactCode, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<RobotArtifactResult>> UploadLockedAsync(
+        UploadRobotArtifactCommand command,
+        BufferedArtifactContent bufferedContent,
+        string normalizedArtifactCode,
+        CancellationToken cancellationToken)
+    {
+        RobotArtifactTechnicalContract? technicalContract = null;
+        if (command.TechnicalContractId.HasValue)
+        {
+            if (_technicalContracts is null)
+                return ApiResult<RobotArtifactResult>.Fail("Technical contract validation is unavailable.", 503);
+            technicalContract = await _technicalContracts.GetAsync(
+                command.TechnicalContractId.Value, false, cancellationToken);
+            if (technicalContract is null || technicalContract.Status != RobotArtifactContractStatus.Published ||
+                (technicalContract.OrganizationId.HasValue && technicalContract.OrganizationId != command.OrganizationId) ||
+                !string.Equals(technicalContract.RuntimeTargetCode, command.RuntimeTargetCode.Trim(), StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(technicalContract.MachineModelCode, command.MachineModelCode.Trim(), StringComparison.OrdinalIgnoreCase))
+                return ApiResult<RobotArtifactResult>.Fail("Published compatible technical contract not found.", 400);
+        }
+
+        var checksum = bufferedContent.Checksum;
         var normalizedRuntimeTargetCode = NormalizeCode(command.RuntimeTargetCode);
         var normalizedMachineModelCode = NormalizeCode(command.MachineModelCode);
 

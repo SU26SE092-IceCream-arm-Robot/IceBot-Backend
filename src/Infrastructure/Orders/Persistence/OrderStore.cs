@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Application.SalesCatalog.ReadModels;
 using Application.Orders.PlaceOrder.ReadModels;
+using Application.ProductionConfiguration.Routes.Support;
 
 namespace Infrastructure.Orders.Persistence;
 
@@ -134,7 +135,12 @@ public sealed class OrderStore : IOrderStore
         _dbContext.KioskConnectivityProjections.AsNoTracking()
             .FirstOrDefaultAsync(connectivity => connectivity.KioskId == kioskId, cancellationToken);
 
-    public Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default)
+    public Task<MenuItem?> GetMenuItemForKioskAsync(
+        Guid menuItemId,
+        Guid? organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default)
     {
         return _dbContext.MenuItems
             .Include(menuItem => menuItem.Menu)
@@ -143,7 +149,15 @@ public sealed class OrderStore : IOrderStore
             .Include(menuItem => menuItem.Recipe)
                 .ThenInclude(recipe => recipe!.RecipeItems)
                     .ThenInclude(item => item.Ingredient)
-            .FirstOrDefaultAsync(menuItem => menuItem.Id == menuItemId, cancellationToken);
+            .FirstOrDefaultAsync(menuItem =>
+                menuItem.Id == menuItemId &&
+                menuItem.Menu.OrganizationId == organizationId &&
+                (!menuItem.Menu.StoreId.HasValue || menuItem.Menu.StoreId == storeId) &&
+                (!menuItem.Menu.KioskId.HasValue || menuItem.Menu.KioskId == kioskId) &&
+                menuItem.Product.OrganizationId == organizationId &&
+                (!menuItem.Product.StoreId.HasValue || menuItem.Product.StoreId == storeId) &&
+                (!menuItem.Product.KioskId.HasValue || menuItem.Product.KioskId == kioskId),
+                cancellationToken);
     }
 
     public Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
@@ -171,8 +185,30 @@ public sealed class OrderStore : IOrderStore
                     option.PriceDelta,
                     option.ExecutionImpact,
                     option.IsAvailable,
+                    !_dbContext.ProductOptionIngredientRequirements.Any(requirement =>
+                        requirement.ProductOptionId == option.Id && !requirement.Ingredient.IsActive),
                     option.IsDefault,
                     option.DisplayOrder))
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<MenuItemOptionGroupReadModel>> ListMenuItemOptionGroupsAsync(
+        Guid menuItemId,
+        CancellationToken cancellationToken = default)
+    {
+        return (from menuItem in _dbContext.MenuItems.AsNoTracking()
+                join optionGroup in _dbContext.OptionGroups.AsNoTracking()
+                    on menuItem.ProductId equals optionGroup.ProductId
+                where menuItem.Id == menuItemId && optionGroup.IsActive
+                select new MenuItemOptionGroupReadModel(
+                    menuItem.Id,
+                    optionGroup.Id,
+                    optionGroup.Code,
+                    optionGroup.Name,
+                    optionGroup.SelectionType,
+                    optionGroup.MinSelections,
+                    optionGroup.MaxSelections,
+                    optionGroup.IsRequired))
             .ToListAsync(cancellationToken);
     }
 
@@ -206,7 +242,7 @@ public sealed class OrderStore : IOrderStore
         Guid recipeId,
         CancellationToken cancellationToken = default)
     {
-        var route = await _dbContext.ExecutionEndpointReadinessProjections
+        var routes = await _dbContext.ExecutionEndpointReadinessProjections
             .AsNoTracking()
             .Where(readiness =>
                 readiness.KioskId == kioskId && readiness.Readiness == ExecutionReadinessState.Ready &&
@@ -229,8 +265,11 @@ public sealed class OrderStore : IOrderStore
                     route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
                         capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
             .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
-            .Select(route => new { route.Id, route.SupportedOptionCodesJson })
-            .FirstOrDefaultAsync(cancellationToken);
+            .Select(route => new { route.Id, route.SupportedOptionCodesJson, route.RequiredCapabilitiesJson })
+            .ToListAsync(cancellationToken);
+        var route = routes.FirstOrDefault(candidate =>
+            !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
+                candidate.RequiredCapabilitiesJson));
         return route is null ? null : new ActiveProductionRouteOptionPolicy(route.Id,
             (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
                 .ToHashSet(StringComparer.OrdinalIgnoreCase));
@@ -349,6 +388,13 @@ public sealed class OrderStore : IOrderStore
             $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0));",
             cancellationToken);
     }
+
+    public Task AcquireOrderWorkflowLockAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({Application.Orders.Support.OrderWorkflowConcurrency.OrderLockKey(orderId)}, 0));",
+            cancellationToken);
 
     public Task<int> CountExecutionAttemptsAsync(
         Guid orderId,
@@ -590,4 +636,5 @@ public sealed class OrderStore : IOrderStore
             throw;
         }
     }
+
 }

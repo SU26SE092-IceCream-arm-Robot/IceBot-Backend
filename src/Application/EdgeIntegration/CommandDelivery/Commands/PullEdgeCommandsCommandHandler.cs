@@ -45,6 +45,16 @@ public sealed class PullEdgeCommandsCommandHandler
             return ApiResult<EdgeCommandPullResult>.Fail("Execution endpoint authentication failed.", 401);
         }
 
+        return await _edgeCommandStore.ExecuteEndpointDeliverySerializedAsync(
+            command.EndpointId,
+            ct => PullLockedAsync(command, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<EdgeCommandPullResult>> PullLockedAsync(
+        PullEdgeCommandsCommand command,
+        CancellationToken cancellationToken)
+    {
         var now = DateTimeOffset.UtcNow;
         var maxCommands = Math.Clamp(command.MaxCommands, 1, 20);
         var commands = await _edgeCommandStore.ListDispatchableAsync(

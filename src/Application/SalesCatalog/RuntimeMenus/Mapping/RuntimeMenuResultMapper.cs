@@ -1,6 +1,7 @@
 using Application.SalesCatalog.RuntimeMenus.Results;
 using Domain.SalesCatalog.Entities;
 using Application.SalesCatalog.ReadModels;
+using Application.SalesCatalog.Rules;
 
 namespace Application.SalesCatalog.RuntimeMenus.Mapping;
 
@@ -40,7 +41,7 @@ internal static class RuntimeMenuResultMapper
             ImageUrl = imageUrl,
             RecipeVersion = item.Recipe?.Version,
             OptionGroups = availableOptions
-                .Where(option => option.IsAvailable)
+                .Where(ProductOptionSelectionRules.IsSelectable)
                 .GroupBy(option => new
                 {
                     option.OptionGroupId,

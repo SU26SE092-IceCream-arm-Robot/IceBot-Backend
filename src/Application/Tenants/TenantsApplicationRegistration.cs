@@ -1,5 +1,6 @@
 using Application.Tenants.Kiosks.Commands;
 using Application.Tenants.Kiosks.Queries;
+using Application.Tenants.Onboarding;
 using Application.Tenants.Organizations.Commands;
 using Application.Tenants.Organizations.Queries;
 using Application.Tenants.RoleScopes.Queries;
@@ -37,6 +38,7 @@ public static class TenantsApplicationRegistration
         services.AddScoped<ActivateOrganizationCommandHandler>();
 
         services.AddScoped<GetTenantTreeQueryHandler>();
+        services.AddScoped<FranchiseOnboardingService>();
         return services;
     }
 }

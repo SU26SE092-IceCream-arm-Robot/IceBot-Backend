@@ -22,6 +22,8 @@ public partial class MaintenanceTicket : SyncAggregateEntity, IKioskScoped
 
     public Guid? DeviceEventId { get; set; }
 
+    public Guid? AlertId { get; set; }
+
     public Guid? AssignedToAccountId { get; set; }
 
     public string TicketNumber { get; set; } = null!;
@@ -69,6 +71,8 @@ public partial class MaintenanceTicket : SyncAggregateEntity, IKioskScoped
     public virtual Order? Order { get; set; }
 
     public virtual DeviceEvent? DeviceEvent { get; set; }
+
+    public virtual Alert? Alert { get; set; }
 
     Guid? IOrganizationScoped.OrganizationId
     {

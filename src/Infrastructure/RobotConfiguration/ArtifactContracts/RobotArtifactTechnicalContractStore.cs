@@ -64,6 +64,9 @@ public sealed class RobotArtifactTechnicalContractStore(IceBotDbContext db) : IR
                 template.Status == Domain.RobotConfiguration.Artifacts.RobotArtifactStatus.Published,
             cancellationToken);
 
+    public Task<bool> HasAuthoringImportReferenceAsync(Guid contractId, CancellationToken cancellationToken) =>
+        db.RobotAuthoringImportItems.AnyAsync(item => item.TechnicalContractId == contractId, cancellationToken);
+
     public async Task AddAsync(RobotArtifactTechnicalContract contract, CancellationToken cancellationToken)
     {
         db.RobotArtifactTechnicalContracts.Add(contract);

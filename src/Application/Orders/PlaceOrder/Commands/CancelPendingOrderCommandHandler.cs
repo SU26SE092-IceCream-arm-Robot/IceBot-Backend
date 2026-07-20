@@ -31,6 +31,7 @@ public sealed class CancelPendingOrderCommandHandler
 
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
+            await _orderStore.AcquireOrderWorkflowLockAsync(orderId, ct);
             var order = await _orderStore.GetOrderByIdAsync(orderId, ct);
             if (order is null)
             {

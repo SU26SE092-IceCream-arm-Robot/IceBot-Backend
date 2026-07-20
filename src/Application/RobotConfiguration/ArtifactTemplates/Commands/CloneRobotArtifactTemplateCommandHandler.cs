@@ -12,6 +12,7 @@ using Domain.Common;
 using Domain.RobotConfiguration.Artifacts;
 using Domain.RobotConfiguration.ArtifactContracts;
 using Application.RobotConfiguration.ArtifactContracts;
+using Application.Shared.Concurrency;
 
 namespace Application.RobotConfiguration.ArtifactTemplates.Commands;
 
@@ -22,19 +23,22 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
     private readonly IArtifactObjectStorage _storage;
     private readonly ArtifactUploadContentService _contentService;
     private readonly IRobotArtifactTechnicalContractStore _technicalContracts;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
     public CloneRobotArtifactTemplateCommandHandler(
         IRobotArtifactStore store,
         IRobotArtifactTemplateStore templateStore,
         IArtifactObjectStorage storage,
         ArtifactUploadContentService contentService,
-        IRobotArtifactTechnicalContractStore technicalContracts)
+        IRobotArtifactTechnicalContractStore technicalContracts,
+        ITechnicalResourceMutationCoordinator mutationCoordinator)
     {
         _store = store;
         _templateStore = templateStore;
         _storage = storage;
         _contentService = contentService;
         _technicalContracts = technicalContracts;
+        _mutations = mutationCoordinator;
     }
 
     public async Task<ApiResult<RobotArtifactResult>> HandleAsync(
@@ -61,21 +65,55 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("MetadataJson must be valid JSON.", 400);
         }
 
-        var template = await _templateStore.GetByIdAsync(command.TemplateId, cancellationToken: cancellationToken);
-        if (template is null || template.Status != RobotArtifactStatus.Published)
+        var code = command.ArtifactCode.Trim().ToUpperInvariant();
+        var observedTemplate = await _templateStore.GetByIdAsync(
+            command.TemplateId, tracked: false, cancellationToken);
+        if (observedTemplate is null || observedTemplate.Status != RobotArtifactStatus.Published)
         {
             return ApiResult<RobotArtifactResult>.Fail("Published robot artifact template not found.", 404);
         }
 
-        if (!template.TechnicalContractId.HasValue ||
-            string.IsNullOrWhiteSpace(template.TechnicalContractChecksum))
+        if (!observedTemplate.TechnicalContractId.HasValue ||
+            string.IsNullOrWhiteSpace(observedTemplate.TechnicalContractChecksum))
         {
             return ApiResult<RobotArtifactResult>.Fail(
                 "The published template does not have a technical contract.", 409);
         }
 
+        var observedContractId = observedTemplate.TechnicalContractId.Value;
+        return await _mutations.ExecuteAsync(
+            [
+                TechnicalResourceMutationIdentity.ArtifactDefinition(command.OrganizationId, code),
+                TechnicalResourceMutationIdentity.Contract(observedContractId),
+                TechnicalResourceMutationIdentity.Template(command.TemplateId)
+            ],
+            ct => CloneLockedAsync(command, code, observedContractId, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<RobotArtifactResult>> CloneLockedAsync(
+        CloneRobotArtifactTemplateCommand command,
+        string code,
+        Guid observedContractId,
+        CancellationToken cancellationToken)
+    {
+        var template = await _templateStore.GetByIdAsync(
+            command.TemplateId, tracked: false, cancellationToken);
+        if (template is null || template.Status != RobotArtifactStatus.Published)
+        {
+            return ApiResult<RobotArtifactResult>.Fail(
+                "The robot artifact template is no longer published; retry with an active template.", 409);
+        }
+
+        if (template.TechnicalContractId != observedContractId ||
+            string.IsNullOrWhiteSpace(template.TechnicalContractChecksum))
+        {
+            return ApiResult<RobotArtifactResult>.Fail(
+                "The robot artifact template technical contract changed concurrently; retry cloning.", 409);
+        }
+
         var technicalContract = await _technicalContracts.GetAsync(
-            template.TechnicalContractId.Value,
+            observedContractId,
             false,
             cancellationToken);
         if (technicalContract is null ||
@@ -89,7 +127,6 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
                 "The template technical contract is no longer published or compatible.", 409);
         }
 
-        var code = command.ArtifactCode.Trim().ToUpperInvariant();
         var existing = await _store.GetArtifactByCodeAndChecksumAsync(
             command.OrganizationId,
             code,

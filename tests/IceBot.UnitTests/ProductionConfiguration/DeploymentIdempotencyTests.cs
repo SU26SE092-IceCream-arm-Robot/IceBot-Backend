@@ -4,11 +4,13 @@ using Application.ProductionConfiguration;
 using Application.ProductionConfiguration.Deployments;
 using Application.ProductionConfiguration.Deployments.Abstractions;
 using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Deployments.Services;
 using Application.ProductionConfiguration.Readiness;
 using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration.Releases.Abstractions;
 using Application.ProductionConfiguration.Releases.Services;
 using Application.RobotConfiguration.Storage.Abstractions;
+using Application.Shared.Wrappers;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.ValueObjects;
@@ -24,6 +26,44 @@ namespace IceBot.UnitTests.ProductionConfiguration;
 
 public sealed class DeploymentIdempotencyTests
 {
+    [Fact]
+    public async Task FullEdgeDeploy_DoesNotBypassIneligiblePreview()
+    {
+        var organizationId = Guid.NewGuid();
+        var kioskId = Guid.NewGuid();
+        var endpointId = Guid.NewGuid();
+        var release = TestData.RetiredRelease(organizationId);
+        var endpoint = Endpoint(endpointId, kioskId, organizationId,
+            KioskExecutionProfile.FullEdge, Guid.NewGuid(), null);
+        var deploymentStore = Substitute.For<IConfigurationDeploymentStore>();
+        deploymentStore.GetEndpointForDeploymentAsync(endpointId, Arg.Any<CancellationToken>()).Returns(endpoint);
+        var releaseStore = Substitute.For<IConfigurationReleaseStore>();
+        releaseStore.GetPublishedReleaseForDeploymentAsync(release.Id, Arg.Any<CancellationToken>()).Returns(release);
+        var preview = Substitute.For<IConfigurationDeploymentPreviewService>();
+        preview.HandleAsync(Arg.Any<Application.Identity.Tokens.Claims.CurrentUserContext>(), kioskId, release.Id,
+                endpointId, Arg.Any<IReadOnlyCollection<DeploymentPreviewSelection>>(),
+                Arg.Any<CancellationToken>(), false)
+            .Returns(ApiResult<ConfigurationDeploymentPreview>.Success(
+                Preview(release, endpoint, isEligible: false)));
+        var handler = new DeployFullEdgeConfigurationCommandHandler(
+            deploymentStore, releaseStore, Substitute.For<IEdgeCommandStore>(),
+            Substitute.For<IEdgeCommandWakeUpPublisher>(), ReadinessGuard(),
+            new FullEdgeReleaseBundleService(Substitute.For<IArtifactObjectStorage>()),
+            new DeploymentValidationService(), preview);
+
+        var result = await handler.HandleAsync(new DeployFullEdgeConfigurationCommand
+        {
+            UserContext = TestData.SystemAdmin(), KioskId = kioskId,
+            ConfigurationReleaseId = release.Id, KioskExecutionEndpointId = endpointId,
+            IdempotencyKey = Guid.NewGuid().ToString("N"), DeploymentPreviewChecksum = new string('a', 64)
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.DoesNotContain(deploymentStore.ReceivedCalls(), call =>
+            call.GetMethodInfo().Name == nameof(IConfigurationDeploymentStore.ExecuteDeploymentCreationAsync));
+    }
+
     [Fact]
     public async Task FullEdgeRetry_ReturnsExistingBeforeBundleStorageIo()
     {
@@ -180,6 +220,19 @@ public sealed class DeploymentIdempotencyTests
             DateTimeOffset.UtcNow,
             deploymentId: deploymentId,
             deploymentKind: kind);
+
+    private static ConfigurationDeploymentPreview Preview(
+        ConfigurationRelease release,
+        KioskExecutionEndpoint endpoint,
+        bool isEligible)
+    {
+        var endpointPreview = new ConfigurationDeploymentEndpointPreview(
+            endpoint.Id, endpoint.EndpointCode, endpoint.ExecutionProfile.ToString(), isEligible,
+            isEligible ? [] : [new DeploymentPreviewBlocker("EndpointNotReady", "Endpoint is not ready.")],
+            [], [], ["BundleInstall"], 0, 0, null, null, new string('a', 64), null);
+        return new ConfigurationDeploymentPreview(
+            release.Id, release.ReleaseChecksum!, endpoint.KioskId, false, [endpointPreview]);
+    }
 
     private static ProductionInventoryReadinessGuard ReadinessGuard() => new(
         Substitute.For<IInventoryReadinessEvaluator>(),

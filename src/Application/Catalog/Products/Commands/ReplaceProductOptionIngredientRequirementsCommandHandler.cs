@@ -3,11 +3,14 @@ using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Catalog.Products.Rules;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 using Domain.Catalog.Entities;
 
 namespace Application.Catalog.Products.Commands;
 
-public sealed class ReplaceProductOptionIngredientRequirementsCommandHandler(IProductStore products)
+public sealed class ReplaceProductOptionIngredientRequirementsCommandHandler(
+    IProductStore products,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<ProductOptionResult>> HandleAsync(
         ReplaceProductOptionIngredientRequirementsCommand command,
@@ -21,6 +24,9 @@ public sealed class ReplaceProductOptionIngredientRequirementsCommandHandler(IPr
         var option = await products.GetProductOptionByIdAsync(
             product.Id, command.OptionGroupId, command.ProductOptionId, asNoTracking: false, ct);
         if (option is null) return ApiResult<ProductOptionResult>.Fail("Product option not found.", 404);
+        var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.ProductOption, option.Id, ct);
+        if (ownershipError is not null) return ApiResult<ProductOptionResult>.Fail(ownershipError, 409);
 
         var items = command.Request.Items;
         if (items.Count > 0 && option.ExecutionImpact != Domain.Catalog.Enums.ProductOptionExecutionImpact.ProductionAffecting)

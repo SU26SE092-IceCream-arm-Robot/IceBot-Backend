@@ -33,12 +33,14 @@ public interface IInventoryStore
     Task<bool> DispenserIdentityExistsAsync(Guid deviceId, string containerCode, Guid? excludedId = null, CancellationToken cancellationToken = default);
     Task<bool> HasStockMovementsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<bool> HasActiveExecutionAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task AcquireDeviceTopologyMutationLocksAsync(IEnumerable<Guid> deviceIds, CancellationToken cancellationToken = default);
     Task AcquireDispenserMutationLockAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task AddDispenserStateAsync(IngredientDispenserState state, CancellationToken cancellationToken = default);
     void RemoveDispenserState(IngredientDispenserState state);
     Task AddTopologyRebindRecordAsync(InventoryTopologyRebindRecord record, CancellationToken cancellationToken = default);
     Task<List<InventoryTopologyRebindRecord>> ListTopologyRebindRecordsAsync(Guid dispenserStateId, int? take = null, CancellationToken cancellationToken = default);
     Task<List<IngredientDispenserState>> ListActiveDispenserStatesByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);
+    Task<List<Guid>> ListActiveDispenserStateIdsByDeviceAsync(Guid deviceId, CancellationToken cancellationToken = default);
     Task AddTopologyChangeRecordAsync(InventoryTopologyChangeRecord record, CancellationToken cancellationToken = default);
     Task<List<InventoryTopologyChangeRecord>> ListTopologyChangeRecordsAsync(Guid dispenserStateId, int take, CancellationToken cancellationToken = default);
     Task<int> CountTopologyChangeRecordsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);

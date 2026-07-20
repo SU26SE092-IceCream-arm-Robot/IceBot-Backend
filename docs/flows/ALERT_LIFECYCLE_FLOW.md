@@ -2,11 +2,11 @@
 
 ## Search Keywords
 
-`alert`, `alert lifecycle`, `acknowledge alert`, `resolve alert`, `dedup`, `occurrence count`, `device event`, `SignalR AlertChanged`
+`alert`, `alert lifecycle`, `acknowledge alert`, `resolve alert`, `dedup`, `occurrence count`, `device event`, `SignalR AlertChanged`, `Firebase critical alert`
 
 ## Purpose
 
-`DeviceEvent` is immutable telemetry evidence. `Alert` is the actionable operational state derived from suitable telemetry. `MaintenanceTicket` remains a separate work-management record and is not created automatically in V1.
+`DeviceEvent` is immutable telemetry evidence. `Alert` is the actionable operational state derived from suitable telemetry. `MaintenanceTicket` remains a separate work-management record; inventory-empty automation may create a linked ticket when enabled.
 
 ## Creation
 
@@ -80,9 +80,100 @@ Creation is intentionally part of authenticated device-event ingestion rather th
 
 `AlertChanged` is sent to `kiosk:{kioskId}` after creation, correlated occurrence, acknowledgement, or resolution commits. It contains the alert identity, scope, device, severity, old/new status, occurrence count, last occurrence timestamp, update timestamp, and version. Clients use REST for initial state/history and SignalR for committed deltas.
 
+## Critical Alert Push Notification
+
+Problem: a franchise operator may not have the management dashboard open while
+an unattended kiosk has a fault that requires human intervention. SignalR is
+appropriate for connected clients but does not recall an absent operator.
+
+Confirmed decision: `CriticalOperationalAlertOpened` is the first Firebase
+business notification. It is derived from committed `Alert` state, never from
+raw `DeviceEvent` payload. A push is attempted only when a new Alert is created
+as Critical or an existing correlated Alert increases from Error to Critical.
+Duplicate source events and later Critical occurrences do not send another
+push.
+
+Recipient policy:
+
+1. Select distinct active Technician and Manager accounts whose active role
+   scope matches the Alert kiosk, store, or organization and which have an
+   active notification-device registration.
+2. If that set is empty, select active OrgAdmin accounts assigned to the exact
+   organization and having an active notification-device registration.
+3. Do not broadcast to SystemAdmin, Staff, unrelated tenant scopes, or every
+   account that can technically read an Alert.
+
+The payload is bounded to notification type, Alert/Kiosk/Device identifiers,
+Alert code, and Critical severity. Raw telemetry payload, customer data, and
+the complete device error message are excluded. The visible title is the
+bounded Alert title.
+
+The Alert and one durable `NotificationDelivery` per recipient are committed in
+the same database transaction. A background worker sends Firebase push after
+commit and retries transient failures. Delivery failure never rolls back device
+evidence or actionable Alert state. SignalR and management reads remain the live
+and authoritative operational surfaces. The outbox provides at-least-once send
+attempts; clients deduplicate by `deliveryId`.
+
+Excluded from the critical-alert trigger:
+
+- every Error/Warning DeviceEvent: too noisy and bypasses Alert correlation.
+- customer/order progress: the kiosk/tablet already uses authoritative polling
+  and SignalR while the customer is present.
+
+Operations owns `NotificationDelivery` and recipient selection; Identity owns
+account notification-device registrations and Firebase delivery. Inventory
+empty uses a separate trigger and delivery key instead of reusing the critical
+device-alert trigger.
+
+The same outbox is shared infrastructure for other independently owned events,
+including overdue Manual/Packaged fulfillment. Each event keeps its own trigger,
+recipient policy, and idempotent delivery key; it does not become an Alert.
+
+Failed configuration deployments are reconciled from committed Full Edge and
+Low-cost deployment state, including executor failures and timeout failures.
+They notify scoped Technician/Manager accounts and fall back to OrgAdmin.
+Candidates from both execution profiles share one failure-time-ordered batch,
+so one profile cannot starve the other. A failure with no currently eligible
+recipient remains pending and becomes deliverable if a matching account and
+notification device are provisioned later; Cloud does not create a synthetic
+recipient or mark it notified without a delivery. Recipient-less failures are
+excluded before the bounded batch is selected, so they cannot starve later
+deliverable failures. One failed candidate is isolated and does not stop the
+remaining items in the batch.
+Maintenance assignment accepts only an active Technician, Manager, or OrgAdmin
+in the ticket tenant scope. It notifies that assignee when an active notification
+device exists. Requeueing a permanently failed delivery repeats delivery only;
+it never repeats the source business transition.
+
+Payment-session reconciliation creates a `payment_intervention` delivery only
+when the session enters manual intervention: retry exhaustion, a provider
+identity or amount mismatch, or provider-paid state still awaiting the signed
+webhook after retries are exhausted. Scoped Staff and Manager recipients are
+preferred, with organization OrgAdmin fallback. Retryable reconciliation,
+restored checkout instructions, explicit cancellation/expiry, and known
+provider-session absence do not create this notification. Delivery identity is
+the payment transaction, intervention code, and recipient, so repeating the
+same reconciliation result is idempotent.
+
+The durable delivery-key evidence for `deployment_failed`,
+`fulfillment_overdue`, and `payment_intervention` is retained beyond ordinary
+notification-delivery retention. Source reconciliation therefore cannot resend
+the same occurrence merely because historical outbox rows were purged.
+
 ## Excluded From V1
 
 - configurable alert rules or thresholds;
 - alert assignment, escalation, snooze, or suppression API;
-- automatic MaintenanceTicket creation;
-- automatic resolution from a later healthy telemetry event.
+- configurable inventory thresholds beyond the current Low/Empty state mapping.
+
+## Inventory Alert Automation
+
+The reconciliation job maps active dispenser state to `INVENTORY_LOW` or
+`INVENTORY_EMPTY`. It serializes each dispenser with a PostgreSQL advisory lock,
+keeps one active alert for the current threshold, resolves stale/duplicate active
+alerts, and publishes SignalR only for committed transitions. When
+`InventoryAlertAutomation:CreateMaintenanceTicketForEmpty` is enabled, Empty
+creates one linked maintenance ticket. Empty also creates a durable push for the
+scoped operational recipients. Healthy recovery resolves the alert; it does not
+close the maintenance ticket automatically.

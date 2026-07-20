@@ -3,6 +3,7 @@ using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Catalog.Products.Rules;
 using Application.Catalog.Products.Support;
+using Application.Shared.Ownership;
 using Application.Shared.Wrappers;
 
 namespace Application.Catalog.Products.Commands;
@@ -10,10 +11,14 @@ namespace Application.Catalog.Products.Commands;
 public sealed class UpdateProductCommandHandler
 {
     private readonly IProductStore _products;
+    private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
 
-    public UpdateProductCommandHandler(IProductStore products)
+    public UpdateProductCommandHandler(
+        IProductStore products,
+        ITechnicalResourceMutationPolicy technicalOwnership)
     {
         _products = products;
+        _technicalOwnership = technicalOwnership;
     }
 
     public async Task<ApiResult<ProductResult>> HandleAsync(
@@ -37,6 +42,16 @@ public sealed class UpdateProductCommandHandler
         }
 
         var newCode = string.IsNullOrWhiteSpace(request.Code) ? product.Code : ProductNormalizer.NormalizeCode(request.Code);
+        var newProductType = string.IsNullOrWhiteSpace(request.ProductType)
+            ? product.ProductType
+            : ProductNormalizer.NormalizeCode(request.ProductType);
+        if (!string.Equals(newCode, product.Code, StringComparison.Ordinal) ||
+            !string.Equals(newProductType, product.ProductType, StringComparison.Ordinal))
+        {
+            var ownershipError = await _technicalOwnership.ValidateDefinitionMutationAsync(
+                TechnicalResourceKind.Product, product.Id, cancellationToken);
+            if (ownershipError is not null) return ApiResult<ProductResult>.Fail(ownershipError, 409);
+        }
 
         var validationError = await ProductRequestValidator.ValidateProductFieldsAsync(
             _products,
@@ -63,9 +78,7 @@ public sealed class UpdateProductCommandHandler
         product.Name = string.IsNullOrWhiteSpace(request.Name) ? product.Name : request.Name.Trim();
         product.DisplayName = request.DisplayName is null ? product.DisplayName : ProductNormalizer.TrimToNull(request.DisplayName);
         product.Description = request.Description is null ? product.Description : ProductNormalizer.TrimToNull(request.Description);
-        product.ProductType = string.IsNullOrWhiteSpace(request.ProductType)
-            ? product.ProductType
-            : ProductNormalizer.NormalizeCode(request.ProductType);
+        product.ProductType = newProductType;
         product.BasePrice = request.BasePrice ?? product.BasePrice;
         product.Currency = string.IsNullOrWhiteSpace(request.Currency)
             ? product.Currency

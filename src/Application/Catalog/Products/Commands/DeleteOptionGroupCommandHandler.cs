@@ -1,9 +1,12 @@
 using Application.Catalog.Abstractions;
 using Application.Shared.Wrappers;
+using Application.Shared.Ownership;
 
 namespace Application.Catalog.Products.Commands;
 
-public sealed class DeleteOptionGroupCommandHandler(IProductStore products)
+public sealed class DeleteOptionGroupCommandHandler(
+    IProductStore products,
+    ITechnicalResourceMutationPolicy technicalOwnership)
 {
     public async Task<ApiResult<bool>> HandleAsync(DeleteOptionGroupCommand command, CancellationToken ct = default)
     {
@@ -13,6 +16,15 @@ public sealed class DeleteOptionGroupCommandHandler(IProductStore products)
         if (access is not null) return access;
         var group = await products.GetOptionGroupByIdAsync(product.Id, command.OptionGroupId, false, ct);
         if (group is null) return ApiResult<bool>.Fail("Option group not found.", 404);
+        var productOwnershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.Product, product.Id, ct);
+        if (productOwnershipError is not null) return ApiResult<bool>.Fail(productOwnershipError, 409);
+        foreach (var option in group.ProductOptions)
+        {
+            var ownershipError = await technicalOwnership.ValidateDefinitionMutationAsync(
+                TechnicalResourceKind.ProductOption, option.Id, ct);
+            if (ownershipError is not null) return ApiResult<bool>.Fail(ownershipError, 409);
+        }
         if (await products.IsOptionGroupReferencedByMenuItemsAsync(group.Id, ct))
             return ApiResult<bool>.Fail("Option group is used by one or more menu items.", 409);
         products.RemoveOptionGroup(group);

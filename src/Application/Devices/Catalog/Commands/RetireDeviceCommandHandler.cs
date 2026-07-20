@@ -45,55 +45,62 @@ public sealed class RetireDeviceCommandHandler
 
         return await _inventory.ExecuteInTransactionAsync(async ct =>
         {
-        var device = await _deviceStore.GetByKioskIdAsync(command.KioskId, deviceId, ct);
-        if (device is null)
-        {
-            return ApiResult<DeviceResult>.Fail("Device not found.", 404);
-        }
+            await _inventory.AcquireDeviceTopologyMutationLocksAsync([deviceId], ct);
+            var device = await _deviceStore.GetByKioskIdAsync(command.KioskId, deviceId, ct);
+            if (device is null)
+            {
+                return ApiResult<DeviceResult>.Fail("Device not found.", 404);
+            }
 
-        if (device.Kiosk is null)
-        {
-            return ApiResult<DeviceResult>.Fail("Device kiosk is missing.", 400);
-        }
-        if (!KioskAccessRules.CanAccessKiosk(userContext, device.Kiosk))
-        {
-            return ApiResult<DeviceResult>.Fail("Access denied.", 403);
-        }
+            if (device.Kiosk is null)
+            {
+                return ApiResult<DeviceResult>.Fail("Device kiosk is missing.", 400);
+            }
+            if (!KioskAccessRules.CanAccessKiosk(userContext, device.Kiosk))
+            {
+                return ApiResult<DeviceResult>.Fail("Access denied.", 403);
+            }
 
-        if (await _inventory.HasActiveExecutionAsync(device.Kiosk.Id, ct))
-        {
-            return ApiResult<DeviceResult>.Fail(
-                "Device cannot be retired while its kiosk has an accepted or running execution.", 409);
-        }
+            if (await _inventory.HasActiveExecutionAsync(device.Kiosk.Id, ct))
+            {
+                return ApiResult<DeviceResult>.Fail(
+                    "Device cannot be retired while its kiosk has an accepted or running execution.", 409);
+            }
 
-        var now = DateTimeOffset.UtcNow;
-        var reason = string.IsNullOrWhiteSpace(command.Reason) ? "DEVICE_RETIRED" : command.Reason.Trim();
-        var states = await _inventory.ListActiveDispenserStatesByDeviceAsync(device.Id, ct);
-        foreach (var state in states)
-        {
-            state.Retire(userContext.AccountId, now);
-            await _inventory.AddTopologyChangeRecordAsync(
-                InventoryTopologyAuditFactory.Create(
-                    state,
-                    InventoryTopologyChangeType.Retired,
-                    reason,
-                    userContext.AccountId,
-                    now,
-                    true,
-                    state.CapacityQuantity,
-                    state.Unit),
-                ct);
-        }
+            var stateIds = await _inventory.ListActiveDispenserStateIdsByDeviceAsync(device.Id, ct);
+            foreach (var stateId in stateIds.OrderBy(id => id))
+            {
+                await _inventory.AcquireDispenserMutationLockAsync(stateId, ct);
+            }
 
-        device.Retire();
-        device.DeletedAt = now;
-        device.DeletedByAccountId = userContext.AccountId;
-        device.UpdatedAt = now;
-        device.UpdatedByAccountId = userContext.AccountId;
+            var now = DateTimeOffset.UtcNow;
+            var reason = string.IsNullOrWhiteSpace(command.Reason) ? "DEVICE_RETIRED" : command.Reason.Trim();
+            var states = await _inventory.ListActiveDispenserStatesByDeviceAsync(device.Id, ct);
+            foreach (var state in states)
+            {
+                state.Retire(userContext.AccountId, now);
+                await _inventory.AddTopologyChangeRecordAsync(
+                    InventoryTopologyAuditFactory.Create(
+                        state,
+                        InventoryTopologyChangeType.Retired,
+                        reason,
+                        userContext.AccountId,
+                        now,
+                        true,
+                        state.CapacityQuantity,
+                        state.Unit),
+                    ct);
+            }
 
-        await _inventory.SaveChangesAsync(ct);
+            device.Retire();
+            device.DeletedAt = now;
+            device.DeletedByAccountId = userContext.AccountId;
+            device.UpdatedAt = now;
+            device.UpdatedByAccountId = userContext.AccountId;
 
-        return ApiResult<DeviceResult>.Success(DeviceResultMapper.ToResult(device), "Device and its dispenser topology retired successfully.");
+            await _inventory.SaveChangesAsync(ct);
+
+            return ApiResult<DeviceResult>.Success(DeviceResultMapper.ToResult(device), "Device and its dispenser topology retired successfully.");
         }, cancellationToken);
     }
 }

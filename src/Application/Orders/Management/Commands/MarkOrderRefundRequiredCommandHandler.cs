@@ -36,6 +36,7 @@ public sealed class MarkOrderRefundRequiredCommandHandler
 
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
+            await _orderStore.AcquireOrderWorkflowLockAsync(command.OrderId, ct);
             var order = await _orderStore.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null)
             {

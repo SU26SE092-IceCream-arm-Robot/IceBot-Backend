@@ -32,6 +32,9 @@ public sealed class ReplaceDeviceCommandHandler(
         ReplaceDeviceCommand command,
         CancellationToken cancellationToken)
     {
+        await inventory.AcquireDeviceTopologyMutationLocksAsync(
+            [command.SourceDeviceId, command.Request.ReplacementDeviceId],
+            cancellationToken);
         var source = await devices.GetByKioskIdAsync(command.KioskId, command.SourceDeviceId, cancellationToken);
         var target = await devices.GetByKioskIdAsync(command.KioskId, command.Request.ReplacementDeviceId, cancellationToken);
         if (source?.Kiosk is null || target?.Kiosk is null)
@@ -57,6 +60,12 @@ public sealed class ReplaceDeviceCommandHandler(
                 "Device cannot be replaced while its kiosk has an accepted or running execution.", 409);
         }
 
+        var sourceStateIds = await inventory.ListActiveDispenserStateIdsByDeviceAsync(source.Id, cancellationToken);
+        foreach (var sourceStateId in sourceStateIds.OrderBy(id => id))
+        {
+            await inventory.AcquireDispenserMutationLockAsync(sourceStateId, cancellationToken);
+        }
+
         var sourceStates = await inventory.ListActiveDispenserStatesByDeviceAsync(source.Id, cancellationToken);
         if (sourceStates.Count > 0)
         {
@@ -67,10 +76,8 @@ public sealed class ReplaceDeviceCommandHandler(
             }
         }
 
-        await inventory.AcquireDispenserMutationLockAsync(target.Id, cancellationToken);
         foreach (var sourceState in sourceStates.OrderBy(state => state.Id))
         {
-            await inventory.AcquireDispenserMutationLockAsync(sourceState.Id, cancellationToken);
             if (await inventory.DispenserIdentityExistsAsync(
                     target.Id,
                     sourceState.ContainerCode,

@@ -55,3 +55,27 @@ public class PaymentLinkData
     [JsonPropertyName("qrCode")]
     public string? QrCode { get; set; }
 }
+
+public sealed class PaymentLinkInformationData
+{
+    [JsonPropertyName("id")]
+    public string? PaymentLinkId { get; set; }
+
+    [JsonPropertyName("orderCode")]
+    public long OrderCode { get; set; }
+
+    [JsonPropertyName("amount")]
+    public decimal Amount { get; set; }
+
+    [JsonPropertyName("amountPaid")]
+    public decimal AmountPaid { get; set; }
+
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("checkoutUrl")]
+    public string? CheckoutUrl { get; set; }
+
+    [JsonPropertyName("qrCode")]
+    public string? QrCode { get; set; }
+}

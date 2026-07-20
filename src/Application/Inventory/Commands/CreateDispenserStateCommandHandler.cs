@@ -14,10 +14,19 @@ public sealed class CreateDispenserStateCommandHandler(IInventoryStore inventory
 {
     public async Task<ApiResult<DispenserStateResult>> HandleAsync(CreateDispenserStateCommand command, CancellationToken ct = default)
     {
+        return await inventory.ExecuteInTransactionAsync(
+            cancellationToken => CreateLockedAsync(command, cancellationToken), ct);
+    }
+
+    private async Task<ApiResult<DispenserStateResult>> CreateLockedAsync(
+        CreateDispenserStateCommand command,
+        CancellationToken ct)
+    {
         var request = command.Request;
         if (request.DeviceId == Guid.Empty || request.IngredientId == Guid.Empty)
             return ApiResult<DispenserStateResult>.Fail("Device and ingredient are required.");
 
+        await inventory.AcquireDeviceTopologyMutationLocksAsync([request.DeviceId], ct);
         var device = await inventory.GetDeviceForTopologyAsync(command.KioskId, request.DeviceId, ct);
         if (device?.Kiosk is null) return ApiResult<DispenserStateResult>.Fail("Device not found in the route kiosk.", 404);
         if (device.Status == DeviceStatus.Retired)
