@@ -9,7 +9,7 @@ namespace WebAPI.GraphQL.Dashboard;
 [ExtendObjectType("Query")]
 public sealed class DashboardQueries
 {
-    [Authorize(Policy = "orders.view")]
+    [Authorize(Policy = "dashboard.view")]
     public async Task<DashboardMetrics> GetDashboard(
         ClaimsPrincipal claimsPrincipal,
         [Service] GetManagementDashboardQueryHandler handler,

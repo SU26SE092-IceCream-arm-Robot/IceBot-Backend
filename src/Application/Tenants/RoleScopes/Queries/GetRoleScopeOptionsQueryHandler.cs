@@ -59,10 +59,6 @@ public sealed class GetRoleScopeOptionsQueryHandler
                 includeInactive: false,
                 cancellationToken);
 
-            organizations = await _tenantTreeStore.ListOrganizationsAsync(includeInactive: false, cancellationToken);
-            stores = await _tenantTreeStore.ListStoresAsync(includeInactive: false, cancellationToken);
-            kiosks = await _tenantTreeStore.ListKiosksAsync(includeInactive: false, cancellationToken);
-
             var allowedOrganizationIds = scope.OrganizationIds
                 .Concat(scopedStores.Select(store => store.OrganizationId))
                 .Concat(scopedKiosks.Select(kiosk => kiosk.OrganizationId))
@@ -74,22 +70,13 @@ public sealed class GetRoleScopeOptionsQueryHandler
 
             var allowedKioskIds = scope.KioskIds.ToHashSet();
 
-            organizations = organizations
-                .Where(organization => allowedOrganizationIds.Contains(organization.Id))
-                .ToList();
-
-            stores = stores
-                .Where(store =>
-                    scope.OrganizationIds.Contains(store.OrganizationId) ||
-                    allowedStoreIds.Contains(store.Id))
-                .ToList();
-
-            kiosks = kiosks
-                .Where(kiosk =>
-                    scope.OrganizationIds.Contains(kiosk.OrganizationId) ||
-                    scope.StoreIds.Contains(kiosk.StoreId) ||
-                    allowedKioskIds.Contains(kiosk.Id))
-                .ToList();
+            organizations = await _tenantTreeStore.ListOrganizationsByIdsAsync(
+                allowedOrganizationIds, includeInactive: false, cancellationToken);
+            stores = await _tenantTreeStore.ListStoresForScopeAsync(
+                scope.OrganizationIds, allowedStoreIds, includeInactive: false, cancellationToken);
+            kiosks = await _tenantTreeStore.ListKiosksForScopeAsync(
+                scope.OrganizationIds, scope.StoreIds, allowedKioskIds,
+                includeInactive: false, cancellationToken);
         }
 
         var result = RoleScopeOptionsResultMapper.ToResult(

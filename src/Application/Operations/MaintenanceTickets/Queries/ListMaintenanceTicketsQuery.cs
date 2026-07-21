@@ -41,6 +41,10 @@ public sealed class ListMaintenanceTicketsQueryHandler
         var pageNumber = query.PageNumber <= 0 ? 1 : query.PageNumber;
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
+        if (query.FromDate.HasValue && query.ToDate.HasValue && query.FromDate > query.ToDate)
+            return PagedResult<MaintenanceTicketResult>.Fail(
+                "Maintenance-ticket from timestamp cannot be after to timestamp.", 400, pageNumber, pageSize);
+
         // Parse Status
         MaintenanceTicketStatus? parsedStatus = null;
         if (!string.IsNullOrWhiteSpace(query.Status))

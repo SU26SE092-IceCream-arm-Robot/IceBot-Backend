@@ -175,14 +175,34 @@ public sealed class PaymentStore : IPaymentStore
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<PaymentTransaction?> GetLatestPaidPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default)
+    public Task<PaymentTransaction?> GetAppliedPaymentSettlementByOrderIdAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default)
     {
         return _dbContext.PaymentTransactions.WhereNotDeleted()
             .Include(payment => payment.Order)
-            .Where(payment => payment.OrderId == orderId && payment.Status == Domain.Payments.Enums.PaymentTransactionStatus.Paid)
-            .OrderByDescending(payment => payment.RequestedAt)
+            .Where(payment =>
+                payment.OrderId == orderId &&
+                payment.Status == Domain.Payments.Enums.PaymentTransactionStatus.Paid &&
+                (payment.SettlementDisposition == Domain.Payments.Enums.PaymentSettlementDisposition.Primary ||
+                 payment.SettlementDisposition == Domain.Payments.Enums.PaymentSettlementDisposition.Unassigned))
+            .OrderByDescending(payment =>
+                payment.SettlementDisposition == Domain.Payments.Enums.PaymentSettlementDisposition.Primary)
+            .ThenBy(payment => payment.PaidAt ?? payment.RequestedAt)
+            .ThenBy(payment => payment.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public Task<bool> HasOtherUnresolvedDuplicatePaymentsAsync(
+        Guid orderId,
+        Guid excludingPaymentTransactionId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.PaymentTransactions.WhereNotDeleted()
+            .AnyAsync(payment =>
+                payment.OrderId == orderId &&
+                payment.Id != excludingPaymentTransactionId &&
+                payment.SettlementDisposition == Domain.Payments.Enums.PaymentSettlementDisposition.DuplicateRefundRequired,
+                cancellationToken);
 
     public Task<PaymentCallback?> GetPaymentCallbackAsync(
         string provider,

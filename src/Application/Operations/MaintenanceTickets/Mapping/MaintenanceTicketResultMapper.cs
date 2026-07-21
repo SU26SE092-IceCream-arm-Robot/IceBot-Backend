@@ -28,6 +28,7 @@ public static class MaintenanceTicketResultMapper
             Description = ticket.Description,
             Priority = ticket.Priority.ToString(),
             Status = ticket.Status.ToString(),
+            OperationalImpact = ticket.OperationalImpact.ToString(),
             AssignedToAccountId = ticket.AssignedToAccountId,
             CreatedByAccountId = ticket.CreatedByAccountId,
             ReportedAt = ticket.ReportedAt,

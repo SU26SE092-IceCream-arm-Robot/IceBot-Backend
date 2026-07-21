@@ -12,6 +12,7 @@ using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
 using Application.Tenants.Stores;
 using Domain.Orders.Entities;
+using Microsoft.Extensions.Options;
 
 namespace Application.Orders.PlaceOrder.Commands;
 
@@ -21,15 +22,18 @@ public sealed class PlaceOrderCommandHandler
     private readonly IOrderStore _orderStore;
     private readonly IRealtimeNotificationPublisher _publisher;
     private readonly PlaceOrderItemAppender _itemAppender;
+    private readonly OrderPaymentWindowOptions _paymentWindow;
 
     public PlaceOrderCommandHandler(
         IOrderStore orderStore,
         IRealtimeNotificationPublisher publisher,
-        PlaceOrderItemAppender itemAppender)
+        PlaceOrderItemAppender itemAppender,
+        IOptions<OrderPaymentWindowOptions> paymentWindow)
     {
         _orderStore = orderStore;
         _publisher = publisher;
         _itemAppender = itemAppender;
+        _paymentWindow = paymentWindow.Value;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
@@ -101,10 +105,10 @@ public sealed class PlaceOrderCommandHandler
             }
 
             var now = DateTimeOffset.UtcNow;
-            var openingHoursError = StoreSalesAvailabilityRules.ValidateOpeningHours(kiosk.Store, now);
-            if (openingHoursError is not null)
+            var admissionError = StoreSalesAvailabilityRules.ValidateSalesAdmission(kiosk.Store, now);
+            if (admissionError is not null)
             {
-                return ApiResult<OrderResult>.Fail(openingHoursError, 409);
+                return ApiResult<OrderResult>.Fail(admissionError, 409);
             }
 
             var order = new Order
@@ -130,7 +134,7 @@ public sealed class PlaceOrderCommandHandler
                     return ApiResult<OrderResult>.Fail(itemFailure.Message, itemFailure.StatusCode);
             }
 
-            order.Place(now);
+            order.Place(now, now.AddMinutes(_paymentWindow.DurationMinutes));
 
             if (request.ClientTotalAmount.HasValue && request.ClientTotalAmount.Value != order.TotalAmount)
             {

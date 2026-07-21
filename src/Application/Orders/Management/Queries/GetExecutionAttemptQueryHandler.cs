@@ -1,6 +1,8 @@
 using Application.Orders.Abstractions;
 using Application.Orders.Management.Mapping;
 using Application.Orders.Management.Results;
+using Application.EdgeIntegration.Dispatch.Contracts;
+using Application.EdgeIntegration.Reports.Services;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 
@@ -19,26 +21,28 @@ public sealed class GetExecutionAttemptQueryHandler
         GetExecutionAttemptQuery query,
         CancellationToken cancellationToken = default)
     {
-        var command = await _orderStore.GetExecutionAttemptAsync(query.SourceCommandId, cancellationToken);
-        if (command?.OrderId is null)
-        {
-            return ApiResult<ExecutionAttemptDetailResult>.Fail("Execution attempt not found.", 404);
-        }
-
-        var order = await _orderStore.GetOrderByIdAsync(command.OrderId.Value, cancellationToken);
+        var scope = ScopeAccessRules.GetEffectiveScope(
+            ScopeRoleSets.OperationsDiagnostics,
+            query.UserContext);
+        var order = await _orderStore.GetManagementOrderByIdAsync(
+            query.OrderId,
+            query.UserContext.IsSystemAdmin,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
+            cancellationToken);
         if (order is null)
         {
-            return ApiResult<ExecutionAttemptDetailResult>.Fail("Order for execution attempt was not found.", 404);
+            return ApiResult<ExecutionAttemptDetailResult>.Fail("Order not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(
-                ScopeRoleSets.OrdersView,
-                query.UserContext,
-                order.OrganizationId,
-                order.StoreId,
-                order.KioskId))
+        var command = await _orderStore.GetExecutionAttemptAsync(
+            order.Id,
+            query.SourceCommandId,
+            cancellationToken);
+        if (command is null)
         {
-            return ApiResult<ExecutionAttemptDetailResult>.Fail("Access denied.", 403);
+            return ApiResult<ExecutionAttemptDetailResult>.Fail("Execution attempt not found.", 404);
         }
 
         var orderRecord = (await _orderStore.ListOrderExecutionRecordsAsync(
@@ -47,6 +51,26 @@ public sealed class GetExecutionAttemptQueryHandler
         var productionRecords = await _orderStore.ListProductionExecutionRecordsAsync(
             command.Id,
             cancellationToken);
+        var payload = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(command.PayloadJson);
+        var productionUnitOutcomes = payload.OrderLines.Select(line =>
+        {
+            var snapshot = ProductionUnitOutcomeSnapshot.Create(
+                line.Quantity,
+                productionRecords.Where(record => record.OrderItemId == line.OrderItemId).ToArray(),
+                line.ProductionUnitStartNo);
+            return new ProductionUnitOutcomeSummaryResult
+            {
+                OrderItemId = line.OrderItemId,
+                ProductionUnitStartNo = line.ProductionUnitStartNo,
+                ExpectedQuantity = line.Quantity,
+                CompletedQuantity = snapshot.CompletedQuantity,
+                FailedQuantity = snapshot.FailedQuantity,
+                ManualInterventionQuantity = snapshot.ManualInterventionQuantity,
+                InProgressQuantity = snapshot.InProgressQuantity,
+                UnreportedQuantity = snapshot.UnreportedQuantity,
+                AggregateStatus = snapshot.AggregateStatus?.ToString()
+            };
+        }).ToArray();
         var adjacentAttempts = await _orderStore.ListAdjacentExecutionAttemptsAsync(
             order.Id,
             command.DispatchAttemptNo!.Value,
@@ -66,7 +90,7 @@ public sealed class GetExecutionAttemptQueryHandler
 
         return ApiResult<ExecutionAttemptDetailResult>.Success(new ExecutionAttemptDetailResult
         {
-            Attempt = ExecutionAttemptResultMapper.ToResult(command, orderRecord),
+            Attempt = ExecutionAttemptResultMapper.ToDiagnostics(command, orderRecord),
             PreviousAttempt = previousAttempt is null
                 ? null
                 : ExecutionAttemptResultMapper.ToReference(previousAttempt),
@@ -100,7 +124,8 @@ public sealed class GetExecutionAttemptQueryHandler
                 .OrderBy(attempt => attempt.DeliveryAttemptNo)
                 .Select(ExecutionAttemptResultMapper.ToResult)
                 .ToArray(),
-            ProductionExecutions = productionRecords.Select(ExecutionAttemptResultMapper.ToResult).ToArray()
+            ProductionExecutions = productionRecords.Select(ExecutionAttemptResultMapper.ToResult).ToArray(),
+            ProductionUnitOutcomes = productionUnitOutcomes
         }, "Execution attempt retrieved successfully.");
     }
 }

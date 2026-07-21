@@ -89,10 +89,16 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
         await using var assertion = fixture.CreateDbContext();
         var order = await assertion.Orders.AsNoTracking()
             .SingleAsync(candidate => candidate.Id == first.OrderId);
-        Assert.Equal(first.Amount * 2, order.PaidAmount);
+        Assert.Equal(first.Amount, order.PaidAmount);
         Assert.Equal(OrderStatus.RefundRequired, order.Status);
         Assert.Equal(2, await assertion.PaymentTransactions.CountAsync(payment =>
             payment.OrderId == first.OrderId && payment.Status == PaymentTransactionStatus.Paid));
+        Assert.Equal(1, await assertion.PaymentTransactions.CountAsync(payment =>
+            payment.OrderId == first.OrderId &&
+            payment.SettlementDisposition == PaymentSettlementDisposition.Primary));
+        Assert.Equal(1, await assertion.PaymentTransactions.CountAsync(payment =>
+            payment.OrderId == first.OrderId &&
+            payment.SettlementDisposition == PaymentSettlementDisposition.DuplicateRefundRequired));
     }
 
     [IntegrationFact]
@@ -265,7 +271,8 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
             menuItem.Id, product.Id, variant.Id, null,
             menuItem.Code, menuItem.DisplayName, product.Code, product.Name,
             variant.Code, variant.Name, null, FulfillmentType.Packaged, 1, amount);
-        order.Place(DateTimeOffset.UtcNow);
+        var placedAt = DateTimeOffset.UtcNow;
+        order.Place(placedAt, placedAt.AddMinutes(15));
         var paymentMethod = new PaymentMethod
         {
             Code = $"payos-{Guid.NewGuid():N}",

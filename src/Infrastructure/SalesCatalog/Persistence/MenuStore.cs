@@ -134,6 +134,7 @@ public sealed class MenuStore : IMenuStore
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default)
     {
         var routes = await _dbContext.ExecutionEndpointReadinessProjections
@@ -142,6 +143,7 @@ public sealed class MenuStore : IMenuStore
                 readiness.KioskId == kioskId &&
                 readiness.Readiness == ExecutionReadinessState.Ready &&
                 readiness.Safety == ExecutionSafetyState.Safe &&
+                readiness.CloudReceivedAt >= readinessReceivedAfter &&
                 readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
                 _dbContext.ConfigurationReleases.WhereNotDeleted().Any(release =>
                     release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge

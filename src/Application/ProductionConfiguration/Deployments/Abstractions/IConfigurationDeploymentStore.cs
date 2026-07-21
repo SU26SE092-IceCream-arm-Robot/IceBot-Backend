@@ -24,7 +24,10 @@ public interface IConfigurationDeploymentStore : IConfigurationDeploymentObserva
     Task<ControllerArtifactSetDeployment?> GetControllerArtifactSetDeploymentForRollbackAsync(Guid deploymentId, CancellationToken cancellationToken = default);
     Task<KioskExecutionEndpoint?> GetEndpointForDeploymentAsync(Guid endpointId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<KioskExecutionEndpoint>> ListEndpointsForDeploymentAsync(Guid kioskId, CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<ExecutionEndpointReadinessProjection>> ListEndpointReadinessAsync(IEnumerable<Guid> endpointIds, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ExecutionEndpointReadinessProjection>> ListEndpointReadinessAsync(
+        IEnumerable<Guid> endpointIds,
+        DateTimeOffset receivedAfter,
+        CancellationToken cancellationToken = default);
     Task<bool> HasPendingFullEdgeDeploymentAsync(Guid kioskId, CancellationToken cancellationToken = default);
     Task<int> GetNextFullEdgeDeploymentAttemptNoAsync(Guid kioskId, Guid configurationReleaseId, CancellationToken cancellationToken = default);
     Task<bool> HasPendingControllerArtifactSetDeploymentAsync(Guid controllerId, CancellationToken cancellationToken = default);

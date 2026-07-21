@@ -168,6 +168,75 @@ public sealed class CreatePaymentSessionCommandHandlerTests
         Assert.Equal("PROVIDER_SESSION_CREATE_REJECTED", scenario.Payment.FailureCode);
     }
 
+    [Fact]
+    public async Task ExpiredOrderPaymentWindow_DoesNotCreatePaymentTransactionOrCallProvider()
+    {
+        var placedAt = DateTimeOffset.UtcNow.AddMinutes(-20);
+        var scenario = ProviderCreateScenario.Create(placedAt, placedAt.AddMinutes(15));
+
+        var result = await scenario.Handler.HandleAsync(CreateCommand(scenario.Order.Id));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.Contains("payment window has expired", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(scenario.Payment);
+        await scenario.Gateway.DidNotReceive().CreatePaymentSessionAsync(
+            Arg.Any<PaymentTransaction>(), Arg.Any<Order>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StorePausedAfterPlacement_DoesNotRevokeExistingOrderPaymentWindow()
+    {
+        var placedAt = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var scenario = ProviderCreateScenario.Create(placedAt, placedAt.AddMinutes(15));
+        scenario.Order.Kiosk.Store.PauseSales(
+            DateTimeOffset.UtcNow,
+            Guid.NewGuid(),
+            "Stop accepting new orders",
+            null);
+        scenario.Gateway.CreatePaymentSessionAsync(
+                Arg.Any<PaymentTransaction>(), scenario.Order, Arg.Any<CancellationToken>())
+            .Returns(new ProviderPaymentSession
+            {
+                CheckoutUrl = "https://payments.example/checkout",
+                ExpiresAt = scenario.Order.PaymentDeadlineAt
+            });
+
+        var result = await scenario.Handler.HandleAsync(CreateCommand(scenario.Order.Id));
+
+        Assert.True(result.Succeeded, result.Message);
+        await scenario.Gateway.Received(1).CreatePaymentSessionAsync(
+            Arg.Any<PaymentTransaction>(), scenario.Order, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task IdempotentReplayAfterOrderPaymentDeadline_DoesNotReturnStaleInstructions()
+    {
+        var placedAt = DateTimeOffset.UtcNow.AddMinutes(-20);
+        var scenario = ProviderCreateScenario.Create(placedAt, placedAt.AddMinutes(15));
+        var paymentMethod = new PaymentMethod
+        {
+            Id = 1, Code = "payos", Name = "PayOS", Provider = "PayOS", IsActive = true
+        };
+        var existing = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(), OrderId = scenario.Order.Id, Order = scenario.Order,
+            PaymentMethodId = paymentMethod.Id, PaymentMethod = paymentMethod,
+            Provider = "PayOS", Amount = 30_000, Currency = "VND",
+            Status = PaymentTransactionStatus.Pending,
+            CheckoutUrl = "https://payments.example/stale"
+        };
+        scenario.Store.GetPaymentTransactionByIdempotencyKeyAsync(
+                Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(existing);
+
+        var result = await scenario.Handler.HandleAsync(CreateCommand(scenario.Order.Id));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.Contains("payment window has expired", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class ProviderCreateScenario
     {
         public required CreatePaymentSessionCommandHandler Handler { get; init; }
@@ -176,7 +245,9 @@ public sealed class CreatePaymentSessionCommandHandlerTests
         public required Order Order { get; init; }
         public PaymentTransaction? Payment { get; set; }
 
-        public static ProviderCreateScenario Create()
+        public static ProviderCreateScenario Create(
+            DateTimeOffset? placedAtOverride = null,
+            DateTimeOffset? paymentDeadlineAtOverride = null)
         {
             var organization = new Organization
             {
@@ -203,7 +274,8 @@ public sealed class CreatePaymentSessionCommandHandlerTests
                 Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
                 "MENU", "Menu", "PRODUCT", "Product", "VARIANT", "Variant", null,
                 FulfillmentType.Packaged, 1, 30_000);
-            order.Place(DateTimeOffset.UtcNow);
+            var placedAt = placedAtOverride ?? DateTimeOffset.UtcNow;
+            order.Place(placedAt, paymentDeadlineAtOverride ?? placedAt.AddMinutes(15));
             var connectivity = KioskConnectivityProjection.Create(kiosk.Id, DateTimeOffset.UtcNow);
             connectivity.Observe(
                 KioskConnectivityStatus.Online,

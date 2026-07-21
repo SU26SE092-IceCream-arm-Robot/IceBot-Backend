@@ -20,6 +20,13 @@ public interface IKioskStore
         string? search,
         CancellationToken cancellationToken = default);
     Task<Kiosk?> GetByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<Kiosk?> GetByStoreAndIdAsync(Guid storeId, Guid kioskId, CancellationToken cancellationToken = default);
+    Task<bool> HasRunningExecutionAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task AddOperationalStateTransitionAsync(KioskOperationalStateTransition transition, CancellationToken cancellationToken = default);
+    Task<T> ExecuteOperationalStateSerializedAsync<T>(
+        Guid kioskId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
     Task AddAsync(Kiosk kiosk, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

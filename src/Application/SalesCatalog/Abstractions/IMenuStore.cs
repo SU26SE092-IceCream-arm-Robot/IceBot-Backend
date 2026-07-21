@@ -46,6 +46,7 @@ public interface IMenuStore
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default);
 
     Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default);

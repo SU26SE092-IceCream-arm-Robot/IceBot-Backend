@@ -29,9 +29,20 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"SELECT pg_advisory_xact_lock(hashtextextended({$"mqtt-credential:{endpointId:D}"}, 0));",
             cancellationToken);
-        var result = await action(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
-        return result;
+        try
+        {
+            // Each broker workflow phase must compare against database state, not an
+            // entity retained by this scoped DbContext from an earlier phase.
+            _dbContext.ChangeTracker.Clear();
+            var result = await action(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            throw;
+        }
     }
 
     public async Task<IReadOnlyList<KioskExecutionEndpoint>> ListAsync(
@@ -164,6 +175,26 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
         return _dbContext.ExecutionEndpointCredentialBindings.AnyAsync(
             credential => credential.CredentialReference == credentialReference,
             cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<Guid>> ListStaleMqttCredentialEndpointIdsAsync(
+        DateTimeOffset staleBefore,
+        int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ExecutionEndpointMqttCredentials
+            .AsNoTracking()
+            .Where(credential =>
+                (credential.Status == ExecutionEndpointMqttCredentialStatus.PendingProvision ||
+                 credential.Status == ExecutionEndpointMqttCredentialStatus.PendingRotation ||
+                 credential.Status == ExecutionEndpointMqttCredentialStatus.PendingRevoke ||
+                 credential.Status == ExecutionEndpointMqttCredentialStatus.RevokeFailed) &&
+                (credential.UpdatedAt ?? credential.CreatedAt) <= staleBefore)
+            .OrderBy(credential => credential.UpdatedAt ?? credential.CreatedAt)
+            .ThenBy(credential => credential.Id)
+            .Select(credential => credential.KioskExecutionEndpointId)
+            .Take(batchSize)
+            .ToListAsync(cancellationToken);
     }
 
     public Task AddCredentialBindingAsync(

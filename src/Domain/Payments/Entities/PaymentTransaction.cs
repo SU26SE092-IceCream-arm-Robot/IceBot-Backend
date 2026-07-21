@@ -44,6 +44,8 @@ public partial class PaymentTransaction : BusinessEntity
 
     public PaymentTransactionStatus Status { get; set; } = PaymentTransactionStatus.Pending;
 
+    public PaymentSettlementDisposition SettlementDisposition { get; private set; }
+
     public DateTimeOffset RequestedAt { get; set; }
 
     public DateTimeOffset? AuthorizedAt { get; set; }
@@ -164,6 +166,60 @@ public partial class PaymentTransaction : BusinessEntity
         CancelledAt = cancelledAt;
         Status = PaymentTransactionStatus.Cancelled;
         ClearRetryState();
+    }
+
+    public void AssignPrimarySettlement()
+    {
+        if (Status != PaymentTransactionStatus.Paid)
+        {
+            throw new DomainRuleException("Only a paid transaction can become the primary settlement.");
+        }
+
+        if (SettlementDisposition is not (PaymentSettlementDisposition.Unassigned or PaymentSettlementDisposition.Primary))
+        {
+            throw new DomainRuleException("A duplicate payment cannot become the primary settlement.");
+        }
+
+        SettlementDisposition = PaymentSettlementDisposition.Primary;
+    }
+
+    public void MarkDuplicateRefundRequired(string reason)
+    {
+        if (Status != PaymentTransactionStatus.Paid)
+        {
+            throw new DomainRuleException("Only a paid transaction can require duplicate-payment intervention.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new DomainRuleException("Duplicate-payment intervention reason is required.");
+        }
+
+        if (SettlementDisposition is PaymentSettlementDisposition.Primary or PaymentSettlementDisposition.DuplicateResolved)
+        {
+            throw new DomainRuleException("The payment settlement disposition cannot be changed to an unresolved duplicate.");
+        }
+
+        SettlementDisposition = PaymentSettlementDisposition.DuplicateRefundRequired;
+        LastErrorCode = "DUPLICATE_PAYMENT_REFUND_REQUIRED";
+        LastErrorMessage = reason.Trim();
+    }
+
+    public void ResolveDuplicatePayment(bool moneyWasRefunded)
+    {
+        if (SettlementDisposition != PaymentSettlementDisposition.DuplicateRefundRequired)
+        {
+            throw new DomainRuleException("Only an unresolved duplicate payment can be resolved.");
+        }
+
+        if (moneyWasRefunded)
+        {
+            Status = PaymentTransactionStatus.Refunded;
+        }
+
+        SettlementDisposition = PaymentSettlementDisposition.DuplicateResolved;
+        LastErrorCode = null;
+        LastErrorMessage = null;
     }
 
     public void MarkExpired(DateTimeOffset expiredAt)

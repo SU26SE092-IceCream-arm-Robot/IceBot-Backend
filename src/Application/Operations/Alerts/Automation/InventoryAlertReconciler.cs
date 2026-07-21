@@ -6,6 +6,7 @@ using Domain.Inventory.Enums;
 using Domain.Operations.Entities;
 using Domain.Operations.Enums;
 using Application.Operations.Alerts.Notifications;
+using Microsoft.Extensions.Logging;
 
 namespace Application.Operations.Alerts.Automation;
 
@@ -13,28 +14,62 @@ public sealed class InventoryAlertReconciler(
     IInventoryAlertAutomationStore store,
     IRealtimeNotificationPublisher publisher,
     IInventoryOperationalAlertNotifier notifier,
-    InventoryAlertAutomationOptions options)
+    InventoryAlertAutomationOptions options,
+    ILogger<InventoryAlertReconciler> logger)
 {
     private const string LowCode = "INVENTORY_LOW";
     private const string EmptyCode = "INVENTORY_EMPTY";
 
-    public async Task<int> ReconcileAsync(DateTimeOffset observedAt, CancellationToken cancellationToken = default)
+    public async Task<InventoryAlertReconciliationResult> ReconcileAsync(
+        DateTimeOffset observedAt,
+        CancellationToken cancellationToken = default)
     {
         var changed = 0;
+        var candidateFailures = 0;
+        var scanSlot = observedAt.ToUnixTimeSeconds() /
+            Math.Max(options.IntervalSeconds, 1);
         var ids = await store.ListActiveDispenserStateIdsAsync(
             checked(options.BatchSize * options.MaxBatchesPerRun),
+            scanSlot,
             cancellationToken);
         foreach (var id in ids)
         {
-            var events = await ReconcileOneAsync(id, observedAt, cancellationToken);
-            changed += events.Count;
-            foreach (var evt in events)
+            try
             {
-                await publisher.PublishAlertChangedAsync(evt, cancellationToken);
+                var events = await ReconcileOneAsync(id, observedAt, cancellationToken);
+                changed += events.Count;
+                foreach (var evt in events)
+                {
+                    try
+                    {
+                        await publisher.PublishAlertChangedAsync(evt, cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogError(exception,
+                            "Inventory alert reconciliation committed alert {AlertId}, but SignalR publication failed.",
+                            evt.AlertId);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                candidateFailures++;
+                logger.LogError(exception,
+                    "Inventory alert reconciliation failed for dispenser state {DispenserStateId}.",
+                    id);
             }
         }
 
-        return changed;
+        return new InventoryAlertReconciliationResult(changed, candidateFailures);
     }
 
     private Task<List<AlertChangedEvent>> ReconcileOneAsync(
@@ -168,3 +203,5 @@ public sealed class InventoryAlertReconciler(
         LastOccurredAt = alert.LastOccurredAt
     };
 }
+
+public sealed record InventoryAlertReconciliationResult(int ChangedAlertCount, int CandidateFailureCount);

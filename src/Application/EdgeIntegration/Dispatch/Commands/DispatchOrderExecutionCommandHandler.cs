@@ -13,9 +13,11 @@ using Domain.Catalog.Enums;
 using Domain.Common;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
+using Domain.ProductionExecution.Enums;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
+using Application.Devices.Telemetry;
 
 namespace Application.EdgeIntegration.Dispatch.Commands;
 
@@ -23,15 +25,18 @@ public sealed class DispatchOrderExecutionCommandHandler
 {
     private readonly IOrderExecutionDispatchStore _store;
     private readonly OrderExecutionDispatchOptions _options;
+    private readonly EdgeTelemetryIngestionOptions _telemetryOptions;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
 
     public DispatchOrderExecutionCommandHandler(
         IOrderExecutionDispatchStore store,
         IOptions<OrderExecutionDispatchOptions> options,
-        IEdgeCommandWakeUpPublisher wakeUpPublisher)
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        IOptions<EdgeTelemetryIngestionOptions>? telemetryOptions = null)
     {
         _store = store;
         _options = options.Value;
+        _telemetryOptions = telemetryOptions?.Value ?? new EdgeTelemetryIngestionOptions();
         _wakeUpPublisher = wakeUpPublisher;
     }
 
@@ -80,6 +85,175 @@ public sealed class DispatchOrderExecutionCommandHandler
             cancellationToken);
         await PublishWakeUpAsync(result, cancellationToken);
         return result;
+    }
+
+    public async Task<ApiResult<OrderExecutionDispatchResult>> HandleRemakeAsync(
+        Guid remakeRequestId,
+        Guid orderId,
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
+        Guid requestedByAccountId,
+        string reason,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_options.Enabled)
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Order execution dispatch is disabled.", 503);
+        if (remakeRequestId == Guid.Empty || orderId == Guid.Empty || orderItemId == Guid.Empty ||
+            productionUnitNo <= 0 || productionUnitQuantity <= 0 || requestedByAccountId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(reason))
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Remake identity, order item, positive unit range, operator, and reason are required.", 400);
+
+        var result = await _store.ExecuteSerializedAsync(
+            orderId,
+            ct => RemakeLockedAsync(
+                remakeRequestId, orderId, orderItemId, productionUnitNo, productionUnitQuantity,
+                requestedByAccountId, reason.Trim(), ct),
+            cancellationToken);
+        await PublishWakeUpAsync(result, cancellationToken);
+        return result;
+    }
+
+    private async Task<ApiResult<OrderExecutionDispatchResult>> RemakeLockedAsync(
+        Guid remakeRequestId,
+        Guid orderId,
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
+        Guid requestedByAccountId,
+        string reason,
+        CancellationToken cancellationToken)
+    {
+        var existing = await _store.GetCommandByIdAsync(remakeRequestId, cancellationToken);
+        if (existing is not null)
+        {
+            if (existing.OrderId != orderId)
+                return ApiResult<OrderExecutionDispatchResult>.Fail(
+                    "Remake request id is already used by another order.", 409);
+            if (existing.CreatedByAccountId != requestedByAccountId)
+                return ApiResult<OrderExecutionDispatchResult>.Fail(
+                    "Remake request id is already owned by another operator.", 409);
+            var existingPayload = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(existing.PayloadJson);
+            var existingLine = existingPayload.OrderLines.SingleOrDefault();
+            if (!string.Equals(existingPayload.ExecutionIntent, "Remake", StringComparison.Ordinal) ||
+                existingLine?.OrderItemId != orderItemId ||
+                existingLine.ProductionUnitStartNo != productionUnitNo ||
+                existingLine.Quantity != productionUnitQuantity)
+                return ApiResult<OrderExecutionDispatchResult>.Fail(
+                    "Remake request id was reused with a different unit selection.", 409);
+            return ApiResult<OrderExecutionDispatchResult>.Success(
+                ToResult(existing, existingPayload.ConfigurationReleaseId, existing: true),
+                "Existing production remake command returned.");
+        }
+
+        var order = await _store.GetOrderAsync(orderId, cancellationToken);
+        if (order is null)
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
+        await _store.AcquireKioskOperationalLockAsync(order.KioskId, cancellationToken);
+        if (!await _store.IsKioskOperationalAsync(order.KioskId, cancellationToken))
+            return KioskNotOperational();
+        if (order.PaymentStatus != PaymentStatus.Paid || order.Status != OrderStatus.FulfillmentIssue)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Only a paid order with an unresolved fulfillment issue can request a production remake.", 409);
+
+        var item = order.OrderItems.SingleOrDefault(candidate => candidate.Id == orderItemId);
+        if (item is null || item.FulfillmentType != FulfillmentType.MachineProduced ||
+            item.Status != OrderItemStatus.Failed)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Only a failed machine-produced order item can be remade.", 409);
+        var requestedLastUnit = (long)productionUnitNo + productionUnitQuantity - 1;
+        if (requestedLastUnit > item.Quantity)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Remake unit range exceeds the order-item quantity.", 400);
+
+        var latest = await _store.GetLatestCommandAsync(orderId, cancellationToken);
+        if (latest is null || !latest.DispatchAttemptNo.HasValue)
+            return ApiResult<OrderExecutionDispatchResult>.Fail("No prior execution attempt was found.", 409);
+        if (latest.DispatchAttemptNo.Value >= _options.MaxDispatchAttempts)
+            return ApiResult<OrderExecutionDispatchResult>.Fail("Maximum execution dispatch attempts reached.", 409);
+
+        var records = await _store.ListProductionExecutionRecordsForOrderItemAsync(
+            orderId, orderItemId, cancellationToken);
+        var snapshot = ProductionUnitOutcomeSnapshot.CreateEffective(item.Quantity, records, latest);
+        if (!snapshot.HasCompleteCoverage || snapshot.InProgressQuantity > 0)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Production remake requires complete, terminal unit evidence for the source item.", 409);
+        var targetRecords = Enumerable.Range(productionUnitNo, productionUnitQuantity)
+            .Select(unitNo => snapshot.Units[unitNo - 1])
+            .ToArray();
+        if (targetRecords.Any(record => record?.Status != ProductionExecutionStatus.Failed ||
+                record.PhysicalOutputState != PhysicalOutputState.No))
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Every remake unit must have failed with confirmed no physical output.", 409);
+        var sourceCommandIds = targetRecords.Select(record => record!.SourceCommandId).Distinct().ToArray();
+        if (sourceCommandIds.Length != 1)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Remake units must originate from one execution command.", 409);
+        var remakeOfSourceCommandId = sourceCommandIds[0];
+
+        var endpoints = await _store.ListActiveEndpointsAsync(order.KioskId, cancellationToken);
+        var candidates = new List<OrderExecutionDispatchCandidate>();
+        foreach (var endpoint in endpoints)
+        {
+            var candidate = await OrderExecutionDispatchPlanner.TryBuildCandidateAsync(
+                _store, endpoint, [item], ReadinessReceivedAfter(), cancellationToken);
+            if (candidate is not null) candidates.Add(candidate);
+        }
+        if (candidates.Count != 1)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                candidates.Count == 0
+                    ? "No ready execution endpoint can perform the remake."
+                    : "Multiple execution endpoints can perform the remake; endpoint selection is ambiguous.",
+                409);
+
+        var selected = candidates[0];
+        await _store.AcquireEndpointAdmissionLockAsync(selected.Endpoint.Id, cancellationToken);
+        if (await _store.CountActiveCommandsAsync(selected.Endpoint.Id, cancellationToken) >=
+            _options.MaxActiveCommandsPerEndpoint)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Execution endpoint still has an active command or its admission queue is full.", 409);
+
+        var now = DateTimeOffset.UtcNow;
+        var expiry = now.AddMinutes(_options.CommandExpiryMinutes);
+        var attemptNo = latest.DispatchAttemptNo.Value + 1;
+        var basePayload = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(
+            OrderExecutionDispatchPlanner.BuildPayload(
+                remakeRequestId, attemptNo, order, selected, [item], expiry));
+        var baseLine = basePayload.OrderLines.Single();
+        var payload = ExecuteOrderCommandPayloadCodec.Serialize(basePayload with
+        {
+            ExecutionIntent = "Remake",
+            RemakeOfSourceCommandId = remakeOfSourceCommandId,
+            OrderLines =
+            [
+                baseLine with
+                {
+                    ProductionUnitStartNo = productionUnitNo,
+                    Quantity = productionUnitQuantity
+                }
+            ]
+        });
+        var edgeCommand = EdgeCommand.Create(
+            EdgeCommandType.ExecuteOrder, order.KioskId, selected.Endpoint.Id, payload, now,
+            order.Id, attemptNo, expiry);
+        edgeCommand.Id = remakeRequestId;
+        edgeCommand.CreatedByAccountId = requestedByAccountId;
+
+        await _store.AddOrderStatusHistoryAsync(new OrderStatusHistory
+        {
+            OrderId = order.Id,
+            ChangedByAccountId = requestedByAccountId,
+            FromStatus = order.Status,
+            ToStatus = order.Status,
+            ChangedAt = now,
+            Reason = $"Production remake attempt {attemptNo}, units {productionUnitNo}-{requestedLastUnit}: {reason}"
+        }, cancellationToken);
+        await _store.AddCommandAsync(edgeCommand, cancellationToken);
+        await _store.SaveChangesAsync(cancellationToken);
+        return ApiResult<OrderExecutionDispatchResult>.Success(
+            ToResult(edgeCommand, selected.Release.Id, existing: false),
+            "Production remake command created successfully.", 201);
     }
 
     private async Task<ApiResult<OrderExecutionDispatchResult>> RedispatchLockedAsync(
@@ -154,6 +328,12 @@ public sealed class DispatchOrderExecutionCommandHandler
             return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
         }
 
+        await _store.AcquireKioskOperationalLockAsync(order.KioskId, cancellationToken);
+        if (!await _store.IsKioskOperationalAsync(order.KioskId, cancellationToken))
+        {
+            return KioskNotOperational();
+        }
+
         var canPrepareRejectedOrder = redispatch is not null && order.Status == OrderStatus.ExecutionRejected;
         if (order.PaymentStatus != PaymentStatus.Paid ||
             (order.Status != OrderStatus.ReadyForFulfillment && !canPrepareRejectedOrder))
@@ -183,7 +363,7 @@ public sealed class DispatchOrderExecutionCommandHandler
         foreach (var endpoint in endpoints)
         {
             var candidate = await OrderExecutionDispatchPlanner.TryBuildCandidateAsync(
-                _store, endpoint, productionItems, cancellationToken);
+                _store, endpoint, productionItems, ReadinessReceivedAfter(), cancellationToken);
             if (candidate is not null)
             {
                 candidates.Add(candidate);
@@ -260,6 +440,14 @@ public sealed class DispatchOrderExecutionCommandHandler
             "Order execution command created successfully.",
             201);
     }
+
+    private DateTimeOffset ReadinessReceivedAfter() =>
+        DateTimeOffset.UtcNow.AddSeconds(-_telemetryOptions.ReadinessTimeoutSeconds);
+
+    private static ApiResult<OrderExecutionDispatchResult> KioskNotOperational() =>
+        ApiResult<OrderExecutionDispatchResult>.Fail(
+            "Kiosk is not operational. The paid order remains queued and will not be dispatched until operations resume.",
+            409);
 
     private static OrderExecutionDispatchResult ToResult(
         EdgeCommand command,

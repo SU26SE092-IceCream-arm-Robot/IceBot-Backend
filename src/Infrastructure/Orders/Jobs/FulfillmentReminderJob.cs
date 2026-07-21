@@ -3,6 +3,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Infrastructure.Operations.Automation;
+using System.Diagnostics;
 
 namespace Infrastructure.Orders.Jobs;
 
@@ -26,9 +28,11 @@ public sealed class FulfillmentReminderJob(
 
     private async Task ProcessBatchAsync(CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             IReadOnlyList<Guid> ids;
+            var candidateFailures = 0;
             var observedAt = DateTimeOffset.UtcNow;
             using (var scope = scopeFactory.CreateScope())
             {
@@ -50,16 +54,24 @@ public sealed class FulfillmentReminderJob(
                 }
                 catch (Exception exception)
                 {
+                    candidateFailures++;
+                    OperationalAutomationMetrics.RecordCandidateFailure("fulfillment_reminder");
                     logger.LogError(exception,
                         "Fulfillment overdue reminder failed for order item {OrderItemId}.", id);
                 }
             }
+
+            OperationalAutomationMetrics.RecordRun(
+                "fulfillment_reminder",
+                candidateFailures == 0 ? "succeeded" : "partial_failure",
+                stopwatch.Elapsed);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception exception)
         {
+            OperationalAutomationMetrics.RecordRun("fulfillment_reminder", "failed", stopwatch.Elapsed);
             logger.LogError(exception, "Fulfillment overdue reminder batch failed.");
         }
     }

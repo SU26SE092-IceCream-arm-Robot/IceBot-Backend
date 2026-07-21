@@ -116,6 +116,7 @@ public class IceBotDbContext : DbContext
     public DbSet<Organization> Organizations => Set<Organization>();
     public DbSet<Store> Stores => Set<Store>();
     public DbSet<Kiosk> Kiosks => Set<Kiosk>();
+    public DbSet<KioskOperationalStateTransition> KioskOperationalStateTransitions => Set<KioskOperationalStateTransition>();
     public DbSet<FranchiseOnboarding> FranchiseOnboardings => Set<FranchiseOnboarding>();
 
     public DbSet<DeviceType> DeviceTypes => Set<DeviceType>();

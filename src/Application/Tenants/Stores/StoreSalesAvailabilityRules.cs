@@ -3,8 +3,18 @@ using Application.Tenants.Stores.Results;
 
 namespace Application.Tenants.Stores;
 
-internal static class StoreSalesAvailabilityRules
+public static class StoreSalesAvailabilityRules
 {
+    public static string? ValidateSalesAdmission(Store store, DateTimeOffset now)
+    {
+        if (store.IsSalesPausedAt(now))
+        {
+            return "Store is temporarily not accepting new orders.";
+        }
+
+        return ValidateOpeningHours(store, now);
+    }
+
     public static string? ValidateOpeningHours(Store store, DateTimeOffset now)
     {
         if (string.IsNullOrWhiteSpace(store.OpeningHoursJson))

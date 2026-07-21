@@ -247,6 +247,22 @@ public partial class OrderItem : BusinessEntity
         Status = OrderItemStatus.Failed;
     }
 
+    public void MarkRemakePreparing()
+    {
+        RejectGenericPackagedTransition();
+        if (Status != OrderItemStatus.Failed)
+            throw new DomainRuleException("Only a failed machine-produced order item can begin remake production.");
+        Status = OrderItemStatus.Preparing;
+    }
+
+    public void MarkRemakeCompleted()
+    {
+        RejectGenericPackagedTransition();
+        if (Status is not (OrderItemStatus.Failed or OrderItemStatus.Preparing))
+            throw new DomainRuleException("Only a failed or remake-preparing order item can complete a remake.");
+        Status = OrderItemStatus.Completed;
+    }
+
     public bool FulfillPackaged()
     {
         if (FulfillmentType != FulfillmentType.Packaged)

@@ -43,8 +43,10 @@ public static class ProductionPackageUpgradeMetrics
     public static void RecordAbandon(string outcome) => AbandonOutcomes.Add(1,
         new KeyValuePair<string, object?>("outcome", outcome));
 
-    public static void RecordReconciliation(int failedCount) => ReconciliationOutcomes.Add(1,
-        new KeyValuePair<string, object?>("outcome", failedCount > 0 ? "failed_stale" : "no_change"));
+    public static void RecordReconciliation(int failedCount, int errorCount) => ReconciliationOutcomes.Add(1,
+        new KeyValuePair<string, object?>("outcome", errorCount > 0 ? "partial_error" :
+            failedCount > 0 ? "failed_stale" : "no_change"),
+        new KeyValuePair<string, object?>("error_count", errorCount));
 
     public static void RecordPendingAge(DateTimeOffset startedAt, DateTimeOffset observedAt, string stage) =>
         PendingAge.Record(Math.Max(0, (observedAt - startedAt).TotalSeconds),

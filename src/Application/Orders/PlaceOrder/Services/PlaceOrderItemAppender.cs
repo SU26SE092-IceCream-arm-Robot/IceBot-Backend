@@ -6,13 +6,19 @@ using Application.SalesCatalog.Rules;
 using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.Tenants.Entities;
+using Application.Devices.Telemetry;
+using Microsoft.Extensions.Options;
 
 namespace Application.Orders.PlaceOrder.Services;
 
 public sealed record PlaceOrderItemAppendFailure(string Message, int StatusCode);
 
-public sealed class PlaceOrderItemAppender(IOrderStore orderStore)
+public sealed class PlaceOrderItemAppender(
+    IOrderStore orderStore,
+    IOptions<EdgeTelemetryIngestionOptions> options)
 {
+    private readonly EdgeTelemetryIngestionOptions _options = options.Value;
+
     public async Task<PlaceOrderItemAppendFailure?> AppendAsync(
         Order order,
         Kiosk kiosk,
@@ -37,7 +43,11 @@ public sealed class PlaceOrderItemAppender(IOrderStore orderStore)
         if (productVariant.FulfillmentType == FulfillmentType.MachineProduced && recipe is not null)
         {
             routePolicy = await orderStore.GetActiveProductionRouteOptionPolicyAsync(
-                kiosk.Id, productVariant.Id, recipe.Id, cancellationToken);
+                kiosk.Id,
+                productVariant.Id,
+                recipe.Id,
+                now.AddSeconds(-_options.ReadinessTimeoutSeconds),
+                cancellationToken);
         }
 
         var sellabilityError = MenuItemSellabilityRules.Validate(

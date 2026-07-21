@@ -28,11 +28,12 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 6. Tablet checks runtime projection freshness:
    now - generatedAt <= 5-15 seconds.
 7. Tablet calls Cloud Backend to place order.
-8. Cloud re-evaluates kiosk, Store opening hours in `Store.TimeZone`, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found.
+8. Cloud re-evaluates kiosk lifecycle, `KioskOperationalState.Operational`, connectivity, Store opening hours in `Store.TimeZone`, explicit Store sales pause, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store, kiosk operational state, or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found.
 9. Cloud creates:
    - Order
    - OrderItems
    - status PendingPayment / Unpaid
+   - immutable `paymentDeadlineAt`
 10. Tablet calls Cloud Backend to create payment session for the order.
 11. Cloud creates:
    - PaymentTransaction
@@ -50,6 +51,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 18. Cloud commits payment/order state.
 19. After the payment transaction commits, Cloud dispatches execution attempt `1`.
    A reconciliation worker repairs any paid `ReadyForFulfillment` order whose required machine-execution command was not created.
+   If the kiosk is not `Operational`, the paid order remains queued. Cloud neither creates/delivers a new `ExecuteOrder` command nor cancels/refunds the order. Existing accepted/running execution evidence continues through its normal report lifecycle.
 20. Tablet status flow updates payment/order screen.
 21. Edge dispatch resolves one active execution endpoint and the active configuration release, then maps every machine-produced order line to an execution route and ordered robot programs.
 22. Cloud publishes a best-effort MQTT `CommandAvailable` wake-up after commit. Edge still finds the durable `ExecuteOrder` command through authenticated pull; periodic polling recovers missed wake-ups.
@@ -70,6 +72,8 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 ```
 
 Payment success and robot execution are separate concerns. Tablet can show payment success before Edge accepts the executable command.
+
+Store sales admission and active fulfillment are also separate concerns. Scheduled closing or an explicit sales pause stops runtime-menu access and new order placement, but does not cancel paid queue entries or stop accepted/running production. An Order placed before closure may create its payment session until its snapshotted `paymentDeadlineAt`; provider expiry is capped by that deadline. Once the deadline passes, no new session is created and the tablet must start a new Order. A verified late `Paid` webhook remains authoritative because money may already have moved.
 
 If the provider accepted session creation but the original response was lost, a background reconciliation worker queries the persisted provider order code and restores the checkout URL or QR payload. This read-side recovery never replaces webhook verification: a provider lookup reporting `PAID` remains pending until a signed webhook authoritatively commits payment and order state. Reconciliation failures and exhausted retries are available through the scoped payment diagnostics read.
 
@@ -193,6 +197,8 @@ Running without report past deadline
 
 Observation timeout is uncertainty about Edge, not proof that production failed. `SupportRequired` is a customer/support projection only; it does not automatically fail or refund the order. A later sequence-valid order-summary report restores `Fresh` and continues the normal lifecycle. REST polling and `OrderExecutionObservationChanged` SignalR events both expose the same projection so the tablet does not remain on `Preparing` indefinitely.
 
+All command-expiry and missing-report deadlines use Cloud receive time. Edge/controller timestamps remain evidence for diagnostics and bounded future-skew validation; clock rollback on a runtime cannot expire an ACK or make a newly received execution report stale. Store timezone changes that affect configured opening hours require an explicit sales pause first. The pause blocks new admission while already paid/accepted/running fulfillment continues.
+
 ## Manual Redispatch
 
 ```text
@@ -243,8 +249,8 @@ Check:
 3. Edge batches events for Cloud sync.
 4. Cloud ingests events through SyncEventInbox.
 5. Cloud deduplicates by eventId/source node.
-6. Job/unit reports carry `sourceProductionJobId`, `orderItemId`, `productionUnitNo`, and `productionUnitQuantity`; they update `ProductionExecutionRecord` and optional stock evidence only. They never advance the business OrderItem or Order lifecycle.
-7. The Edge order-summary report (`sourceProductionJobId = null`) advances all dispatched machine-produced lines. The Order is then aggregated across every line, including manual and packaged fulfillment; it completes only when every order item is complete.
+6. Job/unit reports carry `sourceProductionJobId`, `orderItemId`, `productionUnitNo`, and `productionUnitQuantity`. Cloud rejects overlapping ranges, persists `ProductionExecutionRecord` and optional stock evidence, then derives the effective unit outcome for the machine line.
+7. A machine line completes only when every expected unit is effectively complete. Any failed unit moves a paid Order to `FulfillmentIssue` without removing successful-unit or stock evidence. The Edge order-summary report (`sourceProductionJobId = null`) updates execution observation and must agree with complete job evidence before it can be final.
 8. Cloud appends OrderStatusHistory and typed stock-consumption evidence supplied by Edge.
 9. After commit, Cloud publishes OrderItemFulfillmentChanged for changed lines, OrderStatusChanged when the aggregate status changes, OrderExecutionObservationChanged for an applied order summary, and InventoryChanged for stock evidence.
 10. Cloud returns accepted/duplicate/rejected result.

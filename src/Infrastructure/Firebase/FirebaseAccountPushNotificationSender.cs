@@ -2,6 +2,7 @@ using Application.Identity.NotificationDevices.Abstractions;
 using Application.Identity.NotificationDevices.Delivery;
 using FirebaseAdmin.Messaging;
 using Microsoft.Extensions.Logging;
+using Polly.Timeout;
 using System.Diagnostics.Metrics;
 
 namespace Infrastructure.Firebase;
@@ -14,23 +15,44 @@ public sealed class FirebaseAccountPushNotificationSender : IAccountPushNotifica
     private static readonly Counter<long> Succeeded = Meter.CreateCounter<long>("icebot.notification.push.succeeded");
     private static readonly Counter<long> Failed = Meter.CreateCounter<long>("icebot.notification.push.failed");
     private static readonly Counter<long> Invalidated = Meter.CreateCounter<long>("icebot.notification.push.token_invalidated");
+    private static readonly Counter<long> TimedOut = Meter.CreateCounter<long>("icebot.notification.push.timed_out");
     private readonly IFirebaseClient _firebaseClient;
     private readonly IAccountNotificationDeviceStore _devices;
+    private readonly FirebasePushDeliveryTimeoutPolicy _timeoutPolicy;
     private readonly ILogger<FirebaseAccountPushNotificationSender> _logger;
 
     public FirebaseAccountPushNotificationSender(
         IFirebaseClient firebaseClient,
         IAccountNotificationDeviceStore devices,
+        FirebasePushDeliveryTimeoutPolicy timeoutPolicy,
         ILogger<FirebaseAccountPushNotificationSender> logger)
     {
         _firebaseClient = firebaseClient;
         _devices = devices;
+        _timeoutPolicy = timeoutPolicy;
         _logger = logger;
     }
 
     public async Task<AccountPushDeliveryResult> SendAsync(
         AccountPushNotification notification,
         CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await _timeoutPolicy.ExecuteAsync(
+                ct => new ValueTask<AccountPushDeliveryResult>(SendCoreAsync(notification, ct)),
+                cancellationToken);
+        }
+        catch (TimeoutRejectedException)
+        {
+            TimedOut.Add(1);
+            throw;
+        }
+    }
+
+    private async Task<AccountPushDeliveryResult> SendCoreAsync(
+        AccountPushNotification notification,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(notification);
         if (notification.AccountId == Guid.Empty ||

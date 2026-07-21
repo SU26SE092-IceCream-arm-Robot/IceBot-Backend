@@ -25,17 +25,23 @@ public sealed class AcknowledgeAlertCommandHandler
         AcknowledgeAlertCommand command,
         CancellationToken cancellationToken = default)
     {
-        var outcome = await _store.ExecuteSerializedAsync(
+        AlertChangedEvent? notification = null;
+        var result = await _store.ExecuteSerializedAsync(
             command.AlertId,
-            ct => HandleLockedAsync(command, ct),
+            async ct =>
+            {
+                var outcome = await HandleLockedAsync(command, ct);
+                notification = outcome.Notification;
+                return outcome.Result;
+            },
             cancellationToken);
 
-        if (outcome.Notification is not null)
+        if (notification is not null)
         {
-            await _publisher.PublishAlertChangedAsync(outcome.Notification, cancellationToken);
+            await _publisher.PublishAlertChangedAsync(notification, cancellationToken);
         }
 
-        return outcome.Result;
+        return result;
     }
 
     private async Task<LifecycleOutcome> HandleLockedAsync(
@@ -65,7 +71,6 @@ public sealed class AcknowledgeAlertCommandHandler
             {
                 alert.UpdatedAt = now;
                 alert.UpdatedByAccountId = command.UserContext.AccountId;
-                alert.Version++;
                 await _store.SaveChangesAsync(cancellationToken);
                 notification = ToEvent(alert, oldStatus.ToString(), now);
             }

@@ -27,11 +27,13 @@ internal static class OrderExecutionDispatchPlanner
         IOrderExecutionDispatchStore store,
         KioskExecutionEndpoint endpoint,
         IReadOnlyCollection<OrderItem> productionItems,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken)
     {
         var readiness = await store.GetReadinessAsync(endpoint.Id, cancellationToken);
         if (readiness is null || readiness.Readiness != ExecutionReadinessState.Ready ||
-            readiness.Activity != ExecutionActivityState.Idle || readiness.Safety != ExecutionSafetyState.Safe)
+            readiness.Activity != ExecutionActivityState.Idle || readiness.Safety != ExecutionSafetyState.Safe ||
+            readiness.CloudReceivedAt < readinessReceivedAfter)
             return null;
 
         var availableCapabilities = readiness.Capabilities.Where(x => x.IsAvailable)

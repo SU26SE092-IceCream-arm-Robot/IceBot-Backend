@@ -1,13 +1,32 @@
+using Application.Sync;
+using Application.Sync.Abstractions;
 using Domain.Sync.DeadLetters;
 using Domain.Sync.Ingestion;
 using Domain.Common;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
+using NSubstitute;
 
 namespace IceBot.UnitTests.Sync;
 
 public sealed class SyncDeadLetterTests
 {
+    [Fact]
+    public async Task List_InvalidStatus_IsRejectedBeforePersistenceQuery()
+    {
+        var store = Substitute.For<ISyncDeadLetterStore>();
+        var handler = new ListSyncDeadLettersQueryHandler(store);
+
+        var result = await handler.HandleAsync(new ListSyncDeadLettersQuery(
+            new() { IsSystemAdmin = true }, "not-a-status", null, 1, 20));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        await store.DidNotReceive().ListAsync(
+            Arg.Any<SyncDeadLetterStatus?>(), Arg.Any<string?>(),
+            Arg.Any<int>(), Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public void RetryFailure_ReturnsItemToOpen_AndPreservesExplicitResolutionBoundary()
     {

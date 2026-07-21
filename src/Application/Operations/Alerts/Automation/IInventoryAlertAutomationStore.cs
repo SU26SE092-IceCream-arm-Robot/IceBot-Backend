@@ -7,6 +7,7 @@ public interface IInventoryAlertAutomationStore
 {
     Task<IReadOnlyList<Guid>> ListActiveDispenserStateIdsAsync(
         int maxCount,
+        long scanSlot,
         CancellationToken cancellationToken = default);
     Task<IngredientDispenserState?> GetDispenserStateAsync(Guid id, CancellationToken cancellationToken = default);
     Task<List<Alert>> ListActiveInventoryAlertsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);

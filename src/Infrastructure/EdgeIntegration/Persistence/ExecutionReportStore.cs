@@ -250,6 +250,66 @@ public sealed class ExecutionReportStore :
             cancellationToken);
     }
 
+    public async Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsAsync(
+        Guid sourceCommandId,
+        Guid orderItemId,
+        CancellationToken cancellationToken = default)
+    {
+        var records = await _dbContext.ProductionExecutionRecords
+            .Where(record =>
+                record.SourceCommandId == sourceCommandId &&
+                record.OrderItemId == orderItemId)
+            .OrderBy(record => record.ProductionUnitNo)
+            .ThenBy(record => record.SourceProductionJobId)
+            .ToListAsync(cancellationToken);
+
+        // A new job record is aggregated before SaveChanges so lifecycle and
+        // physical evidence commit in the same report-ingestion transaction.
+        foreach (var local in _dbContext.ChangeTracker.Entries<ProductionExecutionRecord>()
+                     .Where(entry => entry.State == EntityState.Added)
+                     .Select(entry => entry.Entity)
+                     .Where(record =>
+                         record.SourceCommandId == sourceCommandId &&
+                         record.OrderItemId == orderItemId &&
+                         records.All(candidate => candidate.Id != record.Id)))
+        {
+            records.Add(local);
+        }
+
+        return records
+            .OrderBy(record => record.ProductionUnitNo)
+            .ThenBy(record => record.SourceProductionJobId)
+            .ToList();
+    }
+
+    public async Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsForOrderItemAsync(
+        Guid orderId,
+        Guid orderItemId,
+        CancellationToken cancellationToken = default)
+    {
+        var records = await _dbContext.ProductionExecutionRecords
+            .Include(record => record.SourceCommand)
+            .Where(record =>
+                record.SourceCommand.OrderId == orderId &&
+                record.OrderItemId == orderItemId)
+            .OrderBy(record => record.SourceCommand.DispatchAttemptNo)
+            .ThenBy(record => record.ProductionUnitNo)
+            .ToListAsync(cancellationToken);
+
+        foreach (var local in _dbContext.ChangeTracker.Entries<ProductionExecutionRecord>()
+                     .Where(entry => entry.State == EntityState.Added)
+                     .Select(entry => entry.Entity)
+                     .Where(record =>
+                         record.OrderItemId == orderItemId &&
+                         record.SourceCommandId != Guid.Empty &&
+                         records.All(candidate => candidate.Id != record.Id)))
+        {
+            records.Add(local);
+        }
+
+        return records;
+    }
+
     public Task AddStockMovementAsync(
         StockMovement movement,
         CancellationToken cancellationToken = default)

@@ -15,6 +15,7 @@ using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.RobotConfiguration.Programs.Manifests;
 using Microsoft.Extensions.Options;
+using Application.Devices.Telemetry;
 
 namespace Application.ProductionConfiguration.Deployments.Services;
 
@@ -121,9 +122,11 @@ public sealed class ConfigurationDeploymentPreviewHandler(
     IConfigurationDeploymentStore deployments,
     ProductionInventoryReadinessGuard inventoryReadiness,
     DeploymentValidationService validation,
-    IOptions<LowCostControllerCapacityOptions> capacityOptions) : IConfigurationDeploymentPreviewService
+    IOptions<LowCostControllerCapacityOptions> capacityOptions,
+    IOptions<EdgeTelemetryIngestionOptions> telemetryOptions) : IConfigurationDeploymentPreviewService
 {
     private readonly LowCostControllerCapacityOptions _capacity = capacityOptions.Value;
+    private readonly EdgeTelemetryIngestionOptions _telemetry = telemetryOptions.Value;
 
     public async Task<ApiResult<ConfigurationDeploymentPreview>> HandleAsync(
         CurrentUserContext user,
@@ -158,7 +161,9 @@ public sealed class ConfigurationDeploymentPreviewHandler(
             return ApiResult<ConfigurationDeploymentPreview>.Fail("Access denied.", 403);
 
         var readinessByEndpoint = (await deployments.ListEndpointReadinessAsync(
-                endpoints.Select(endpoint => endpoint.Id), cancellationToken))
+                endpoints.Select(endpoint => endpoint.Id),
+                DateTimeOffset.UtcNow.AddSeconds(-_telemetry.ReadinessTimeoutSeconds),
+                cancellationToken))
             .ToDictionary(item => item.KioskExecutionEndpointId);
         var fullInventory = await inventoryReadiness.EvaluateDeployAsync(
             release, kioskId, cancellationToken: cancellationToken);

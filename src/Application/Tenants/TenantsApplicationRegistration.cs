@@ -22,6 +22,7 @@ public static class TenantsApplicationRegistration
         services.AddScoped<CreateKioskCommandHandler>();
         services.AddScoped<UpdateKioskCommandHandler>();
         services.AddScoped<SetKioskStatusCommandHandler>();
+        services.AddScoped<SetKioskOperationalStateCommandHandler>();
 
         services.AddScoped<ListStoresQueryHandler>();
         services.AddScoped<GetStoreQueryHandler>();
@@ -29,6 +30,8 @@ public static class TenantsApplicationRegistration
         services.AddScoped<UpdateStoreCommandHandler>();
         services.AddScoped<DisableStoreCommandHandler>();
         services.AddScoped<ActivateStoreCommandHandler>();
+        services.AddScoped<PauseStoreSalesCommandHandler>();
+        services.AddScoped<ResumeStoreSalesCommandHandler>();
 
         services.AddScoped<ListOrganizationsQueryHandler>();
         services.AddScoped<GetOrganizationQueryHandler>();

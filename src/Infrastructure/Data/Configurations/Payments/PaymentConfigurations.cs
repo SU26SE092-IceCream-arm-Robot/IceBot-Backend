@@ -43,6 +43,10 @@ internal sealed class PaymentTransactionConfiguration : IEntityTypeConfiguration
             .IsUnique()
             .HasFilter("\"ProviderOrderCode\" IS NOT NULL");
         entity.HasIndex(x => x.ProviderTransactionId).HasFilter("\"ProviderTransactionId\" IS NOT NULL");
+        entity.HasIndex(x => x.OrderId);
+        entity.HasIndex(x => x.OrderId, "IX_PaymentTransactions_OrderId_PrimarySettlement")
+            .IsUnique()
+            .HasFilter("\"SettlementDisposition\" = 1");
         entity.Property(x => x.ProviderOrderCode).HasMaxLength(100);
         entity.Property(x => x.ProviderPaymentLinkId).HasMaxLength(200);
         entity.Property(x => x.ProviderStatus).HasMaxLength(100);

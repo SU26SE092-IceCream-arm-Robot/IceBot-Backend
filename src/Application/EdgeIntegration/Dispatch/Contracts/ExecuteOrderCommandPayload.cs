@@ -5,7 +5,9 @@ namespace Application.EdgeIntegration.Dispatch.Contracts;
 
 public sealed record ExecuteOrderCommandPayload
 {
-    public int SchemaVersion { get; init; } = 2;
+    public int SchemaVersion { get; init; } = 3;
+    public string ExecutionIntent { get; init; } = "Initial";
+    public Guid? RemakeOfSourceCommandId { get; init; }
     public Guid CommandId { get; init; }
     public int DispatchAttemptNo { get; init; }
     public Guid OrderId { get; init; }
@@ -30,6 +32,7 @@ public sealed record ExecuteOrderLinePayload
     public Guid ProductVariantId { get; init; }
     public Guid? RecipeId { get; init; }
     public int Quantity { get; init; }
+    public int ProductionUnitStartNo { get; init; } = 1;
     public string ProductCodeSnapshot { get; init; } = string.Empty;
     public string ProductVariantCodeSnapshot { get; init; } = string.Empty;
     public int? RecipeVersionSnapshot { get; init; }
@@ -138,8 +141,14 @@ public static class ExecuteOrderCommandPayloadCodec
 
     private static void ValidateFull(ExecuteOrderCommandPayload payload)
     {
-        if (payload.SchemaVersion != 2)
+        if (payload.SchemaVersion != 3)
             throw new DomainRuleException("Execute-order command payload schema version is unsupported.");
+        var isInitial = string.Equals(payload.ExecutionIntent, "Initial", StringComparison.Ordinal);
+        var isRemake = string.Equals(payload.ExecutionIntent, "Remake", StringComparison.Ordinal);
+        if ((!isInitial && !isRemake) ||
+            (isInitial && payload.RemakeOfSourceCommandId.HasValue) ||
+            (isRemake && (!payload.RemakeOfSourceCommandId.HasValue || payload.RemakeOfSourceCommandId == Guid.Empty)))
+            throw new DomainRuleException("Execute-order command payload has invalid execution intent provenance.");
         if (payload.ActiveSetVersion.HasValue != !string.IsNullOrWhiteSpace(payload.ActiveSetChecksum))
             throw new DomainRuleException("Execute-order command payload has incomplete active artifact-set provenance.");
         if (payload.CommandId == Guid.Empty || payload.DispatchAttemptNo <= 0 || payload.OrderId == Guid.Empty ||
@@ -150,7 +159,8 @@ public static class ExecuteOrderCommandPayloadCodec
             throw new DomainRuleException("Execute-order command payload is missing required command identity or execution data.");
 
         if (payload.OrderLines.Any(line => line.OrderItemId == Guid.Empty || line.ProductId == Guid.Empty ||
-                line.ProductVariantId == Guid.Empty || line.Quantity <= 0 || line.ExecutionRouteId == Guid.Empty ||
+                line.ProductVariantId == Guid.Empty || line.Quantity <= 0 || line.ProductionUnitStartNo <= 0 ||
+                line.ExecutionRouteId == Guid.Empty ||
                 line.SelectedOptions.Select(option => option.ProductOptionId).Distinct().Count() != line.SelectedOptions.Count ||
                 line.SelectedOptions.Any(option => option.ProductOptionId == Guid.Empty || option.OptionGroupId <= 0 ||
                     string.IsNullOrWhiteSpace(option.OptionGroupCode) || string.IsNullOrWhiteSpace(option.Code) ||

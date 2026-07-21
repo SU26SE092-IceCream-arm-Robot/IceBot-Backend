@@ -24,6 +24,27 @@ public sealed class PaymentSessionInterventionPolicyTests
         Assert.False(PaymentSessionInterventionPolicy.CanReconcile(payment, observedAt));
     }
 
+    [Fact]
+    public void PaidDuplicatePayment_IsVisibleForInterventionButCannotBeReconciled()
+    {
+        var payment = new PaymentTransaction
+        {
+            Provider = "PayOS",
+            ProviderOrderCode = "1234567890123",
+            Amount = 30_000,
+            Status = PaymentTransactionStatus.Pending
+        };
+        payment.MarkPaid("provider-transaction", DateTimeOffset.UtcNow);
+        payment.MarkDuplicateRefundRequired("Duplicate provider payment.");
+
+        var appearsInQueue = new[] { payment }.AsQueryable()
+            .Where(PaymentSessionInterventionPolicy.BuildQueuePredicate(DateTimeOffset.UtcNow))
+            .Any();
+
+        Assert.True(appearsInQueue);
+        Assert.False(PaymentSessionInterventionPolicy.CanReconcile(payment, DateTimeOffset.UtcNow));
+    }
+
     private static PaymentTransaction CreatePendingPayment(DateTimeOffset expiresAt, string checkoutUrl) =>
         new()
         {

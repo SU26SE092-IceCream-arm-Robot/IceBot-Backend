@@ -119,6 +119,30 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
             Assert.True(data.TryGetProperty("menuChanges", out _));
             Assert.True(data.TryGetProperty("endpoints", out _));
         }
+
+        Guid targetInstallationId;
+        Guid targetReleaseId;
+        await using (var deploymentSetupContext = _fixture.CreateDbContext())
+        {
+            var upgrade = await deploymentSetupContext.ProductionPackageUpgrades.AsNoTracking()
+                .SingleAsync(item => item.Id == upgradeId);
+            targetInstallationId = upgrade.TargetInstallationId!.Value;
+            targetReleaseId = await deploymentSetupContext.ProductionPackageInstallations.AsNoTracking()
+                .Where(item => item.Id == targetInstallationId)
+                .Select(item => item.DraftConfigurationReleaseId!.Value)
+                .SingleAsync();
+        }
+        await ActivateFullEdgeAsync(_fixture, scenario.ExecutionEndpointId, Guid.NewGuid(),
+            targetReleaseId, new string('d', 64));
+        await using (var displacedDeploymentContext = _fixture.CreateDbContext())
+        {
+            await displacedDeploymentContext.KioskExecutionEndpoints
+                .Where(item => item.Id == scenario.ExecutionEndpointId)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(item => item.ActiveConfigurationDeploymentId, (Guid?)null)
+                    .SetProperty(item => item.ActiveConfigurationReleaseId, (Guid?)null)
+                    .SetProperty(item => item.ActiveConfigurationReleaseChecksum, (string?)null));
+        }
         using (var cutoverResponse = await client.PostAsync($"{basePath}/{upgradeId:D}/cutover", null))
             Assert.Equal(HttpStatusCode.Conflict, cutoverResponse.StatusCode);
         using (var rollbackWithoutReason = await client.PostAsJsonAsync(
@@ -457,6 +481,74 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
         Assert.True(preview.Succeeded, preview.Message);
         Assert.Contains("ManagedFieldDrift:ICE_CREAM", preview.Data!.Blockers);
         Assert.Equal("ReuseExistingCandidate", Assert.Single(preview.Data.Artifacts).MaterializationAction);
+    }
+
+    [IntegrationFact]
+    public async Task Execute_RejectsApprovedPreviewWhenSourceScopeChangesBeforeMaterialization()
+    {
+        var actorId = Guid.NewGuid();
+        var storage = _fixture.CreateObjectStorage(autoCreateBucket: true);
+        var scenario = await ProductionPackageInstallationScenarioSeed.SeedAsync(_fixture, storage, actorId);
+        var user = new CurrentUserContext { AccountId = actorId, IsSystemAdmin = true };
+        Guid installationId;
+        Guid targetVersionId;
+        string previewChecksum;
+
+        await using (var setupContext = _fixture.CreateDbContext())
+        {
+            var installed = await CreateInstallationService(setupContext, storage).InstallAsync(
+                new InstallProductionPackageCommand
+                {
+                    UserContext = user,
+                    OrganizationId = scenario.OrganizationId,
+                    PackageId = scenario.PackageId,
+                    PackageVersionId = scenario.PackageVersionId,
+                    IdempotencyKey = $"scope-drift-source-{Guid.NewGuid():N}",
+                    ProductSourceKeys = [scenario.ProductSourceKey]
+                }, CancellationToken.None);
+            Assert.True(installed.Succeeded, installed.Message);
+            installationId = installed.Data!.Id;
+            targetVersionId = (await CloneAsNextPublishedVersionAsync(
+                setupContext, scenario.PackageVersionId, actorId)).Id;
+            await setupContext.SaveChangesAsync();
+        }
+
+        await using (var previewContext = _fixture.CreateDbContext())
+        {
+            var preview = await CreateUpgradeService(previewContext, storage).PreviewAsync(
+                user, scenario.OrganizationId, installationId, targetVersionId, [], CancellationToken.None);
+            Assert.True(preview.Succeeded, preview.Message);
+            Assert.Empty(preview.Data!.Blockers);
+            previewChecksum = preview.Data.PreviewChecksum;
+        }
+
+        await using (var mutationContext = _fixture.CreateDbContext())
+        {
+            var product = await mutationContext.Products.SingleAsync(product =>
+                product.OrganizationId == scenario.OrganizationId);
+            product.Name = "Changed after approval preview";
+            await mutationContext.SaveChangesAsync();
+        }
+
+        await using (var executeContext = _fixture.CreateDbContext())
+        {
+            var result = await CreateUpgradeService(executeContext, storage).ExecuteAsync(
+                new ExecuteProductionPackageUpgradeCommand
+                {
+                    UserContext = user,
+                    OrganizationId = scenario.OrganizationId,
+                    SourceInstallationId = installationId,
+                    TargetPackageVersionId = targetVersionId,
+                    PreviewChecksum = previewChecksum,
+                    IdempotencyKey = $"scope-drift-upgrade-{Guid.NewGuid():N}"
+                }, CancellationToken.None);
+
+            Assert.False(result.Succeeded);
+            Assert.Equal(409, result.StatusCode);
+            Assert.Contains("preview is stale", result.Message!, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(0, await executeContext.ProductionPackageUpgrades.CountAsync(
+                value => value.SourceInstallationId == installationId));
+        }
     }
 
     [IntegrationFact]
@@ -829,14 +921,23 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
             await postCutoverEditContext.SaveChangesAsync();
         }
 
-        await using (var rollbackContext = _fixture.CreateDbContext())
+        await using (var firstRollbackContext = _fixture.CreateDbContext())
+        await using (var secondRollbackContext = _fixture.CreateDbContext())
         {
-            var service = CreateUpgradeService(rollbackContext, storage, rollbackDispatcher);
-            var rollback = await service.RollbackAsync(user, scenario.OrganizationId, sourceInstallationId,
-                upgradeId, null, "Integration rollback", CancellationToken.None);
-            Assert.True(rollback.Succeeded, rollback.Message);
-            Assert.Equal(202, rollback.StatusCode);
-            Assert.Equal(nameof(ProductionPackageUpgradeStatus.RollbackPending), rollback.Data!.Status);
+            var rollbacks = await Task.WhenAll(
+                CreateUpgradeService(firstRollbackContext, storage, rollbackDispatcher).RollbackAsync(
+                    user, scenario.OrganizationId, sourceInstallationId, upgradeId, null,
+                    "Integration rollback", CancellationToken.None),
+                CreateUpgradeService(secondRollbackContext, storage, rollbackDispatcher).RollbackAsync(
+                    user, scenario.OrganizationId, sourceInstallationId, upgradeId, null,
+                    "Integration rollback", CancellationToken.None));
+
+            Assert.All(rollbacks, rollback =>
+            {
+                Assert.True(rollback.Succeeded, rollback.Message);
+                Assert.Equal(202, rollback.StatusCode);
+                Assert.Equal(nameof(ProductionPackageUpgradeStatus.RollbackPending), rollback.Data!.Status);
+            });
             Assert.Equal(2, rollbackDispatcher.Commands.Count);
         }
 
@@ -1311,49 +1412,63 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
     private sealed class RecordingRollbackDispatcher : IConfigurationDeploymentRollbackDispatcher,
         IConfigurationDeploymentObservationReader
     {
+        private readonly object _gate = new();
         public List<RollbackConfigurationDeploymentCommand> Commands { get; } = [];
         public Dictionary<Guid, Guid> NewDeploymentIds { get; } = [];
         public Dictionary<Guid, ConfigurationDeploymentReadModel> Deployments { get; } = [];
+        private readonly Dictionary<string, ConfigurationDeploymentRollbackResult> _resultsByIdempotencyKey = [];
 
         public Task<ApiResult<ConfigurationDeploymentRollbackResult>> HandleAsync(
             RollbackConfigurationDeploymentCommand command, CancellationToken cancellationToken = default)
         {
-            Commands.Add(command);
-            var newDeploymentId = Guid.NewGuid();
-            NewDeploymentIds[command.TargetDeploymentId] = newDeploymentId;
-            Deployments[newDeploymentId] = new ConfigurationDeploymentReadModel
+            lock (_gate)
             {
-                Id = newDeploymentId,
-                Status = ConfigurationDeploymentReadStatus.Pending
-            };
-            return Task.FromResult(ApiResult<ConfigurationDeploymentRollbackResult>.Success(
-                new ConfigurationDeploymentRollbackResult
+                if (_resultsByIdempotencyKey.TryGetValue(command.IdempotencyKey, out var existing))
+                    return Task.FromResult(ApiResult<ConfigurationDeploymentRollbackResult>.Success(existing));
+
+                Commands.Add(command);
+                var newDeploymentId = Guid.NewGuid();
+                NewDeploymentIds[command.TargetDeploymentId] = newDeploymentId;
+                Deployments[newDeploymentId] = new ConfigurationDeploymentReadModel
+                {
+                    Id = newDeploymentId,
+                    Status = ConfigurationDeploymentReadStatus.Pending
+                };
+                var result = new ConfigurationDeploymentRollbackResult
                 {
                     TargetDeploymentId = command.TargetDeploymentId,
                     NewDeploymentId = newDeploymentId,
                     KioskId = command.KioskId,
                     Status = "Pending"
-                }));
+                };
+                _resultsByIdempotencyKey[command.IdempotencyKey] = result;
+                return Task.FromResult(ApiResult<ConfigurationDeploymentRollbackResult>.Success(result));
+            }
         }
 
         public Task<ConfigurationDeploymentReadModel?> GetConfigurationDeploymentAsync(
-            Guid deploymentId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Deployments.GetValueOrDefault(deploymentId));
+            Guid deploymentId, CancellationToken cancellationToken = default)
+        {
+            lock (_gate)
+                return Task.FromResult(Deployments.GetValueOrDefault(deploymentId));
+        }
 
         public void FailAllPending(string failureCode, string failureReason)
         {
-            foreach (var deployment in Deployments.Values
-                         .Where(item => item.Status == ConfigurationDeploymentReadStatus.Pending).ToArray())
-                Deployments[deployment.Id] = CopyWithStatus(
-                    deployment, ConfigurationDeploymentReadStatus.Failed, failureCode, failureReason);
+            lock (_gate)
+                foreach (var deployment in Deployments.Values
+                             .Where(item => item.Status == ConfigurationDeploymentReadStatus.Pending).ToArray())
+                    Deployments[deployment.Id] = CopyWithStatus(
+                        deployment, ConfigurationDeploymentReadStatus.Failed, failureCode, failureReason);
         }
 
         public void ActivateAllPending()
         {
-            foreach (var deployment in Deployments.Values
-                         .Where(item => item.Status == ConfigurationDeploymentReadStatus.Pending).ToArray())
-                Deployments[deployment.Id] = CopyWithStatus(
-                    deployment, ConfigurationDeploymentReadStatus.Active, null, null);
+            lock (_gate)
+                foreach (var deployment in Deployments.Values
+                             .Where(item => item.Status == ConfigurationDeploymentReadStatus.Pending).ToArray())
+                    Deployments[deployment.Id] = CopyWithStatus(
+                        deployment, ConfigurationDeploymentReadStatus.Active, null, null);
         }
 
         private static ConfigurationDeploymentReadModel CopyWithStatus(ConfigurationDeploymentReadModel source,

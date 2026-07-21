@@ -136,6 +136,8 @@ POST /api/v1/iot/execution-endpoints/{endpointId}/production-sync/state-summarie
 
 The summary channel is advisory current state used to recover visibility quickly after reconnect. It is not durable event history, does not create production events, and never advances `ProductionEventCheckpoint`.
 
+For the same persistent `sourceExecutorId`, production sequence numbers, heartbeat sequence numbers, readiness revisions, and state-summary revisions must survive ordinary process and device restart. Resetting a counter causes new records to be treated as stale or conflicting. A genuinely reprovisioned runtime receives a new executor identity and starts new streams; V1 does not infer a reboot epoch from wall-clock timestamps.
+
 ### Heartbeat
 
 ```http
@@ -208,6 +210,10 @@ sellability and admission: online menu/order validation requires Ready + Safe
 and every declared route capability available; command dispatch also requires
 Idle. Busy is temporary executor occupancy, not kiosk Offline. SignalR emits
 `ExecutionReadinessChanged` only after a newer projection commits.
+
+Readiness is current-state evidence only for `EdgeTelemetryIngestion__ReadinessTimeoutSeconds` after Cloud receives it. Runtime menu, checkout, deployment preview, and production-package workspace ignore an older projection even when its last reported value was Ready/Safe. Executor wall-clock time is not used for this TTL.
+
+Historical device events remain ingestible and deduplicated for audit. An Error/Critical event older than `EdgeTelemetryIngestion__AlertAutomationMaxEventAgeMinutes` at Cloud receive time does not create/correlate an operational Alert or send a critical push; replay must not masquerade as a new incident.
 
 
 ## Related Docs

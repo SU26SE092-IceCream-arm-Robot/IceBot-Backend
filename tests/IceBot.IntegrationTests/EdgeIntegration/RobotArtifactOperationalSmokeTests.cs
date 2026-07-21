@@ -142,7 +142,7 @@ public sealed class RobotArtifactOperationalSmokeTests
                     EndpointId = graph.EndpointId,
                     CommandId = commandId,
                     AckStatus = "Accepted",
-                    AcknowledgedAt = acknowledgedAt
+                    AcknowledgedAt = acknowledgedAt.AddSeconds(-2)
                 });
         }
 
@@ -158,6 +158,8 @@ public sealed class RobotArtifactOperationalSmokeTests
             .Where(order => order.Id == orderId)
             .Select(order => order.Status)
             .SingleAsync());
+        Assert.True((await assertion.EdgeCommands.SingleAsync(command => command.Id == commandId)).RespondedAt!.Value >
+            acknowledgedAt.AddSeconds(-2));
     }
 
     [IntegrationFact]
@@ -997,14 +999,6 @@ public sealed class RobotArtifactOperationalSmokeTests
 
         var productionJobId = Guid.NewGuid();
         var stockEvidenceEventId = Guid.NewGuid();
-        OrderItemStatus jobItemStatusBefore;
-        await using (var beforeJobContext = _fixture.CreateDbContext())
-        {
-            jobItemStatusBefore = await beforeJobContext.OrderItems
-                .Where(item => item.OrderId == orderId)
-                .Select(item => item.Status)
-                .SingleAsync();
-        }
         await ReportProductionAsync(
             graph,
             command.Id,
@@ -1017,15 +1011,24 @@ public sealed class RobotArtifactOperationalSmokeTests
         await using (var jobLevelAssertionContext = _fixture.CreateDbContext())
         {
             Assert.Equal(
-                OrderStatus.Accepted,
+                OrderStatus.Preparing,
                 (await jobLevelAssertionContext.Orders.SingleAsync(x => x.Id == orderId)).Status);
             Assert.Equal(
-                jobItemStatusBefore,
+                OrderItemStatus.Preparing,
                 await jobLevelAssertionContext.OrderItems
                     .Where(item => item.OrderId == orderId)
                     .Select(item => item.Status)
                     .SingleAsync());
         }
+        await ReportProductionAsync(
+            graph,
+            command.Id,
+            Guid.NewGuid(),
+            1,
+            "Completed",
+            releaseId,
+            deployment.ReleaseChecksum,
+            productionUnitNo: 2);
         await ReportProductionAsync(
             graph,
             command.Id,
@@ -1058,6 +1061,122 @@ public sealed class RobotArtifactOperationalSmokeTests
             Assert.Equal(orderId, movement.CorrelationId);
             Assert.Equal(90, (await completedContext.IngredientDispenserStates
                 .SingleAsync(x => x.Id == graph.DispenserStateId)).EstimatedQuantity);
+        }
+
+        var partialOrderId = await CreatePaidOrderAsync(graph, quantity: 3);
+        var partialDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
+        {
+            OrderId = partialOrderId,
+            DispatchAttemptNo = 1
+        });
+        Assert.True(partialDispatch.Succeeded, partialDispatch.Message);
+        await PullAndAcknowledgeAsync(graph, partialDispatch.Data!.EdgeCommandId, "Accepted");
+        var partialStockEventOne = Guid.NewGuid();
+        var partialStockEventTwo = Guid.NewGuid();
+        await ReportProductionAsync(
+            graph, partialDispatch.Data.EdgeCommandId, Guid.NewGuid(), 1, "Completed",
+            releaseId, deployment.ReleaseChecksum,
+            [new StockMovementEvidenceInput(partialStockEventOne, graph.DispenserStateId, 1, null, null, false)],
+            productionUnitNo: 1);
+        var overlappingUnit = await IngestProductionAsync(
+            graph, partialDispatch.Data.EdgeCommandId, Guid.NewGuid(), 1, "Completed",
+            releaseId, deployment.ReleaseChecksum, productionUnitNo: 1);
+        Assert.False(overlappingUnit.Succeeded);
+        Assert.Contains("overlaps units", overlappingUnit.Message);
+        await ReportProductionAsync(
+            graph, partialDispatch.Data.EdgeCommandId, Guid.NewGuid(), 1, "Completed",
+            releaseId, deployment.ReleaseChecksum,
+            [new StockMovementEvidenceInput(partialStockEventTwo, graph.DispenserStateId, 1, null, null, false)],
+            productionUnitNo: 2);
+        await ReportProductionAsync(
+            graph, partialDispatch.Data.EdgeCommandId, Guid.NewGuid(), 1, "Failed",
+            releaseId, deployment.ReleaseChecksum, productionUnitNo: 3);
+        var contradictorySummary = await IngestProductionAsync(
+            graph, partialDispatch.Data.EdgeCommandId, null, 1, "Completed",
+            releaseId, deployment.ReleaseChecksum);
+        Assert.False(contradictorySummary.Succeeded);
+        Assert.Contains("contradicts production-unit evidence", contradictorySummary.Message);
+        await ReportProductionAsync(
+            graph, partialDispatch.Data.EdgeCommandId, null, 1, "Failed",
+            releaseId, deployment.ReleaseChecksum);
+
+        await using (var partialAssertionContext = _fixture.CreateDbContext())
+        {
+            Assert.Equal(
+                OrderStatus.FulfillmentIssue,
+                (await partialAssertionContext.Orders.SingleAsync(order => order.Id == partialOrderId)).Status);
+            Assert.Equal(
+                OrderItemStatus.Failed,
+                await partialAssertionContext.OrderItems.Where(item => item.OrderId == partialOrderId)
+                    .Select(item => item.Status).SingleAsync());
+            Assert.Equal(2, await partialAssertionContext.ProductionExecutionRecords.CountAsync(record =>
+                record.SourceCommandId == partialDispatch.Data.EdgeCommandId &&
+                record.Status == ProductionExecutionStatus.Completed));
+            Assert.Equal(2, await partialAssertionContext.StockMovements.CountAsync(movement =>
+                movement.SourceEventId == partialStockEventOne || movement.SourceEventId == partialStockEventTwo));
+        }
+
+        var remakeRequestId = Guid.NewGuid();
+        Application.EdgeIntegration.Dispatch.Results.OrderExecutionDispatchResult remake;
+        await using (var remakeContext = _fixture.CreateDbContext())
+        {
+            var remakeHandler = new DispatchOrderExecutionCommandHandler(
+                new OrderExecutionDispatchStore(remakeContext),
+                Options.Create(new OrderExecutionDispatchOptions()),
+                new NoOpEdgeCommandWakeUpPublisher { PublishResult = false });
+            var unsafeRemake = await remakeHandler.HandleRemakeAsync(
+                Guid.NewGuid(),
+                partialOrderId,
+                await remakeContext.OrderItems.Where(item => item.OrderId == partialOrderId)
+                    .Select(item => item.Id).SingleAsync(),
+                1,
+                1,
+                user.AccountId,
+                "Must reject an already produced unit.");
+            Assert.False(unsafeRemake.Succeeded);
+            Assert.Equal("Every remake unit must have failed with confirmed no physical output.", unsafeRemake.Message);
+            var remakeResult = await remakeHandler.HandleRemakeAsync(
+                remakeRequestId,
+                partialOrderId,
+                await remakeContext.OrderItems.Where(item => item.OrderId == partialOrderId)
+                    .Select(item => item.Id).SingleAsync(),
+                3,
+                1,
+                user.AccountId,
+                "Retry unit 3 after confirmed no physical output.");
+            Assert.True(remakeResult.Succeeded, remakeResult.Message);
+            remake = remakeResult.Data!;
+            var repeatedRemake = await remakeHandler.HandleRemakeAsync(
+                remakeRequestId,
+                partialOrderId,
+                await remakeContext.OrderItems.Where(item => item.OrderId == partialOrderId)
+                    .Select(item => item.Id).SingleAsync(),
+                3,
+                1,
+                user.AccountId,
+                "Retry unit 3 after confirmed no physical output.");
+            Assert.True(repeatedRemake.Succeeded, repeatedRemake.Message);
+            Assert.True(repeatedRemake.Data!.Existing);
+            Assert.Equal(remake.EdgeCommandId, repeatedRemake.Data.EdgeCommandId);
+        }
+        await PullAndAcknowledgeAsync(graph, remake.EdgeCommandId, "Accepted");
+        await ReportProductionAsync(
+            graph, remake.EdgeCommandId, Guid.NewGuid(), 1, "Completed",
+            remake.ConfigurationReleaseId, deployment.ReleaseChecksum, productionUnitNo: 3);
+        await ReportProductionAsync(
+            graph, remake.EdgeCommandId, null, 1, "Completed",
+            remake.ConfigurationReleaseId, deployment.ReleaseChecksum);
+        await using (var remakeAssertionContext = _fixture.CreateDbContext())
+        {
+            Assert.Equal(
+                OrderStatus.Completed,
+                (await remakeAssertionContext.Orders.SingleAsync(order => order.Id == partialOrderId)).Status);
+            Assert.Equal(
+                OrderItemStatus.Completed,
+                await remakeAssertionContext.OrderItems.Where(item => item.OrderId == partialOrderId)
+                    .Select(item => item.Status).SingleAsync());
+            Assert.Equal(2, await remakeAssertionContext.StockMovements.CountAsync(movement =>
+                movement.SourceEventId == partialStockEventOne || movement.SourceEventId == partialStockEventTwo));
         }
 
         var rejectedOrderId = await CreatePaidOrderAsync(graph);
@@ -1147,8 +1266,8 @@ public sealed class RobotArtifactOperationalSmokeTests
             sharedStockEvidenceId,
             graph.DispenserStateId,
             5,
-            85,
-            null,
+            83,
+            DateTimeOffset.UtcNow,
             false);
         await Task.WhenAll(
             ReportProductionAsync(
@@ -1188,7 +1307,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             "Completed",
             releaseId,
             deployment.ReleaseChecksum,
-            [sharedEvidence with { QuantityConsumed = 1, BalanceAfter = 84 }]);
+            [sharedEvidence with { QuantityConsumed = 1, BalanceAfter = 82 }]);
         Assert.False(reusedEvidence.Succeeded);
         Assert.Equal(400, reusedEvidence.StatusCode);
         Assert.Equal(
@@ -1216,7 +1335,7 @@ public sealed class RobotArtifactOperationalSmokeTests
                 inconsistentBalanceEvidenceId,
                 graph.DispenserStateId,
                 5,
-                81,
+                79,
                 null,
                 false)]);
         Assert.False(inconsistentBalance.Succeeded);
@@ -1227,7 +1346,7 @@ public sealed class RobotArtifactOperationalSmokeTests
 
         await using (var inconsistentBalanceContext = _fixture.CreateDbContext())
         {
-            Assert.Equal(85, (await inconsistentBalanceContext.IngredientDispenserStates
+            Assert.Equal(83, (await inconsistentBalanceContext.IngredientDispenserStates
                 .SingleAsync(state => state.Id == graph.DispenserStateId)).EstimatedQuantity);
             Assert.False(await inconsistentBalanceContext.StockMovements
                 .AnyAsync(movement => movement.SourceEventId == inconsistentBalanceEvidenceId));
@@ -1252,7 +1371,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             RefillAsync(graph, user, 5, refillReasonTwo));
         await using (var refillAssertionContext = _fixture.CreateDbContext())
         {
-            Assert.Equal(95, (await refillAssertionContext.IngredientDispenserStates
+            Assert.Equal(93, (await refillAssertionContext.IngredientDispenserStates
                 .SingleAsync(state => state.Id == graph.DispenserStateId)).EstimatedQuantity);
             Assert.Equal(2, await refillAssertionContext.StockMovements.CountAsync(movement =>
                 movement.ReasonCode == refillReasonOne || movement.ReasonCode == refillReasonTwo));
@@ -1326,15 +1445,30 @@ public sealed class RobotArtifactOperationalSmokeTests
         var attemptDetail = await new GetExecutionAttemptQueryHandler(new OrderStore(ackAssertionContext))
             .HandleAsync(new GetExecutionAttemptQuery
             {
+                OrderId = orderId,
                 SourceCommandId = command.Id,
                 UserContext = user
             });
         Assert.True(attemptDetail.Succeeded, attemptDetail.Message);
-        var productionExecution = Assert.Single(attemptDetail.Data!.ProductionExecutions);
-        Assert.NotEqual(Guid.Empty, productionExecution.SourceProductionJobId);
+        Assert.Equal(2, attemptDetail.Data!.ProductionExecutions.Count);
+        Assert.All(attemptDetail.Data.ProductionExecutions,
+            productionExecution => Assert.NotEqual(Guid.Empty, productionExecution.SourceProductionJobId));
+        var unitOutcome = Assert.Single(attemptDetail.Data.ProductionUnitOutcomes);
+        Assert.Equal(2, unitOutcome.CompletedQuantity);
+        Assert.Equal(0, unitOutcome.UnreportedQuantity);
         Assert.NotEmpty(attemptDetail.Data.DeliveryAttempts);
         Assert.False(attemptDetail.Data.Provenance.IsRedispatch);
         Assert.Null(attemptDetail.Data.PreviousAttempt);
+
+        var crossOrderAttemptDetail = await new GetExecutionAttemptQueryHandler(new OrderStore(ackAssertionContext))
+            .HandleAsync(new GetExecutionAttemptQuery
+            {
+                OrderId = failedOrderId,
+                SourceCommandId = command.Id,
+                UserContext = user
+            });
+        Assert.False(crossOrderAttemptDetail.Succeeded);
+        Assert.Equal(404, crossOrderAttemptDetail.StatusCode);
 
         var expiryOrderId = await CreatePaidOrderAsync(graph);
         var expiryBase = DateTimeOffset.UtcNow;
@@ -1379,6 +1513,22 @@ public sealed class RobotArtifactOperationalSmokeTests
             "Running",
             releaseId,
             deployment.ReleaseChecksum);
+        await using (var rollbackClockContext = _fixture.CreateDbContext())
+        {
+            await rollbackClockContext.OrderExecutionRecords
+                .Where(record => record.SourceCommandId == staleDispatch.Data.EdgeCommandId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(
+                    record => record.LastExecutorReportedAt,
+                    DateTimeOffset.UtcNow.AddDays(-1)));
+            var timeoutStore = new OrderExecutionTimeoutStore(rollbackClockContext);
+            var now = DateTimeOffset.UtcNow;
+            var freshCandidates = await timeoutStore.ListCandidateCommandIdsAsync(
+                now,
+                now.AddMinutes(-5),
+                now.AddMinutes(-30),
+                100);
+            Assert.DoesNotContain(staleDispatch.Data.EdgeCommandId, freshCandidates);
+        }
         var staleObservedAt = DateTimeOffset.UtcNow.AddMinutes(31);
         await using (var heartbeatContext = _fixture.CreateDbContext())
         {
@@ -1450,6 +1600,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             var expiredAttemptDetail = await new GetExecutionAttemptQueryHandler(provenanceStore)
                 .HandleAsync(new GetExecutionAttemptQuery
                 {
+                    OrderId = expiryOrderId,
                     SourceCommandId = expiryDispatch.Data.EdgeCommandId,
                     UserContext = user
                 });
@@ -1460,6 +1611,7 @@ public sealed class RobotArtifactOperationalSmokeTests
             var redispatchDetail = await new GetExecutionAttemptQueryHandler(provenanceStore)
                 .HandleAsync(new GetExecutionAttemptQuery
                 {
+                    OrderId = expiryOrderId,
                     SourceCommandId = redispatch.Data.EdgeCommandId,
                     UserContext = user
                 });
@@ -1645,7 +1797,7 @@ public sealed class RobotArtifactOperationalSmokeTests
                 Ingredients = new[] { new { graph.IngredientId } }
             }));
         var now = DateTimeOffset.UtcNow;
-        order.Place(now);
+        order.Place(now, now.AddMinutes(15));
         order.MarkPaid(order.TotalAmount, now);
         dbContext.Orders.Add(order);
         await dbContext.SaveChangesAsync();

@@ -1,6 +1,7 @@
 using System.Diagnostics.Metrics;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Application.Payments.Providers;
 using Infrastructure.Payments;
 using Infrastructure.Payments.Observability;
@@ -12,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using IceBot.IntegrationTests.Infrastructure;
+using Domain.Catalog.Enums;
 
 namespace IceBot.IntegrationTests.Payments;
 
@@ -176,6 +178,44 @@ public sealed class PayOsResilienceTests
         Assert.Equal("https://pay.test/link-1", session.CheckoutUrl);
     }
 
+    [Fact]
+    public async Task GatewayCapsProviderExpiryAtOrderPaymentDeadline()
+    {
+        const string responseJson = """
+            {
+              "code": "00",
+              "data": {
+                "orderCode": 1234567890123,
+                "paymentLinkId": "link-1",
+                "status": "PENDING",
+                "checkoutUrl": "https://pay.test/link-1"
+              }
+            }
+            """;
+        var handler = new CapturingJsonResponseHandler(responseJson);
+        var gateway = CreateGateway(handler);
+        var order = new Order { OrderNumber = "ORDER-DEADLINE" };
+        order.AddItem(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
+            "ITEM", "Item", "PRODUCT", "Product", "VARIANT", "Variant", null,
+            FulfillmentType.Packaged, 1, 10_000);
+        var placedAt = DateTimeOffset.UtcNow;
+        var deadline = placedAt.AddMinutes(5);
+        order.Place(placedAt, deadline);
+
+        var payment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(),
+            Amount = 10_000,
+            ProviderOrderCode = "1234567890123"
+        };
+        var session = await gateway.CreatePaymentSessionAsync(payment, order);
+
+        using var request = JsonDocument.Parse(handler.RequestJson!);
+        Assert.Equal(deadline.ToUnixTimeSeconds(), request.RootElement.GetProperty("expiredAt").GetInt64());
+        Assert.Equal(deadline, session.ExpiresAt);
+    }
+
     private static PaymentTransaction Payment(PayOsPaymentGateway gateway)
     {
         var payment = new PaymentTransaction { Id = Guid.NewGuid(), Amount = 10_000 };
@@ -225,5 +265,21 @@ public sealed class PayOsResilienceTests
             {
                 Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
             });
+    }
+
+    private sealed class CapturingJsonResponseHandler(string responseJson) : HttpMessageHandler
+    {
+        public string? RequestJson { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+            };
+        }
     }
 }

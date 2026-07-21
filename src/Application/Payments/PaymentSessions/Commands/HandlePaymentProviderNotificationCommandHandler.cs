@@ -165,11 +165,11 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
             await _paymentStore.AcquireOrderWorkflowLockAsync(paymentTransaction.OrderId, ct);
             await _paymentStore.ReloadOrderAsync(paymentTransaction.Order, ct);
 
-            var existingPaidPayment = notification.IsPaid
-                ? await _paymentStore.GetLatestPaidPaymentTransactionByOrderIdAsync(paymentTransaction.OrderId, ct)
+            var appliedSettlement = notification.IsPaid
+                ? await _paymentStore.GetAppliedPaymentSettlementByOrderIdAsync(paymentTransaction.OrderId, ct)
                 : null;
-            var paidByDifferentTransaction = existingPaidPayment is not null &&
-                existingPaidPayment.Id != paymentTransaction.Id;
+            var paidByDifferentTransaction = appliedSettlement is not null &&
+                appliedSettlement.Id != paymentTransaction.Id;
 
             var callback = new PaymentCallback
             {
@@ -199,11 +199,23 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
             if (!alreadyProcessed)
             {
                 PaymentNotificationApplier.ApplyNotification(paymentTransaction, notification);
-                if (paidByDifferentTransaction &&
-                    paymentTransaction.Order.PaidAmount > paymentTransaction.Order.TotalAmount)
+                if (notification.IsPaid && paymentTransaction.Status == PaymentTransactionStatus.Paid)
                 {
-                    paymentTransaction.Order.MarkOverpaymentRefundRequired(
-                        "Multiple provider-confirmed payments exceeded the order total. Manual refund review is required.");
+                    var paidAt = notification.ProviderPaidAt ?? DateTimeOffset.UtcNow;
+                    var paidAmount = notification.PaidAmount ?? paymentTransaction.Amount;
+                    if (paidByDifferentTransaction)
+                    {
+                        appliedSettlement!.AssignPrimarySettlement();
+                        const string duplicateReason =
+                            "A second provider-confirmed payment was received for an already settled order. Manual refund review is required.";
+                        paymentTransaction.MarkDuplicateRefundRequired(duplicateReason);
+                        paymentTransaction.Order.MarkDuplicatePaymentRefundRequired(duplicateReason);
+                    }
+                    else
+                    {
+                        paymentTransaction.AssignPrimarySettlement();
+                        paymentTransaction.Order.MarkPaid(paidAmount, paidAt);
+                    }
                 }
 
                 newOrderStatus = paymentTransaction.Order.Status;

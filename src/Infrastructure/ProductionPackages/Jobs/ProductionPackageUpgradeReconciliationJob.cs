@@ -45,6 +45,10 @@ public sealed class ProductionPackageUpgradeReconciliationJob(
                     logger.LogWarning(
                         "Marked {FailedCount} of {CandidateCount} stale production package upgrades Failed.",
                         result.FailedCount, result.CandidateCount);
+                if (result.ErrorCount > 0)
+                    logger.LogError(
+                        "Failed to reconcile {ErrorCount} of {CandidateCount} stale production package upgrades; later candidates were still processed.",
+                        result.ErrorCount, result.CandidateCount);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {

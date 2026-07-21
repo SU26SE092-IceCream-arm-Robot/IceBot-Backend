@@ -54,6 +54,7 @@ public static class DevicesModule
         services.AddScoped<ProvisionMqttEndpointCredentialCommandHandler>();
         services.AddScoped<RotateMqttEndpointCredentialCommandHandler>();
         services.AddScoped<RevokeMqttEndpointCredentialCommandHandler>();
+        services.AddScoped<ReconcileStaleMqttEndpointCredentialCommandHandler>();
 
         return services;
     }

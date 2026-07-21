@@ -7,6 +7,7 @@ using Application.Shared.Wrappers;
 using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
 using Domain.Orders.Enums;
+using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
 using System.Text.Json;
@@ -70,6 +71,13 @@ public sealed class CreatePaymentSessionCommandHandler
                         409);
                 }
 
+                if (HasExpiredOrderPaymentWindow(order, DateTimeOffset.UtcNow))
+                {
+                    return ApiResult<PaymentSessionResult>.Fail(
+                        "The order payment window has expired.",
+                        409);
+                }
+
                 if (existingByIdempotencyKey.Status == PaymentTransactionStatus.Failed &&
                     !HasPaymentInstructions(existingByIdempotencyKey))
                 {
@@ -106,6 +114,14 @@ public sealed class CreatePaymentSessionCommandHandler
                 return ApiResult<PaymentSessionResult>.Fail("Order amount must be greater than zero.", 400);
             }
 
+            var now = DateTimeOffset.UtcNow;
+            if (HasExpiredOrderPaymentWindow(order, now))
+            {
+                return ApiResult<PaymentSessionResult>.Fail(
+                    "The order payment window has expired.",
+                    409);
+            }
+
             var activeSession = await _paymentStore.GetActivePaymentTransactionByOrderIdAsync(order.Id, ct);
             if (activeSession is not null)
             {
@@ -134,7 +150,6 @@ public sealed class CreatePaymentSessionCommandHandler
                 return ApiResult<PaymentSessionResult>.Fail("PayOS payment method is inactive.", 409);
             }
 
-            var now = DateTimeOffset.UtcNow;
             var paymentTransaction = new PaymentTransaction
             {
                 OrderId = order.Id,
@@ -178,6 +193,15 @@ public sealed class CreatePaymentSessionCommandHandler
         if (payment is null)
         {
             return ApiResult<PaymentSessionResult>.Fail("Payment transaction not found after creation.", 500);
+        }
+
+        var providerRequestStartedAt = DateTimeOffset.UtcNow;
+        if (HasExpiredOrderPaymentWindow(payment.Order, providerRequestStartedAt))
+        {
+            payment.MarkExpired(providerRequestStartedAt);
+            payment.ExpiresAt = payment.Order.PaymentDeadlineAt;
+            await _paymentStore.SaveChangesAsync(cancellationToken);
+            return ApiResult<PaymentSessionResult>.Fail("The order payment window has expired.", 409);
         }
 
         try
@@ -244,4 +268,7 @@ public sealed class CreatePaymentSessionCommandHandler
     private static bool HasPaymentInstructions(PaymentTransaction transaction) =>
         !string.IsNullOrWhiteSpace(transaction.CheckoutUrl) ||
         !string.IsNullOrWhiteSpace(transaction.QrCodePayload);
+
+    private static bool HasExpiredOrderPaymentWindow(Order order, DateTimeOffset observedAt) =>
+        order.PaymentDeadlineAt != default && order.PaymentDeadlineAt <= observedAt;
 }

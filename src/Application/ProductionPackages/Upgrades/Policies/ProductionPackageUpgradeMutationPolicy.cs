@@ -29,6 +29,19 @@ public sealed class ProductionPackageUpgradeMutationPolicy(IProductionPackageUpg
             new TechnicalResourceMutationIdentity("MenuItem", item.MenuItemId.ToString("D"))))
         .ToArray();
 
+    public IReadOnlyCollection<TechnicalResourceMutationIdentity> PreparationMutationIdentities(
+        ProductionPackageUpgrade upgrade,
+        ProductionPackageUpgradeSourceState sourceState) =>
+        MutationIdentities(upgrade)
+            .Concat(sourceState.SourceResources.Products.Values.Select(product =>
+                TechnicalResourceMutationIdentity.Product(product.Id)))
+            .Concat(sourceState.MenuItems.Select(item =>
+                TechnicalResourceMutationIdentity.Menu(item.MenuId)))
+            .Concat(sourceState.EndpointTargets.Select(item =>
+                TechnicalResourceMutationIdentity.ExecutionEndpoint(item.Endpoint.Id)))
+            .Distinct()
+            .ToArray();
+
     public void ValidateCutover(ProductionPackageUpgradeMutationState state)
     {
         if (state.Upgrade.Status != ProductionPackageUpgradeStatus.ReadyForReview ||

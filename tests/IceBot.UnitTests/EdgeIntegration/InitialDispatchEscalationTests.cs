@@ -30,7 +30,7 @@ public sealed class InitialDispatchEscalationTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
             "ITEM", "Item", "PRODUCT", "Product", "VARIANT", "Variant", null,
             FulfillmentType.MachineProduced, 1, 30_000);
-        order.Place(paidAt.AddMinutes(-1));
+        order.Place(paidAt.AddMinutes(-1), paidAt.AddMinutes(14));
         order.MarkPaid(order.TotalAmount, paidAt);
 
         var store = Substitute.For<IOrderExecutionDispatchStore>();

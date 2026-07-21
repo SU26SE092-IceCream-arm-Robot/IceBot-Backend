@@ -177,6 +177,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "dashboard.view",
+            Description = "View management dashboard metrics within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "orders.view",
             Description = "View back-office orders within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },

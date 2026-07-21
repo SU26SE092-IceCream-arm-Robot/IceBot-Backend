@@ -43,9 +43,7 @@ internal static class PaymentNotificationApplier
             }
 
             var paidAt = notification.ProviderPaidAt ?? DateTimeOffset.UtcNow;
-            var paidAmount = notification.PaidAmount ?? paymentTransaction.Amount;
             paymentTransaction.MarkPaid(notification.ProviderTransactionId, paidAt, notification.RawPayloadJson);
-            paymentTransaction.Order.MarkPaid(paidAmount, paidAt);
             return;
         }
 

@@ -24,6 +24,20 @@ public sealed class OrderExecutionCustomerProjectionTests
         Assert.True(projection.RequiresStaffSupport);
     }
 
+    [Fact]
+    public void ProjectFromOrder_ExpiredOrderPaymentWindowDoesNotOfferRetry()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var order = new Order();
+        TestData.SetProperty(order, nameof(Order.Status), OrderStatus.PendingPayment);
+        TestData.SetProperty(order, nameof(Order.PaymentDeadlineAt), now.AddMinutes(-1));
+
+        var projection = OrderStatusProjector.ProjectFromOrder(order, observedAt: now);
+
+        Assert.Equal("PaymentExpired", projection.CustomerStatus);
+        Assert.False(projection.CanRetryPayment);
+    }
+
     [Theory]
     [InlineData(ExecutionObservationStatus.Stale, CustomerExecutionStatus.Delayed, "Delayed", false)]
     [InlineData(ExecutionObservationStatus.Unreachable, CustomerExecutionStatus.PendingRecovery, "PendingRecovery", false)]

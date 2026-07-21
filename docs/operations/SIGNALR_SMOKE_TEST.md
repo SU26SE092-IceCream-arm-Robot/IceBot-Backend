@@ -45,9 +45,11 @@ Extract the `token` from the response.
    - Target: `JoinKiosk`
    - Arguments: `["00000000-0000-0000-0000-000000000000"]` (Replace with a valid Kiosk ID)
 3. Trigger a kiosk lifecycle or connectivity change:
-   - Example lifecycle: call `PATCH /api/v1/management/kiosks/{kioskId}/status` with `Maintenance`.
-   - Example connectivity: ingest a newer authenticated heartbeat whose status changes between `Online`, `Degraded`, and `Offline`.
+   - Example lifecycle: call `PATCH /api/v1/management/kiosks/{kioskId}/status` with `Disabled`, then restore it to `Active` after the check.
+   - Example connectivity: ingest a newer authenticated heartbeat or run timeout reconciliation so status changes between `Online`, `Degraded`, and `Unreachable`.
    - Expected: You should receive a `KioskStatusChanged` event in your SignalR client.
+   - Call `PATCH /api/v1/management/stores/{storeId}/kiosks/{kioskId}/operational-state` with a new state and reason.
+   - Expected: You should receive a distinct `KioskOperationalStateChanged` event.
 4. Trigger a maintenance ticket update:
    - Example: Call `POST /api/v1/management/maintenance-tickets` to create a ticket for that kiosk.
    - Expected: You should receive a `MaintenanceTicketChanged` event.
@@ -69,7 +71,7 @@ Extract the `token` from the response.
 
 - **OrderHub**: `OrderStatusChanged`, `OrderItemFulfillmentChanged`, `PaymentStatusChanged`
 - **OperationsHub**: `OrderItemFulfillmentChanged` is sent to `kiosk:{kioskId}` for fulfillment-workspace refresh.
-- **OperationsHub**: `KioskStatusChanged`, `ExecutionReadinessChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`
+- **OperationsHub**: `KioskStatusChanged`, `KioskOperationalStateChanged`, `ExecutionReadinessChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`
 - **ManagementDashboardHub**: `DashboardInvalidated`
 
 `DeviceEventCreated` is emitted for a newly committed device event. `AlertChanged` is also emitted when Error/Critical telemetry creates an actionable alert and when that alert is acknowledged or resolved.

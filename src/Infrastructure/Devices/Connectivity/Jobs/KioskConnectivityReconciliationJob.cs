@@ -14,6 +14,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Infrastructure.Operations.Automation;
+using System.Diagnostics;
 
 namespace Infrastructure.Devices.Connectivity.Jobs;
 
@@ -46,6 +48,7 @@ public sealed class KioskConnectivityReconciliationJob : BackgroundService
 
     private async Task ReconcileAsync(CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             var observedAt = DateTimeOffset.UtcNow;
@@ -58,21 +61,39 @@ public sealed class KioskConnectivityReconciliationJob : BackgroundService
 
             foreach (var kioskId in kioskIds)
             {
-                using var itemScope = _scopeFactory.CreateScope();
-                var handler = itemScope.ServiceProvider
-                    .GetRequiredService<ReconcileKioskConnectivityCommandHandler>();
-                await handler.HandleAsync(new ReconcileKioskConnectivityCommand
+                try
                 {
-                    KioskId = kioskId,
-                    ObservedAt = observedAt
-                }, cancellationToken);
+                    using var itemScope = _scopeFactory.CreateScope();
+                    var handler = itemScope.ServiceProvider
+                        .GetRequiredService<ReconcileKioskConnectivityCommandHandler>();
+                    await handler.HandleAsync(new ReconcileKioskConnectivityCommand
+                    {
+                        KioskId = kioskId,
+                        ObservedAt = observedAt
+                    }, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    OperationalAutomationMetrics.RecordCandidateFailure("kiosk_connectivity_reconciliation");
+                    _logger.LogError(ex,
+                        "Kiosk connectivity reconciliation failed for kiosk {KioskId}.",
+                        kioskId);
+                }
             }
+            OperationalAutomationMetrics.RecordRun(
+                "kiosk_connectivity_reconciliation", "succeeded", stopwatch.Elapsed);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
+            OperationalAutomationMetrics.RecordRun(
+                "kiosk_connectivity_reconciliation", "failed", stopwatch.Elapsed);
             _logger.LogError(ex, "Kiosk connectivity reconciliation failed.");
         }
     }

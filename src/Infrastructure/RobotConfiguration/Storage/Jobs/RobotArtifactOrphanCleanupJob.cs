@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Infrastructure.Operations.Automation;
+using System.Diagnostics;
 
 namespace Infrastructure.RobotConfiguration.Storage.Jobs;
 
@@ -38,9 +40,16 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
         var interval = TimeSpan.FromHours(_options.OrphanCleanupIntervalHours);
         while (!stoppingToken.IsCancellationRequested)
         {
+            var stopwatch = Stopwatch.StartNew();
             try
             {
-                await CleanupAsync(stoppingToken);
+                var result = await CleanupAsync(stoppingToken);
+                OperationalAutomationMetrics.RecordRun(
+                    "robot_artifact_orphan_cleanup",
+                    !result.Completed
+                        ? "skipped"
+                        : result.CandidateFailureCount == 0 ? "succeeded" : "partial_failure",
+                    stopwatch.Elapsed);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
@@ -48,6 +57,8 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
             }
             catch (Exception ex)
             {
+                OperationalAutomationMetrics.RecordRun(
+                    "robot_artifact_orphan_cleanup", "failed", stopwatch.Elapsed);
                 _logger.LogError(ex, "Robot artifact orphan cleanup failed.");
             }
 
@@ -62,7 +73,7 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
         }
     }
 
-    private async Task CleanupAsync(CancellationToken cancellationToken)
+    private async Task<RobotArtifactCleanupResult> CleanupAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var lockManager = scope.ServiceProvider.GetRequiredService<Infrastructure.Concurrency.PostgresAdvisoryLockManager>();
@@ -70,7 +81,7 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
         if (cleanupLock is null)
         {
             _logger.LogInformation("Robot artifact orphan cleanup skipped because another backend instance holds the distributed lock.");
-            return;
+            return new RobotArtifactCleanupResult(false, 0);
         }
 
         var storage = scope.ServiceProvider.GetRequiredService<IArtifactObjectStorage>();
@@ -82,6 +93,7 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
         }
         var threshold = DateTimeOffset.UtcNow.AddHours(-_options.OrphanGracePeriodHours);
         var deletedCount = 0;
+        var candidateFailures = 0;
 
         foreach (var prefix in ManagedPrefixes)
         {
@@ -101,6 +113,8 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
                 }
                 catch (Exception ex)
                 {
+                    candidateFailures++;
+                    OperationalAutomationMetrics.RecordCandidateFailure("robot_artifact_orphan_cleanup");
                     _logger.LogWarning(ex, "Failed to delete unreferenced robot configuration object {StorageKey}.", item.StorageKey);
                 }
 
@@ -120,5 +134,8 @@ public sealed class RobotArtifactOrphanCleanupJob : BackgroundService
             "Robot artifact orphan cleanup completed. Deleted {DeletedCount} objects older than {Threshold}.",
             deletedCount,
             threshold);
+        return new RobotArtifactCleanupResult(true, candidateFailures);
     }
+
+    private sealed record RobotArtifactCleanupResult(bool Completed, int CandidateFailureCount);
 }

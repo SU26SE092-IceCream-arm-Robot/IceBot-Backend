@@ -55,7 +55,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             IceBotEdgeMetrics.RecordObservationTransition(
                 notifications.OrderExecutionObservationChanged.ObservationStatus,
                 notifications.OrderExecutionObservationChanged.CustomerExecutionStatus,
-                command.ObservedAt - notifications.OrderExecutionObservationChanged.LastExecutorReportedAt);
+                command.ObservedAt - notifications.OrderExecutionObservationChanged.LastCloudReceivedAt);
             await _publisher.PublishOrderExecutionObservationChangedAsync(
                 notifications.OrderExecutionObservationChanged,
                 cancellationToken);
@@ -126,7 +126,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             ? command.ObservedAt.AddMinutes(-_options.RunningReportTimeoutMinutes)
             : command.ObservedAt.AddMinutes(-_options.AcceptedReportTimeoutMinutes);
         if (record.Status is not (ProductionExecutionStatus.Accepted or ProductionExecutionStatus.Running) ||
-            record.LastExecutorReportedAt > cutoff)
+            record.CloudReceivedAt > cutoff)
         {
             return null;
         }
@@ -140,7 +140,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             heartbeat.ReceivedAt < unreachableCutoff ||
             heartbeat.Status == KioskHeartbeatStatus.Offline;
         var supportRequired = unreachable &&
-            record.LastExecutorReportedAt <= command.ObservedAt.AddMinutes(-_options.UnreachableSupportEscalationMinutes);
+            record.CloudReceivedAt <= command.ObservedAt.AddMinutes(-_options.UnreachableSupportEscalationMinutes);
         var customerExecutionStatus = supportRequired
             ? CustomerExecutionStatus.SupportRequired
             : unreachable
@@ -257,6 +257,7 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             CustomerStatusMessage = projection.CustomerStatusMessage,
             RequiresStaffSupport = projection.RequiresStaffSupport,
             LastExecutorReportedAt = record.LastExecutorReportedAt,
+            LastCloudReceivedAt = record.CloudReceivedAt,
             UpdatedAt = observedAt,
             Version = 1
         };

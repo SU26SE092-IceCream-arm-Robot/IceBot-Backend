@@ -51,7 +51,11 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public DateTimeOffset PlacedAt { get; private set; }
 
+    public DateTimeOffset PaymentDeadlineAt { get; private set; }
+
     public DateTimeOffset? PaidAt { get; private set; }
+
+    public OrderStatus? StatusBeforeDuplicatePaymentIntervention { get; private set; }
 
     public DateTimeOffset? CompletedAt { get; private set; }
 
@@ -153,7 +157,7 @@ public partial class Order : BusinessEntity, IStoreScoped
         }
     }
 
-    public void Place(DateTimeOffset placedAt)
+    public void Place(DateTimeOffset placedAt, DateTimeOffset paymentDeadlineAt)
     {
         if (Status != OrderStatus.Draft)
         {
@@ -165,8 +169,14 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Cannot place an order without items.");
         }
 
+        if (paymentDeadlineAt <= placedAt)
+        {
+            throw new DomainRuleException("Order payment deadline must be after placement time.");
+        }
+
         RecalculateTotals();
         PlacedAt = placedAt;
+        PaymentDeadlineAt = paymentDeadlineAt;
         Status = OrderStatus.PendingPayment;
     }
 
@@ -258,6 +268,7 @@ public partial class Order : BusinessEntity, IStoreScoped
         }
 
         Status = OrderStatus.RefundRequired;
+        StatusBeforeDuplicatePaymentIntervention = null;
         Notes = notes ?? Notes;
     }
 
@@ -269,7 +280,35 @@ public partial class Order : BusinessEntity, IStoreScoped
         }
 
         Status = OrderStatus.RefundRequired;
+        StatusBeforeDuplicatePaymentIntervention = null;
         Notes = notes ?? Notes;
+    }
+
+    public void MarkDuplicatePaymentRefundRequired(string? notes = null)
+    {
+        if (PaymentStatus != PaymentStatus.Paid)
+        {
+            throw new DomainRuleException("Only a paid order can require duplicate-payment intervention.");
+        }
+
+        if (Status != OrderStatus.RefundRequired)
+        {
+            StatusBeforeDuplicatePaymentIntervention = Status;
+        }
+
+        Status = OrderStatus.RefundRequired;
+        Notes = notes ?? Notes;
+    }
+
+    public void ResolveDuplicatePaymentIntervention()
+    {
+        if (Status != OrderStatus.RefundRequired || !StatusBeforeDuplicatePaymentIntervention.HasValue)
+        {
+            return;
+        }
+
+        Status = StatusBeforeDuplicatePaymentIntervention.Value;
+        StatusBeforeDuplicatePaymentIntervention = null;
     }
 
     public void MarkFulfillmentIssue(string? notes = null)
@@ -296,6 +335,13 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Only fulfillment-ready or accepted orders can be prepared.");
         }
 
+        Status = OrderStatus.Preparing;
+    }
+
+    public void BeginFulfillmentRecovery()
+    {
+        if (PaymentStatus != PaymentStatus.Paid || Status != OrderStatus.FulfillmentIssue)
+            throw new DomainRuleException("Only a paid order with a fulfillment issue can begin recovery.");
         Status = OrderStatus.Preparing;
     }
 
@@ -351,6 +397,7 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Only refund-required orders can be marked as refunded.");
         }
         Status = OrderStatus.Refunded;
+        StatusBeforeDuplicatePaymentIntervention = null;
     }
 
     public void MarkCompensated()
@@ -360,6 +407,7 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Only refund-required orders can be marked as compensated.");
         }
         Status = OrderStatus.Compensated;
+        StatusBeforeDuplicatePaymentIntervention = null;
     }
 
     private void EnsureEditable()

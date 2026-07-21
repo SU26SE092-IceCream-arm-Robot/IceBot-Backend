@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Infrastructure.Operations.Automation;
+using System.Diagnostics;
 
 namespace Infrastructure.ProductionConfiguration.Jobs;
 
@@ -37,58 +39,10 @@ public sealed class DeploymentTimeoutReconciliationJob : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            try
-            {
-                using var scope = _scopeFactory.CreateScope();
-                var handler = scope.ServiceProvider.GetRequiredService<ReconcileExpiredDeploymentCommandsCommandHandler>();
-                var reportTimeoutHandler = scope.ServiceProvider.GetRequiredService<ReconcileAcceptedDeploymentReportTimeoutsCommandHandler>();
-                var activationTimeoutHandler = scope.ServiceProvider.GetRequiredService<ReconcileInstalledDeploymentActivationTimeoutsCommandHandler>();
-                var now = DateTimeOffset.UtcNow;
-                var result = await handler.HandleAsync(now, batchSize, stoppingToken);
-                var reportTimeoutResult = await reportTimeoutHandler.HandleAsync(
-                    now,
-                    TimeSpan.FromMinutes(Math.Max(_options.AcceptedReportTimeoutMinutes, 1)),
-                    batchSize,
-                    stoppingToken);
-                var activationTimeoutResult = await activationTimeoutHandler.HandleAsync(
-                    now,
-                    TimeSpan.FromMinutes(Math.Max(_options.InstalledActivationTimeoutMinutes, 1)),
-                    batchSize,
-                    stoppingToken);
-
-                if (result.ExpiredCommandCount > 0)
-                {
-                    _logger.LogInformation(
-                        "Deployment timeout reconciliation processed {ExpiredCommandCount} commands, failed {ReconciledDeploymentCount} pending deployments, and found {MissingDeploymentCount} missing deployment references.",
-                        result.ExpiredCommandCount,
-                        result.ReconciledDeploymentCount,
-                        result.MissingDeploymentCount);
-                }
-
-                if (reportTimeoutResult.TotalCount > 0)
-                {
-                    _logger.LogWarning(
-                        "Deployment report timeout reconciliation failed {FullEdgeCount} Full Edge and {ControllerCount} low-cost deployments whose accepted commands received no installation report.",
-                        reportTimeoutResult.FullEdgeDeploymentCount,
-                        reportTimeoutResult.ControllerDeploymentCount);
-                }
-
-                if (activationTimeoutResult.TotalCount > 0)
-                {
-                    _logger.LogWarning(
-                        "Deployment activation timeout reconciliation failed {FullEdgeCount} Full Edge and {ControllerCount} low-cost deployments that remained installed without activation.",
-                        activationTimeoutResult.FullEdgeDeploymentCount,
-                        activationTimeoutResult.ControllerDeploymentCount);
-                }
-            }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Deployment timeout reconciliation failed.");
-            }
+            var observedAt = DateTimeOffset.UtcNow;
+            await ReconcileExpiredCommandsAsync(observedAt, batchSize, stoppingToken);
+            await ReconcileAcceptedReportTimeoutsAsync(observedAt, batchSize, stoppingToken);
+            await ReconcileInstalledActivationTimeoutsAsync(observedAt, batchSize, stoppingToken);
 
             try
             {
@@ -98,6 +52,120 @@ public sealed class DeploymentTimeoutReconciliationJob : BackgroundService
             {
                 break;
             }
+        }
+    }
+
+    private async Task ReconcileExpiredCommandsAsync(
+        DateTimeOffset observedAt,
+        int batchSize,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider.GetRequiredService<ReconcileExpiredDeploymentCommandsCommandHandler>();
+            var result = await handler.HandleAsync(observedAt, batchSize, cancellationToken);
+            foreach (var failure in result.Failures)
+            {
+                OperationalAutomationMetrics.RecordCandidateFailure("deployment_command_expiry");
+                _logger.LogError(
+                    "Deployment expiry reconciliation skipped command {CommandId}: {Reason}",
+                    failure.CommandId,
+                    failure.Reason);
+            }
+
+            OperationalAutomationMetrics.RecordRun(
+                "deployment_command_expiry",
+                result.Failures.Count == 0 ? "succeeded" : "partial_failure",
+                stopwatch.Elapsed);
+            if (result.ExpiredCommandCount > 0)
+            {
+                _logger.LogInformation(
+                    "Deployment timeout reconciliation processed {ExpiredCommandCount} commands, failed {ReconciledDeploymentCount} pending deployments, and found {MissingDeploymentCount} missing deployment references.",
+                    result.ExpiredCommandCount,
+                    result.ReconciledDeploymentCount,
+                    result.MissingDeploymentCount);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            OperationalAutomationMetrics.RecordRun("deployment_command_expiry", "failed", stopwatch.Elapsed);
+            _logger.LogError(exception, "Deployment command expiry reconciliation failed.");
+        }
+    }
+
+    private async Task ReconcileAcceptedReportTimeoutsAsync(
+        DateTimeOffset observedAt,
+        int batchSize,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider.GetRequiredService<ReconcileAcceptedDeploymentReportTimeoutsCommandHandler>();
+            var result = await handler.HandleAsync(
+                observedAt,
+                TimeSpan.FromMinutes(Math.Max(_options.AcceptedReportTimeoutMinutes, 1)),
+                batchSize,
+                cancellationToken);
+            OperationalAutomationMetrics.RecordRun("deployment_accepted_report_timeout", "succeeded", stopwatch.Elapsed);
+            if (result.TotalCount > 0)
+            {
+                _logger.LogWarning(
+                    "Deployment report timeout reconciliation failed {FullEdgeCount} Full Edge and {ControllerCount} low-cost deployments whose accepted commands received no installation report.",
+                    result.FullEdgeDeploymentCount,
+                    result.ControllerDeploymentCount);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            OperationalAutomationMetrics.RecordRun("deployment_accepted_report_timeout", "failed", stopwatch.Elapsed);
+            _logger.LogError(exception, "Deployment accepted-report timeout reconciliation failed.");
+        }
+    }
+
+    private async Task ReconcileInstalledActivationTimeoutsAsync(
+        DateTimeOffset observedAt,
+        int batchSize,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider.GetRequiredService<ReconcileInstalledDeploymentActivationTimeoutsCommandHandler>();
+            var result = await handler.HandleAsync(
+                observedAt,
+                TimeSpan.FromMinutes(Math.Max(_options.InstalledActivationTimeoutMinutes, 1)),
+                batchSize,
+                cancellationToken);
+            OperationalAutomationMetrics.RecordRun("deployment_installed_activation_timeout", "succeeded", stopwatch.Elapsed);
+            if (result.TotalCount > 0)
+            {
+                _logger.LogWarning(
+                    "Deployment activation timeout reconciliation failed {FullEdgeCount} Full Edge and {ControllerCount} low-cost deployments that remained installed without activation.",
+                    result.FullEdgeDeploymentCount,
+                    result.ControllerDeploymentCount);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            OperationalAutomationMetrics.RecordRun("deployment_installed_activation_timeout", "failed", stopwatch.Elapsed);
+            _logger.LogError(exception, "Deployment installed-activation timeout reconciliation failed.");
         }
     }
 }

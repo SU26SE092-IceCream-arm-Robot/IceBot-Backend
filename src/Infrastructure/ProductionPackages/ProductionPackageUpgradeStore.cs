@@ -263,12 +263,16 @@ public sealed class ProductionPackageUpgradeStore(IceBotDbContext db) : IProduct
             var releaseId = installation.DraftConfigurationReleaseId.Value;
             var hasFullEdgeDeployment = await db.KioskConfigurationDeployments.AsNoTracking().AnyAsync(item =>
                 item.OrganizationId == organizationId && item.ConfigurationReleaseId == releaseId &&
-                item.Status != Domain.ProductionConfiguration.Enums.KioskConfigurationDeploymentStatus.Failed,
+                ((item.Status == Domain.ProductionConfiguration.Enums.KioskConfigurationDeploymentStatus.Pending ||
+                  item.Status == Domain.ProductionConfiguration.Enums.KioskConfigurationDeploymentStatus.Installed) ||
+                 item.KioskExecutionEndpoint.ActiveConfigurationDeploymentId == item.Id),
                 cancellationToken);
             if (hasFullEdgeDeployment) return true;
             var hasControllerDeployment = await db.ControllerArtifactSetDeployments.AsNoTracking().AnyAsync(item =>
                 item.OrganizationId == organizationId && item.SourceConfigurationReleaseId == releaseId &&
-                item.Status != Domain.ProductionConfiguration.Enums.ControllerArtifactSetDeploymentStatus.Failed,
+                ((item.Status == Domain.ProductionConfiguration.Enums.ControllerArtifactSetDeploymentStatus.Pending ||
+                  item.Status == Domain.ProductionConfiguration.Enums.ControllerArtifactSetDeploymentStatus.Installed) ||
+                 item.KioskExecutionEndpoint.ActiveArtifactSetDeploymentId == item.Id),
                 cancellationToken);
             if (hasControllerDeployment) return true;
         }
@@ -305,6 +309,47 @@ public sealed class ProductionPackageUpgradeStore(IceBotDbContext db) : IProduct
                 .SetProperty(item => item.FailureMessage,
                     "Upgrade materialization exceeded the configured progress timeout.")
                 .SetProperty(item => item.UpdatedAt, now), cancellationToken) == 1;
+
+    public async Task<ProductionPackageUpgradeRollbackAttemptRecordResult> RecordRollbackAttemptAsync(
+        Guid organizationId, Guid sourceInstallationId, Guid upgradeId, Guid endpointId,
+        Guid deploymentId, Guid actorId, string reason, DateTimeOffset now, int maxAttempts,
+        CancellationToken cancellationToken)
+    {
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        await db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"production-package-upgrade-rollback:{upgradeId:D}:{endpointId:D}"}, 0))",
+            cancellationToken);
+
+        db.ChangeTracker.Clear();
+        var upgrade = await UpgradeQuery(tracked: true)
+            .SingleOrDefaultAsync(item => item.OrganizationId == organizationId &&
+                                          item.SourceInstallationId == sourceInstallationId &&
+                                          item.Id == upgradeId,
+                cancellationToken)
+            ?? throw new Domain.Common.DomainRuleException("Package upgrade not found.");
+        if (upgrade.Status == ProductionPackageUpgradeStatus.RolledBack)
+            throw new Domain.Common.DomainRuleException("Package upgrade is already rolled back.");
+        if (upgrade.Status is not (ProductionPackageUpgradeStatus.Completed or
+            ProductionPackageUpgradeStatus.RollbackPending))
+            throw new Domain.Common.DomainRuleException("Only a completed package upgrade can record rollback deployment evidence.");
+
+        var endpoint = upgrade.EndpointTargets.SingleOrDefault(item =>
+            item.KioskExecutionEndpointId == endpointId)
+            ?? throw new Domain.Common.DomainRuleException("Rollback execution endpoint is not part of this package upgrade.");
+        var existing = endpoint.RollbackAttempts.SingleOrDefault(item => item.DeploymentId == deploymentId);
+        if (existing is not null)
+        {
+            await transaction.CommitAsync(cancellationToken);
+            return new ProductionPackageUpgradeRollbackAttemptRecordResult(upgrade, false, existing.AttemptNo);
+        }
+
+        upgrade.BeginRollback(actorId, now);
+        endpoint.RecordRollbackDeployment(deploymentId, actorId, reason, now, maxAttempts);
+        await db.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new ProductionPackageUpgradeRollbackAttemptRecordResult(
+            upgrade, true, endpoint.RollbackAttempts.Max(item => item.AttemptNo));
+    }
 
     public Task SaveChangesAsync(CancellationToken cancellationToken) => db.SaveChangesAsync(cancellationToken);
 

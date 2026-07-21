@@ -160,7 +160,7 @@ public sealed class FulfillmentReminderIntegrationTests(IntegrationTestFixture f
             menuItem.Code, menuItem.DisplayName, product.Code, product.Name, variant.Code, variant.Name,
             null, FulfillmentType.Packaged, 1, 10_000);
         var paymentTimestamp = paidAt ?? DateTimeOffset.UtcNow.AddMinutes(-10);
-        order.Place(paymentTimestamp);
+        order.Place(paymentTimestamp, paymentTimestamp.AddMinutes(15));
         order.MarkPaid(order.TotalAmount, paymentTimestamp);
         if (failItem) item.FailPackaged("Test failure");
         db.Orders.Add(order);

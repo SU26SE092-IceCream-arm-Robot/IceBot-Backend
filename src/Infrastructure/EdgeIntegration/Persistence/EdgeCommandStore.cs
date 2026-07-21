@@ -9,6 +9,8 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Application.Orders.Support;
 using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.Tenants.Kiosks.Rules;
+using Domain.Tenants.Enums;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -34,6 +36,13 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
         await transaction.CommitAsync(cancellationToken);
         return result;
     }
+
+    public Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({KioskOperationalConcurrency.LockKey(kioskId)}, 0));",
+            cancellationToken);
 
     public async Task<T> ExecuteSerializedAsync<T>(
         Guid commandId,
@@ -70,6 +79,11 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
             .Where(command =>
                 command.KioskId == kioskId &&
                 command.TargetExecutionEndpointId == endpointId &&
+                (command.CommandType != EdgeCommandType.ExecuteOrder ||
+                    _dbContext.Kiosks.Any(kiosk =>
+                        kiosk.Id == kioskId &&
+                        kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active &&
+                        kiosk.OperationalState == KioskOperationalState.Operational)) &&
                 (command.Status == EdgeCommandStatus.PendingDelivery ||
                     command.Status == EdgeCommandStatus.Delivered))
             .OrderBy(command => command.CreatedAt)

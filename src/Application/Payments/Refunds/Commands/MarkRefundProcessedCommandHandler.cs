@@ -56,6 +56,9 @@ public sealed class MarkRefundProcessedCommandHandler
             var transaction = refund.PaymentTransaction;
             var order = transaction.Order;
 
+            await _paymentStore.AcquireOrderWorkflowLockAsync(order.Id, ct);
+            await _paymentStore.ReloadOrderAsync(order, ct);
+
             originalOrderStatus = order.Status;
             originalTxStatus = transaction.Status;
             orgId = order.OrganizationId;
@@ -99,20 +102,35 @@ public sealed class MarkRefundProcessedCommandHandler
             refund.MarkProcessed(command.ProviderRefundId, now);
 
             var previousStatus = order.Status;
-            var newStatus = OrderStatus.Refunded;
+            var isDuplicatePayment = transaction.SettlementDisposition ==
+                PaymentSettlementDisposition.DuplicateRefundRequired;
+            var moneyWasRefunded = !string.Equals(method, "Voucher", StringComparison.OrdinalIgnoreCase);
 
-            if (string.Equals(method, "Voucher", StringComparison.OrdinalIgnoreCase))
+            if (isDuplicatePayment)
             {
-                newStatus = OrderStatus.Compensated;
-                order.MarkCompensated();
-                // do not set order.PaymentStatus = PaymentStatus.Refunded because the payment was not reversed
+                transaction.ResolveDuplicatePayment(moneyWasRefunded);
+                var hasOtherDuplicatePayments = await _paymentStore.HasOtherUnresolvedDuplicatePaymentsAsync(
+                    order.Id,
+                    transaction.Id,
+                    ct);
+                if (!hasOtherDuplicatePayments)
+                {
+                    order.ResolveDuplicatePaymentIntervention();
+                }
             }
             else
             {
-                newStatus = OrderStatus.Refunded;
-                order.MarkRefunded();
-                order.MarkPaymentRefunded();
-                transaction.Status = PaymentTransactionStatus.Refunded;
+                if (!moneyWasRefunded)
+                {
+                    order.MarkCompensated();
+                    // A voucher compensates the customer but does not reverse the payment.
+                }
+                else
+                {
+                    order.MarkRefunded();
+                    order.MarkPaymentRefunded();
+                    transaction.Status = PaymentTransactionStatus.Refunded;
+                }
             }
 
             order.UpdatedAt = now;
@@ -128,18 +146,22 @@ public sealed class MarkRefundProcessedCommandHandler
             canRetryPayment = customerStatusInfo.CanRetryPayment;
             requiresStaffSupport = customerStatusInfo.RequiresStaffSupport;
 
-            // Record OrderStatusHistory
-            var history = new Domain.Orders.Entities.OrderStatusHistory
+            if (order.Status != previousStatus)
             {
-                Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                FromStatus = previousStatus,
-                ToStatus = newStatus,
-                ChangedAt = now,
-                Reason = $"Refund processed via {method}.",
-                ChangedByAccountId = command.UserContext.AccountId
-            };
-            await _paymentStore.AddOrderStatusHistoryAsync(history, ct);
+                var history = new Domain.Orders.Entities.OrderStatusHistory
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    FromStatus = previousStatus,
+                    ToStatus = order.Status,
+                    ChangedAt = now,
+                    Reason = isDuplicatePayment
+                        ? $"Duplicate payment intervention resolved via {method}."
+                        : $"Refund processed via {method}.",
+                    ChangedByAccountId = command.UserContext.AccountId
+                };
+                await _paymentStore.AddOrderStatusHistoryAsync(history, ct);
+            }
 
             await _paymentStore.SaveChangesAsync(ct);
 

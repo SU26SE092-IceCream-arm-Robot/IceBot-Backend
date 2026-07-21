@@ -36,6 +36,8 @@ public sealed class OrderResult
 
     public DateTimeOffset PlacedAt { get; set; }
 
+    public DateTimeOffset PaymentDeadlineAt { get; set; }
+
     public DateTimeOffset? PaidAt { get; set; }
 
     public DateTimeOffset? CompletedAt { get; set; }

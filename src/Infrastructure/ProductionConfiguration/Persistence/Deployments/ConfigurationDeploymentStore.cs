@@ -84,12 +84,14 @@ public sealed class ConfigurationDeploymentStore : IConfigurationDeploymentStore
 
     public async Task<IReadOnlyList<ExecutionEndpointReadinessProjection>> ListEndpointReadinessAsync(
         IEnumerable<Guid> endpointIds,
+        DateTimeOffset receivedAfter,
         CancellationToken cancellationToken = default)
     {
         var ids = endpointIds.Distinct().ToArray();
         return await _dbContext.ExecutionEndpointReadinessProjections.AsNoTracking()
             .Include(projection => projection.Capabilities)
-            .Where(projection => ids.Contains(projection.KioskExecutionEndpointId))
+            .Where(projection => ids.Contains(projection.KioskExecutionEndpointId) &&
+                projection.CloudReceivedAt >= receivedAfter)
             .ToListAsync(cancellationToken);
     }
 

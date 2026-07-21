@@ -12,10 +12,15 @@ using Domain.RobotConfiguration.ArtifactContracts;
 using Domain.SalesCatalog.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.Devices.Telemetry;
+using Microsoft.Extensions.Options;
 
 namespace Infrastructure.ProductionPackages;
 
-public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInventoryReadinessEvaluator inventoryReadiness)
+public sealed class ProductionPackageWorkspaceStore(
+    IceBotDbContext db,
+    IInventoryReadinessEvaluator inventoryReadiness,
+    IOptions<EdgeTelemetryIngestionOptions> telemetryOptions)
     : IProductionPackageWorkspaceStore
 {
     public Task<ProductionPackageWorkspaceScope?> GetScopeAsync(Guid organizationId, Guid installationId,
@@ -124,7 +129,8 @@ public sealed class ProductionPackageWorkspaceStore(IceBotDbContext db, IInvento
             : [];
         var endpointIds = endpoints.Select(x => x.Id).ToArray();
         var readinessByEndpoint = await db.ExecutionEndpointReadinessProjections.AsNoTracking()
-            .Include(x => x.Capabilities).Where(x => endpointIds.Contains(x.KioskExecutionEndpointId))
+            .Include(x => x.Capabilities).Where(x => endpointIds.Contains(x.KioskExecutionEndpointId) &&
+                x.CloudReceivedAt >= DateTimeOffset.UtcNow.AddSeconds(-telemetryOptions.Value.ReadinessTimeoutSeconds))
             .ToDictionaryAsync(x => x.KioskExecutionEndpointId, cancellationToken);
         var requiredCapabilityCodes = release?.ExecutionRoutes.SelectMany(x => x.RobotBindings)
             .Select(x => x.RequiredWorkcellCapabilityCode).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];

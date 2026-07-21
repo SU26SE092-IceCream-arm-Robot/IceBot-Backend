@@ -9,6 +9,7 @@ public static class PaymentSessionInterventionPolicy
 {
     public const string IdentityMismatchCode = "PROVIDER_SESSION_IDENTITY_MISMATCH";
     public const string AmountMismatchCode = "PROVIDER_SESSION_AMOUNT_MISMATCH";
+    public const string DuplicatePaymentRefundRequiredCode = "DUPLICATE_PAYMENT_REFUND_REQUIRED";
 
     public static bool CanReconcile(PaymentTransaction payment, DateTimeOffset observedAt) =>
         payment.Status == PaymentTransactionStatus.Pending &&
@@ -33,7 +34,9 @@ public static class PaymentSessionInterventionPolicy
                 (payment.QrCodePayload == null || payment.QrCodePayload == "")) ||
                (payment.ExpiresAt.HasValue && payment.ExpiresAt <= observedAt))) ||
              payment.LastErrorCode == IdentityMismatchCode ||
-             payment.LastErrorCode == AmountMismatchCode);
+             payment.LastErrorCode == AmountMismatchCode ||
+             (payment.Status == PaymentTransactionStatus.Paid &&
+              payment.SettlementDisposition == PaymentSettlementDisposition.DuplicateRefundRequired));
 
     public static bool RequiresNotification(PaymentSessionReconciliationOutcome outcome) =>
         outcome is PaymentSessionReconciliationOutcome.RetryExhausted or

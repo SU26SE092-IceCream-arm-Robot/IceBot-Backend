@@ -6,6 +6,7 @@ namespace Application.EdgeIntegration.Abstractions;
 
 public interface IEdgeCommandStore
 {
+    Task AcquireKioskOperationalLockAsync(Guid kioskId, CancellationToken cancellationToken = default);
     Task<T> ExecuteEndpointDeliverySerializedAsync<T>(
         Guid endpointId,
         Func<CancellationToken, Task<T>> action,

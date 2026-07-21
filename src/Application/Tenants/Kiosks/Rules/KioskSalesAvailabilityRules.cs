@@ -5,7 +5,7 @@ using Domain.Devices.Connectivity;
 
 namespace Application.Tenants.Kiosks.Rules;
 
-internal static class KioskSalesAvailabilityRules
+public static class KioskSalesAvailabilityRules
 {
     public static string? ValidateOnlineSalesAvailability(
         Kiosk kiosk,
@@ -14,6 +14,11 @@ internal static class KioskSalesAvailabilityRules
         if (kiosk.Status != KioskStatus.Active)
         {
             return "Kiosk is not active for sales.";
+        }
+
+        if (kiosk.OperationalState != KioskOperationalState.Operational)
+        {
+            return $"Kiosk is not accepting orders while its operational state is {kiosk.OperationalState}.";
         }
 
         if (kiosk.Store is null || kiosk.Organization is null)

@@ -140,7 +140,9 @@ namespace Infrastructure
                         options.ConnectivityReconciliationIntervalSeconds > 0 &&
                         options.ConnectivityReconciliationBatchSize > 0 &&
                         options.MaxBatchEventCount > 0 &&
-                        options.AlertCorrelationWindowMinutes > 0,
+                        options.AlertCorrelationWindowMinutes > 0 &&
+                        options.AlertAutomationMaxEventAgeMinutes > 0 &&
+                        options.ReadinessTimeoutSeconds > 0,
                     "Edge telemetry clock skew and connectivity reconciliation settings are invalid.")
                 .ValidateOnStart();
             services.AddHostedService<KioskConnectivityReconciliationJob>();
@@ -151,6 +153,8 @@ namespace Infrastructure
             services.AddScoped<IAlertStore, AlertStore>();
             services.AddScoped<Application.Operations.Alerts.Automation.IInventoryAlertAutomationStore,
                 InventoryAlertAutomationStore>();
+            services.AddScoped<Application.Operations.Alerts.Automation.IMqttCredentialAlertAutomationStore,
+                MqttCredentialAlertAutomationStore>();
             services.AddOptions<Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions>()
                 .Bind(config.GetSection(Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions.SectionName))
                 .Validate(options =>
@@ -162,7 +166,8 @@ namespace Infrastructure
                 provider.GetRequiredService<Application.Operations.Alerts.Automation.IInventoryAlertAutomationStore>(),
                 provider.GetRequiredService<Application.Abstractions.Realtime.IRealtimeNotificationPublisher>(),
                 provider.GetRequiredService<Application.Operations.Alerts.Notifications.IInventoryOperationalAlertNotifier>(),
-                provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions>>().Value));
+                provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions>>().Value,
+                provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Application.Operations.Alerts.Automation.InventoryAlertReconciler>>()));
             services.AddHostedService<Operations.Jobs.InventoryAlertReconciliationJob>();
             services.AddScoped<Application.Operations.Alerts.Notifications.IOperationalAlertNotificationRecipientStore,
                 CriticalAlertNotificationRecipientStore>();
@@ -285,10 +290,13 @@ namespace Infrastructure
                      !string.IsNullOrWhiteSpace(options.AdminPassword) &&
                      !string.IsNullOrWhiteSpace(options.SubscriberRole) &&
                      !string.IsNullOrWhiteSpace(options.TopicPrefix) && options.TimeoutSeconds > 0 &&
-                     options.RetryCount is >= 0 and <= 3 && options.RetryDelayMilliseconds >= 0),
+                     options.RetryCount is >= 0 and <= 3 && options.RetryDelayMilliseconds >= 0 &&
+                     options.ReconciliationIntervalSeconds > 0 &&
+                     options.ReconciliationBatchSize > 0),
                     "Enabled MQTT credential provisioning settings are incomplete or invalid.")
                 .ValidateOnStart();
             services.AddScoped<IMqttEndpointCredentialProvisioner, MosquittoDynamicSecurityCredentialProvisioner>();
+            services.AddHostedService<Devices.Credentials.Jobs.MqttCredentialReconciliationJob>();
             services.AddOptions<Application.EdgeIntegration.Reports.ExecutionReportIngestionOptions>()
                 .Bind(config.GetSection(Application.EdgeIntegration.Reports.ExecutionReportIngestionOptions.SectionName))
                 .Validate(options => options.MaxFutureClockSkewSeconds >= 0,

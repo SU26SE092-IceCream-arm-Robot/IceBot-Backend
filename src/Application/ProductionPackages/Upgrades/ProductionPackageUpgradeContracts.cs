@@ -57,6 +57,11 @@ public sealed record ProductionPackageUpgradeMutationState(
 
 public sealed record ProductionPackageUpgradeInsertResult(bool Created, ProductionPackageUpgrade Upgrade);
 
+public sealed record ProductionPackageUpgradeRollbackAttemptRecordResult(
+    ProductionPackageUpgrade Upgrade,
+    bool Recorded,
+    int AttemptNo);
+
 public interface IProductionPackageUpgradeStore
 {
     Task<ProductionPackageInstallation?> GetSourceInstallationAsync(
@@ -95,6 +100,10 @@ public interface IProductionPackageUpgradeStore
         DateTimeOffset cutoff, int batchSize, CancellationToken cancellationToken);
     Task<bool> TryFailStaleMaterializingAsync(
         Guid upgradeId, DateTimeOffset cutoff, DateTimeOffset now, CancellationToken cancellationToken);
+    Task<ProductionPackageUpgradeRollbackAttemptRecordResult> RecordRollbackAttemptAsync(
+        Guid organizationId, Guid sourceInstallationId, Guid upgradeId, Guid endpointId,
+        Guid deploymentId, Guid actorId, string reason, DateTimeOffset now, int maxAttempts,
+        CancellationToken cancellationToken);
     Task SaveChangesAsync(CancellationToken cancellationToken);
     void ReplaceMenuItemProductOptions(MenuItem menuItem, IReadOnlyCollection<Guid> productOptionIds);
     Task MarkFailedAsync(Guid organizationId, Guid upgradeId, string code, string message,

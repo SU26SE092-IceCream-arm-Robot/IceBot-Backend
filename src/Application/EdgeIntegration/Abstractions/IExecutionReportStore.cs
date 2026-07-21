@@ -43,6 +43,14 @@ public interface IProductionExecutionReportStore
         Guid sourceCommandId,
         Guid sourceProductionJobId,
         CancellationToken cancellationToken = default);
+    Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsAsync(
+        Guid sourceCommandId,
+        Guid orderItemId,
+        CancellationToken cancellationToken = default);
+    Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsForOrderItemAsync(
+        Guid orderId,
+        Guid orderItemId,
+        CancellationToken cancellationToken = default);
     Task AddProductionExecutionRecordAsync(ProductionExecutionRecord record, CancellationToken cancellationToken = default);
     Task<OrderExecutionRecord?> GetOrderExecutionRecordAsync(Guid sourceCommandId, CancellationToken cancellationToken = default);
     Task AddOrderExecutionRecordAsync(OrderExecutionRecord record, CancellationToken cancellationToken = default);

@@ -16,7 +16,8 @@ public sealed record DataRetentionPurgeResult(
     int RefreshTokens,
     int PasswordResetRequests,
     int AccountInvitations,
-    int NotificationDeliveries);
+    int NotificationDeliveries,
+    IReadOnlyList<DataRetentionPurgeFailure> Failures);
 
 public sealed class DataRetentionPurger
 {
@@ -33,20 +34,30 @@ public sealed class DataRetentionPurger
         DateTimeOffset now,
         CancellationToken cancellationToken = default)
     {
-        var heartbeats = await PurgeHeartbeatsAsync(now.AddDays(-_options.HeartbeatDays), cancellationToken);
-        var deviceEvents = await PurgeDeviceEventsAsync(now.AddDays(-_options.DeviceEventDays), cancellationToken);
-        var operationLogs = await PurgeOperationLogsAsync(now.AddDays(-_options.OperationLogDays), cancellationToken);
-        var syncInbox = await PurgeSyncInboxAsync(now.AddDays(-_options.ProcessedSyncInboxDays), cancellationToken);
-        var nonces = await PurgeRequestNoncesAsync(now, cancellationToken);
+        var failures = new List<DataRetentionPurgeFailure>();
+        var heartbeats = await DataRetentionCategoryRunner.RunAsync(
+            "heartbeats", () => PurgeHeartbeatsAsync(now.AddDays(-_options.HeartbeatDays), cancellationToken), failures, cancellationToken);
+        var deviceEvents = await DataRetentionCategoryRunner.RunAsync(
+            "device_events", () => PurgeDeviceEventsAsync(now.AddDays(-_options.DeviceEventDays), cancellationToken), failures, cancellationToken);
+        var operationLogs = await DataRetentionCategoryRunner.RunAsync(
+            "operation_logs", () => PurgeOperationLogsAsync(now.AddDays(-_options.OperationLogDays), cancellationToken), failures, cancellationToken);
+        var syncInbox = await DataRetentionCategoryRunner.RunAsync(
+            "sync_inbox", () => PurgeSyncInboxAsync(now.AddDays(-_options.ProcessedSyncInboxDays), cancellationToken), failures, cancellationToken);
+        var nonces = await DataRetentionCategoryRunner.RunAsync(
+            "execution_request_nonces", () => PurgeRequestNoncesAsync(now, cancellationToken), failures, cancellationToken);
         var identityCutoff = now.AddDays(-_options.ExpiredIdentityCredentialDays);
-        var refreshTokens = await PurgeRefreshTokensAsync(now, identityCutoff, cancellationToken);
-        var passwordResets = await PurgePasswordResetRequestsAsync(now, identityCutoff, cancellationToken);
-        var invitations = await PurgeAccountInvitationsAsync(now, identityCutoff, cancellationToken);
-        var notificationDeliveries = await PurgeNotificationDeliveriesAsync(
-            now.AddDays(-_options.NotificationDeliveryDays), cancellationToken);
+        var refreshTokens = await DataRetentionCategoryRunner.RunAsync(
+            "refresh_tokens", () => PurgeRefreshTokensAsync(now, identityCutoff, cancellationToken), failures, cancellationToken);
+        var passwordResets = await DataRetentionCategoryRunner.RunAsync(
+            "password_reset_requests", () => PurgePasswordResetRequestsAsync(now, identityCutoff, cancellationToken), failures, cancellationToken);
+        var invitations = await DataRetentionCategoryRunner.RunAsync(
+            "account_invitations", () => PurgeAccountInvitationsAsync(now, identityCutoff, cancellationToken), failures, cancellationToken);
+        var notificationDeliveries = await DataRetentionCategoryRunner.RunAsync(
+            "notification_deliveries", () => PurgeNotificationDeliveriesAsync(
+                now.AddDays(-_options.NotificationDeliveryDays), cancellationToken), failures, cancellationToken);
         return new DataRetentionPurgeResult(
             heartbeats, deviceEvents, operationLogs, syncInbox, nonces,
-            refreshTokens, passwordResets, invitations, notificationDeliveries);
+            refreshTokens, passwordResets, invitations, notificationDeliveries, failures);
     }
 
     private async Task<int> PurgeHeartbeatsAsync(DateTimeOffset cutoff, CancellationToken cancellationToken)

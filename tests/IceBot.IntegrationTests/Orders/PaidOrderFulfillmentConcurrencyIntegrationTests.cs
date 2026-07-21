@@ -224,7 +224,7 @@ public sealed class PaidOrderFulfillmentConcurrencyIntegrationTests(IntegrationT
             packagedMenuItem.Code, packagedMenuItem.DisplayName, product.Code, product.Name,
             packagedVariant.Code, packagedVariant.Name, null, FulfillmentType.Packaged, 1, 10_000);
         var paidAt = DateTimeOffset.UtcNow;
-        order.Place(paidAt);
+        order.Place(paidAt, paidAt.AddMinutes(15));
         order.MarkPaid(order.TotalAmount, paidAt);
         manualItem.MarkAccepted();
         manualItem.MarkPreparing();

@@ -54,9 +54,15 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             throw new InvalidOperationException("Payment transaction provider order code is invalid.");
         }
         var description = SanitizeDescription($"IceBot {order.OrderNumber}");
-        var expiresAt = _options.ExpireMinutes > 0
+        var providerExpiresAt = _options.ExpireMinutes > 0
             ? DateTimeOffset.UtcNow.AddMinutes(_options.ExpireMinutes)
             : (DateTimeOffset?)null;
+        var orderDeadlineAt = order.PaymentDeadlineAt == default
+            ? (DateTimeOffset?)null
+            : order.PaymentDeadlineAt;
+        var expiresAt = providerExpiresAt.HasValue && orderDeadlineAt.HasValue
+            ? (providerExpiresAt.Value <= orderDeadlineAt.Value ? providerExpiresAt : orderDeadlineAt)
+            : providerExpiresAt ?? orderDeadlineAt;
 
         var request = new CreatePaymentLinkRequest
         {

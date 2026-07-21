@@ -132,6 +132,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | --- | --- | --- |
 | `roles.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View roles catalog and static permission matrix |
 | `role-scope-options.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View valid organizational scope options for a target role |
+| `dashboard.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View management dashboard metrics within assigned scope |
 | `accounts.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read internal accounts. SystemAdmin can read all accounts; OrgAdmin and Manager are scope-filtered |
 | `accounts.manage` | `SystemAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for internal accounts |
 | `organizations.manage` | `SystemAdmin` | Platform-level organization management: create, activate, disable organizations |
@@ -178,7 +179,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `inventory.manage` | `SystemAdmin`, `Manager`, `Staff`, `Technician` | Refill dispenser state and adjust inventory estimates within assigned scope |
 | `inventory.configure` | `SystemAdmin`, `Manager`, `Technician` | Provision and configure dispenser topology, activate/retire states, and delete only unused states within assigned scope |
 | `operations.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosk heartbeat history, device events, and curated operation logs within assigned scope |
-| `operations.diagnostics` | `SystemAdmin`, `Technician` | View raw operation-log diagnostic payloads within assigned kiosk scope |
+| `operations.diagnostics` | `SystemAdmin`, `Technician` | View raw operation-log payloads and order execution diagnostics within assigned kiosk scope |
 | `notifications.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Requeue permanently failed notification deliveries within assigned scope; reason and actor are audited |
 | `maintenance.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View maintenance tickets within assigned scope |
 | `maintenance.create` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Create maintenance tickets within assigned scope |

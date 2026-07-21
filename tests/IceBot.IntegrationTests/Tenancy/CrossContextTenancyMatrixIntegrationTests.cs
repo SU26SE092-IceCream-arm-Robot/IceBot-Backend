@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Domain.Orders.Entities;
+using Domain.ProductionPackages;
 using IceBot.IntegrationTests.Infrastructure;
 using IceBot.IntegrationTests.ProductionPackages;
 using Microsoft.EntityFrameworkCore;
@@ -66,6 +67,7 @@ public sealed class CrossContextTenancyMatrixIntegrationTests(IntegrationTestFix
         var storage = fixture.CreateObjectStorage(autoCreateBucket: true);
         var foreign = await ProductionPackageInstallationScenarioSeed.SeedAsync(fixture, storage, actorId);
         var foreignOrderId = await SeedOrderAsync(foreign);
+        var foreignInstallationId = await SeedInstallationAsync(foreign);
 
         await using var factory = new PackageApiWebApplicationFactory(
             fixture,
@@ -112,6 +114,38 @@ public sealed class CrossContextTenancyMatrixIntegrationTests(IntegrationTestFix
             });
         Assert.Equal(HttpStatusCode.Forbidden, fulfillmentResponse.StatusCode);
 
+        using var repairResponse = await client.PostAsync(
+            $"/api/v1/management/organizations/{foreign.OrganizationId:D}/production-package-installations/" +
+            $"{foreignInstallationId:D}/repair",
+            null);
+        Assert.Equal(HttpStatusCode.Forbidden, repairResponse.StatusCode);
+
+        using var upgradePreviewResponse = await client.PostAsJsonAsync(
+            $"/api/v1/management/organizations/{foreign.OrganizationId:D}/production-package-installations/" +
+            $"{foreignInstallationId:D}/upgrades/preview",
+            new
+            {
+                targetPackageVersionId = Guid.NewGuid(),
+                productSourceKeys = Array.Empty<string>()
+            });
+        Assert.Equal(HttpStatusCode.Forbidden, upgradePreviewResponse.StatusCode);
+
+        using var upgradeRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            $"/api/v1/management/organizations/{foreign.OrganizationId:D}/production-package-installations/" +
+            $"{foreignInstallationId:D}/upgrades")
+        {
+            Content = JsonContent.Create(new
+            {
+                targetPackageVersionId = Guid.NewGuid(),
+                previewChecksum = new string('c', 64),
+                productSourceKeys = Array.Empty<string>()
+            })
+        };
+        upgradeRequest.Headers.Add("Idempotency-Key", $"foreign-upgrade-{Guid.NewGuid():N}");
+        using var upgradeResponse = await client.SendAsync(upgradeRequest);
+        Assert.Equal(HttpStatusCode.Forbidden, upgradeResponse.StatusCode);
+
         await using var assertionContext = fixture.CreateDbContext();
         Assert.Equal(1, await assertionContext.Orders.CountAsync(order => order.Id == foreignOrderId));
     }
@@ -130,6 +164,25 @@ public sealed class CrossContextTenancyMatrixIntegrationTests(IntegrationTestFix
         dbContext.Orders.Add(order);
         await dbContext.SaveChangesAsync();
         return order.Id;
+    }
+
+    private async Task<Guid> SeedInstallationAsync(ProductionPackageInstallationScenario scenario)
+    {
+        await using var dbContext = fixture.CreateDbContext();
+        var installation = ProductionPackageInstallation.Start(
+            scenario.OrganizationId,
+            scenario.StoreId,
+            scenario.KioskId,
+            scenario.PackageVersionId,
+            new string('a', 64),
+            new string('b', 64),
+            $"tenancy-{Guid.NewGuid():N}",
+            [scenario.ProductSourceKey],
+            DateTimeOffset.UtcNow.AddMinutes(-1));
+        installation.Fail("TENANCY_TEST", "Seeded foreign installation.", DateTimeOffset.UtcNow);
+        dbContext.ProductionPackageInstallations.Add(installation);
+        await dbContext.SaveChangesAsync();
+        return installation.Id;
     }
 
     private static async Task<JsonDocument> ReadJsonAsync(HttpResponseMessage response)

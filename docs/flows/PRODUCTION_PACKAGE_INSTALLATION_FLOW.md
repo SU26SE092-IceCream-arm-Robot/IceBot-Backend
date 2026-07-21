@@ -172,6 +172,11 @@ materialization cannot create a second Catalog or robot graph. Terminal retries
 return the existing Upgrade. Reusing the key with another payload returns
 `409`.
 
+Execute revalidates the approved `previewChecksum` immediately before successor
+materialization and again before preparation evidence is recorded. A changed
+source catalog, MenuItem binding, or active endpoint scope is rejected as stale;
+it is never silently added to the approved upgrade.
+
 The successor stays independently reviewable. Existing Recipe, Artifact,
 RobotProgram, ConfigurationRelease publication, and deployment APIs remain the
 only way to publish and activate its technical graph. Upgrade cutover does not
@@ -216,8 +221,10 @@ idempotent rollback deployments through the existing deployment rollback
 handler and returns `202` while Edge activation is pending. Unknown, Pending,
 Installed, or Active observation is never redispatched automatically. If an
 observed rollback deployment is Failed, another call may create the next audited
-deployment attempt, up to three attempts per endpoint. A repeated call after
-every latest rollback deployment is Active verifies after-state checksums,
+deployment attempt, up to three attempts per endpoint. Recording each returned
+deployment is serialized per upgrade endpoint, so duplicate idempotent dispatch
+reuses the existing audit entry rather than creating another attempt. A repeated
+call after every latest rollback deployment is Active verifies after-state checksums,
 restores typed MenuItem/option bindings, availability, and canonical Product
 codes, restores the source installation, and supersedes the successor.
 Post-cutover Catalog or Menu binding changes cause `409`; rollback never

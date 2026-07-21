@@ -4,6 +4,7 @@ using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.Sync.Entities;
 using Domain.Devices.ExecutionEndpoints.Projections;
+using Domain.ProductionExecution.Projections;
 
 namespace Application.EdgeIntegration.Abstractions;
 
@@ -16,6 +17,14 @@ public interface IOrderExecutionDispatchStore
 
     Task AcquireEndpointAdmissionLockAsync(
         Guid endpointId,
+        CancellationToken cancellationToken = default);
+
+    Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> IsKioskOperationalAsync(
+        Guid kioskId,
         CancellationToken cancellationToken = default);
 
     Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
@@ -46,6 +55,15 @@ public interface IOrderExecutionDispatchStore
 
     Task<EdgeCommand?> GetLatestCommandAsync(
         Guid orderId,
+        CancellationToken cancellationToken = default);
+
+    Task<EdgeCommand?> GetCommandByIdAsync(
+        Guid commandId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsForOrderItemAsync(
+        Guid orderId,
+        Guid orderItemId,
         CancellationToken cancellationToken = default);
 
     Task AddOrderStatusHistoryAsync(

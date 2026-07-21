@@ -58,10 +58,14 @@ public sealed class DashboardStore : IDashboardStore
                 connectivity => visibleKioskIds.Contains(connectivity.KioskId) &&
                     connectivity.Status == Domain.Devices.Connectivity.KioskConnectivityStatus.Unreachable,
                 cancellationToken);
-        var maintenanceKioskCount = kioskStats.FirstOrDefault(x => x.Status == Domain.Tenants.Enums.KioskStatus.Maintenance)?.Count ?? 0;
+        var maintenanceKioskCount = await kiosksQuery.CountAsync(
+            kiosk => kiosk.OperationalState == Domain.Tenants.Enums.KioskOperationalState.Maintenance,
+            cancellationToken);
 
         var pendingOrderCount = await ordersQuery.CountAsync(o => o.Status == Domain.Orders.Enums.OrderStatus.PendingPayment, cancellationToken);
-        var paidOrderCount = await ordersQuery.CountAsync(o => o.Status == Domain.Orders.Enums.OrderStatus.Paid, cancellationToken);
+        var paidOrderCount = await ordersQuery.CountAsync(
+            order => order.PaymentStatus == Domain.Orders.Enums.PaymentStatus.Paid,
+            cancellationToken);
         var refundRequiredOrderCount = await ordersQuery.CountAsync(o => o.Status == Domain.Orders.Enums.OrderStatus.RefundRequired, cancellationToken);
 
         var lowStockDispenserCount = await dispensersQuery.CountAsync(d => d.CurrentLevelStatus == Domain.Inventory.Enums.IngredientLevelStatus.Low, cancellationToken);

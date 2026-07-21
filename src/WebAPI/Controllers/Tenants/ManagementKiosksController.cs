@@ -18,19 +18,22 @@ public class ManagementKiosksController : ControllerBase
     private readonly CreateKioskCommandHandler _createKiosk;
     private readonly UpdateKioskCommandHandler _updateKiosk;
     private readonly SetKioskStatusCommandHandler _setKioskStatus;
+    private readonly SetKioskOperationalStateCommandHandler _setKioskOperationalState;
 
     public ManagementKiosksController(
         ListKiosksQueryHandler listKiosks,
         GetKioskQueryHandler getKiosk,
         CreateKioskCommandHandler createKiosk,
         UpdateKioskCommandHandler updateKiosk,
-        SetKioskStatusCommandHandler setKioskStatus)
+        SetKioskStatusCommandHandler setKioskStatus,
+        SetKioskOperationalStateCommandHandler setKioskOperationalState)
     {
         _listKiosks = listKiosks;
         _getKiosk = getKiosk;
         _createKiosk = createKiosk;
         _updateKiosk = updateKiosk;
         _setKioskStatus = setKioskStatus;
+        _setKioskOperationalState = setKioskOperationalState;
     }
 
     [HttpGet("kiosks")]
@@ -122,6 +125,26 @@ public class ManagementKiosksController : ControllerBase
             Request = request
         };
         var result = await _setKioskStatus.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPatch("stores/{storeId:guid}/kiosks/{kioskId:guid}/operational-state")]
+    [Authorize(Policy = "kiosks.manage")]
+    public async Task<IActionResult> SetKioskOperationalState(
+        Guid storeId,
+        Guid kioskId,
+        [FromBody] SetKioskOperationalStateRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _setKioskOperationalState.HandleAsync(
+            new SetKioskOperationalStateCommand
+            {
+                StoreId = storeId,
+                KioskId = kioskId,
+                Request = request,
+                UserContext = User.GetUserContext()
+            },
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

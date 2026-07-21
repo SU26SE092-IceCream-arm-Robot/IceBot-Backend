@@ -37,6 +37,7 @@ internal static class OrderExecutionLifecycleApplier
             CustomerStatusMessage = projection.CustomerStatusMessage,
             RequiresStaffSupport = projection.RequiresStaffSupport,
             LastExecutorReportedAt = record.LastExecutorReportedAt,
+            LastCloudReceivedAt = record.CloudReceivedAt,
             UpdatedAt = context.CloudReceivedAt,
             Version = 1
         };

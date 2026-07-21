@@ -1,5 +1,6 @@
 using Domain.Identity.Entities;
 using Domain.Identity.Enums;
+using Domain.Operations.Entities;
 using Domain.Tenants.Entities;
 using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.Operations.Persistence;
@@ -10,6 +11,47 @@ namespace IceBot.IntegrationTests.Operations;
 [Collection(IntegrationTestFixture.CollectionName)]
 public sealed class MaintenanceAssignmentScopeIntegrationTests(IntegrationTestFixture fixture)
 {
+    [IntegrationFact]
+    public async Task TicketNumberCollision_CanBeRetriedInSameUnitOfWork()
+    {
+        await using var db = fixture.CreateDbContext();
+        var organization = new Organization
+        {
+            Code = $"ORG-{Guid.NewGuid():N}",
+            Name = "Maintenance collision organization"
+        };
+        var store = new Store
+        {
+            OrganizationId = organization.Id,
+            Code = $"STORE-{Guid.NewGuid():N}",
+            Name = "Maintenance collision store",
+            TimeZone = "Asia/Bangkok"
+        };
+        var kiosk = new Kiosk
+        {
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            Code = $"KIOSK-{Guid.NewGuid():N}",
+            Name = "Maintenance collision kiosk"
+        };
+        db.AddRange(organization, store, kiosk);
+        await db.SaveChangesAsync();
+
+        var existing = NewTicket(organization.Id, store.Id, kiosk.Id, "MNT-COLLISION");
+        db.MaintenanceTickets.Add(existing);
+        await db.SaveChangesAsync();
+
+        var candidate = NewTicket(organization.Id, store.Id, kiosk.Id, existing.TicketNumber);
+        var subject = new MaintenanceTicketStore(db);
+        await subject.AddAsync(candidate);
+
+        Assert.False(await subject.TrySaveNewTicketAsync());
+
+        candidate.TicketNumber = $"MNT-{Guid.NewGuid():N}";
+        Assert.True(await subject.TrySaveNewTicketAsync());
+        Assert.True(await db.MaintenanceTickets.AnyAsync(ticket => ticket.Id == candidate.Id));
+    }
+
     [IntegrationFact]
     public async Task AssigneeRoleScope_MustMatchTicketTenant()
     {
@@ -63,4 +105,20 @@ public sealed class MaintenanceAssignmentScopeIntegrationTests(IntegrationTestFi
         Assert.False(await subject.CanAssignAccountAsync(
             account.Id, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
     }
+
+    private static MaintenanceTicket NewTicket(
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        string ticketNumber) =>
+        new()
+        {
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            TicketNumber = ticketNumber,
+            IssueCode = "TEST",
+            Title = "Collision test",
+            ReportedAt = DateTimeOffset.UtcNow
+        };
 }

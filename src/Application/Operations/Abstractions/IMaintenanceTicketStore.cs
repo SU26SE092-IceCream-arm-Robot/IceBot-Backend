@@ -62,7 +62,14 @@ public interface IMaintenanceTicketStore
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
+    Task<bool> TrySaveNewTicketAsync(CancellationToken cancellationToken = default);
+
     Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
+    Task AcquireKioskOperationalLockAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<bool> HasRunningExecutionAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task AddOperationalStateTransitionAsync(
+        Domain.Tenants.Entities.KioskOperationalStateTransition transition,
+        CancellationToken cancellationToken = default);
 }
 
 public sealed record MaintenanceKioskScope(Guid OrganizationId, Guid StoreId, Guid KioskId);

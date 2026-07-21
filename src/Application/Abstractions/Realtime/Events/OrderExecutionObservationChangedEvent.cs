@@ -14,6 +14,7 @@ public sealed record OrderExecutionObservationChangedEvent
     public required string CustomerStatusMessage { get; init; }
     public required bool RequiresStaffSupport { get; init; }
     public required DateTimeOffset LastExecutorReportedAt { get; init; }
+    public required DateTimeOffset LastCloudReceivedAt { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }
     public required int Version { get; init; }
 }

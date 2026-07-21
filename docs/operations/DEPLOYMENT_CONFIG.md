@@ -85,6 +85,7 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Firebase enabled flag | `Firebase__Enabled` | **P1** | Explicitly set `false` when Google/Firebase login is not deployed. |
 | Firebase credentials path | `Firebase__CredentialsPath` | **P0 Feature** | **Secret-mounted path required** when Firebase is enabled outside an environment that supplies application-default credentials. |
 | Firebase auth resilience | `Firebase__Resilience__OperationTimeoutSeconds`, `__RetryCount`, `__RetryDelayMilliseconds`, `__CircuitBreakerFailureRatio`, `__CircuitBreakerMinimumThroughput`, `__CircuitBreakerSamplingDurationSeconds`, `__CircuitBreakerBreakDurationSeconds` | **P2** | Defaults are suitable initially. Only transport and explicit Firebase service failures retry; invalid/expired/revoked tokens never retry. Settings are startup-validated. |
+| Firebase push operation timeout | `Firebase__PushDelivery__OperationTimeoutSeconds` | **P1** | Default `30` seconds. Bounds one FCM send attempt. Do not add sender-level retry: durable `NotificationDelivery` owns retry and delivery identity. Keep this lower than `NotificationDelivery__ProcessingTimeoutSeconds`. |
 
 ## Payment Provider
 
@@ -100,6 +101,7 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Enable payment-session reconciliation | `Payments__SessionReconciliation__Enabled` | **P1** | Keep the appsettings default `true` when PayOS checkout is enabled. The worker repairs responses lost after provider session creation without repeating the create `POST`. |
 | Payment-session reconciliation timing | `Payments__SessionReconciliation__IntervalSeconds`, `__StaleAfterSeconds`, `__RetryDelaySeconds` | **P2** | Start with the appsettings defaults. Increase the interval or delay only when provider rate limits require it. Settings are startup-validated. |
 | Payment-session reconciliation batch | `Payments__SessionReconciliation__BatchSize` | **P2** | Maximum pending transactions queried per scan; appsettings default is `50`. |
+| Order payment window | `Payments__OrderPaymentWindow__DurationMinutes` | **P1** | Server-authoritative time allowed to start payment after Order placement, including across Store closing or a manual sales pause. Default `15`; startup validation allows `1-120`. PayOS session expiry is capped by this deadline. |
 
 ## Robot Artifact Storage
 
@@ -158,6 +160,8 @@ Object storage is validated before background jobs start. Connection failure, in
 | Execution-report future clock skew | `ExecutionReportIngestion__MaxFutureClockSkewSeconds` | **P1** | Maximum accepted future offset for report and stock-evidence timestamps; default is `300` seconds. |
 | Edge telemetry future clock skew | `EdgeTelemetryIngestion__MaxFutureClockSkewSeconds` | **P1** | Maximum accepted future offset for heartbeat and future device-event timestamps; default is `300` seconds. |
 | Kiosk heartbeat timeout | `EdgeTelemetryIngestion__HeartbeatTimeoutSeconds` | **P1** | Maximum Cloud receive-time silence before an Active kiosk becomes Offline/Unreachable; default is `90` seconds. |
+| Execution readiness timeout | `EdgeTelemetryIngestion__ReadinessTimeoutSeconds` | **P1** | Maximum Cloud receive-time age for a Ready/Safe projection used by menu, checkout, deployment preview, and workspace; default is `120` seconds. |
+| Alert automation event age | `EdgeTelemetryIngestion__AlertAutomationMaxEventAgeMinutes` | **P1** | Maximum age at Cloud receive time for replayed Error/Critical device evidence to create/correlate an Alert or push; default is `60` minutes. Older events remain audit history. |
 | Connectivity reconciliation interval | `EdgeTelemetryIngestion__ConnectivityReconciliationIntervalSeconds` | **P1** | Background scan interval for heartbeat timeout transitions; default is `15` seconds. |
 | Connectivity reconciliation batch size | `EdgeTelemetryIngestion__ConnectivityReconciliationBatchSize` | **P2** | Maximum Active kiosk candidates checked per scan; appsettings default is `100`. |
 | Edge batch event count | `EdgeTelemetryIngestion__MaxBatchEventCount` | **P1** | Maximum items accepted by one telemetry replay or production-history replay request; default is `100`. Request body size remains bounded separately by execution-endpoint security. |
@@ -167,8 +171,8 @@ Object storage is validated before background jobs start. Connection failure, in
 | Processed inbox retention | `DataRetention__ProcessedSyncInboxDays` | **P1** | Default `180` days. Applies only to Processed/Ignored rows without a dead-letter reference. |
 | Expired identity credential retention | `DataRetention__ExpiredIdentityCredentialDays` | **P1** | Default `30` days after expiry for refresh tokens, password-reset requests, and account invitations. Active credentials are never purged. |
 | Notification delivery retention | `DataRetention__NotificationDeliveryDays` | **P1** | Default `90` days. Ordinary Delivered/PermanentFailure outbox rows are purged; pending/retryable rows and durable idempotency evidence for `deployment_failed`, `fulfillment_overdue`, and `payment_intervention` are retained. |
-| Retention work limits | `DataRetention__BatchSize`, `DataRetention__MaxBatchesPerRun` | **P1** | Defaults `1000` rows per SQL delete and `20` batches per entity per run. Tune against database load. |
-| Inventory alert automation | `InventoryAlertAutomation__Enabled`, `__IntervalSeconds`, `__BatchSize`, `__MaxBatchesPerRun` | **P1** | Enabled by default. Reconciles Low/Empty dispenser states with actionable alerts using bounded batches. |
+| Retention work limits | `DataRetention__BatchSize`, `DataRetention__MaxBatchesPerRun` | **P1** | Defaults `1000` rows per SQL delete and `20` batches per entity per run. Tune against database load. A failed retention category is logged and retried on the next scheduled run; other categories continue. |
+| Inventory alert automation | `InventoryAlertAutomation__Enabled`, `__IntervalSeconds`, `__BatchSize`, `__MaxBatchesPerRun` | **P1** | Enabled by default. Reconciles Low/Empty dispenser states with actionable alerts using bounded rotating scan windows. A failed dispenser candidate is logged without blocking later candidates. |
 | Empty inventory ticket creation | `InventoryAlertAutomation__CreateMaintenanceTicketForEmpty` | **P1** | Default `true`; creates one alert-linked maintenance ticket for each Empty incident. |
 | Durable push delivery | `NotificationDelivery__Enabled`, `__IntervalSeconds`, `__BatchSize` | **P1** | Enabled by default. Disable only when Firebase delivery is intentionally unavailable; pending rows remain durable. |
 | Push retry policy | `NotificationDelivery__ProcessingTimeoutSeconds`, `__BaseRetryDelaySeconds` | **P1** | Defaults `120` and `30` seconds. Processing rows older than the timeout are reclaimed; transient failures use exponential delay. |
@@ -183,7 +187,7 @@ Object storage is validated before background jobs start. Connection failure, in
 | MQTT credential provisioning | `MqttCredentialProvisioning__Enabled`, `__Provider`, `__Host`, `__Port`, `__UseTls` | **P0 Feature/Security** | Enables execution-endpoint subscriber provisioning through Mosquitto Dynamic Security. Disabled by default. Production requires TLS. |
 | MQTT dynsec administrator | `MqttCredentialProvisioning__AdminUsername`, `__AdminPassword` | **P0 Secret** | Broker-control identity used only for client credential lifecycle. Supply from secret manager; never reuse backend publisher or endpoint credentials. |
 | MQTT endpoint subscriber role | `MqttCredentialProvisioning__SubscriberRole` | **P1** | Must exist on the broker and restrict `%u` to `icebot/execution-endpoints/%u/commands/available`. Local bootstrap creates `icebot-endpoint-subscriber`. |
-| MQTT credential resilience | `MqttCredentialProvisioning__TimeoutSeconds`, `__RetryCount`, `__RetryDelayMilliseconds` | **P2** | Defaults to 10-second command timeout, one retry, and 500 ms base delay. Retry covers transport failure only; broker business errors are returned without retry. |
+| MQTT credential resilience | `MqttCredentialProvisioning__TimeoutSeconds`, `__RetryCount`, `__RetryDelayMilliseconds`, `__ReconciliationIntervalSeconds`, `__ReconciliationBatchSize` | **P2** | Defaults to 10-second command timeout, one transport retry, 500 ms base delay, a 60-second reconciliation scan, and 100 candidates per batch. Stale provision/rotation requires operator retry; stale revocation is retried automatically. |
 
 Broker startup, endpoint-scoped ACL provisioning, Edge subscription behavior, and production TLS rules are defined in [MQTT Operations](MQTT_OPERATIONS.md).
 

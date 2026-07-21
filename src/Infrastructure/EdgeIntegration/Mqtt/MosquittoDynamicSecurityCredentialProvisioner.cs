@@ -94,7 +94,15 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
         CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
-        ThrowIfError(await ExecuteCommandAsync(new { command = "disableClient", username }, cancellationToken));
+        var error = await ExecuteCommandAsync(new { command = "disableClient", username }, cancellationToken);
+        if (error is null ||
+            error.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        ThrowIfError(error);
     }
 
     private async Task<string?> ExecuteCommandAsync(object command, CancellationToken cancellationToken)
