@@ -301,6 +301,7 @@ namespace Infrastructure
                         options.MaxActiveCommandsPerEndpoint > 0 &&
                         options.ReconciliationIntervalSeconds > 0 &&
                         options.ReconciliationBatchSize > 0 &&
+                        options.InitialDispatchSupportEscalationMinutes > 0 &&
                         options.TimeoutReconciliationIntervalSeconds > 0 &&
                         options.TimeoutReconciliationBatchSize > 0 &&
                         options.AcceptedReportTimeoutMinutes > 0 &&

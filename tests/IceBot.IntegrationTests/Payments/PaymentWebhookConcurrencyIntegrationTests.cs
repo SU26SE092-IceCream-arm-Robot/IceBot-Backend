@@ -48,6 +48,54 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
     }
 
     [IntegrationFact]
+    public async Task TwoProviderConfirmedSessions_ForSameOrder_RequireManualRefundReview()
+    {
+        var first = await SeedAsync();
+        var firstResult = await HandleAsync(first, "event:first-session-paid");
+        Assert.True(firstResult.Succeeded, firstResult.Message);
+
+        Seed second;
+        await using (var mutation = fixture.CreateDbContext())
+        {
+            var firstPayment = await mutation.PaymentTransactions.AsNoTracking()
+                .SingleAsync(payment => payment.Id == first.PaymentId);
+            var secondPayment = new PaymentTransaction
+            {
+                OrderId = first.OrderId,
+                PaymentMethodId = firstPayment.PaymentMethodId,
+                TransactionNumber = $"TX-{Guid.NewGuid():N}",
+                Provider = firstPayment.Provider,
+                ProviderOrderCode = Random.Shared
+                    .NextInt64(1_000_000_000_000, 9_999_999_999_999)
+                    .ToString(),
+                Amount = first.Amount,
+                Currency = firstPayment.Currency,
+                Status = PaymentTransactionStatus.Pending,
+                RequestedAt = DateTimeOffset.UtcNow
+            };
+            mutation.PaymentTransactions.Add(secondPayment);
+            await mutation.SaveChangesAsync();
+            second = new Seed(
+                first.OrganizationId,
+                first.OrderId,
+                secondPayment.Id,
+                secondPayment.ProviderOrderCode,
+                first.Amount);
+        }
+
+        var secondResult = await HandleAsync(second, "event:second-session-paid");
+
+        Assert.True(secondResult.Succeeded, secondResult.Message);
+        await using var assertion = fixture.CreateDbContext();
+        var order = await assertion.Orders.AsNoTracking()
+            .SingleAsync(candidate => candidate.Id == first.OrderId);
+        Assert.Equal(first.Amount * 2, order.PaidAmount);
+        Assert.Equal(OrderStatus.RefundRequired, order.Status);
+        Assert.Equal(2, await assertion.PaymentTransactions.CountAsync(payment =>
+            payment.OrderId == first.OrderId && payment.Status == PaymentTransactionStatus.Paid));
+    }
+
+    [IntegrationFact]
     public async Task ConcurrentCancellationAndPaidWebhook_PreservesPaidEvidenceAndSafeOrderState()
     {
         var seed = await SeedAsync();

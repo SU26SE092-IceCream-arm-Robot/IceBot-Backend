@@ -11,6 +11,7 @@ using Application.Payments.Providers;
 using Application.Shared.Wrappers;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
+using Domain.Payments.Enums;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -70,8 +71,8 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
                 Arg.Any<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>(),
                 Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>()(CancellationToken.None));
-        store.PaymentCallbackExistsAsync("payos", notification.ProviderEventId, Arg.Any<CancellationToken>())
-            .Returns(false);
+        store.GetPaymentCallbackAsync("payos", notification.ProviderEventId, Arg.Any<CancellationToken>())
+            .Returns((PaymentCallback?)null);
         store.GetPaymentTransactionByProviderOrderCodeAsync(
                 "payos", payment.ProviderOrderCode, Arg.Any<CancellationToken>())
             .Returns(payment);
@@ -90,9 +91,131 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         Assert.Equal(409, result.StatusCode);
         Assert.Contains("does not match", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(Domain.Payments.Enums.PaymentTransactionStatus.Pending, payment.Status);
-        await store.DidNotReceive().AddPaymentCallbackAsync(
-            Arg.Any<PaymentCallback>(), Arg.Any<CancellationToken>());
+        await store.Received(1).AddPaymentCallbackAsync(
+            Arg.Is<PaymentCallback>(callback =>
+                callback.ProcessingStatus == Domain.Payments.Enums.PaymentCallbackProcessingStatus.Ignored &&
+                callback.LastError != null &&
+                callback.LastError.Contains("does not match", StringComparison.OrdinalIgnoreCase)),
+            Arg.Any<CancellationToken>());
+        await store.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
+        await dispatchStore.DidNotReceive().ExecuteSerializedAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Func<CancellationToken, Task<ApiResult<Application.EdgeIntegration.Dispatch.Results.OrderExecutionDispatchResult>>>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DuplicateProviderEventWithDifferentPayload_IsRejected()
+    {
+        var payment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(),
+            OrderId = Guid.NewGuid(),
+            Provider = "payos",
+            ProviderOrderCode = "1234567890123",
+            Status = PaymentTransactionStatus.Paid
+        };
+        var callback = new PaymentCallback
+        {
+            PaymentTransactionId = payment.Id,
+            PaymentTransaction = payment,
+            Provider = "payos",
+            ProviderEventId = "event:paid",
+            EventType = "PAID",
+            PayloadJson = "{\"amount\":30000}",
+            ReceivedAt = DateTimeOffset.UtcNow
+        };
+        callback.MarkProcessed(DateTimeOffset.UtcNow);
+        var store = Substitute.For<IPaymentStore>();
+        store.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>()(CancellationToken.None));
+        store.GetPaymentCallbackAsync("payos", callback.ProviderEventId!, Arg.Any<CancellationToken>())
+            .Returns(callback);
+        var gateway = Substitute.For<IPaymentGateway>();
+        gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new ProviderPaymentNotification
+            {
+                Provider = "payos",
+                ProviderEventId = callback.ProviderEventId,
+                ProviderOrderCode = payment.ProviderOrderCode,
+                EventType = "PAID",
+                IsPaid = true,
+                PaidAmount = 30_000,
+                RawPayloadJson = "{\"amount\":30001}"
+            });
+
+        var result = await CreateHandler(store, gateway).HandleAsync(
+            new HandlePaymentProviderNotificationCommand
+            {
+                Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{}" }
+            });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.Contains("different payment or payload", result.Message, StringComparison.OrdinalIgnoreCase);
         await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SecondProviderConfirmedPayment_RequiresManualRefundAndDoesNotDispatch()
+    {
+        const decimal amount = 30_000;
+        var order = new Order { Id = Guid.NewGuid(), KioskId = Guid.NewGuid(), OrderNumber = "ORDER-OVERPAID" };
+        order.SetCurrency("VND");
+        order.AddItem(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
+            "ITEM", "Item", "PRODUCT", "Product", "VARIANT", "Variant", null,
+            Domain.Catalog.Enums.FulfillmentType.MachineProduced, 1, amount);
+        order.Place(DateTimeOffset.UtcNow.AddMinutes(-10));
+        order.MarkPaid(amount, DateTimeOffset.UtcNow.AddMinutes(-9));
+        var previousPayment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(), OrderId = order.Id, Order = order, Provider = "payos",
+            ProviderOrderCode = "1111111111111", Amount = amount, Currency = "VND",
+            Status = PaymentTransactionStatus.Paid
+        };
+        var currentPayment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(), OrderId = order.Id, Order = order, Provider = "payos",
+            ProviderOrderCode = "2222222222222", Amount = amount, Currency = "VND",
+            Status = PaymentTransactionStatus.Pending
+        };
+        var notification = new ProviderPaymentNotification
+        {
+            Provider = "payos", ProviderEventId = "event:second-paid",
+            ProviderOrderCode = currentPayment.ProviderOrderCode, EventType = "PAID",
+            ProviderStatus = "PAID", IsPaid = true, PaidAmount = amount,
+            RawPayloadJson = "{\"paid\":true}"
+        };
+        var store = Substitute.For<IPaymentStore>();
+        store.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>()(CancellationToken.None));
+        store.GetPaymentCallbackAsync("payos", notification.ProviderEventId!, Arg.Any<CancellationToken>())
+            .Returns((PaymentCallback?)null);
+        store.GetPaymentTransactionByProviderOrderCodeAsync(
+                "payos", currentPayment.ProviderOrderCode!, Arg.Any<CancellationToken>())
+            .Returns(currentPayment);
+        store.GetLatestPaidPaymentTransactionByOrderIdAsync(order.Id, Arg.Any<CancellationToken>())
+            .Returns(previousPayment);
+        var gateway = Substitute.For<IPaymentGateway>();
+        gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(notification);
+        var dispatchStore = Substitute.For<IOrderExecutionDispatchStore>();
+
+        var result = await CreateHandler(store, gateway, dispatchStore).HandleAsync(
+            new HandlePaymentProviderNotificationCommand
+            {
+                Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{}" }
+            });
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(PaymentTransactionStatus.Paid, currentPayment.Status);
+        Assert.Equal(amount * 2, order.PaidAmount);
+        Assert.Equal(Domain.Orders.Enums.OrderStatus.RefundRequired, order.Status);
         await dispatchStore.DidNotReceive().ExecuteSerializedAsync(
             Arg.Any<Guid>(),
             Arg.Any<Func<CancellationToken, Task<ApiResult<Application.EdgeIntegration.Dispatch.Results.OrderExecutionDispatchResult>>>>(),

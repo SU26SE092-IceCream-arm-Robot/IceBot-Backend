@@ -65,7 +65,10 @@ public interface IPaymentStore
         Guid orderId,
         CancellationToken cancellationToken = default);
 
-    Task<bool> PaymentCallbackExistsAsync(string provider, string providerEventId, CancellationToken cancellationToken = default);
+    Task<PaymentCallback?> GetPaymentCallbackAsync(
+        string provider,
+        string providerEventId,
+        CancellationToken cancellationToken = default);
 
     Task AcquirePaymentSessionLockAsync(Guid orderId, CancellationToken cancellationToken = default);
 

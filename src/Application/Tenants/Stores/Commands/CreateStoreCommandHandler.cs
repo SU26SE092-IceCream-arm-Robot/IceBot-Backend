@@ -23,7 +23,8 @@ public sealed class CreateStoreCommandHandler
         var organizationId = command.OrganizationId;
         var request = command.Request;
 
-        if (!StoreAccessRules.CanManageOrganizationStores(userContext, organizationId))
+        if (!StoreAccessRules.CanManageOrganizationStores(
+                ScopeRoleSets.StoresManage, userContext, organizationId))
         {
             return ApiResult<StoreResult>.Fail("Access denied.", 403);
         }

@@ -147,6 +147,7 @@ Object storage is validated before background jobs start. Connection failure, in
 | Active commands per endpoint | `OrderExecutionDispatch__MaxActiveCommandsPerEndpoint` | **P1** | Set from real Edge capacity; default is `20`. |
 | Dispatch reconciliation interval | `OrderExecutionDispatch__ReconciliationIntervalSeconds` | **P2** | Use appsettings default `10` unless database load requires tuning. |
 | Dispatch reconciliation batch size | `OrderExecutionDispatch__ReconciliationBatchSize` | **P2** | Use appsettings default `50` unless recovery volume requires tuning. |
+| Initial dispatch support escalation | `OrderExecutionDispatch__InitialDispatchSupportEscalationMinutes` | **P1** | Paid machine orders with no initial command become `FulfillmentIssue` after this duration; default is `15` minutes. |
 | Execution-timeout reconciliation interval | `OrderExecutionDispatch__TimeoutReconciliationIntervalSeconds` | **P2** | Use appsettings default `30`. |
 | Execution-timeout batch size | `OrderExecutionDispatch__TimeoutReconciliationBatchSize` | **P2** | Use appsettings default `100`. |
 | Accepted report timeout | `OrderExecutionDispatch__AcceptedReportTimeoutMinutes` | **P1** | Maximum time after ACK before missing order-summary evidence becomes stale; default is `5`. |

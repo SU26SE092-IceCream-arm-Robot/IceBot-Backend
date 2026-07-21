@@ -171,7 +171,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `ingredients.read` | `SystemAdmin`, `Manager` | Browse the global ingredient reference catalog used by recipe authoring |
 | `ingredients.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ingredient definitions |
 | `menus.manage` | `SystemAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
-| `payments.manage` | `SystemAdmin`, `Manager` | Payment method/config management |
+| `payments.manage` | `SystemAdmin`, `Manager` | Tenant payment operations and intervention workflows |
+| `payment-methods.manage` | `SystemAdmin` | Global payment-method catalog status management |
 | `refunds.manage` | `SystemAdmin`, `Manager`, `Staff` | Manual support/refund workflow. Auto provider refund is future work |
 | `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
 | `inventory.manage` | `SystemAdmin`, `Manager`, `Staff`, `Technician` | Refill dispenser state and adjust inventory estimates within assigned scope |
@@ -191,9 +192,9 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 ## Current Implementation Notes
 
 - Current `ScopedRoleAuthorizationHandler` checks role presence only.
-- Store management APIs perform service-level scope checks using `OrganizationId` and `StoreId` from role scope claims.
-- Other route/resource scope matching is still added incrementally as APIs pass `OrganizationId`, `StoreId`, or `KioskId` authorization context.
-- Role checks must validate requested resource scope before returning scoped tenant data.
+- Scoped authorization evaluates role and resource scope from the same `UserRoleScope`. A privileged role in one tenant cannot borrow organization, store, or kiosk ids assigned to another role.
+- Management list queries pass role-specific effective scope sets into persistence filters. Sensitive read-by-id and mutation queries should include the same scope predicate and return `404` when the resource is outside that scope.
+- Route/resource authorization must validate requested scope before returning scoped tenant data or applying a state transition.
 - Account read APIs use `accounts.read` and must remain scope-filtered for non-`SystemAdmin` callers. Account mutation APIs use `accounts.manage` and remain `SystemAdmin` only.
 - `GET /management/accounts/{accountId}/effective-access` uses `accounts.read` and returns the target account's active role scopes plus the effective ids used by current scoped authorization rules.
 - Effective access does not expand organization scope into store/kiosk ids. Use GraphQL `tenantTree` or REST `role-scope-options` for UI tree display.

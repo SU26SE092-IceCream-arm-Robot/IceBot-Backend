@@ -30,7 +30,7 @@ public sealed class CreateKioskCommandHandler
             return ApiResult<KioskResult>.Fail("Store not found.", 404);
         }
 
-        if (!KioskAccessRules.CanManageStoreKiosks(userContext, store))
+        if (!KioskAccessRules.CanManageStoreKiosks(ScopeRoleSets.KiosksManage, userContext, store))
         {
             return ApiResult<KioskResult>.Fail("Access denied.", 403);
         }

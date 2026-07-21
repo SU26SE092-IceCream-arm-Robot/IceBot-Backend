@@ -61,6 +61,74 @@ public sealed class ExecutionReportIngestionTests
     }
 
     [Fact]
+    public async Task HandleAsync_RejectsStockEvidenceForDifferentOrderItem()
+    {
+        var unitOfWork = Substitute.For<IExecutionReportUnitOfWork>();
+        var handler = new IngestExecutionReportCommandHandler(
+            unitOfWork,
+            Substitute.For<IRealtimeNotificationPublisher>(),
+            Options.Create(new ExecutionReportIngestionOptions()));
+        var reportedOrderItemId = Guid.NewGuid();
+
+        var result = await handler.HandleAsync(new IngestExecutionReportCommand
+        {
+            KioskId = Guid.NewGuid(),
+            EndpointId = Guid.NewGuid(),
+            CommandId = Guid.NewGuid(),
+            SourceEventId = Guid.NewGuid(),
+            SequenceNumber = 1,
+            EdgeCreatedAt = DateTimeOffset.UtcNow,
+            ReportType = "ProductionExecution",
+            Status = "Running",
+            SourceProductionJobId = Guid.NewGuid(),
+            OrderItemId = reportedOrderItemId,
+            ProductionUnitNo = 1,
+            ProductionUnitQuantity = 1,
+            StockMovements =
+            [
+                new StockMovementEvidenceInput(
+                    Guid.NewGuid(), Guid.NewGuid(), 1, null, DateTimeOffset.UtcNow, true, Guid.NewGuid())
+            ]
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "Stock movement evidence must belong to the reported production-job order item.",
+            result.Message);
+        await unitOfWork.DidNotReceive().GetEndpointForReportAuthAsync(
+            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_RejectsFailedProductionReportWithoutPhysicalOutputEvidence()
+    {
+        var unitOfWork = Substitute.For<IExecutionReportUnitOfWork>();
+        var handler = new IngestExecutionReportCommandHandler(
+            unitOfWork,
+            Substitute.For<IRealtimeNotificationPublisher>(),
+            Options.Create(new ExecutionReportIngestionOptions()));
+
+        var result = await handler.HandleAsync(new IngestExecutionReportCommand
+        {
+            KioskId = Guid.NewGuid(),
+            EndpointId = Guid.NewGuid(),
+            CommandId = Guid.NewGuid(),
+            SourceEventId = Guid.NewGuid(),
+            SequenceNumber = 1,
+            EdgeCreatedAt = DateTimeOffset.UtcNow,
+            ReportType = "ProductionExecution",
+            Status = "Failed"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "Failed production execution reports must state whether physical output may have occurred.",
+            result.Message);
+        await unitOfWork.DidNotReceive().GetEndpointForReportAuthAsync(
+            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task HandleAsync_RejectsProductionReleaseThatDiffersFromAcceptedCommandPayload()
     {
         var now = DateTimeOffset.UtcNow;
@@ -120,6 +188,70 @@ public sealed class ExecutionReportIngestionTests
         await receiptStore.DidNotReceive().AddProductionExecutionRecordAsync(
             Arg.Any<Domain.ProductionExecution.Projections.ProductionExecutionRecord>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_RejectsActiveArtifactSetThatDiffersFromAcceptedCommandPayload()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var kioskId = Guid.NewGuid();
+        var endpoint = ActiveFullEdgeEndpoint(kioskId);
+        var releaseId = Guid.NewGuid();
+        var releaseChecksum = new string('a', 64);
+        var edgeCommand = EdgeCommand.Create(
+            EdgeCommandType.ExecuteOrder,
+            kioskId,
+            endpoint.Id,
+            JsonSerializer.Serialize(new
+            {
+                ConfigurationReleaseId = releaseId,
+                ReleaseChecksum = releaseChecksum,
+                ActiveSetVersion = 7,
+                ActiveSetChecksum = new string('b', 64)
+            }),
+            now,
+            Guid.NewGuid(),
+            1,
+            now.AddMinutes(30));
+        edgeCommand.Id = Guid.NewGuid();
+        edgeCommand.RecordDeliveryAttempt(1, now, EdgeCommandDeliveryOutcome.Sent);
+        edgeCommand.Accept(now);
+
+        var unitOfWork = Substitute.For<IExecutionReportUnitOfWork>();
+        unitOfWork.GetEndpointForReportAuthAsync(endpoint.Id, Arg.Any<CancellationToken>()).Returns(endpoint);
+        unitOfWork.ExecuteReportIngestionAsync(
+                Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(),
+                Arg.Any<Func<CancellationToken, Task<ApiResult<ExecutionReportIngestResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<ExecutionReportIngestResult>>>>()(
+                CancellationToken.None));
+        unitOfWork.GetCommandAsync(edgeCommand.Id, Arg.Any<CancellationToken>()).Returns(edgeCommand);
+        var handler = new IngestExecutionReportCommandHandler(
+            unitOfWork,
+            Substitute.For<IRealtimeNotificationPublisher>(),
+            Options.Create(new ExecutionReportIngestionOptions()));
+
+        var result = await handler.HandleAsync(new IngestExecutionReportCommand
+        {
+            KioskId = kioskId,
+            EndpointId = endpoint.Id,
+            CommandId = edgeCommand.Id,
+            SourceEventId = Guid.NewGuid(),
+            SequenceNumber = 1,
+            EdgeCreatedAt = now,
+            ReportType = "ProductionExecution",
+            Status = "Running",
+            SourceConfigurationReleaseId = releaseId,
+            ReleaseChecksum = releaseChecksum,
+            ActiveSetVersion = 8,
+            ActiveSetChecksum = new string('b', 64)
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Equal(
+            "Production execution report active artifact set does not match the dispatched command.",
+            result.Message);
     }
 
     [Fact]

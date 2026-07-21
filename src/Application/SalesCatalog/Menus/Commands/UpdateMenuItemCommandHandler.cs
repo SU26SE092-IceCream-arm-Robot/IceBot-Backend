@@ -4,6 +4,7 @@ using Application.SalesCatalog.Menus.Results;
 using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
+using Application.Shared.Concurrency;
 using Domain.Catalog.Entities;
 
 namespace Application.SalesCatalog.Menus.Commands;
@@ -11,10 +12,14 @@ namespace Application.SalesCatalog.Menus.Commands;
 public sealed class UpdateMenuItemCommandHandler
 {
     private readonly IMenuStore _menus;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
-    public UpdateMenuItemCommandHandler(IMenuStore menus)
+    public UpdateMenuItemCommandHandler(
+        IMenuStore menus,
+        ITechnicalResourceMutationCoordinator mutations)
     {
         _menus = menus;
+        _mutations = mutations;
     }
 
     public async Task<ApiResult<MenuItemResult>> HandleAsync(
@@ -24,7 +29,6 @@ public sealed class UpdateMenuItemCommandHandler
         var menuId = command.MenuId;
         var menuItemId = command.MenuItemId;
         var request = command.Request;
-        var updatedByAccountId = command.UpdatedByAccountId;
 
         var menu = await _menus.GetMenuByIdAsync(menuId, cancellationToken: cancellationToken);
         if (menu is null)
@@ -50,8 +54,31 @@ public sealed class UpdateMenuItemCommandHandler
         {
             return ApiResult<MenuItemResult>.Fail("Product variant does not exist.", 400);
         }
+
+        var productLocks = new[] { item.ProductId, productVariant.ProductId }
+            .Distinct()
+            .Select(TechnicalResourceMutationIdentity.Product)
+            .ToArray();
+        return await _mutations.ExecuteAsync(
+            productLocks,
+            ct => UpdateLockedAsync(command, menu, item, productVariant, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<MenuItemResult>> UpdateLockedAsync(
+        UpdateMenuItemCommand command,
+        Domain.SalesCatalog.Entities.Menu menu,
+        Domain.SalesCatalog.Entities.MenuItem item,
+        ProductVariant productVariant,
+        CancellationToken cancellationToken)
+    {
+        var request = command.Request;
+        var updatedByAccountId = command.UpdatedByAccountId;
+        var menuId = command.MenuId;
         var newProductId = productVariant.ProductId;
-        var newRecipeId = request.RecipeId ?? item.RecipeId;
+        if (request.ClearRecipe && request.RecipeId.HasValue)
+            return ApiResult<MenuItemResult>.Fail("RecipeId and ClearRecipe cannot be supplied together.");
+        var newRecipeId = request.ClearRecipe ? null : request.RecipeId ?? item.RecipeId;
         var newCode = string.IsNullOrWhiteSpace(request.Code) ? item.Code : MenuNormalizer.NormalizeCode(request.Code);
         var newDisplayName = string.IsNullOrWhiteSpace(request.DisplayName) ? item.DisplayName : request.DisplayName;
         var newPrice = request.Price ?? item.Price;
@@ -66,7 +93,7 @@ public sealed class UpdateMenuItemCommandHandler
             menuId,
             command.Scope.OrganizationId,
             newProductId,
-            newProductVariantId,
+            productVariant.Id,
             newRecipeId,
             newCode,
             newDisplayName,
@@ -102,7 +129,7 @@ public sealed class UpdateMenuItemCommandHandler
         }
 
         item.ProductId = newProductId;
-        item.ProductVariantId = newProductVariantId;
+        item.ProductVariantId = productVariant.Id;
         item.RecipeId = newRecipeId;
         item.Code = newCode;
         item.DisplayName = newDisplayName.Trim();

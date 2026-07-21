@@ -17,6 +17,7 @@ public static class EdgeIntegrationModule
         services.AddScoped<AcknowledgeEdgeCommandCommandHandler>();
         services.AddScoped<IngestExecutionReportCommandHandler>();
         services.AddScoped<DispatchOrderExecutionCommandHandler>();
+        services.AddScoped<EscalateInitialDispatchFailureCommandHandler>();
         services.AddScoped<ReconcileOrderExecutionTimeoutCommandHandler>();
         services.AddScoped<ArtifactCommandPayloadEnricher>();
 

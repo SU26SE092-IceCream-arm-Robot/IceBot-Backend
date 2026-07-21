@@ -9,6 +9,8 @@ public sealed record TechnicalResourceMutationIdentity(string ResourceType, stri
     public static TechnicalResourceMutationIdentity Artifact(Guid id) => Resource("RobotArtifact", id);
     public static TechnicalResourceMutationIdentity Template(Guid id) => Resource("RobotArtifactTemplate", id);
     public static TechnicalResourceMutationIdentity Program(Guid id) => Resource("RobotProgram", id);
+    public static TechnicalResourceMutationIdentity Product(Guid id) => Resource("Product", id);
+    public static TechnicalResourceMutationIdentity Menu(Guid id) => Resource("Menu", id);
     public static TechnicalResourceMutationIdentity PackageInstallation(Guid id) =>
         Resource("ProductionPackageInstallation", id);
 

@@ -261,6 +261,17 @@ public partial class Order : BusinessEntity, IStoreScoped
         Notes = notes ?? Notes;
     }
 
+    public void MarkOverpaymentRefundRequired(string? notes = null)
+    {
+        if (PaymentStatus != PaymentStatus.Paid || PaidAmount <= TotalAmount)
+        {
+            throw new DomainRuleException("Only an overpaid order can require an overpayment refund.");
+        }
+
+        Status = OrderStatus.RefundRequired;
+        Notes = notes ?? Notes;
+    }
+
     public void MarkFulfillmentIssue(string? notes = null)
     {
         if (PaymentStatus != PaymentStatus.Paid)

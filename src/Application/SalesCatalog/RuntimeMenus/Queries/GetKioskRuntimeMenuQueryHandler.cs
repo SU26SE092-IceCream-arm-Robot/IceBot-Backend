@@ -6,6 +6,7 @@ using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
 using Application.Tenants.Stores;
 using Application.SalesCatalog.Rules;
+using Application.SalesCatalog.RuntimeMenus.Support;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
 
@@ -133,6 +134,7 @@ public sealed class GetKioskRuntimeMenuQueryHandler
         var result = new RuntimeMenuResult
         {
             SnapshotId = Guid.CreateVersion7(),
+            Revision = RuntimeMenuRevision.Compute(kiosk.Id, items),
             KioskId = kiosk.Id,
             GeneratedAt = now,
             ExpiresAt = now.Add(SnapshotTtl),

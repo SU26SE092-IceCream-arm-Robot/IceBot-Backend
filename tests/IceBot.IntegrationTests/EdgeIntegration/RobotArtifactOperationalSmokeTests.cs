@@ -997,6 +997,14 @@ public sealed class RobotArtifactOperationalSmokeTests
 
         var productionJobId = Guid.NewGuid();
         var stockEvidenceEventId = Guid.NewGuid();
+        OrderItemStatus jobItemStatusBefore;
+        await using (var beforeJobContext = _fixture.CreateDbContext())
+        {
+            jobItemStatusBefore = await beforeJobContext.OrderItems
+                .Where(item => item.OrderId == orderId)
+                .Select(item => item.Status)
+                .SingleAsync();
+        }
         await ReportProductionAsync(
             graph,
             command.Id,
@@ -1011,6 +1019,12 @@ public sealed class RobotArtifactOperationalSmokeTests
             Assert.Equal(
                 OrderStatus.Accepted,
                 (await jobLevelAssertionContext.Orders.SingleAsync(x => x.Id == orderId)).Status);
+            Assert.Equal(
+                jobItemStatusBefore,
+                await jobLevelAssertionContext.OrderItems
+                    .Where(item => item.OrderId == orderId)
+                    .Select(item => item.Status)
+                    .SingleAsync());
         }
         await ReportProductionAsync(
             graph,
@@ -1034,7 +1048,14 @@ public sealed class RobotArtifactOperationalSmokeTests
             Assert.Equal(OrderStatus.Completed, (await completedContext.Orders.SingleAsync(x => x.Id == orderId)).Status);
             var movement = await completedContext.StockMovements.SingleAsync(x => x.SourceEventId == stockEvidenceEventId);
             Assert.Equal(-10, movement.Quantity);
-            Assert.Equal(orderId, movement.ReferenceId);
+            Assert.Equal("OrderItem", movement.ReferenceType);
+            Assert.Equal(
+                await completedContext.OrderItems
+                    .Where(item => item.OrderId == orderId)
+                    .Select(item => (Guid?)item.Id)
+                    .SingleAsync(),
+                movement.ReferenceId);
+            Assert.Equal(orderId, movement.CorrelationId);
             Assert.Equal(90, (await completedContext.IngredientDispenserStates
                 .SingleAsync(x => x.Id == graph.DispenserStateId)).EstimatedQuantity);
         }

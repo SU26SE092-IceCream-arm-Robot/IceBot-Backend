@@ -186,6 +186,13 @@ public sealed class IngestExecutionReportCommandHandler
                 cancellationToken);
         }
 
+        if (notifications.OrderExecutionObservationChanged is not null)
+        {
+            await _publisher.PublishOrderExecutionObservationChangedAsync(
+                notifications.OrderExecutionObservationChanged,
+                cancellationToken);
+        }
+
         foreach (var itemEvent in notifications.OrderItemFulfillmentChanged)
         {
             await _publisher.PublishOrderItemFulfillmentChangedAsync(itemEvent, cancellationToken);

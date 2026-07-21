@@ -12,30 +12,6 @@ namespace Application.EdgeIntegration.Reports.Services;
 
 internal static class OrderItemExecutionLifecycleApplier
 {
-    public static async Task ApplyJobReportAsync(
-        IExecutionReportUnitOfWork store,
-        ExecutionReportProcessingContext context,
-        ProductionExecutionStatus status,
-        CancellationToken cancellationToken)
-    {
-        var command = context.Command;
-        var order = await GetOrderAsync(store, context, cancellationToken);
-        var payload = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(context.EdgeCommand.PayloadJson);
-        var line = payload.OrderLines.SingleOrDefault(candidate => candidate.OrderItemId == command.OrderItemId)
-            ?? throw new DomainRuleException("Production job order item is not present in the dispatched command.");
-        if (command.ProductionUnitNo!.Value + command.ProductionUnitQuantity!.Value - 1 > line.Quantity)
-            throw new DomainRuleException("Production job unit range exceeds the dispatched order-line quantity.");
-
-        var item = order.OrderItems.Single(candidate => candidate.Id == line.OrderItemId);
-        EnsureMachineProduced(item);
-        var previousItemStatus = item.Status;
-        var previousOrderStatus = order.Status;
-        ApplyItemStatus(item, status, completeItem:
-            command.ProductionUnitNo == 1 && command.ProductionUnitQuantity == line.Quantity);
-        await RecordChangesAsync(
-            store, context, order, item, previousItemStatus, previousOrderStatus, status, cancellationToken);
-    }
-
     public static async Task ApplyOrderSummaryAsync(
         IExecutionReportUnitOfWork store,
         ExecutionReportProcessingContext context,
@@ -43,6 +19,8 @@ internal static class OrderItemExecutionLifecycleApplier
         CancellationToken cancellationToken)
     {
         var order = await GetOrderAsync(store, context, cancellationToken);
+        if (IsFinalBusinessState(order.Status)) return;
+
         var payload = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(context.EdgeCommand.PayloadJson);
         var previousOrderStatus = order.Status;
         foreach (var line in payload.OrderLines)
@@ -92,11 +70,14 @@ internal static class OrderItemExecutionLifecycleApplier
                 if (item.Status == OrderItemStatus.Pending) item.MarkAccepted();
                 if (item.Status == OrderItemStatus.Accepted) item.MarkPreparing();
                 break;
-            case ProductionExecutionStatus.Completed when completeItem && item.Status != OrderItemStatus.Completed:
+            case ProductionExecutionStatus.Completed when completeItem &&
+                item.Status is OrderItemStatus.Pending or OrderItemStatus.Accepted or OrderItemStatus.Preparing:
                 if (item.Status == OrderItemStatus.Pending) item.MarkAccepted();
                 item.MarkCompleted(); break;
-            case ProductionExecutionStatus.Failed when item.Status is not (OrderItemStatus.Completed or OrderItemStatus.Failed):
-            case ProductionExecutionStatus.RequiresManualIntervention when item.Status is not (OrderItemStatus.Completed or OrderItemStatus.Failed):
+            case ProductionExecutionStatus.Failed when item.Status is not (
+                OrderItemStatus.Completed or OrderItemStatus.Cancelled or OrderItemStatus.Failed):
+            case ProductionExecutionStatus.RequiresManualIntervention when item.Status is not (
+                OrderItemStatus.Completed or OrderItemStatus.Cancelled or OrderItemStatus.Failed):
                 item.MarkFailed(); break;
         }
     }
@@ -106,34 +87,6 @@ internal static class OrderItemExecutionLifecycleApplier
         if (item.FulfillmentType != FulfillmentType.MachineProduced)
             throw new DomainRuleException(
                 "Production execution reports apply only to machine-produced order items.");
-    }
-
-    private static async Task RecordChangesAsync(
-        IExecutionReportUnitOfWork store,
-        ExecutionReportProcessingContext context,
-        Order order,
-        OrderItem item,
-        OrderItemStatus previousItemStatus,
-        OrderStatus previousOrderStatus,
-        ProductionExecutionStatus status,
-        CancellationToken cancellationToken)
-    {
-        if (item.Status != previousItemStatus)
-        {
-            await store.AddOrderItemStatusHistoryAsync(new OrderItemStatusHistory
-            {
-                OrderItemId = item.Id,
-                SourceEventId = context.Command.SourceEventId,
-                FromStatus = previousItemStatus,
-                ToStatus = item.Status,
-                ChangedAt = context.ExecutorReportedAt,
-                Reason = $"Production job report: {status}."
-            }, cancellationToken);
-            QueueItemChangedNotification(context, order, item, previousItemStatus);
-        }
-
-        OrderFulfillmentAggregator.Apply(order, context.ExecutorReportedAt, context.Command.ErrorMessage);
-        await RecordOrderChangeAsync(store, context, order, previousOrderStatus, status, cancellationToken);
     }
 
     private static async Task RecordOrderChangeAsync(
@@ -188,4 +141,14 @@ internal static class OrderItemExecutionLifecycleApplier
             Version = 1
         });
     }
+
+    private static bool IsFinalBusinessState(OrderStatus status) => status is
+        OrderStatus.Completed or
+        OrderStatus.Cancelled or
+        OrderStatus.Failed or
+        OrderStatus.ExecutionRejected or
+        OrderStatus.RefundRequired or
+        OrderStatus.Refunded or
+        OrderStatus.Compensated or
+        OrderStatus.FulfillmentIssue;
 }

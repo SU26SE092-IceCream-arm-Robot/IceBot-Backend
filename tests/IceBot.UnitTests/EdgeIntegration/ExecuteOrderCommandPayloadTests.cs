@@ -96,4 +96,70 @@ public sealed class ExecuteOrderCommandPayloadTests
         Assert.Equal(payload.CommandId, restored.CommandId);
         Assert.Single(restored.OrderLines);
     }
+
+    [Fact]
+    public void FullPayload_RejectsIncompleteActiveArtifactSetProvenance()
+    {
+        var payload = CreateValidPayload() with
+        {
+            ActiveSetVersion = 7,
+            ActiveSetChecksum = null
+        };
+
+        var exception = Assert.Throws<DomainRuleException>(() =>
+            ExecuteOrderCommandPayloadCodec.Serialize(payload));
+
+        Assert.Equal(
+            "Execute-order command payload has incomplete active artifact-set provenance.",
+            exception.Message);
+    }
+
+    private static ExecuteOrderCommandPayload CreateValidPayload() => new()
+    {
+        CommandId = Guid.NewGuid(),
+        DispatchAttemptNo = 1,
+        OrderId = Guid.NewGuid(),
+        OrderNumber = "ORDER-2",
+        KioskId = Guid.NewGuid(),
+        TargetExecutionEndpointId = Guid.NewGuid(),
+        ExecutionProfile = "LowCostController",
+        ConfigurationReleaseId = Guid.NewGuid(),
+        ReleaseChecksum = "release-checksum",
+        ReleaseManifestSchemaVersion = 1,
+        ManifestJson = "{}",
+        CommandExpiryAt = DateTimeOffset.UtcNow.AddMinutes(5),
+        OrderLines =
+        [
+            new ExecuteOrderLinePayload
+            {
+                OrderItemId = Guid.NewGuid(),
+                ProductId = Guid.NewGuid(),
+                ProductVariantId = Guid.NewGuid(),
+                Quantity = 1,
+                ProductCodeSnapshot = "P",
+                ProductVariantCodeSnapshot = "V",
+                RecipeSnapshotSchemaVersion = 1,
+                ExecutionRouteId = Guid.NewGuid(),
+                RouteCode = "ROUTE",
+                RobotPrograms =
+                [
+                    new ExecuteOrderRobotProgramPayload
+                    {
+                        BindingOrder = 1,
+                        RobotProgramId = Guid.NewGuid(),
+                        ProgramManifestChecksum = "program-checksum",
+                        Artifacts =
+                        [
+                            new ExecuteOrderArtifactPayload
+                            {
+                                RobotArtifactId = Guid.NewGuid(),
+                                RunOrder = 1,
+                                ArtifactChecksum = "artifact-checksum"
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    };
 }

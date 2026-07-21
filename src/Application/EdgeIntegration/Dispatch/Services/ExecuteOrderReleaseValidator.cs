@@ -21,5 +21,9 @@ internal static class ExecuteOrderReleaseValidator
         if (command.SourceConfigurationReleaseId.Value != provenance.ConfigurationReleaseId ||
             !string.Equals(command.ReleaseChecksum.Trim(), provenance.ReleaseChecksum, StringComparison.Ordinal))
             throw new DomainRuleException("Production execution report release does not match the dispatched command.");
+
+        if (command.ActiveSetVersion != provenance.ActiveSetVersion ||
+            !string.Equals(command.ActiveSetChecksum, provenance.ActiveSetChecksum, StringComparison.Ordinal))
+            throw new DomainRuleException("Production execution report active artifact set does not match the dispatched command.");
     }
 }

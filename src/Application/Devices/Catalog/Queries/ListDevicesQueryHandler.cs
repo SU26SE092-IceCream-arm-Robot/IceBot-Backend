@@ -13,6 +13,7 @@ using Application.Devices.Connectivity.Results;
 using Application.Devices.Credentials.Results;
 using Application.Shared.Wrappers;
 using Domain.Devices.Catalog;
+using Application.Tenants;
 
 namespace Application.Devices.Catalog.Queries;
 
@@ -35,6 +36,7 @@ public sealed class ListDevicesQueryHandler
         var kioskId = query.KioskId;
         var status = query.Status;
         var search = query.Search;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.DevicesView, userContext);
 
         if (!string.IsNullOrWhiteSpace(status))
         {
@@ -59,9 +61,9 @@ public sealed class ListDevicesQueryHandler
         else
         {
             list = await _deviceStore.ListAccessibleAsync(
-                userContext.AllowedOrganizationIds,
-                userContext.AllowedStoreIds,
-                userContext.AllowedKioskIds,
+                scope.OrganizationIds,
+                scope.StoreIds,
+                scope.KioskIds,
                 organizationId,
                 storeId,
                 kioskId,

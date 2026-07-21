@@ -53,6 +53,13 @@ public interface IOrderStore
         CancellationToken cancellationToken = default);
 
     Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default);
+    Task<Order?> GetManagementOrderByIdAsync(
+        Guid orderId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default);
 
     Task<int> CountOrdersAsync(
         string? search,
@@ -157,4 +164,8 @@ public interface IOrderStore
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
+
+    Task<T> ExecuteCheckoutTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
 }

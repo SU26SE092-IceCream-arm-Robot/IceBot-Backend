@@ -1,6 +1,7 @@
 using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.CommandDelivery.Commands;
 using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Dispatch.Contracts;
 using Application.EdgeIntegration.Dispatch.Services;
 using Application.EdgeIntegration.Reports.Commands;
 using Application.EdgeIntegration.Timeouts.Commands;
@@ -27,23 +28,22 @@ internal static class ProductionExecutionReportApplier
             throw new DomainRuleException("Production execution reports require an execute-order command.");
 
         ExecuteOrderReleaseValidator.Validate(command, edgeCommand);
+        if (command.SourceProductionJobId.HasValue)
+            ValidateProductionJobAgainstCommand(command, edgeCommand.PayloadJson);
         var status = ExecutionReportStatusMapper.ParseProductionStatus(command.Status);
         var physicalOutputState = ExecutionReportStatusMapper.ToPhysicalOutputState(command.PhysicalOutputMayHaveOccurred);
         var productionApplied = await ApplyProductionRecordAsync(
             unitOfWork, context, status, physicalOutputState, cancellationToken);
-        if (command.SourceProductionJobId.HasValue)
-            await OrderItemExecutionLifecycleApplier.ApplyJobReportAsync(
-                unitOfWork, context, status, cancellationToken);
         var orderApplied = !command.SourceProductionJobId.HasValue && await ApplyOrderRecordAsync(
             unitOfWork, context, status, cancellationToken);
 
         if (orderApplied)
             await OrderExecutionLifecycleApplier.ApplyAsync(
                 unitOfWork, context, status, cancellationToken);
-        if (productionApplied && command.StockMovements.Count > 0)
+        var stockApplied = command.StockMovements.Count > 0 &&
             await ExecutionStockEvidenceApplier.ApplyAsync(
                 unitOfWork, context, cancellationToken);
-        return productionApplied || orderApplied;
+        return productionApplied || orderApplied || stockApplied;
     }
 
     private static async Task<bool> ApplyProductionRecordAsync(
@@ -73,17 +73,30 @@ internal static class ProductionExecutionReportApplier
             return true;
         }
 
-        if (record.OrderItemId != command.OrderItemId!.Value ||
-            record.ProductionUnitNo != command.ProductionUnitNo!.Value ||
-            record.ProductionUnitQuantity != command.ProductionUnitQuantity!.Value)
-        {
-            throw new DomainRuleException(
-                "Production execution report unit identity does not match the first report for this source job.");
-        }
+        record.EnsureSameProvenance(
+            command.OrderItemId!.Value,
+            command.ProductionUnitNo!.Value,
+            command.ProductionUnitQuantity!.Value,
+            command.WorkcellId,
+            command.ControllerId,
+            command.ExecutionPlanChecksum,
+            command.ActiveSetVersion,
+            command.ActiveSetChecksum);
 
         return record.ApplyObservation(
             command.SourceEventId, command.SequenceNumber, command.EdgeCreatedAt, context.ExecutorReportedAt,
             context.CloudReceivedAt, status, physicalOutputState, command.ErrorCode, command.ErrorMessage);
+    }
+
+    private static void ValidateProductionJobAgainstCommand(
+        IngestExecutionReportCommand command,
+        string payloadJson)
+    {
+        var payload = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(payloadJson);
+        var line = payload.OrderLines.SingleOrDefault(candidate => candidate.OrderItemId == command.OrderItemId)
+            ?? throw new DomainRuleException("Production job order item is not present in the dispatched command.");
+        if ((long)command.ProductionUnitNo!.Value + command.ProductionUnitQuantity!.Value - 1 > line.Quantity)
+            throw new DomainRuleException("Production job unit range exceeds the dispatched order-line quantity.");
     }
 
     private static async Task<bool> ApplyOrderRecordAsync(

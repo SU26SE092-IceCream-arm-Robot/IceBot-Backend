@@ -222,6 +222,8 @@ public sealed class MenuStore : IMenuStore
     {
         return _dbContext.Recipes
             .AsNoTracking()
+            .Include(recipe => recipe.RecipeItems)
+                .ThenInclude(item => item.Ingredient)
             .FirstOrDefaultAsync(recipe => recipe.Id == recipeId, cancellationToken);
     }
 

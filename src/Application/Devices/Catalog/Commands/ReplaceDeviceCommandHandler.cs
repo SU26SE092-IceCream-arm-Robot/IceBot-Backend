@@ -1,4 +1,5 @@
 using Application.Devices.Catalog.Abstractions;
+using Application.Tenants;
 using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Connectivity.Abstractions;
@@ -45,7 +46,7 @@ public sealed class ReplaceDeviceCommandHandler(
         {
             return ApiResult<DeviceReplacementResult>.Fail("Replacement device must differ from the source device.", 400);
         }
-        if (!KioskAccessRules.CanAccessKiosk(command.UserContext, source.Kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesManage, command.UserContext, source.Kiosk))
         {
             return ApiResult<DeviceReplacementResult>.Fail("Access denied.", 403);
         }

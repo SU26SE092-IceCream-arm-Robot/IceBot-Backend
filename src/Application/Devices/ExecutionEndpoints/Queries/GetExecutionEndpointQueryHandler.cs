@@ -2,6 +2,7 @@ using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.ExecutionEndpoints.Mapping;
 using Application.Devices.ExecutionEndpoints.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Application.Tenants.Kiosks;
 
 namespace Application.Devices.ExecutionEndpoints.Queries;
@@ -15,7 +16,7 @@ public sealed class GetExecutionEndpointQueryHandler
     {
         var endpoint = await _store.GetByKioskIdAsync(query.KioskId, query.EndpointId, cancellationToken);
         if (endpoint is null) return ApiResult<ExecutionEndpointResult>.Fail("Execution endpoint not found.", 404);
-        if (!KioskAccessRules.CanAccessKiosk(query.UserContext, endpoint.Kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesView, query.UserContext, endpoint.Kiosk))
             return ApiResult<ExecutionEndpointResult>.Fail("Access denied.", 403);
         var readiness = (await _store.ListReadinessAsync([endpoint.Id], cancellationToken)).SingleOrDefault();
         return ApiResult<ExecutionEndpointResult>.Success(ExecutionEndpointResultMapper.ToResult(endpoint, readiness));

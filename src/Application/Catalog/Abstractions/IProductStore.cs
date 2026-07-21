@@ -89,6 +89,10 @@ public interface IProductStore
 
     Task<bool> IsProductOptionReferencedByMenuItemsAsync(Guid productOptionId, CancellationToken cancellationToken = default);
 
+    Task<bool> IsProductReferencedByMenuItemsAsync(Guid productId, CancellationToken cancellationToken = default);
+
+    Task<bool> IsProductVariantReferencedByMenuItemsAsync(Guid productVariantId, CancellationToken cancellationToken = default);
+
     Task<List<Ingredient>> ListIngredientsByIdsAsync(IReadOnlyCollection<Guid> ingredientIds, CancellationToken cancellationToken = default);
 
     Task<bool> ProductCategoryExistsAsync(long categoryId, CancellationToken cancellationToken = default);

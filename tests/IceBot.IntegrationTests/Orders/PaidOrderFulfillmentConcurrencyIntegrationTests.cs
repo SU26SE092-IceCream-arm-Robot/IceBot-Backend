@@ -130,6 +130,24 @@ public sealed class PaidOrderFulfillmentConcurrencyIntegrationTests(IntegrationT
         Assert.Contains(rows, row => row.OrderItemId == seeded.ManualItemId);
     }
 
+    [IntegrationFact]
+    public async Task DefaultFulfillmentQueue_ExcludesRefundRequiredOrders()
+    {
+        var seeded = await SeedMixedPaidOrderAsync();
+        await using (var mutation = fixture.CreateDbContext())
+        {
+            var order = await mutation.Orders.SingleAsync(candidate => candidate.Id == seeded.OrderId);
+            order.MarkRefundRequired("Payment intervention required.");
+            await mutation.SaveChangesAsync();
+        }
+
+        await using var db = fixture.CreateDbContext();
+        var rows = await new OrderFulfillmentReadStore(db).ListQueueItemsAsync(
+            null, null, null, null, null, false, true, [], [], [], 1, 500);
+
+        Assert.DoesNotContain(rows, row => row.OrderId == seeded.OrderId);
+    }
+
     private async Task<SeededOrder> SeedMixedPaidOrderAsync(bool failPackagedItem = false)
     {
         await using var db = fixture.CreateDbContext();

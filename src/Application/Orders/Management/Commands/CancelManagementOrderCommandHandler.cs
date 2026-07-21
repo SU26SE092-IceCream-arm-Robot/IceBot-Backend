@@ -27,26 +27,20 @@ public sealed class CancelManagementOrderCommandHandler
     {
         OrderStatus fromStatus = OrderStatus.Draft;
         OrderStatusChangedEvent? statusChangedEvent = null;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, command.UserContext);
 
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
             await _orderStore.AcquireOrderWorkflowLockAsync(command.OrderId, ct);
-            var order = await _orderStore.GetOrderByIdAsync(command.OrderId, ct);
+            var order = await _orderStore.GetManagementOrderByIdAsync(
+                command.OrderId, command.UserContext.IsSystemAdmin,
+                scope.OrganizationIds, scope.StoreIds, scope.KioskIds, ct);
             if (order is null)
             {
                 return ApiResult<ManagementOrderDetailResult>.Fail("Order not found.", 404);
             }
 
             fromStatus = order.Status;
-
-            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersManage,
-                command.UserContext,
-                order.OrganizationId,
-                order.StoreId,
-                order.KioskId))
-            {
-                return ApiResult<ManagementOrderDetailResult>.Fail("Access denied.", 403);
-            }
 
             if (order.PaymentStatus == PaymentStatus.Paid)
             {

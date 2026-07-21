@@ -184,12 +184,15 @@ public sealed class PaymentStore : IPaymentStore
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task<bool> PaymentCallbackExistsAsync(string provider, string providerEventId, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.PaymentCallbacks.AnyAsync(
-            callback => callback.Provider == provider && callback.ProviderEventId == providerEventId,
-            cancellationToken);
-    }
+    public Task<PaymentCallback?> GetPaymentCallbackAsync(
+        string provider,
+        string providerEventId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.PaymentCallbacks.AsNoTracking()
+            .Include(callback => callback.PaymentTransaction)
+            .FirstOrDefaultAsync(
+                callback => callback.Provider == provider && callback.ProviderEventId == providerEventId,
+                cancellationToken);
 
     public async Task<IReadOnlyList<PaymentTransaction>> ListPaymentTransactionsByOrderIdAsync(
         Guid orderId,

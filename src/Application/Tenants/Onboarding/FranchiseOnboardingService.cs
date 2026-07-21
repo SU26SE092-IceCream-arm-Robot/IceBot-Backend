@@ -266,5 +266,5 @@ public sealed class FranchiseOnboardingService(
     }
 
     private static bool CanManage(CurrentUserContext user, Guid organizationId) =>
-        StoreAccessRules.CanManageOrganizationStores(user, organizationId);
+        StoreAccessRules.CanManageOrganizationStores(ScopeRoleSets.StoresManage, user, organizationId);
 }

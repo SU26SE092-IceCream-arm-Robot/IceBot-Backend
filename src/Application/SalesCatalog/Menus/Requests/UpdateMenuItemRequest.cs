@@ -6,6 +6,8 @@ public sealed class UpdateMenuItemRequest
 
     public Guid? RecipeId { get; set; }
 
+    public bool ClearRecipe { get; set; }
+
     public string? Code { get; set; }
 
     public string? DisplayName { get; set; }

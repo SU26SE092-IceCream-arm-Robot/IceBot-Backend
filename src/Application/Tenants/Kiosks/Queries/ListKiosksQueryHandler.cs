@@ -24,6 +24,7 @@ public sealed class ListKiosksQueryHandler
         var storeId = query.StoreId;
         var status = query.Status;
         var search = query.Search;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.KiosksView, userContext);
 
         KioskStatus? parsedStatus = null;
         if (!string.IsNullOrWhiteSpace(status))
@@ -45,9 +46,9 @@ public sealed class ListKiosksQueryHandler
         else
         {
             list = await _kioskStore.ListAccessibleAsync(
-                userContext.AllowedOrganizationIds,
-                userContext.AllowedStoreIds,
-                userContext.AllowedKioskIds,
+                scope.OrganizationIds,
+                scope.StoreIds,
+                scope.KioskIds,
                 organizationId,
                 storeId,
                 parsedStatus,

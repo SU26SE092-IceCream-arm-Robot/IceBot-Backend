@@ -110,6 +110,8 @@ public static class ExecuteOrderCommandPayloadCodec
                 ?? throw new DomainRuleException("Execute-order command payload is empty.");
             if (payload.ConfigurationReleaseId == Guid.Empty || string.IsNullOrWhiteSpace(payload.ReleaseChecksum))
                 throw new DomainRuleException("Execute-order command payload is missing release provenance.");
+            if (payload.ActiveSetVersion.HasValue != !string.IsNullOrWhiteSpace(payload.ActiveSetChecksum))
+                throw new DomainRuleException("Execute-order command payload has incomplete active artifact-set provenance.");
 
             return payload;
         }
@@ -138,6 +140,8 @@ public static class ExecuteOrderCommandPayloadCodec
     {
         if (payload.SchemaVersion != 2)
             throw new DomainRuleException("Execute-order command payload schema version is unsupported.");
+        if (payload.ActiveSetVersion.HasValue != !string.IsNullOrWhiteSpace(payload.ActiveSetChecksum))
+            throw new DomainRuleException("Execute-order command payload has incomplete active artifact-set provenance.");
         if (payload.CommandId == Guid.Empty || payload.DispatchAttemptNo <= 0 || payload.OrderId == Guid.Empty ||
             payload.KioskId == Guid.Empty || payload.TargetExecutionEndpointId == Guid.Empty ||
             string.IsNullOrWhiteSpace(payload.OrderNumber) || string.IsNullOrWhiteSpace(payload.ExecutionProfile) ||
@@ -169,4 +173,6 @@ public sealed record ExecuteOrderCommandProvenance
     public int SchemaVersion { get; init; }
     public Guid ConfigurationReleaseId { get; init; }
     public string ReleaseChecksum { get; init; } = string.Empty;
+    public long? ActiveSetVersion { get; init; }
+    public string? ActiveSetChecksum { get; init; }
 }

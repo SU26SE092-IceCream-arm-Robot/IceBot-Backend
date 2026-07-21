@@ -1,6 +1,7 @@
 using Application.Identity.InternalAccounts.Requests;
 using Application.Identity.Roles.Rules;
 using Application.Identity.Tokens.Claims;
+using Application.Tenants;
 using Domain.Tenants.Enums;
 
 namespace Application.Identity.InternalAccounts;
@@ -57,23 +58,25 @@ internal static class AccountRoleAssignmentRules
             return null;
         }
 
-        return selectedScope switch
+        var assigningRoles = userContext.RoleScopes
+            .Select(scope => scope.RoleCode)
+            .Where(roleCode => RoleCatalogRules.CanAssignRole(roleCode, targetRoleCode))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        if (assigningRoles.Length == 0)
         {
-            TenantScopeType.Organization => request.OrganizationId.HasValue &&
-                                            userContext.AllowedOrganizationIds.Contains(request.OrganizationId.Value)
-                ? null
-                : "Current account is not allowed to assign this organization scope.",
+            return "Current account is not allowed to assign this role.";
+        }
 
-            TenantScopeType.Store => IsStoreScopeAllowed(userContext, request)
-                ? null
-                : "Current account is not allowed to assign this store scope.",
-
-            TenantScopeType.Kiosk => IsKioskScopeAllowed(userContext, request)
-                ? null
-                : "Current account is not allowed to assign this kiosk scope.",
-
-            _ => "Unsupported role scope."
-        };
+        return ScopeAccessRules.CanAccessScopedRow(
+            assigningRoles,
+            userContext,
+            request.OrganizationId,
+            request.StoreId,
+            request.KioskId)
+            ? null
+            : $"Current account is not allowed to assign this {selectedScope.ToString().ToLowerInvariant()} scope.";
     }
 
     public static TenantScopeType ResolveSelectedScope(AccountRoleScopeRequest request)
@@ -93,34 +96,4 @@ internal static class AccountRoleAssignmentRules
             : TenantScopeType.Global;
     }
 
-    private static bool IsStoreScopeAllowed(
-        CurrentUserContext userContext,
-        AccountRoleScopeRequest request)
-    {
-        if (request.StoreId.HasValue && userContext.AllowedStoreIds.Contains(request.StoreId.Value))
-        {
-            return true;
-        }
-
-        return request.OrganizationId.HasValue &&
-               userContext.AllowedOrganizationIds.Contains(request.OrganizationId.Value);
-    }
-
-    private static bool IsKioskScopeAllowed(
-        CurrentUserContext userContext,
-        AccountRoleScopeRequest request)
-    {
-        if (request.KioskId.HasValue && userContext.AllowedKioskIds.Contains(request.KioskId.Value))
-        {
-            return true;
-        }
-
-        if (request.StoreId.HasValue && userContext.AllowedStoreIds.Contains(request.StoreId.Value))
-        {
-            return true;
-        }
-
-        return request.OrganizationId.HasValue &&
-               userContext.AllowedOrganizationIds.Contains(request.OrganizationId.Value);
-    }
 }

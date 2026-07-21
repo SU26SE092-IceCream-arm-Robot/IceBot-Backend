@@ -1,4 +1,5 @@
 using Application.Devices.Catalog.Abstractions;
+using Application.Tenants;
 using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Connectivity.Abstractions;
@@ -56,7 +57,7 @@ public sealed class RetireDeviceCommandHandler
             {
                 return ApiResult<DeviceResult>.Fail("Device kiosk is missing.", 400);
             }
-            if (!KioskAccessRules.CanAccessKiosk(userContext, device.Kiosk))
+            if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesManage, userContext, device.Kiosk))
             {
                 return ApiResult<DeviceResult>.Fail("Access denied.", 403);
             }

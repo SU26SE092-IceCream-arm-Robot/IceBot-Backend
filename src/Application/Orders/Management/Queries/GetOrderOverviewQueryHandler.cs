@@ -1,6 +1,7 @@
 using Application.Orders.Abstractions;
 using Application.Orders.Management.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.Orders.Management.Queries;
 
@@ -19,6 +20,7 @@ public sealed class GetOrderOverviewQueryHandler
     {
         var userContext = query.UserContext;
         var take = Math.Clamp(query.Take, 1, 50);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersView, userContext);
 
         var overview = await _orderStore.GetOrderOverviewAsync(
             query.From,
@@ -27,9 +29,9 @@ public sealed class GetOrderOverviewQueryHandler
             query.KioskId,
             take,
             userContext.IsSystemAdmin,
-            userContext.AllowedOrganizationIds,
-            userContext.AllowedStoreIds,
-            userContext.AllowedKioskIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             cancellationToken);
 
         return ApiResult<OrderOverviewResult>.Success(overview, "Order overview retrieved successfully.");

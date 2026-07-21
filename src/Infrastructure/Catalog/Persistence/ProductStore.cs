@@ -218,6 +218,16 @@ public sealed class ProductStore : IProductStore
         return _dbContext.MenuItemProductOptions.AnyAsync(membership => membership.ProductOptionId == productOptionId, cancellationToken);
     }
 
+    public Task<bool> IsProductReferencedByMenuItemsAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.MenuItems.AnyAsync(item => item.ProductId == productId, cancellationToken);
+
+    public Task<bool> IsProductVariantReferencedByMenuItemsAsync(
+        Guid productVariantId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.MenuItems.AnyAsync(item => item.ProductVariantId == productVariantId, cancellationToken);
+
     public Task<List<Ingredient>> ListIngredientsByIdsAsync(IReadOnlyCollection<Guid> ingredientIds, CancellationToken cancellationToken = default) =>
         _dbContext.Ingredients.Where(ingredient => ingredientIds.Contains(ingredient.Id)).ToListAsync(cancellationToken);
 

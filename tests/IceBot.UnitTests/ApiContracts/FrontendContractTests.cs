@@ -109,6 +109,7 @@ public sealed class FrontendContractTests
         Assert.Null(typeof(UpdateProductOptionRequest).GetProperty("IsAvailable"));
         Assert.Null(typeof(PlaceOrderItemRequest).GetProperty("OptionsJson"));
         Assert.NotNull(typeof(PlaceOrderItemRequest).GetProperty("SelectedOptions"));
+        Assert.NotNull(typeof(UpdateMenuItemRequest).GetProperty("ClearRecipe"));
     }
 
     [Fact]

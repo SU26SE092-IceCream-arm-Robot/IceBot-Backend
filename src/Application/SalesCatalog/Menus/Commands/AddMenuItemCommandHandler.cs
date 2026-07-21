@@ -4,6 +4,7 @@ using Application.SalesCatalog.Menus.Results;
 using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
+using Application.Shared.Concurrency;
 using Domain.SalesCatalog.Entities;
 
 namespace Application.SalesCatalog.Menus.Commands;
@@ -11,10 +12,14 @@ namespace Application.SalesCatalog.Menus.Commands;
 public sealed class AddMenuItemCommandHandler
 {
     private readonly IMenuStore _menus;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
-    public AddMenuItemCommandHandler(IMenuStore menus)
+    public AddMenuItemCommandHandler(
+        IMenuStore menus,
+        ITechnicalResourceMutationCoordinator mutations)
     {
         _menus = menus;
+        _mutations = mutations;
     }
 
     public async Task<ApiResult<MenuItemResult>> HandleAsync(
@@ -23,9 +28,8 @@ public sealed class AddMenuItemCommandHandler
     {
         var menuId = command.MenuId;
         var request = command.Request;
-        var createdByAccountId = command.CreatedByAccountId;
 
-        var menu = await _menus.GetMenuByIdAsync(menuId, asNoTracking: false, cancellationToken);
+        var menu = await _menus.GetMenuByIdAsync(menuId, asNoTracking: true, cancellationToken);
         if (menu is null)
         {
             return ApiResult<MenuItemResult>.Fail("Menu not found.", 404);
@@ -42,6 +46,28 @@ public sealed class AddMenuItemCommandHandler
         {
             return ApiResult<MenuItemResult>.Fail("Product variant does not exist.", 400);
         }
+
+        return await _mutations.ExecuteAsync(
+            [
+                TechnicalResourceMutationIdentity.Menu(menu.Id),
+                TechnicalResourceMutationIdentity.Product(productVariant.ProductId)
+            ],
+            ct => AddLockedAsync(command, productVariant, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<MenuItemResult>> AddLockedAsync(
+        AddMenuItemCommand command,
+        Domain.Catalog.Entities.ProductVariant productVariant,
+        CancellationToken cancellationToken)
+    {
+        var request = command.Request;
+        var createdByAccountId = command.CreatedByAccountId;
+        var menu = await _menus.GetMenuByIdAsync(command.MenuId, asNoTracking: false, cancellationToken);
+        if (menu is null)
+            return ApiResult<MenuItemResult>.Fail("Menu not found.", 404);
+        var accessError = MenuManagementCommandRules.ValidateExisting<MenuItemResult>(command.Scope, menu);
+        if (accessError is not null) return accessError;
 
         var validationError = await MenuItemRequestValidator.ValidateMenuItemFieldsAsync(
             _menus,

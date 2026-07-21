@@ -4,6 +4,8 @@ public sealed class RuntimeMenuResult
 {
     public Guid SnapshotId { get; set; }
 
+    public string Revision { get; set; } = null!;
+
     public Guid KioskId { get; set; }
 
     public DateTimeOffset GeneratedAt { get; set; }

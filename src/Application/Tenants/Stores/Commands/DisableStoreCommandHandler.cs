@@ -26,7 +26,8 @@ public sealed class DisableStoreCommandHandler
             return ApiResult<bool>.Fail("Store not found.", 404);
         }
 
-        if (!StoreAccessRules.CanManageOrganizationStores(userContext, store.OrganizationId))
+        if (!StoreAccessRules.CanManageOrganizationStores(
+                ScopeRoleSets.StoresManage, userContext, store.OrganizationId))
         {
             return ApiResult<bool>.Fail("Access denied.", 403);
         }

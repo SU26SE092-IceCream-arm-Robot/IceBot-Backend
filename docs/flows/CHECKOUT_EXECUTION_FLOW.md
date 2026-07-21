@@ -243,10 +243,10 @@ Check:
 3. Edge batches events for Cloud sync.
 4. Cloud ingests events through SyncEventInbox.
 5. Cloud deduplicates by eventId/source node.
-6. Job/unit reports carry `sourceProductionJobId`, `orderItemId`, `productionUnitNo`, and `productionUnitQuantity`; they update production evidence and only the identified machine-produced order line.
+6. Job/unit reports carry `sourceProductionJobId`, `orderItemId`, `productionUnitNo`, and `productionUnitQuantity`; they update `ProductionExecutionRecord` and optional stock evidence only. They never advance the business OrderItem or Order lifecycle.
 7. The Edge order-summary report (`sourceProductionJobId = null`) advances all dispatched machine-produced lines. The Order is then aggregated across every line, including manual and packaged fulfillment; it completes only when every order item is complete.
 8. Cloud appends OrderStatusHistory and typed stock-consumption evidence supplied by Edge.
-9. After commit, Cloud publishes OrderItemFulfillmentChanged for changed lines, OrderStatusChanged when the aggregate status changes, and InventoryChanged for stock evidence.
+9. After commit, Cloud publishes OrderItemFulfillmentChanged for changed lines, OrderStatusChanged when the aggregate status changes, OrderExecutionObservationChanged for an applied order summary, and InventoryChanged for stock evidence.
 10. Cloud returns accepted/duplicate/rejected result.
 ```
 
@@ -264,7 +264,7 @@ different authorities. Concurrent completion of Manual, Packaged, and
 MachineProduced lines must reload and aggregate the order under the same order lock;
 the last completing line transitions the order to `Completed` exactly once.
 
-Every production report must match the configuration release id and checksum embedded in its accepted execute-order command. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. A source production job is permanently bound to its first reported order item and production-unit range. Each stock-evidence item identifies its `OrderItemId`; Cloud validates the ingredient against that line's immutable recipe or option snapshot. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
+Every production report must match the configuration release id and checksum embedded in its accepted execute-order command; Low-cost reports must also match the active artifact-set version and checksum. Cloud rejects future-dated report/evidence timestamps beyond the configured clock-skew allowance. A source production job is permanently bound to the immutable provenance established by its first report: order item, production-unit range, workcell, controller, execution-plan checksum, and active artifact set. Each stock-evidence item identifies the same `OrderItemId` as the job report; Cloud validates the ingredient against that line's immutable recipe or option snapshot. Stock evidence uses its own globally unique event id, so concurrent job reports cannot consume the same evidence twice.
 
 ## Real-time Order & Payment Updates
 
@@ -272,7 +272,7 @@ During the checkout and execution flow, state changes (e.g. order placement, can
 - **`OrderStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when order status transitions.
 - **`OrderItemFulfillmentChanged`** is published to `order:{orderId}` and `kiosk:{kioskId}` when a manual, packaged, or machine-produced line changes status.
 - **`PaymentStatusChanged`** is published on `OrderHub` to group `order:{orderId}` when payment transaction status changes.
-- **`OrderExecutionObservationChanged`** is published on `OrderHub` when execution observation changes to `Delayed`, `PendingRecovery`, or `SupportRequired` without changing `Order.Status`.
+- **`OrderExecutionObservationChanged`** is published on `OrderHub` when an order-summary report refreshes execution observation or reconciliation changes it to `Delayed`, `PendingRecovery`, or `SupportRequired` without changing `Order.Status`.
 
 These events allow checkout UIs to automatically update payment success/failure screens or execution status without polling.
 
