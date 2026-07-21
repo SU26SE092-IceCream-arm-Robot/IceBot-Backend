@@ -2,6 +2,7 @@ using Application.Orders.Abstractions;
 using Application.Orders.Management.Mapping;
 using Application.Orders.Management.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.Orders.Management.Queries;
 
@@ -20,6 +21,7 @@ public sealed class ListManagementOrdersQueryHandler
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersView, query.UserContext);
 
         var totalCount = await _orderStore.CountOrdersAsync(
             query.Search,
@@ -29,9 +31,9 @@ public sealed class ListManagementOrdersQueryHandler
             query.StoreId,
             query.KioskId,
             query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             cancellationToken);
 
         var orders = await _orderStore.ListOrdersAsync(
@@ -42,9 +44,9 @@ public sealed class ListManagementOrdersQueryHandler
             query.StoreId,
             query.KioskId,
             query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             pageNumber,
             pageSize,
             cancellationToken);

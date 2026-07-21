@@ -1,4 +1,5 @@
 using Application.Devices.Catalog.Abstractions;
+using Application.Tenants;
 using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Connectivity.Abstractions;
@@ -40,7 +41,7 @@ public sealed class CreateDeviceCommandHandler
             return ApiResult<DeviceResult>.Fail("Kiosk not found.", 404);
         }
 
-        if (!KioskAccessRules.CanAccessKiosk(userContext, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesManage, userContext, kiosk))
         {
             return ApiResult<DeviceResult>.Fail("Access denied.", 403);
         }

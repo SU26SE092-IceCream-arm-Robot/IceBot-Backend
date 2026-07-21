@@ -1,4 +1,5 @@
 using Application.Devices.Catalog.Abstractions;
+using Application.Tenants;
 using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Connectivity.Abstractions;
@@ -48,7 +49,7 @@ public sealed class UpdateDeviceCommandHandler
         {
             return ApiResult<DeviceResult>.Fail("A retired device cannot be updated.", 409);
         }
-        if (!KioskAccessRules.CanAccessKiosk(userContext, device.Kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesManage, userContext, device.Kiosk))
         {
             return ApiResult<DeviceResult>.Fail("Access denied.", 403);
         }

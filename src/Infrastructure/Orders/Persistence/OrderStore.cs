@@ -12,6 +12,7 @@ using Domain.Tenants.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using System.Data;
 using Application.SalesCatalog.ReadModels;
 using Application.Orders.PlaceOrder.ReadModels;
 using Application.ProductionConfiguration.Routes.Support;
@@ -151,6 +152,7 @@ public sealed class OrderStore : IOrderStore
                     .ThenInclude(item => item.Ingredient)
             .FirstOrDefaultAsync(menuItem =>
                 menuItem.Id == menuItemId &&
+                menuItem.Product.DeletedAt == null &&
                 menuItem.Menu.OrganizationId == organizationId &&
                 (!menuItem.Menu.StoreId.HasValue || menuItem.Menu.StoreId == storeId) &&
                 (!menuItem.Menu.KioskId.HasValue || menuItem.Menu.KioskId == kioskId) &&
@@ -281,6 +283,30 @@ public sealed class OrderStore : IOrderStore
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
+    }
+
+    public Task<Order?> GetManagementOrderByIdAsync(
+        Guid orderId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.Orders.WhereNotDeleted()
+            .Include(order => order.OrderItems)
+                .ThenInclude(item => item.Options)
+            .Where(order => order.Id == orderId);
+
+        if (!isSystemAdmin)
+        {
+            query = query.Where(order =>
+                (order.OrganizationId.HasValue && allowedOrganizationIds.Contains(order.OrganizationId.Value)) ||
+                (order.StoreId.HasValue && allowedStoreIds.Contains(order.StoreId.Value)) ||
+                allowedKioskIds.Contains(order.KioskId));
+        }
+
+        return query.FirstOrDefaultAsync(cancellationToken);
     }
 
     public Task<int> CountOrdersAsync(
@@ -623,6 +649,27 @@ public sealed class OrderStore : IOrderStore
     public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+
+        try
+        {
+            var result = await action(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    public async Task<T> ExecuteCheckoutTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead,
+            cancellationToken);
 
         try
         {

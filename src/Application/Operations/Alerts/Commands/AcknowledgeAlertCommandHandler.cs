@@ -3,8 +3,8 @@ using Application.Abstractions.Realtime.Events;
 using Application.Operations.Abstractions;
 using Application.Operations.Alerts.Mapping;
 using Application.Operations.Alerts.Results;
-using Application.Operations.Alerts.Rules;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Domain.Common;
 using Domain.Operations.Enums;
 
@@ -42,16 +42,17 @@ public sealed class AcknowledgeAlertCommandHandler
         AcknowledgeAlertCommand command,
         CancellationToken cancellationToken)
     {
-        var alert = await _store.GetByIdAsync(command.AlertId, cancellationToken);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AlertsManage, command.UserContext);
+        var alert = await _store.GetAccessibleByIdAsync(
+            command.AlertId,
+            command.UserContext.IsSystemAdmin,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
+            cancellationToken);
         if (alert is null)
         {
             return new LifecycleOutcome(ApiResult<AlertResult>.Fail("Alert not found.", 404), null);
-        }
-
-        if (!AlertAccessRules.CanAccess(
-                command.UserContext, alert.Kiosk.OrganizationId, alert.Kiosk.StoreId, alert.KioskId))
-        {
-            return new LifecycleOutcome(ApiResult<AlertResult>.Fail("Access denied.", 403), null);
         }
 
         var oldStatus = alert.Status;

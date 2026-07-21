@@ -150,7 +150,8 @@ public sealed class OrderFulfillmentReadStore(IceBotDbContext dbContext) : IOrde
             item.FulfillmentType != FulfillmentType.MachineProduced &&
             item.Order.Status != OrderStatus.Cancelled &&
             item.Order.Status != OrderStatus.Refunded &&
-            item.Order.Status != OrderStatus.Compensated);
+            item.Order.Status != OrderStatus.Compensated &&
+            item.Order.Status != OrderStatus.RefundRequired);
 
         if (!includeTerminal)
             query = query.Where(item =>

@@ -3,6 +3,7 @@ using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.CommandDelivery.Services;
 using Application.EdgeIntegration.Dispatch;
 using Application.EdgeIntegration.Dispatch.Commands;
+using Application.Abstractions.Realtime;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.ExecutionEndpoints.Projections;
 using Domain.Orders.Entities;
@@ -34,7 +35,9 @@ public sealed class OrderExecutionDispatchReconciliationJobTests
             .AddSingleton<IOrderExecutionDispatchStore>(store)
             .AddSingleton<IOptions<OrderExecutionDispatchOptions>>(options)
             .AddSingleton<IEdgeCommandWakeUpPublisher, NoOpEdgeCommandWakeUpPublisher>()
+            .AddSingleton<IRealtimeNotificationPublisher, NoOpRealtimeNotificationPublisher>()
             .AddScoped<DispatchOrderExecutionCommandHandler>()
+            .AddScoped<EscalateInitialDispatchFailureCommandHandler>()
             .BuildServiceProvider();
         var job = new OrderExecutionDispatchReconciliationJob(
             services.GetRequiredService<IServiceScopeFactory>(),
@@ -45,7 +48,8 @@ public sealed class OrderExecutionDispatchReconciliationJobTests
         await store.SecondOrderObserved.Task.WaitAsync(TimeSpan.FromSeconds(5));
         await job.StopAsync(CancellationToken.None);
 
-        Assert.Equal([firstOrderId, secondOrderId], store.AttemptedOrderIds);
+        Assert.Contains(firstOrderId, store.AttemptedOrderIds);
+        Assert.Contains(secondOrderId, store.AttemptedOrderIds);
     }
 
     private sealed class PoisonFirstDispatchStore(Guid firstOrderId, Guid secondOrderId)

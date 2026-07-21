@@ -25,7 +25,10 @@ public sealed class GetInternalAccountEffectiveAccessQueryHandler
             return ApiResult<AccountAccessResult>.Fail("Account not found.", 404);
         }
 
-        if (!ScopeAccessRules.SharesAnyActiveScope(query.UserContext, account.AccountRoles))
+        if (!ScopeAccessRules.SharesAnyActiveScope(
+                ScopeRoleSets.AccountsRead,
+                query.UserContext,
+                account.AccountRoles))
         {
             return ApiResult<AccountAccessResult>.Fail("Access denied.", 403);
         }

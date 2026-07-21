@@ -72,6 +72,11 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
                             "Order execution dispatch reconciliation deferred order {OrderId}: {Message}",
                             orderId,
                             result.Message);
+
+                        await TryEscalateAsync(
+                            orderId,
+                            result.Message ?? "Initial dispatch was deferred.",
+                            cancellationToken);
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -82,6 +87,7 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
                 {
                     _logger.LogError(ex,
                         "Order execution dispatch reconciliation failed for order {OrderId}.", orderId);
+                    await TryEscalateAsync(orderId, ex.Message, cancellationToken);
                 }
             }
         }
@@ -91,6 +97,35 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Order execution dispatch reconciliation failed.");
+        }
+    }
+
+    private async Task TryEscalateAsync(
+        Guid orderId,
+        string failureReason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider
+                .GetRequiredService<EscalateInitialDispatchFailureCommandHandler>();
+            var result = await handler.HandleAsync(orderId, failureReason, cancellationToken);
+            if (!result.Succeeded)
+            {
+                _logger.LogError(
+                    "Initial dispatch escalation failed for order {OrderId}: {Message}",
+                    orderId,
+                    result.Message);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Initial dispatch escalation failed for order {OrderId}.", orderId);
         }
     }
 }

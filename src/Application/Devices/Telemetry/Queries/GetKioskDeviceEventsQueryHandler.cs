@@ -2,6 +2,7 @@ using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Telemetry.Mapping;
 using Application.Devices.Telemetry.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Application.Tenants.Kiosks;
 
 namespace Application.Devices.Telemetry.Queries;
@@ -28,7 +29,7 @@ public sealed class GetKioskDeviceEventsQueryHandler
             return PagedResult<DeviceEventResult>.Fail("Kiosk not found.", 404, pageNumber, pageSize);
         }
 
-        if (!KioskAccessRules.CanAccessKiosk(query.UserContext, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.OperationsView, query.UserContext, kiosk))
         {
             return PagedResult<DeviceEventResult>.Forbidden("Access denied.", pageNumber, pageSize);
         }

@@ -31,6 +31,11 @@ public static class MenuItemSellabilityRules
             return $"Menu item '{item.DisplayName}' is not available.";
         }
 
+        if (item.Product.DeletedAt.HasValue)
+        {
+            return $"Product '{item.Product.Name}' has been deleted.";
+        }
+
         if (!item.Product.IsAvailable)
         {
             return $"Product '{item.Product.Name}' is not available.";

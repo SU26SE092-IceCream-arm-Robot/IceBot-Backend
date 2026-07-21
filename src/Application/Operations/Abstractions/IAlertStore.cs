@@ -44,5 +44,12 @@ public interface IAlertStore
         CancellationToken cancellationToken = default);
 
     Task<Alert?> GetByIdAsync(Guid alertId, CancellationToken cancellationToken = default);
+    Task<Alert?> GetAccessibleByIdAsync(
+        Guid alertId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default);
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

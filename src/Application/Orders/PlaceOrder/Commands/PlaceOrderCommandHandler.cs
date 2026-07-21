@@ -57,7 +57,7 @@ public sealed class PlaceOrderCommandHandler
             : $"client-order:{request.KioskId:N}:{clientOrderId}";
 
         OrderStatusChangedEvent? statusChangedEvent = null;
-        var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
+        var result = await _orderStore.ExecuteCheckoutTransactionAsync(async ct =>
         {
             foreach (var lockKey in new[] { scopedIdempotencyKey, clientOrderLockKey }
                 .Where(lockKey => lockKey is not null)

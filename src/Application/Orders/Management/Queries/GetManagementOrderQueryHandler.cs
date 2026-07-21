@@ -19,19 +19,17 @@ public sealed class GetManagementOrderQueryHandler
         GetManagementOrderQuery query,
         CancellationToken cancellationToken = default)
     {
-        var order = await _orderStore.GetOrderByIdAsync(query.OrderId, cancellationToken);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersView, query.UserContext);
+        var order = await _orderStore.GetManagementOrderByIdAsync(
+            query.OrderId,
+            query.UserContext.IsSystemAdmin,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
+            cancellationToken);
         if (order is null)
         {
             return ApiResult<ManagementOrderDetailResult>.Fail("Order not found.", 404);
-        }
-
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersView,
-            query.UserContext,
-            order.OrganizationId,
-            order.StoreId,
-            order.KioskId))
-        {
-            return ApiResult<ManagementOrderDetailResult>.Fail("Access denied.", 403);
         }
 
         return ApiResult<ManagementOrderDetailResult>.Success(

@@ -1,7 +1,9 @@
 using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.Menus.Mapping;
 using Application.SalesCatalog.Menus.Results;
+using Application.SalesCatalog.Menus.Rules;
 using Application.Shared.Wrappers;
+using Domain.SalesCatalog.Enums;
 
 namespace Application.SalesCatalog.Menus.Commands;
 
@@ -34,6 +36,14 @@ public sealed class SetMenuItemStatusCommandHandler
         if (item is null)
         {
             return ApiResult<MenuItemResult>.Fail("Menu item not found.", 404);
+        }
+
+        if (command.Status == MenuItemStatus.Active)
+        {
+            var activationError = await MenuItemActivationRules.ValidateAsync(
+                _menus, menu, item, cancellationToken);
+            if (activationError is not null)
+                return ApiResult<MenuItemResult>.Fail(activationError, 409);
         }
 
         item.Status = command.Status;

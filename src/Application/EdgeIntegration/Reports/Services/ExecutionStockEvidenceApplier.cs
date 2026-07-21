@@ -13,7 +13,7 @@ namespace Application.EdgeIntegration.Reports.Services;
 
 internal static class ExecutionStockEvidenceApplier
 {
-    public static async Task ApplyAsync(
+    public static async Task<bool> ApplyAsync(
         IExecutionReportUnitOfWork store,
         ExecutionReportProcessingContext context,
         CancellationToken cancellationToken)
@@ -25,6 +25,7 @@ internal static class ExecutionStockEvidenceApplier
         await store.AcquireDispenserMutationLocksAsync(
             command.StockMovements.Select(evidence => evidence.IngredientDispenserStateId),
             cancellationToken);
+        var applied = false;
 
         foreach (var evidence in command.StockMovements)
         {
@@ -34,9 +35,13 @@ internal static class ExecutionStockEvidenceApplier
             {
                 if (existingMovement.IngredientDispenserStateId != evidence.IngredientDispenserStateId ||
                     existingMovement.Quantity != -evidence.QuantityConsumed ||
-                    existingMovement.ReferenceId != edgeCommand.OrderId ||
+                    existingMovement.ReferenceType != "OrderItem" ||
+                    existingMovement.ReferenceId != evidence.OrderItemId ||
                     existingMovement.OriginNodeId != context.SourceExecutorId ||
                     existingMovement.IsEstimated != evidence.IsEstimated ||
+                    !HasSameStoredTimestamp(
+                        existingMovement.OccurredAt,
+                        evidence.OccurredAt ?? command.EdgeCreatedAt) ||
                     evidence.BalanceAfter.HasValue && existingMovement.BalanceAfter != evidence.BalanceAfter)
                 {
                     throw new DomainRuleException(
@@ -62,8 +67,8 @@ internal static class ExecutionStockEvidenceApplier
                 evidence.QuantityConsumed,
                 occurredAt,
                 evidence.BalanceAfter,
-                "Order",
-                edgeCommand.OrderId,
+                "OrderItem",
+                evidence.OrderItemId,
                 evidence.SourceEventId);
             movement.OrganizationId = state.Kiosk.OrganizationId;
             movement.StoreId = state.Kiosk.StoreId;
@@ -74,6 +79,7 @@ internal static class ExecutionStockEvidenceApplier
             movement.CorrelationId = edgeCommand.OrderId;
             movement.CausationId = command.SourceEventId;
             await store.AddStockMovementAsync(movement, cancellationToken);
+            applied = true;
 
             notifications.InventoryChanged.Add(new InventoryChangedEvent
             {
@@ -84,5 +90,10 @@ internal static class ExecutionStockEvidenceApplier
                 Unit = state.Unit, Status = state.CurrentLevelStatus.ToString(), UpdatedAt = occurredAt, Version = 1
             });
         }
+
+        return applied;
     }
+
+    private static bool HasSameStoredTimestamp(DateTimeOffset left, DateTimeOffset right) =>
+        left.UtcDateTime.Ticks / 10 == right.UtcDateTime.Ticks / 10;
 }

@@ -2,6 +2,7 @@ using Application.Operations.OperationLogs.Abstractions;
 using Application.Operations.OperationLogs.Mapping;
 using Application.Operations.OperationLogs.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Application.Tenants.Kiosks;
 using Domain.Common.Enums;
 
@@ -40,7 +41,7 @@ public sealed class ListOperationLogsQueryHandler
             return PagedResult<OperationLogResult>.Fail("Kiosk not found.", 404, pageNumber, pageSize);
         }
 
-        if (!KioskAccessRules.CanAccessKiosk(user, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.OperationsView, user, kiosk))
         {
             return PagedResult<OperationLogResult>.Forbidden("Access denied.", pageNumber, pageSize);
         }

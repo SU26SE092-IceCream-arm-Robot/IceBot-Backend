@@ -32,7 +32,7 @@ public sealed class SetKioskStatusCommandHandler
             return ApiResult<KioskResult>.Fail("Kiosk not found.", 404);
         }
 
-        if (!KioskAccessRules.CanAccessKiosk(userContext, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.KiosksManage, userContext, kiosk))
         {
             return ApiResult<KioskResult>.Fail("Access denied.", 403);
         }

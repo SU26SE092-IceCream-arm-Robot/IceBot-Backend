@@ -42,6 +42,17 @@ public sealed class MenuItemSellabilityRulesTests
     }
 
     [Fact]
+    public void Validate_RejectsSoftDeletedProduct()
+    {
+        var (item, kiosk) = CreateMachineProducedItem();
+        item.Product.DeletedAt = DateTimeOffset.UtcNow;
+
+        var error = MenuItemSellabilityRules.Validate(item, kiosk, DateTimeOffset.UtcNow, true);
+
+        Assert.Equal("Product 'Vanilla' has been deleted.", error);
+    }
+
+    [Fact]
     public void Validate_RejectsAttachedInactiveRecipeForManualItem()
     {
         var (item, kiosk) = CreateMachineProducedItem();

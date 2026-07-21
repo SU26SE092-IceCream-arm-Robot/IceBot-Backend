@@ -2,6 +2,7 @@ using Application.Orders.Management.Abstractions;
 using Application.Orders.Management.Results;
 using Application.Orders.Management.Rules;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.Orders.Management.Queries;
 
@@ -21,16 +22,16 @@ public sealed class ListFulfillmentQueueQueryHandler(IOrderFulfillmentReadStore 
 
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersView, query.UserContext);
         var totalCount = await fulfillment.CountQueueItemsAsync(
             query.KioskId, query.FulfillmentType, query.ItemStatus, query.PaidFrom, query.PaidTo,
             query.IncludeTerminal, query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds, query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds, cancellationToken);
+            scope.OrganizationIds, scope.StoreIds, scope.KioskIds, cancellationToken);
         var rows = await fulfillment.ListQueueItemsAsync(
             query.KioskId, query.FulfillmentType, query.ItemStatus, query.PaidFrom, query.PaidTo,
             query.IncludeTerminal, query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds, query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds, pageNumber, pageSize, cancellationToken);
+            scope.OrganizationIds, scope.StoreIds, scope.KioskIds,
+            pageNumber, pageSize, cancellationToken);
 
         var observedAt = DateTimeOffset.UtcNow;
         return PagedResult<FulfillmentQueueItemResult>.Success(

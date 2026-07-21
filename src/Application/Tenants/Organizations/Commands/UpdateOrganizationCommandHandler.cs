@@ -1,6 +1,7 @@
 using Application.Shared.Wrappers;
 using Application.Tenants.Abstractions;
 using Application.Tenants.Organizations.Results;
+using Application.Tenants;
 
 namespace Application.Tenants.Organizations.Commands;
 
@@ -21,7 +22,10 @@ public sealed class UpdateOrganizationCommandHandler
         var organizationId = command.OrganizationId;
         var request = command.Request;
 
-        if (!OrganizationAccessRules.CanAccessOrganization(userContext, organizationId))
+        if (!OrganizationAccessRules.CanAccessOrganization(
+                ScopeRoleSets.OrganizationsUpdate,
+                userContext,
+                organizationId))
         {
             return ApiResult<OrganizationResult>.Fail("Access denied to this organization.", 403);
         }

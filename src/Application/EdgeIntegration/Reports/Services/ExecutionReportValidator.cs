@@ -35,10 +35,16 @@ internal static class ExecutionReportValidator
             return "Production-job reports require source job, order item, positive unit number, and positive unit quantity.";
         if (command.StockMovements.Count > 100)
             return "A production execution report supports at most 100 stock movement evidence items.";
+        if (command.StockMovements.Any(item => item.OrderItemId != command.OrderItemId))
+            return "Stock movement evidence must belong to the reported production-job order item.";
         if (command.StockMovements.Any(item => item.SourceEventId == Guid.Empty || item.OrderItemId == Guid.Empty ||
                 item.IngredientDispenserStateId == Guid.Empty || item.QuantityConsumed <= 0 || item.BalanceAfter < 0) ||
             command.StockMovements.Select(item => item.SourceEventId).Distinct().Count() != command.StockMovements.Count)
             return "Stock movement evidence requires unique event ids, dispenser states, positive consumed quantities, and non-negative balances.";
+        if (string.Equals(command.ReportType, "ProductionExecution", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(command.Status, "Failed", StringComparison.OrdinalIgnoreCase) &&
+            !command.PhysicalOutputMayHaveOccurred.HasValue)
+            return "Failed production execution reports must state whether physical output may have occurred.";
         return null;
     }
 }

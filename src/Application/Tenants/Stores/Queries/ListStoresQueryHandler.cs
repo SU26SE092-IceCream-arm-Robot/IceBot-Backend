@@ -22,6 +22,7 @@ public sealed class ListStoresQueryHandler
         var organizationId = query.OrganizationId;
         var status = query.Status;
         var search = query.Search;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.StoresView, userContext);
 
         EntityStatus? parsedStatus = null;
         if (!string.IsNullOrWhiteSpace(status))
@@ -41,8 +42,8 @@ public sealed class ListStoresQueryHandler
         }
 
         var accessibleStores = await _storeStore.ListAccessibleAsync(
-            userContext.AllowedOrganizationIds,
-            userContext.AllowedStoreIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
             organizationId,
             parsedStatus,
             search,

@@ -12,6 +12,53 @@ namespace IceBot.IntegrationTests.Tenancy;
 public sealed class CrossContextTenancyMatrixIntegrationTests(IntegrationTestFixture fixture)
 {
     [IntegrationFact]
+    public async Task StrongRole_CannotBorrowForeignScopeFromRoleThatDoesNotAuthorizeOperation()
+    {
+        var actorId = Guid.NewGuid();
+        var allowedOrganizationId = Guid.NewGuid();
+        var storage = fixture.CreateObjectStorage(autoCreateBucket: true);
+        var foreign = await ProductionPackageInstallationScenarioSeed.SeedAsync(fixture, storage, actorId);
+
+        await using var factory = new PackageApiWebApplicationFactory(
+            fixture,
+            storage,
+            actorId,
+            "OrgAdmin",
+            [
+                $"OrgAdmin|{allowedOrganizationId:D}|*|*",
+                $"Manager|{foreign.OrganizationId:D}|*|*"
+            ]);
+        using var client = factory.CreateAuthenticatedClient();
+
+        using var response = await client.GetAsync(
+            $"/api/v1/management/organizations/{foreign.OrganizationId:D}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [IntegrationFact]
+    public async Task Manager_CannotMutateGlobalPaymentMethodCatalog()
+    {
+        var actorId = Guid.NewGuid();
+        var organizationId = Guid.NewGuid();
+        var storage = fixture.CreateObjectStorage(autoCreateBucket: true);
+
+        await using var factory = new PackageApiWebApplicationFactory(
+            fixture,
+            storage,
+            actorId,
+            "Manager",
+            [$"Manager|{organizationId:D}|*|*"]);
+        using var client = factory.CreateAuthenticatedClient();
+
+        using var response = await client.PatchAsJsonAsync(
+            "/api/v1/management/payment-methods/1/status",
+            new { isActive = false });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [IntegrationFact]
     public async Task OrganizationScopedActor_CannotReadAnotherTenantAcrossManagementSurfaces()
     {
         var actorId = Guid.NewGuid();

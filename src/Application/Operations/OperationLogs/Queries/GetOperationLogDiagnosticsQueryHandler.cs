@@ -2,6 +2,7 @@ using Application.Operations.OperationLogs.Abstractions;
 using Application.Operations.OperationLogs.Mapping;
 using Application.Operations.OperationLogs.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Application.Tenants.Kiosks;
 
 namespace Application.Operations.OperationLogs.Queries;
@@ -25,7 +26,8 @@ public sealed class GetOperationLogDiagnosticsQueryHandler
             return ApiResult<OperationLogDiagnosticsResult>.Fail("Kiosk not found.", 404);
         }
 
-        if (!KioskAccessRules.CanAccessKiosk(query.UserContext, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(
+                ScopeRoleSets.OperationsDiagnostics, query.UserContext, kiosk))
         {
             return ApiResult<OperationLogDiagnosticsResult>.Fail("Access denied.", 403);
         }

@@ -1,6 +1,7 @@
 using Application.Shared.Wrappers;
 using Application.Tenants.Abstractions;
 using Application.Tenants.Organizations.Results;
+using Application.Tenants;
 
 namespace Application.Tenants.Organizations.Queries;
 
@@ -20,7 +21,10 @@ public sealed class GetOrganizationQueryHandler
         var userContext = query.UserContext;
         var organizationId = query.OrganizationId;
 
-        if (!OrganizationAccessRules.CanAccessOrganization(userContext, organizationId))
+        if (!OrganizationAccessRules.CanAccessOrganization(
+                ScopeRoleSets.OrganizationsView,
+                userContext,
+                organizationId))
         {
             return ApiResult<OrganizationResult>.Fail("Access denied to this organization.", 403);
         }

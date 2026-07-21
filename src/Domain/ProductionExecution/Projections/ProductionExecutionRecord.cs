@@ -126,6 +126,30 @@ public class ProductionExecutionRecord : AuditedEntity
         return true;
     }
 
+    public void EnsureSameProvenance(
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
+        Guid? workcellId,
+        Guid? controllerId,
+        string? executionPlanChecksum,
+        long? activeSetVersion,
+        string? activeSetChecksum)
+    {
+        if (OrderItemId != orderItemId ||
+            ProductionUnitNo != productionUnitNo ||
+            ProductionUnitQuantity != productionUnitQuantity ||
+            WorkcellId != workcellId ||
+            ControllerId != controllerId ||
+            !string.Equals(ExecutionPlanChecksum, executionPlanChecksum, StringComparison.Ordinal) ||
+            ActiveSetVersion != activeSetVersion ||
+            !string.Equals(ActiveSetChecksum, activeSetChecksum, StringComparison.Ordinal))
+        {
+            throw new DomainRuleException(
+                "Production execution report provenance does not match the first report for this source job.");
+        }
+    }
+
     private bool CanApply(Guid sourceEventId, long sequenceNumber)
     {
         if (sourceEventId == Guid.Empty || sequenceNumber <= 0)

@@ -38,15 +38,14 @@ public sealed class RecordManualOrderItemFulfillmentEventCommandHandler(
         OrderStatus? previousOrderStatus = null;
         Order? changedOrder = null;
         OrderItemFulfillmentChangedEvent? itemChangedEvent = null;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, command.UserContext);
         var result = await orders.ExecuteInTransactionAsync(async ct =>
         {
             await orders.AcquireOrderWorkflowLockAsync(command.OrderId, ct);
-            var order = await orders.GetOrderByIdAsync(command.OrderId, ct);
+            var order = await orders.GetManagementOrderByIdAsync(
+                command.OrderId, command.UserContext.IsSystemAdmin,
+                scope.OrganizationIds, scope.StoreIds, scope.KioskIds, ct);
             if (order is null) return ApiResult<ManagementOrderDetailResult>.Fail("Order not found.", 404);
-            if (!ScopeAccessRules.CanAccessScopedRow(
-                    ScopeRoleSets.OrdersManage, command.UserContext,
-                    order.OrganizationId, order.StoreId, order.KioskId))
-                return ApiResult<ManagementOrderDetailResult>.Fail("Access denied.", 403);
             var item = order.OrderItems.SingleOrDefault(candidate => candidate.Id == command.OrderItemId);
             if (item is null) return ApiResult<ManagementOrderDetailResult>.Fail("Order item not found.", 404);
             if (item.FulfillmentType != FulfillmentType.Manual)

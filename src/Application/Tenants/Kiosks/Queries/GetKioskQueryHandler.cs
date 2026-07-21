@@ -23,7 +23,7 @@ public sealed class GetKioskQueryHandler
             return ApiResult<KioskResult>.Fail("Kiosk not found.", 404);
         }
 
-        if (!KioskAccessRules.CanAccessKiosk(query.UserContext, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.KiosksView, query.UserContext, kiosk))
         {
             return ApiResult<KioskResult>.Fail("Access denied.", 403);
         }

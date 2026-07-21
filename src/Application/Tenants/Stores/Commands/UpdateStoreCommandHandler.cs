@@ -27,7 +27,7 @@ public sealed class UpdateStoreCommandHandler
             return ApiResult<StoreResult>.Fail("Store not found.", 404);
         }
 
-        if (!StoreAccessRules.CanAccessStore(userContext, store))
+        if (!StoreAccessRules.CanAccessStore(ScopeRoleSets.StoresUpdate, userContext, store))
         {
             return ApiResult<StoreResult>.Fail("Access denied.", 403);
         }
