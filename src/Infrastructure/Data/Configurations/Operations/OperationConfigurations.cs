@@ -44,6 +44,8 @@ internal sealed class MaintenanceTicketConfiguration : IEntityTypeConfiguration<
     public void Configure(EntityTypeBuilder<MaintenanceTicket> entity)
     {
         entity.ToTable("MaintenanceTickets");
+        entity.Property(x => x.OperationalImpact)
+            .HasDefaultValue(Domain.Operations.Enums.MaintenanceOperationalImpact.None);
         entity.HasIndex(x => x.TicketNumber).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => x.AlertId).IsUnique().HasFilter("\"AlertId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
         entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.Status, x.ReportedAt });

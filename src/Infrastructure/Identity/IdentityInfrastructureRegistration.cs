@@ -34,7 +34,16 @@ public static class IdentityInfrastructureRegistration
                     options.CircuitBreakerBreakDurationSeconds >= 1,
                 "Firebase resilience settings are invalid.")
             .ValidateOnStart();
+        services.AddOptions<FirebasePushDeliveryOptions>()
+            .Bind(config.GetSection(FirebasePushDeliveryOptions.SectionName))
+            .Validate(options => options.OperationTimeoutSeconds is >= 1 and <= 120,
+                "Firebase push delivery operation timeout must be between 1 and 120 seconds.")
+            .Validate(options => options.OperationTimeoutSeconds <
+                config.GetValue<int>("NotificationDelivery:ProcessingTimeoutSeconds", 120),
+                "Firebase push delivery operation timeout must be lower than the notification delivery processing timeout.")
+            .ValidateOnStart();
         services.AddSingleton<FirebaseAuthResiliencePipeline>();
+        services.AddSingleton<FirebasePushDeliveryTimeoutPolicy>();
         services.AddSingleton<IExternalIdentityProvider, FirebaseExternalIdentityProvider>();
         services.AddSingleton<IPasswordHasher, BcryptPasswordHasher>();
         services.AddScoped<IAccessTokenGenerator, JwtAccessTokenGenerator>();

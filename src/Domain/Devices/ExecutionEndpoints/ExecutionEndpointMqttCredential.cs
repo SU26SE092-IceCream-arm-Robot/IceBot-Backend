@@ -35,10 +35,43 @@ public class ExecutionEndpointMqttCredential : AuditedEntity
 
     public void BeginRotation()
     {
-        if (Status is not (ExecutionEndpointMqttCredentialStatus.Active or ExecutionEndpointMqttCredentialStatus.Failed))
-            throw new DomainRuleException("Only active or failed MQTT credentials can be rotated.");
+        if (Status != ExecutionEndpointMqttCredentialStatus.Active)
+            throw new DomainRuleException("Only active MQTT credentials can begin rotation.");
         CredentialVersion++;
         Status = ExecutionEndpointMqttCredentialStatus.PendingRotation;
+        LastError = null;
+    }
+
+    public void BeginReprovision()
+    {
+        if (Status != ExecutionEndpointMqttCredentialStatus.Revoked)
+            throw new DomainRuleException("Only revoked MQTT credentials can be provisioned again.");
+        CredentialVersion++;
+        Status = ExecutionEndpointMqttCredentialStatus.PendingProvision;
+        ActivatedAt = null;
+        RevokedAt = null;
+        LastError = null;
+    }
+
+    public void RetryFailedProvisionOrRotation()
+    {
+        if (Status != ExecutionEndpointMqttCredentialStatus.Failed)
+            throw new DomainRuleException("MQTT credential provisioning or rotation has not failed.");
+        CredentialVersion++;
+        Status = ActivatedAt.HasValue
+            ? ExecutionEndpointMqttCredentialStatus.PendingRotation
+            : ExecutionEndpointMqttCredentialStatus.PendingProvision;
+        LastError = null;
+    }
+
+    public void RestartPendingOperation()
+    {
+        if (Status is not (
+            ExecutionEndpointMqttCredentialStatus.PendingProvision or
+            ExecutionEndpointMqttCredentialStatus.PendingRotation or
+            ExecutionEndpointMqttCredentialStatus.PendingRevoke))
+            throw new DomainRuleException("MQTT credential operation is not pending.");
+        CredentialVersion++;
         LastError = null;
     }
 
@@ -61,10 +94,31 @@ public class ExecutionEndpointMqttCredential : AuditedEntity
         LastError = normalized.Length <= 1000 ? normalized : normalized[..1000];
     }
 
+    public void BeginRevocation()
+    {
+        if (Status is not (
+            ExecutionEndpointMqttCredentialStatus.Active or
+            ExecutionEndpointMqttCredentialStatus.Failed or
+            ExecutionEndpointMqttCredentialStatus.RevokeFailed))
+            throw new DomainRuleException("MQTT credential cannot begin revocation from its current state.");
+        CredentialVersion++;
+        Status = ExecutionEndpointMqttCredentialStatus.PendingRevoke;
+        LastError = null;
+    }
+
+    public void MarkRevocationFailed(string error)
+    {
+        if (Status != ExecutionEndpointMqttCredentialStatus.PendingRevoke)
+            throw new DomainRuleException("MQTT credential revocation is not pending.");
+        Status = ExecutionEndpointMqttCredentialStatus.RevokeFailed;
+        var normalized = string.IsNullOrWhiteSpace(error) ? "Broker revocation failed." : error.Trim();
+        LastError = normalized.Length <= 1000 ? normalized : normalized[..1000];
+    }
+
     public void MarkRevoked(DateTimeOffset revokedAt)
     {
-        if (Status == ExecutionEndpointMqttCredentialStatus.Revoked)
-            throw new DomainRuleException("MQTT credential is already revoked.");
+        if (Status != ExecutionEndpointMqttCredentialStatus.PendingRevoke)
+            throw new DomainRuleException("MQTT credential revocation is not pending.");
         Status = ExecutionEndpointMqttCredentialStatus.Revoked;
         RevokedAt = revokedAt;
         LastError = null;

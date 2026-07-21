@@ -4,6 +4,8 @@ namespace Application.Payments.Refunds.Requests;
 
 public sealed class RequestRefundRequest
 {
+    public Guid? PaymentTransactionId { get; set; }
+
     [Required]
     public string RefundMethod { get; set; } = "FullMoneyRefund"; // "FullMoneyRefund" or "Voucher"
 

@@ -53,8 +53,8 @@ public sealed class OrderExecutionTimeoutStore : IOrderExecutionTimeoutStore
                         command.RespondedAt <= acceptedCutoff) ||
                      _dbContext.OrderExecutionRecords.Any(record =>
                          record.SourceCommandId == command.Id &&
-                         ((record.Status == ProductionExecutionStatus.Accepted && record.LastExecutorReportedAt <= acceptedCutoff) ||
-                          (record.Status == ProductionExecutionStatus.Running && record.LastExecutorReportedAt <= runningCutoff)))))))
+                         ((record.Status == ProductionExecutionStatus.Accepted && record.CloudReceivedAt <= acceptedCutoff) ||
+                          (record.Status == ProductionExecutionStatus.Running && record.CloudReceivedAt <= runningCutoff)))))))
             .OrderBy(command => command.CommandExpiryAt)
             .ThenBy(command => command.RespondedAt)
             .ThenBy(command => command.Id)

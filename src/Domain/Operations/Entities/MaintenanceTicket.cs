@@ -38,6 +38,8 @@ public partial class MaintenanceTicket : SyncAggregateEntity, IKioskScoped
 
     public MaintenanceTicketStatus Status { get; set; } = MaintenanceTicketStatus.Open;
 
+    public MaintenanceOperationalImpact OperationalImpact { get; set; } = MaintenanceOperationalImpact.None;
+
     public DateTimeOffset ReportedAt { get; set; }
 
     public DateTimeOffset? DueAt { get; set; }

@@ -50,6 +50,7 @@ public interface IOrderStore
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default);
 
     Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default);
@@ -122,6 +123,7 @@ public interface IOrderStore
         CancellationToken cancellationToken = default);
 
     Task<EdgeCommand?> GetExecutionAttemptAsync(
+        Guid orderId,
         Guid sourceCommandId,
         CancellationToken cancellationToken = default);
 

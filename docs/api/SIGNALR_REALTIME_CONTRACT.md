@@ -2,7 +2,7 @@
 
 ## Search Keywords
 
-`SignalR`, `realtime`, `OrderHub`, `OperationsHub`, `ManagementDashboardHub`, `OrderStatusChanged`, `OrderItemFulfillmentChanged`, `PaymentStatusChanged`, `OrderExecutionObservationChanged`, `KioskStatusChanged`, `ExecutionReadinessChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`, `DashboardInvalidated`, `reconnect`, `hub group`
+`SignalR`, `realtime`, `OrderHub`, `OperationsHub`, `ManagementDashboardHub`, `OrderStatusChanged`, `OrderItemFulfillmentChanged`, `PaymentStatusChanged`, `OrderExecutionObservationChanged`, `KioskStatusChanged`, `KioskOperationalStateChanged`, `ExecutionReadinessChanged`, `DeviceEventCreated`, `AlertChanged`, `MaintenanceTicketChanged`, `InventoryChanged`, `DashboardInvalidated`, `reconnect`, `hub group`
 
 ## Scope
 SignalR is used exclusively for Cloud-to-Human UI realtime updates, UI deltas, and dashboard invalidation. It is **not** used for Cloud-to-Edge/Kiosk/Robot runtime integration or machine-to-machine command/event flows (which will be handled by MQTT/edge sync). SignalR does not send robot execution commands or device control commands.
@@ -37,13 +37,14 @@ Clients must explicitly join a group to receive targeted events.
 - `OrderStatusChanged`: Triggered when an order status changes (e.g., placed, preparing, completed).
 - `OrderItemFulfillmentChanged`: Triggered after a manual, packaged, or machine-produced line commits a status transition. It carries order/item/kiosk identity, fulfillment type, old/new item status, quantity, and update time.
 - `PaymentStatusChanged`: Triggered when payment succeeds or fails.
-- `OrderExecutionObservationChanged`: Triggered when Cloud observation changes without claiming a physical order-state transition. The payload contains `ObservationStatus`, `CustomerExecutionStatus`, customer message, support flag, and last executor report time. Clients should apply it directly to the current order screen.
+- `OrderExecutionObservationChanged`: Triggered when Cloud observation changes without claiming a physical order-state transition. The payload contains `ObservationStatus`, `CustomerExecutionStatus`, customer message, support flag, executor evidence time, and last Cloud receive time. Clients should apply it directly to the current order screen; timeout authority is the Cloud receive time.
 
 ### OperationsHub Events
 - `OrderItemFulfillmentChanged`: The same committed line delta is sent to `kiosk:{kioskId}` so the staff fulfillment workspace can update without waiting for an aggregate order transition.
 - `MaintenanceTicketChanged`: Triggered when a maintenance ticket is created, updated, assigned, started, resolved, closed, or cancelled.
 - `InventoryChanged`: Triggered when a dispenser is refilled or its stock estimate is adjusted.
 - `KioskStatusChanged`: Triggered only after a committed lifecycle or connectivity transition. Management changes populate `oldLifecycleStatus/newLifecycleStatus`; heartbeat and timeout changes populate `oldConnectivity/newConnectivity`. Connectivity never mutates kiosk lifecycle. Duplicate heartbeat ingestion and unchanged projections do not emit this event.
+- `KioskOperationalStateChanged`: Triggered after a committed operator or maintenance-driven operational transition. It carries old/new state, actor, reason, optional source maintenance ticket, and transition time. `EmergencyStopRequested` means Cloud intervention intent, not confirmed hardware state. The event is separate from lifecycle/connectivity and is the UI signal for refetching sales/dispatch admission.
 - `ExecutionReadinessChanged`: Triggered after a newer typed readiness/capability projection commits. Payload carries endpoint, revision, readiness, activity, and safety; clients refresh detailed capability state from the read model when needed.
 - `DeviceEventCreated`: Triggered once after a new warning/error device event commits. Idempotent event retries do not publish it again.
 - `AlertChanged`: Triggered after an actionable alert is created, acknowledged, or resolved. It carries a committed state delta; idempotent lifecycle retries do not publish it again.

@@ -35,6 +35,7 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("tenant-tree.view", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
         options.AddScopedRolePolicy("roles.view", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("role-scope-options.view", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("dashboard.view", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
 
         options.AddScopedRolePolicy("orders.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff");
         options.AddScopedRolePolicy("orders.manage", "SystemAdmin", "OrgAdmin", "Manager", "Staff");

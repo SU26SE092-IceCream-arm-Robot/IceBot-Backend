@@ -4,6 +4,9 @@ using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.Tenants.Kiosks.Rules;
+using Domain.ProductionExecution.Enums;
+using Domain.Sync.Enums;
 
 namespace Infrastructure.Tenants.Persistence;
 
@@ -89,6 +92,46 @@ public sealed class KioskStore : IKioskStore
     public Task<Kiosk?> GetByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Kiosks.WhereNotDeleted().FirstOrDefaultAsync(x => x.Id == kioskId, cancellationToken);
+    }
+
+    public Task<Kiosk?> GetByStoreAndIdAsync(
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Kiosks.WhereNotDeleted()
+            .FirstOrDefaultAsync(x => x.Id == kioskId && x.StoreId == storeId, cancellationToken);
+
+    public Task<bool> HasRunningExecutionAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.EdgeCommands.AnyAsync(command =>
+            command.KioskId == kioskId &&
+            command.CommandType == EdgeCommandType.ExecuteOrder &&
+            command.Status == EdgeCommandStatus.Accepted &&
+            !_dbContext.OrderExecutionRecords.Any(record =>
+                record.SourceCommandId == command.Id &&
+                (record.Status == ProductionExecutionStatus.Completed ||
+                 record.Status == ProductionExecutionStatus.Failed ||
+                 record.Status == ProductionExecutionStatus.RequiresManualIntervention)),
+            cancellationToken);
+
+    public Task AddOperationalStateTransitionAsync(
+        KioskOperationalStateTransition transition,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskOperationalStateTransitions.AddAsync(transition, cancellationToken).AsTask();
+
+    public async Task<T> ExecuteOperationalStateSerializedAsync<T>(
+        Guid kioskId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
+    {
+        await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({KioskOperationalConcurrency.LockKey(kioskId)}, 0));",
+            cancellationToken);
+        var result = await action(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return result;
     }
 
     public Task AddAsync(Kiosk kiosk, CancellationToken cancellationToken = default)

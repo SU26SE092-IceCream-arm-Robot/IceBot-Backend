@@ -137,6 +137,33 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         await PublishDashboardInvalidatedAsync(dashboardEvt, ct);
     }
 
+    public async Task PublishKioskOperationalStateChangedAsync(
+        KioskOperationalStateChangedEvent evt,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}")
+                .SendAsync("KioskOperationalStateChanged", evt, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to publish SignalR KioskOperationalStateChanged event for kiosk {KioskId}.",
+                evt.KioskId);
+        }
+
+        await PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
+        {
+            Scope = "Organization",
+            OrganizationId = evt.OrganizationId,
+            StoreId = evt.StoreId,
+            Reason = "KioskOperationalStateChanged",
+            UpdatedAt = evt.ChangedAt
+        }, ct);
+    }
+
     public async Task PublishDeviceEventCreatedAsync(DeviceEventCreatedEvent evt, CancellationToken ct = default)
     {
         try

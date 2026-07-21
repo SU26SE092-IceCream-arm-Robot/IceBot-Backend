@@ -23,8 +23,35 @@ public sealed class MqttEndpointCredentialTests
         Assert.Equal(ExecutionEndpointMqttCredentialStatus.PendingRotation, credential.Status);
 
         credential.MarkActive(DateTimeOffset.UtcNow);
+        credential.BeginRevocation();
+        Assert.Equal(3, credential.CredentialVersion);
+        Assert.Equal(ExecutionEndpointMqttCredentialStatus.PendingRevoke, credential.Status);
         credential.MarkRevoked(DateTimeOffset.UtcNow);
         Assert.Equal(ExecutionEndpointMqttCredentialStatus.Revoked, credential.Status);
         Assert.Throws<DomainRuleException>(() => credential.BeginRotation());
+    }
+
+    [Fact]
+    public void FailedOperations_CanReturnToTheirOwningPendingState()
+    {
+        var credential = ExecutionEndpointMqttCredential.BeginProvision(
+            Guid.NewGuid(), "MosquittoDynamicSecurity");
+        credential.MarkFailed("Broker unavailable");
+
+        credential.RetryFailedProvisionOrRotation();
+        Assert.Equal(ExecutionEndpointMqttCredentialStatus.PendingProvision, credential.Status);
+        Assert.Equal(2, credential.CredentialVersion);
+
+        credential.MarkActive(DateTimeOffset.UtcNow);
+        credential.BeginRotation();
+        credential.MarkFailed("Broker unavailable");
+        credential.RetryFailedProvisionOrRotation();
+        Assert.Equal(ExecutionEndpointMqttCredentialStatus.PendingRotation, credential.Status);
+
+        credential.MarkActive(DateTimeOffset.UtcNow);
+        credential.BeginRevocation();
+        credential.MarkRevocationFailed("Broker unavailable");
+        credential.BeginRevocation();
+        Assert.Equal(ExecutionEndpointMqttCredentialStatus.PendingRevoke, credential.Status);
     }
 }

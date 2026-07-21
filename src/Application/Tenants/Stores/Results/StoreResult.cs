@@ -18,6 +18,13 @@ public sealed class StoreResult
     public string? PhoneNumber { get; set; }
     public string? Email { get; set; }
     public IReadOnlyList<StoreOpeningHoursDayResult> OpeningHours { get; set; } = [];
+    public bool IsSalesPaused { get; set; }
+    public DateTimeOffset? SalesPausedAt { get; set; }
+    public DateTimeOffset? SalesPausedUntil { get; set; }
+    public string? SalesPauseReason { get; set; }
+    public Guid? SalesPausedByAccountId { get; set; }
+    public DateTimeOffset? SalesResumedAt { get; set; }
+    public Guid? SalesResumedByAccountId { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 }

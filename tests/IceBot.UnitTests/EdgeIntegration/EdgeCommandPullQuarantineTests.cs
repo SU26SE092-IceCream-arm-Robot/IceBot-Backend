@@ -75,6 +75,7 @@ public sealed class EdgeCommandPullQuarantineTests
         Assert.Equal(EdgeCommandStatus.DeliveryFailed, invalid.Status);
         Assert.Equal("InvalidDurablePayload", invalid.DeliveryAttempts.Single().ResponseCode);
         Assert.Equal(EdgeCommandStatus.Delivered, valid.Status);
+        await store.Received(1).AcquireKioskOperationalLockAsync(kioskId, Arg.Any<CancellationToken>());
         await store.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

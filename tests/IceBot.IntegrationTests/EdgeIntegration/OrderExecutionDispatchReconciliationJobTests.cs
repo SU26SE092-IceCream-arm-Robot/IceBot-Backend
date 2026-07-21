@@ -88,6 +88,12 @@ public sealed class OrderExecutionDispatchReconciliationJobTests
         public Task AcquireEndpointAdmissionLockAsync(Guid endpointId, CancellationToken cancellationToken = default) =>
             Task.CompletedTask;
 
+        public Task AcquireKioskOperationalLockAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
+
+        public Task<bool> IsKioskOperationalAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(true);
+
         public Task<IReadOnlyList<KioskExecutionEndpoint>> ListActiveEndpointsAsync(
             Guid kioskId,
             CancellationToken cancellationToken = default) =>
@@ -117,6 +123,17 @@ public sealed class OrderExecutionDispatchReconciliationJobTests
         public Task<EdgeCommand?> GetLatestCommandAsync(
             Guid orderId,
             CancellationToken cancellationToken = default) => Task.FromResult<EdgeCommand?>(null);
+
+        public Task<EdgeCommand?> GetCommandByIdAsync(
+            Guid commandId,
+            CancellationToken cancellationToken = default) => Task.FromResult<EdgeCommand?>(null);
+
+        public Task<List<Domain.ProductionExecution.Projections.ProductionExecutionRecord>>
+            ListProductionExecutionRecordsForOrderItemAsync(
+                Guid orderId,
+                Guid orderItemId,
+                CancellationToken cancellationToken = default) =>
+            Task.FromResult(new List<Domain.ProductionExecution.Projections.ProductionExecutionRecord>());
 
         public Task AddOrderStatusHistoryAsync(
             OrderStatusHistory history,

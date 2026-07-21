@@ -52,6 +52,14 @@ public sealed class ProductionPackageUpgradeService(
         if (string.IsNullOrWhiteSpace(command.IdempotencyKey))
             return ApiResult<ProductionPackageUpgradeResult>.Fail("Idempotency-Key is required.", 400);
 
+        var sourceInstallation = await upgrades.GetSourceInstallationAsync(
+            command.OrganizationId, command.SourceInstallationId, cancellationToken);
+        if (sourceInstallation is null)
+            return ApiResult<ProductionPackageUpgradeResult>.Fail("Source package installation not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageInstall, command.UserContext,
+                command.OrganizationId, sourceInstallation.StoreId, sourceInstallation.KioskId))
+            return ApiResult<ProductionPackageUpgradeResult>.Fail("Access denied.", 403);
+
         var existing = await upgrades.FindByIdempotencyKeyAsync(
             command.OrganizationId, command.IdempotencyKey, cancellationToken);
         if (existing is not null && existing.Status is ProductionPackageUpgradeStatus.ReadyForReview or
@@ -162,6 +170,7 @@ public sealed class ProductionPackageUpgradeService(
         var suffix = $"UPG_{upgrade.Id:N}";
         try
         {
+            await EnsureApprovedScopeIsCurrentAsync(command, upgrade, cancellationToken);
             var installResult = await installer.InstallAsync(new InstallProductionPackageCommand
             {
                 UserContext = command.UserContext,
@@ -188,14 +197,10 @@ public sealed class ProductionPackageUpgradeService(
                 installResult.Data.Id, cancellationToken)
                 ?? throw new DomainRuleException("Upgrade successor installation identity could not be persisted.");
 
-            var resources = new[]
-            {
-                TechnicalResourceMutationIdentity.PackageInstallation(command.SourceInstallationId),
-                TechnicalResourceMutationIdentity.PackageInstallation(installResult.Data.Id),
-                new TechnicalResourceMutationIdentity("ProductionPackageUpgrade", upgrade.Id.ToString("D"))
-            };
+            var resources = mutationPolicy.PreparationMutationIdentities(upgrade, sourceState);
             return await mutationCoordinator.ExecuteAsync(resources, async ct =>
             {
+                await EnsureApprovedScopeIsCurrentAsync(command, upgrade, ct);
                 var state = await upgrades.GetPreparationStateAsync(command.OrganizationId, upgrade.Id,
                     installResult.Data.Id, ct);
                 if (state is null)
@@ -346,12 +351,6 @@ public sealed class ProductionPackageUpgradeService(
             ProductionPackageUpgradeStatus.RollbackPending))
             return ApiResult<ProductionPackageUpgradeResult>.Fail(
                 "Only a Completed package upgrade can roll back.", 409);
-        if (observed.Status == ProductionPackageUpgradeStatus.Completed)
-        {
-            observed.BeginRollback(user.AccountId, DateTimeOffset.UtcNow);
-            await upgrades.SaveChangesAsync(cancellationToken);
-        }
-
         foreach (var endpoint in observed.EndpointTargets)
         {
             ConfigurationDeploymentReadModel? currentRollback = null;
@@ -386,10 +385,22 @@ public sealed class ProductionPackageUpgradeService(
                     result.Message ?? "Package upgrade rollback deployment failed.", result.StatusCode)
                     .AddDetail("kioskExecutionEndpointId", endpoint.KioskExecutionEndpointId);
             }
-            endpoint.RecordRollbackDeployment(result.Data.NewDeploymentId, user.AccountId, reason,
-                DateTimeOffset.UtcNow, MaxRollbackDeploymentAttempts);
-            ProductionPackageUpgradeMetrics.RecordRollbackAttempt(result.Data.Profile, attemptNo);
-            await upgrades.SaveChangesAsync(cancellationToken);
+            ProductionPackageUpgradeRollbackAttemptRecordResult recorded;
+            try
+            {
+                recorded = await upgrades.RecordRollbackAttemptAsync(
+                    organizationId, sourceInstallationId, upgradeId, endpoint.KioskExecutionEndpointId,
+                    result.Data.NewDeploymentId, user.AccountId, reason, DateTimeOffset.UtcNow,
+                    MaxRollbackDeploymentAttempts, cancellationToken);
+            }
+            catch (DomainRuleException ex)
+            {
+                ProductionPackageUpgradeMetrics.RecordRollback("blocked");
+                return ApiResult<ProductionPackageUpgradeResult>.Fail(ex.Message, 409)
+                    .AddDetail("kioskExecutionEndpointId", endpoint.KioskExecutionEndpointId);
+            }
+            if (recorded.Recorded)
+                ProductionPackageUpgradeMetrics.RecordRollbackAttempt(result.Data.Profile, recorded.AttemptNo);
         }
 
         try
@@ -498,6 +509,30 @@ public sealed class ProductionPackageUpgradeService(
         {
             ProductionPackageUpgradeMetrics.RecordAbandon("blocked");
             return ApiResult<ProductionPackageUpgradeResult>.Fail(ex.Message, 409);
+        }
+    }
+
+    private async Task EnsureApprovedScopeIsCurrentAsync(
+        ExecuteProductionPackageUpgradeCommand command,
+        ProductionPackageUpgrade upgrade,
+        CancellationToken cancellationToken)
+    {
+        var current = await previewService.BuildAsync(
+            command.UserContext,
+            command.OrganizationId,
+            command.SourceInstallationId,
+            command.TargetPackageVersionId,
+            command.ProductSourceKeys,
+            cancellationToken);
+
+        if (!current.Result.Succeeded || current.Result.Data is null ||
+            current.Result.Data.Blockers.Count > 0 ||
+            !CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(current.Result.Data.PreviewChecksum),
+                Encoding.UTF8.GetBytes(upgrade.PreviewChecksum)))
+        {
+            throw new DomainRuleException(
+                "Upgrade approval scope changed during successor materialization. Generate a new preview before retrying.");
         }
     }
 

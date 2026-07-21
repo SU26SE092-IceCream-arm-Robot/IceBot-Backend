@@ -10,4 +10,6 @@ public sealed class EdgeTelemetryIngestionOptions
     public int ConnectivityReconciliationBatchSize { get; set; } = 100;
     public int MaxBatchEventCount { get; set; } = 100;
     public int AlertCorrelationWindowMinutes { get; set; } = 15;
+    public int AlertAutomationMaxEventAgeMinutes { get; set; } = 60;
+    public int ReadinessTimeoutSeconds { get; set; } = 120;
 }

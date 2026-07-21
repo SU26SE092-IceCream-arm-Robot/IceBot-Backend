@@ -11,13 +11,44 @@ public sealed class InventoryAlertAutomationStore(IceBotDbContext db) : IInvento
 {
     public async Task<IReadOnlyList<Guid>> ListActiveDispenserStateIdsAsync(
         int maxCount,
+        long scanSlot,
         CancellationToken cancellationToken = default) =>
-        await db.IngredientDispenserStates.WhereNotDeleted().AsNoTracking()
+        await ListActiveDispenserStateIdsCoreAsync(maxCount, scanSlot, cancellationToken);
+
+    private async Task<IReadOnlyList<Guid>> ListActiveDispenserStateIdsCoreAsync(
+        int maxCount,
+        long scanSlot,
+        CancellationToken cancellationToken)
+    {
+        var take = Math.Clamp(maxCount, 1, 10_000);
+        var query = db.IngredientDispenserStates.WhereNotDeleted().AsNoTracking()
             .Where(state => state.IsActive)
-            .OrderBy(state => state.Id)
+            .OrderBy(state => state.Id);
+        var count = await query.CountAsync(cancellationToken);
+        if (count == 0)
+        {
+            return [];
+        }
+
+        var offset = InventoryAlertScanWindow.CalculateOffset(count, take, scanSlot);
+        var result = await query
+            .Skip(offset)
             .Select(state => state.Id)
-            .Take(Math.Clamp(maxCount, 1, 10_000))
+            .Take(take)
             .ToListAsync(cancellationToken);
+        if (result.Count == take || result.Count == count)
+        {
+            return result;
+        }
+
+        var remaining = take - result.Count;
+        var wrapAround = await query
+            .Select(state => state.Id)
+            .Take(remaining)
+            .ToListAsync(cancellationToken);
+        result.AddRange(wrapAround);
+        return result;
+    }
 
     public Task<IngredientDispenserState?> GetDispenserStateAsync(
         Guid id,

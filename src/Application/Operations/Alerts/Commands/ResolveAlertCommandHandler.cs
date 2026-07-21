@@ -31,17 +31,23 @@ public sealed class ResolveAlertCommandHandler
             return ApiResult<AlertResult>.Fail("Resolution notes are required.", 400);
         }
 
-        var outcome = await _store.ExecuteSerializedAsync(
+        AlertChangedEvent? notification = null;
+        var result = await _store.ExecuteSerializedAsync(
             command.AlertId,
-            ct => HandleLockedAsync(command, notes, ct),
+            async ct =>
+            {
+                var outcome = await HandleLockedAsync(command, notes, ct);
+                notification = outcome.Notification;
+                return outcome.Result;
+            },
             cancellationToken);
 
-        if (outcome.Notification is not null)
+        if (notification is not null)
         {
-            await _publisher.PublishAlertChangedAsync(outcome.Notification, cancellationToken);
+            await _publisher.PublishAlertChangedAsync(notification, cancellationToken);
         }
 
-        return outcome.Result;
+        return result;
     }
 
     private async Task<LifecycleOutcome> HandleLockedAsync(
@@ -73,7 +79,6 @@ public sealed class ResolveAlertCommandHandler
             {
                 alert.UpdatedAt = now;
                 alert.UpdatedByAccountId = command.UserContext.AccountId;
-                alert.Version++;
                 await _store.SaveChangesAsync(cancellationToken);
                 notification = new AlertChangedEvent
                 {

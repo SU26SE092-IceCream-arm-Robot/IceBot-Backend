@@ -38,7 +38,7 @@ public sealed class ListStoresQueryHandler
         if (userContext.IsSystemAdmin)
         {
             var list = await _storeStore.ListAsync(organizationId, parsedStatus, search, cancellationToken);
-            return ApiResult<IReadOnlyList<StoreResult>>.Success(list.Select(StoreResultMapper.ToResult).ToList());
+            return ApiResult<IReadOnlyList<StoreResult>>.Success(list.Select(store => StoreResultMapper.ToResult(store)).ToList());
         }
 
         var accessibleStores = await _storeStore.ListAccessibleAsync(
@@ -49,6 +49,6 @@ public sealed class ListStoresQueryHandler
             search,
             cancellationToken);
 
-        return ApiResult<IReadOnlyList<StoreResult>>.Success(accessibleStores.Select(StoreResultMapper.ToResult).ToList());
+        return ApiResult<IReadOnlyList<StoreResult>>.Success(accessibleStores.Select(store => StoreResultMapper.ToResult(store)).ToList());
     }
 }

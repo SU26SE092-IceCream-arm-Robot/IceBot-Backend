@@ -13,11 +13,23 @@ using Application.Operations.Alerts.Notifications;
 using Domain.Common.Enums;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Application.Devices.Telemetry.Rules;
 
 namespace IceBot.UnitTests.Devices;
 
 public sealed class DeviceEventIngestionTests
 {
+    [Fact]
+    public void HistoricalEvent_IsNotEligibleForAlertAutomation()
+    {
+        var receivedAt = DateTimeOffset.UtcNow;
+
+        Assert.False(DeviceEventAutomationRules.IsEligibleForAlertAutomation(
+            receivedAt.AddHours(-2), receivedAt, 30));
+        Assert.True(DeviceEventAutomationRules.IsEligibleForAlertAutomation(
+            receivedAt.AddMinutes(-29), receivedAt, 30));
+    }
+
     [Fact]
     public async Task HandleAsync_RejectsInformationalEvidenceBeforeStoreAccess()
     {

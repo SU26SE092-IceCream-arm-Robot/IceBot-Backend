@@ -85,7 +85,7 @@ Response:
 Rules:
 
 - Edge must deduplicate by `commandId`.
-- New `ExecuteOrder` payloads include `SchemaVersion = 2`. Edge must reject unsupported schema versions; Cloud may read release provenance from legacy payloads without treating those payloads as fully executable contracts. Each selected option can include immutable ingredient requirements (`ingredientId`, code/name snapshots, quantity per option, unit, required workcell capability); Edge must use this order snapshot rather than live catalog data.
+- New `ExecuteOrder` payloads include `SchemaVersion = 3`, `executionIntent`, and a `productionUnitStartNo` on each line. Edge must reject unsupported schema versions; Cloud may read release provenance from legacy payloads without treating those payloads as fully executable contracts. Each selected option can include immutable ingredient requirements (`ingredientId`, code/name snapshots, quantity per option, unit, required workcell capability); Edge must use this order snapshot rather than live catalog data.
 - An ordered artifact may include `RequiredOptionCode`. Edge executes that artifact only when the same order line contains a selected option with the matching normalized code; otherwise Edge skips it without changing the remaining `RunOrder`. This is conditional file selection, not a Lua runtime parameter.
 - Deployment commands include typed Cloud correlation fields for deployment ownership. `PayloadJson` is execution data, not the authoritative link used by timeout reconciliation.
 - Pull first materializes any short-lived artifact download URLs. Only after payload enrichment succeeds does it mark returned commands as `Delivered` and record a delivery attempt.
@@ -205,7 +205,7 @@ Command ack owns delivery and executor-admission state. For `ExecuteOrder`, that
 `RequiresManualIntervention` belong to the execution event/report ingest
 boundary, not this endpoint.
 
-`acknowledgedAt` is executor evidence, not ordering authority. It must not be farther in the future than `ExecutionReportIngestion__MaxFutureClockSkewSeconds`, and must not predate command creation or recorded delivery beyond that same skew allowance.
+`acknowledgedAt` is executor evidence, not ordering or expiry authority. It must not be farther in the future than `ExecutionReportIngestion__MaxFutureClockSkewSeconds`, and must not predate command creation or recorded delivery beyond that same skew allowance. Cloud applies the acknowledgement, command expiry, provisional execution projection, status history, and realtime update at Cloud receive time.
 
 For `ExecuteOrder` commands:
 
@@ -225,6 +225,7 @@ Execution timeout reconciliation:
 - Reconciliation changes `OrderExecutionRecord.ObservationStatus` and `CustomerExecutionStatus`; it does not claim that the physical job failed and does not change an Accepted/Preparing Order to `Failed`.
 - Customer order/payment polling reads the latest dispatch attempt projection. SignalR publishes `OrderExecutionObservationChanged` to the order group for the same projection.
 - A later valid executor report restores observation to `Fresh` through normal sequence validation.
+- Missing-report deadlines and support escalation use the last Cloud receive time. `LastExecutorReportedAt` remains diagnostics evidence and cannot make a freshly received report immediately stale when an executor clock moves backward.
 
 Redispatch is an explicit management operation, not an Edge-side automatic retry. Backend permits a new attempt only after transport `DeliveryFailed` or a rejection proven to be before physical output. It allocates the next attempt number under the order lock, enforces the configured maximum, and records operator/reason audit. `ExecutorBusy` redelivers the same command; possible physical output, `RefundRequired`, production failure, and manual intervention remain support/compensation flows.
 
@@ -314,9 +315,9 @@ Rules:
 - A final replay may transition `Accepted` directly to `Completed`, `Failed`, or `RequiresManualIntervention`; `Running` may have been lost while the controller was disconnected.
 - `physicalOutputMayHaveOccurred` must be set when reporting failed production execution. It drives customer/support projection: failure before output can be handled differently from failure after possible physical output.
 - Deployment report `Active` updates the observed active configuration/artifact-set snapshot on `KioskExecutionEndpoint`.
-- Order-summary production reports update machine-produced item status in the same transaction, then aggregate the whole mixed order. A failed line produces `FulfillmentIssue`; it does not automatically claim that the whole order failed or that a refund occurred. Each aggregate change appends `OrderStatusHistory`. A final/support business Order remains authoritative; a late report still updates execution evidence but cannot reopen or overwrite that Order lifecycle.
-- A report with `sourceProductionJobId` set is job/unit-level evidence: it updates `ProductionExecutionRecord` and optional stock evidence only. It must not complete or fail the whole order.
-- A report with `sourceProductionJobId=null` is the Edge-computed order summary: it updates `OrderExecutionRecord` and the business Order, not a job-level `ProductionExecutionRecord`. Edge emits this summary only after applying its local multi-job aggregation policy.
+- Job/unit evidence is the Cloud authority for per-unit production outcomes. Non-overlapping ranges update `ProductionExecutionRecord`, optional stock evidence, effective completed/failed/in-progress counts, and the affected machine line in one transaction. A line completes only after all expected units are covered by effective `Completed` evidence; one failed unit moves a paid order to `FulfillmentIssue` while successful unit and inventory evidence remain intact.
+- A report with `sourceProductionJobId=null` remains the Edge-computed order observation and updates `OrderExecutionRecord`. When any job evidence exists, a final summary requires complete coverage and must agree with the Cloud-derived aggregate; contradictory final summaries are rejected. A non-final summary may arrive behind newer unit evidence and cannot rewind the business lifecycle.
+- A remake is a new `ExecuteOrder` command with `executionIntent=Remake`, `remakeOfSourceCommandId`, and an exact `productionUnitStartNo`/quantity range. Cloud creates it only for failed units with confirmed no physical output. Evidence from the later remake attempt supersedes the failed outcome for those units; all earlier execution and stock evidence remains immutable.
 - Changed lines publish `OrderItemFulfillmentChanged`; aggregate order transitions publish `OrderStatusChanged`; applied order-summary observations publish `OrderExecutionObservationChanged` through SignalR after commit.
 - `stockMovements` is typed append-only consumption evidence and is accepted only on a report with `sourceProductionJobId`. Every item must identify the same `OrderItemId` as that job report. Each item has its own globally unique `sourceEventId`; duplicates are serialized by evidence identity and ignored even when two different reports arrive concurrently. The dispenser must belong to the reporting kiosk. Evidence freshness is independent from lifecycle projection freshness, so a sequence-stale job observation can still append previously unseen physical evidence.
 - A supplied `balanceAfter` updates the observed dispenser estimate. Without it, Cloud records evidence without guessing a new balance. Inventory evidence does not gate runtime-menu sellability or order creation in V1.

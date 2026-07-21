@@ -17,4 +17,5 @@ public sealed class CreateMaintenanceTicketRequest
     [StringLength(100)]
     public string? IssueCode { get; init; }
     public MaintenancePriority? Priority { get; init; }
+    public MaintenanceOperationalImpact OperationalImpact { get; init; } = MaintenanceOperationalImpact.None;
 }

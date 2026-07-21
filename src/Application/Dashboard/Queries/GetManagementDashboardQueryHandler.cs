@@ -18,7 +18,7 @@ public sealed class GetManagementDashboardQueryHandler
         CancellationToken cancellationToken = default)
     {
         var userContext = query.UserContext;
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersView, userContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.DashboardView, userContext);
         var metrics = await _dashboardStore.GetDashboardMetricsAsync(
             userContext.IsSystemAdmin,
             scope.OrganizationIds,

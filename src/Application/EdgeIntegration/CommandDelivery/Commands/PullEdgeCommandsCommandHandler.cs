@@ -56,6 +56,7 @@ public sealed class PullEdgeCommandsCommandHandler
         CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
+        await _edgeCommandStore.AcquireKioskOperationalLockAsync(command.KioskId, cancellationToken);
         var maxCommands = Math.Clamp(command.MaxCommands, 1, 20);
         var commands = await _edgeCommandStore.ListDispatchableAsync(
             command.KioskId,

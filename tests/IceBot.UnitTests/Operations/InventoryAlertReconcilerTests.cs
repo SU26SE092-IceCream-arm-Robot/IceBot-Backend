@@ -8,6 +8,7 @@ using Domain.Operations.Entities;
 using Domain.Operations.Enums;
 using Domain.Tenants.Entities;
 using NSubstitute;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IceBot.UnitTests.Operations;
 
@@ -26,7 +27,8 @@ public sealed class InventoryAlertReconcilerTests
 
         var changed = await reconciler.ReconcileAsync(Now);
 
-        Assert.Equal(1, changed);
+        Assert.Equal(1, changed.ChangedAlertCount);
+        Assert.Equal(0, changed.CandidateFailureCount);
         var alert = Assert.Single(alerts);
         Assert.Equal("INVENTORY_EMPTY", alert.AlertCode);
         Assert.Equal(alert.Id, ticket?.AlertId);
@@ -45,7 +47,7 @@ public sealed class InventoryAlertReconcilerTests
         store.MaintenanceTicketExistsForAlertAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(true);
         var changed = await reconciler.ReconcileAsync(Now.AddMinutes(1));
 
-        Assert.Equal(0, changed);
+        Assert.Equal(0, changed.ChangedAlertCount);
         Assert.Single(alerts);
         await notifier.Received(1).NotifyEmptyAsync(
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<Guid>(),
@@ -63,8 +65,41 @@ public sealed class InventoryAlertReconcilerTests
 
         var changed = await reconciler.ReconcileAsync(Now);
 
-        Assert.Equal(1, changed);
+        Assert.Equal(1, changed.ChangedAlertCount);
         Assert.Equal(AlertStatus.Resolved, alert.Status);
+    }
+
+    [Fact]
+    public async Task CandidateFailure_DoesNotBlockLaterDispenserStates()
+    {
+        var failedState = State(IngredientLevelStatus.Low, 0);
+        var healthyState = State(IngredientLevelStatus.Low, 0);
+        var store = Substitute.For<IInventoryAlertAutomationStore>();
+        store.ListActiveDispenserStateIdsAsync(Arg.Any<int>(), Arg.Any<long>(), Arg.Any<CancellationToken>())
+            .Returns([failedState.Id, healthyState.Id]);
+        store.GetDispenserStateAsync(failedState.Id, Arg.Any<CancellationToken>())
+            .Returns<Task<IngredientDispenserState?>>(_ => throw new InvalidOperationException("poison state"));
+        store.GetDispenserStateAsync(healthyState.Id, Arg.Any<CancellationToken>()).Returns(healthyState);
+        store.ListActiveInventoryAlertsAsync(healthyState.Id, Arg.Any<CancellationToken>()).Returns([]);
+        store.MaintenanceTicketExistsForAlertAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns(false);
+        store.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<List<Application.Abstractions.Realtime.Events.AlertChangedEvent>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<List<Application.Abstractions.Realtime.Events.AlertChangedEvent>>>>()(CancellationToken.None));
+        var alerts = new List<Alert>();
+        store.AddAlertAsync(Arg.Do<Alert>(alerts.Add), Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
+        var reconciler = new InventoryAlertReconciler(
+            store,
+            Substitute.For<IRealtimeNotificationPublisher>(),
+            Substitute.For<IInventoryOperationalAlertNotifier>(),
+            new InventoryAlertAutomationOptions { BatchSize = 10, MaxBatchesPerRun = 1 },
+            NullLogger<InventoryAlertReconciler>.Instance);
+
+        var result = await reconciler.ReconcileAsync(Now);
+
+        Assert.Equal(1, result.CandidateFailureCount);
+        Assert.Equal(1, result.ChangedAlertCount);
+        Assert.Single(alerts);
     }
 
     private static (
@@ -76,7 +111,7 @@ public sealed class InventoryAlertReconcilerTests
     {
         var alerts = existing ?? [];
         var store = Substitute.For<IInventoryAlertAutomationStore>();
-        store.ListActiveDispenserStateIdsAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns([state.Id]);
+        store.ListActiveDispenserStateIdsAsync(Arg.Any<int>(), Arg.Any<long>(), Arg.Any<CancellationToken>()).Returns([state.Id]);
         store.GetDispenserStateAsync(state.Id, Arg.Any<CancellationToken>()).Returns(state);
         store.ListActiveInventoryAlertsAsync(state.Id, Arg.Any<CancellationToken>())
             .Returns(_ => alerts.Where(alert => alert.Status is AlertStatus.Open or AlertStatus.Acknowledged).ToList());
@@ -94,7 +129,9 @@ public sealed class InventoryAlertReconcilerTests
             MaxBatchesPerRun = 1,
             CreateMaintenanceTicketForEmpty = true
         };
-        return (new InventoryAlertReconciler(store, publisher, notifier, options), store, publisher, notifier, alerts);
+        return (new InventoryAlertReconciler(
+            store, publisher, notifier, options, NullLogger<InventoryAlertReconciler>.Instance),
+            store, publisher, notifier, alerts);
     }
 
     private static IngredientDispenserState State(IngredientLevelStatus level, decimal? quantity)

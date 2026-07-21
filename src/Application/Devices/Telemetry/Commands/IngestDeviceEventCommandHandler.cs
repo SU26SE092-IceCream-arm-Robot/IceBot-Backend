@@ -12,6 +12,7 @@ using Domain.Operations.Entities;
 using Domain.Operations.Enums;
 using Application.Operations.Alerts.Notifications;
 using Microsoft.Extensions.Options;
+using Application.Devices.Telemetry.Rules;
 
 namespace Application.Devices.Telemetry.Commands;
 
@@ -130,7 +131,11 @@ public sealed class IngestDeviceEventCommandHandler
         await _store.AddDeviceEventAsync(deviceEvent, cancellationToken);
 
         AlertChangedEvent? alertNotification = null;
-        if (command.Severity is SeverityLevel.Error or SeverityLevel.Critical)
+        var eligibleForAlertAutomation = DeviceEventAutomationRules.IsEligibleForAlertAutomation(
+            deviceEvent.OccurredAt,
+            receivedAt,
+            _options.AlertAutomationMaxEventAgeMinutes);
+        if (eligibleForAlertAutomation && command.Severity is SeverityLevel.Error or SeverityLevel.Critical)
         {
             var correlationWindow = TimeSpan.FromMinutes(_options.AlertCorrelationWindowMinutes);
             var correlationKey = Alert.NormalizeCorrelationKey(deviceEvent.EventType);

@@ -49,6 +49,11 @@ public sealed class CreateMaintenanceTicketCommandHandler
             return ApiResult<MaintenanceTicketResult>.Fail("Kiosk not found.", 404);
         }
 
+        if (!Enum.IsDefined(req.OperationalImpact))
+        {
+            return ApiResult<MaintenanceTicketResult>.Fail("Invalid maintenance operational impact.", 400);
+        }
+
         if (!MaintenanceTicketAccessRules.CanCreate(
                 user,
                 kioskScope.OrganizationId,
@@ -112,13 +117,24 @@ public sealed class CreateMaintenanceTicketCommandHandler
             Description = req.Description?.Trim(),
             Priority = req.Priority ?? MaintenancePriority.Medium,
             Status = MaintenanceTicketStatus.Open,
+            OperationalImpact = req.OperationalImpact,
             ReportedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = user.AccountId,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
         await _ticketStore.AddAsync(ticket, cancellationToken);
-        await _ticketStore.SaveChangesAsync(cancellationToken);
+        var saved = false;
+        for (var attempt = 0; attempt < 5 && !saved; attempt++)
+        {
+            if (attempt > 0)
+                ticket.TicketNumber = await MaintenanceTicketNumberGenerator.GenerateAsync(
+                    _ticketStore, cancellationToken);
+            saved = await _ticketStore.TrySaveNewTicketAsync(cancellationToken);
+        }
+        if (!saved)
+            return ApiResult<MaintenanceTicketResult>.Fail(
+                "A unique maintenance ticket number could not be allocated.", 409);
 
         var result = MaintenanceTicketResultMapper.ToResult(ticket);
 

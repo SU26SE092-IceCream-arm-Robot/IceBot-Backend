@@ -115,8 +115,8 @@ Response:
 Rules:
 
 - Use this endpoint only for Cloud Sales Catalog truth.
-- Cloud online sales require `KioskStatus.Active`, active parent tenant scope, and connectivity `Online` or `Degraded`.
-- Lifecycle and connectivity are separate contracts; `Unreachable` is not a `KioskStatus` value.
+- Cloud online sales require `KioskStatus.Active`, `KioskOperationalState.Operational`, active parent tenant scope, and connectivity `Online` or `Degraded`.
+- Lifecycle, operational admission, and connectivity are separate contracts. `Online` does not imply `AcceptingOrders`; `Unreachable` is not a lifecycle or operational-state value.
 - Offline-created order sync is not a current tablet capability. A future offline mode requires an explicit offline session and reconciliation contract; the normal order endpoint must not be treated as offline authority.
 - For final runtime availability before checkout, the tablet should still prefer the Local Edge runtime projection when the edge service is available.
 - `snapshotId` identifies the runtime-menu response for client cache/debug purposes. Order creation does not accept it as authority; Cloud always reloads the selected menu items and recalculates prices.

@@ -2586,6 +2586,11 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("KioskId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("OperationalImpact")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid");
 
@@ -2950,6 +2955,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset>("PaymentDeadlineAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
 
@@ -2963,6 +2971,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("StatusBeforeDuplicatePaymentIntervention")
                         .HasColumnType("integer");
 
                     b.Property<Guid?>("StoreId")
@@ -3630,6 +3641,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("RetryCount")
                         .HasColumnType("integer");
 
+                    b.Property<int>("SettlementDisposition")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -3663,6 +3677,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("Provider", "ProviderOrderCode")
                         .IsUnique()
                         .HasFilter("\"ProviderOrderCode\" IS NOT NULL");
+
+                    b.HasIndex(new[] { "OrderId" }, "IX_PaymentTransactions_OrderId_PrimarySettlement")
+                        .IsUnique()
+                        .HasFilter("\"SettlementDisposition\" = 1");
 
                     b.ToTable("PaymentTransactions", (string)null);
                 });
@@ -7346,6 +7364,21 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("OperationalState")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTimeOffset?>("OperationalStateChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OperationalStateChangedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OperationalStateReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -7395,6 +7428,55 @@ namespace Infrastructure.Migrations
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Kiosks", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Tenants.Entities.KioskOperationalStateTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromState")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("SourceMaintenanceTicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ToState")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceMaintenanceTicketId");
+
+                    b.HasIndex("KioskId", "ChangedAt");
+
+                    b.ToTable("KioskOperationalStateTransitions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Tenants.Entities.Organization", b =>
@@ -7534,6 +7616,25 @@ namespace Infrastructure.Migrations
                     b.Property<string>("Province")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("SalesPauseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("SalesPausedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SalesPausedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SalesPausedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SalesResumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SalesResumedByAccountId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -9290,6 +9391,20 @@ namespace Infrastructure.Migrations
                     b.Navigation("Organization");
 
                     b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("Domain.Tenants.Entities.KioskOperationalStateTransition", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Operations.Entities.MaintenanceTicket", null)
+                        .WithMany()
+                        .HasForeignKey("SourceMaintenanceTicketId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Domain.Tenants.Entities.Store", b =>

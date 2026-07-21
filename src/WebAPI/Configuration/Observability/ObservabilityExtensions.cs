@@ -9,6 +9,8 @@ using Infrastructure.Payments.Observability;
 using Infrastructure.Firebase;
 using Application.RobotConfiguration.AuthoringImports;
 using Infrastructure.Operations.Notifications;
+using Infrastructure.Operations.Automation;
+using Infrastructure.Devices.Credentials.Observability;
 
 namespace WebAPI.Configuration.Observability;
 
@@ -112,6 +114,8 @@ public static class ObservabilityExtensions
                     .AddMeter(RobotAuthoringImportObservability.InstrumentationName)
                     .AddMeter(ProductionPackageUpgradeMetrics.MeterName)
                     .AddMeter(NotificationDeliveryMetrics.MeterName)
+                    .AddMeter(OperationalAutomationMetrics.MeterName)
+                    .AddMeter(MqttCredentialReconciliationMetrics.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();

@@ -102,11 +102,11 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
                 "Physical-output evidence is supported only for rejected execute-order commands.", 400));
         }
 
-        var observedAt = command.AcknowledgedAt ?? cloudReceivedAt;
+        var acknowledgedAt = command.AcknowledgedAt ?? cloudReceivedAt;
         var allowedSkew = TimeSpan.FromSeconds(Math.Max(_options.MaxFutureClockSkewSeconds, 0));
-        if (observedAt > cloudReceivedAt.Add(allowedSkew) ||
-            observedAt < edgeCommand.CreatedAt.Subtract(allowedSkew) ||
-            (edgeCommand.DeliveredAt.HasValue && observedAt < edgeCommand.DeliveredAt.Value.Subtract(allowedSkew)))
+        if (acknowledgedAt > cloudReceivedAt.Add(allowedSkew) ||
+            acknowledgedAt < edgeCommand.CreatedAt.Subtract(allowedSkew) ||
+            (edgeCommand.DeliveredAt.HasValue && acknowledgedAt < edgeCommand.DeliveredAt.Value.Subtract(allowedSkew)))
         {
             return AcknowledgementOutcome.FromResult(ApiResult<EdgeCommandAckResult>.Fail(
                 "Acknowledgement timestamp is outside the allowed command clock-skew window.", 400));
@@ -133,13 +133,13 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
 
         try
         {
-            ApplyAck(edgeCommand, command, observedAt);
+            ApplyAck(edgeCommand, command, cloudReceivedAt);
             ApplyOrderAck(order, edgeCommand, command);
             await EnsureProvisionalExecutionRecordAsync(
                 endpoint,
                 edgeCommand,
                 command,
-                observedAt,
+                cloudReceivedAt,
                 cancellationToken);
         }
         catch (Domain.Common.DomainRuleException ex)
@@ -155,7 +155,7 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
                 OrderId = order!.Id,
                 FromStatus = previousOrderStatus,
                 ToStatus = order.Status,
-                ChangedAt = observedAt,
+                ChangedAt = cloudReceivedAt,
                 Reason = BuildHistoryReason(command)
             }, cancellationToken);
         }
@@ -180,7 +180,7 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
                 CustomerStatusMessage = projection.CustomerStatusMessage,
                 CanRetryPayment = projection.CanRetryPayment,
                 RequiresStaffSupport = projection.RequiresStaffSupport,
-                UpdatedAt = observedAt,
+                UpdatedAt = cloudReceivedAt,
                 Version = 1
             };
         }

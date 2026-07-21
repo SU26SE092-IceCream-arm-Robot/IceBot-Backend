@@ -39,6 +39,7 @@ internal sealed class StoreConfiguration : IEntityTypeConfiguration<Store>
     {
         entity.ToTable("Stores");
         entity.HasIndex(x => new { x.OrganizationId, x.Code }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.Property(x => x.SalesPauseReason).HasMaxLength(500);
         entity.HasOne(x => x.Organization)
             .WithMany(x => x.Stores)
             .HasForeignKey(x => x.OrganizationId)
@@ -55,6 +56,9 @@ internal sealed class KioskConfiguration : IEntityTypeConfiguration<Kiosk>
         entity.HasIndex(x => new { x.Id, x.OrganizationId }).IsUnique();
         entity.HasIndex(x => new { x.OrganizationId, x.Code }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => x.SerialNumber).IsUnique().HasFilter(EfModelConfigurationConstants.NotNullAndActive(nameof(Kiosk.SerialNumber)));
+        entity.Property(x => x.OperationalState)
+            .HasDefaultValue(Domain.Tenants.Enums.KioskOperationalState.Operational);
+        entity.Property(x => x.OperationalStateReason).HasMaxLength(500);
         entity.HasOne(x => x.Organization)
             .WithMany()
             .HasForeignKey(x => x.OrganizationId)
@@ -100,5 +104,24 @@ internal sealed class FranchiseOnboardingConfiguration : IEntityTypeConfiguratio
         entity.HasIndex(x => x.PackageInstallationId)
             .IsUnique()
             .HasFilter(EfModelConfigurationConstants.NotNullAndActive(nameof(FranchiseOnboarding.PackageInstallationId)));
+    }
+}
+
+internal sealed class KioskOperationalStateTransitionConfiguration
+    : IEntityTypeConfiguration<KioskOperationalStateTransition>
+{
+    public void Configure(EntityTypeBuilder<KioskOperationalStateTransition> entity)
+    {
+        entity.ToTable("KioskOperationalStateTransitions");
+        entity.Property(x => x.Reason).HasMaxLength(500);
+        entity.HasIndex(x => new { x.KioskId, x.ChangedAt });
+        entity.HasOne<Kiosk>()
+            .WithMany()
+            .HasForeignKey(x => x.KioskId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<MaintenanceTicket>()
+            .WithMany()
+            .HasForeignKey(x => x.SourceMaintenanceTicketId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

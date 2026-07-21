@@ -84,6 +84,16 @@ public sealed class StoreStore : IStoreStore
         return _dbContext.Stores.WhereNotDeleted().FirstOrDefaultAsync(x => x.Id == storeId, cancellationToken);
     }
 
+    public Task<Store?> GetByOrganizationAndIdAsync(
+        Guid organizationId,
+        Guid storeId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Stores.WhereNotDeleted().FirstOrDefaultAsync(
+            x => x.OrganizationId == organizationId && x.Id == storeId,
+            cancellationToken);
+    }
+
     public Task AddAsync(Store store, CancellationToken cancellationToken = default)
     {
         return _dbContext.Stores.AddAsync(store, cancellationToken).AsTask();

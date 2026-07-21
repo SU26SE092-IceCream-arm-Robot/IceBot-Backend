@@ -9,6 +9,10 @@ public sealed class KioskResult
     public string Name { get; set; } = null!;
     public string KioskType { get; set; } = null!;
     public string Status { get; set; } = null!;
+    public string OperationalState { get; set; } = null!;
+    public string? OperationalStateReason { get; set; }
+    public DateTimeOffset? OperationalStateChangedAt { get; set; }
+    public Guid? OperationalStateChangedByAccountId { get; set; }
     public string? SerialNumber { get; set; }
     public string TimeZone { get; set; } = null!;
     public string? Address { get; set; }

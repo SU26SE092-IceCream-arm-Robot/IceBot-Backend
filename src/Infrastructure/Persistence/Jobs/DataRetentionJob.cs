@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Infrastructure.Operations.Automation;
+using System.Diagnostics;
 
 namespace Infrastructure.Persistence.Jobs;
 
@@ -35,6 +37,7 @@ public sealed class DataRetentionJob : BackgroundService
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             using var scope = _scopeFactory.CreateScope();
@@ -51,12 +54,25 @@ public sealed class DataRetentionJob : BackgroundService
                 result.PasswordResetRequests,
                 result.AccountInvitations,
                 result.NotificationDeliveries);
+            foreach (var failure in result.Failures)
+            {
+                OperationalAutomationMetrics.RecordCandidateFailure("data_retention");
+                _logger.LogError(
+                    "Data retention purge failed for category {Category}: {Error}",
+                    failure.Category,
+                    failure.Error);
+            }
+            OperationalAutomationMetrics.RecordRun(
+                "data_retention",
+                result.Failures.Count == 0 ? "succeeded" : "partial_failure",
+                stopwatch.Elapsed);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
+            OperationalAutomationMetrics.RecordRun("data_retention", "failed", stopwatch.Elapsed);
             _logger.LogError(ex, "Data retention purge failed.");
         }
     }

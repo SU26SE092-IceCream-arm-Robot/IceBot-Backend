@@ -31,59 +31,84 @@ public sealed class ReconcileExpiredDeploymentCommandsCommandHandler
             observedAt, maxCommands, cancellationToken);
         var reconciled = 0;
         var missingDeployments = 0;
+        var failures = new List<DeploymentTimeoutReconciliationFailure>();
 
         foreach (var command in commands)
         {
-            var wasAlreadyRejectedAsExpired =
-                command.Status == EdgeCommandStatus.Rejected &&
-                string.Equals(command.RejectionCode, "CommandExpired", StringComparison.Ordinal);
-            if (!wasAlreadyRejectedAsExpired && !command.RejectIfExpired(observedAt))
-                continue;
-
-            if (command.DeploymentKind == DeploymentCommandTargetKind.FullEdgeConfiguration)
+            try
             {
-                var deployment = await _deploymentStore.GetFullEdgeDeploymentForReconciliationAsync(
-                    command.DeploymentId!.Value, cancellationToken);
-                if (deployment is null)
+                if (!command.DeploymentId.HasValue)
                 {
-                    missingDeployments++;
+                    failures.Add(new DeploymentTimeoutReconciliationFailure(
+                        command.Id,
+                        "Deployment command has no deployment reference."));
                     continue;
                 }
 
-                if (deployment.Status == KioskConfigurationDeploymentStatus.Pending)
-                {
-                    deployment.MarkCommandExpired(observedAt);
-                    reconciled++;
-                }
-            }
-            else if (command.DeploymentKind == DeploymentCommandTargetKind.LowCostArtifactSet)
-            {
-                var deployment = await _deploymentStore.GetControllerDeploymentForReconciliationAsync(
-                    command.DeploymentId!.Value, cancellationToken);
-                if (deployment is null)
-                {
-                    missingDeployments++;
+                var wasAlreadyRejectedAsExpired =
+                    command.Status == EdgeCommandStatus.Rejected &&
+                    string.Equals(command.RejectionCode, "CommandExpired", StringComparison.Ordinal);
+                if (!wasAlreadyRejectedAsExpired && !command.RejectIfExpired(observedAt))
                     continue;
-                }
 
-                if (deployment.Status == ControllerArtifactSetDeploymentStatus.Pending)
+                if (command.DeploymentKind == DeploymentCommandTargetKind.FullEdgeConfiguration)
                 {
-                    deployment.MarkCommandExpired(observedAt);
-                    reconciled++;
+                    var deployment = await _deploymentStore.GetFullEdgeDeploymentForReconciliationAsync(
+                        command.DeploymentId.Value, cancellationToken);
+                    if (deployment is null)
+                    {
+                        missingDeployments++;
+                        continue;
+                    }
+
+                    if (deployment.Status == KioskConfigurationDeploymentStatus.Pending)
+                    {
+                        deployment.MarkCommandExpired(observedAt);
+                        reconciled++;
+                    }
+                }
+                else if (command.DeploymentKind == DeploymentCommandTargetKind.LowCostArtifactSet)
+                {
+                    var deployment = await _deploymentStore.GetControllerDeploymentForReconciliationAsync(
+                        command.DeploymentId.Value, cancellationToken);
+                    if (deployment is null)
+                    {
+                        missingDeployments++;
+                        continue;
+                    }
+
+                    if (deployment.Status == ControllerArtifactSetDeploymentStatus.Pending)
+                    {
+                        deployment.MarkCommandExpired(observedAt);
+                        reconciled++;
+                    }
+                }
+                else
+                {
+                    failures.Add(new DeploymentTimeoutReconciliationFailure(
+                        command.Id,
+                        "Deployment command kind is not supported."));
                 }
             }
-            else
+            catch (DomainRuleException exception)
             {
-                throw new DomainRuleException("Deployment command kind is not supported.");
+                failures.Add(new DeploymentTimeoutReconciliationFailure(command.Id, exception.Message));
             }
         }
 
         await _edgeCommandStore.SaveChangesAsync(cancellationToken);
-        return new DeploymentTimeoutReconciliationResult(commands.Count, reconciled, missingDeployments);
+        return new DeploymentTimeoutReconciliationResult(
+            commands.Count,
+            reconciled,
+            missingDeployments,
+            failures);
     }
 }
 
 public sealed record DeploymentTimeoutReconciliationResult(
     int ExpiredCommandCount,
     int ReconciledDeploymentCount,
-    int MissingDeploymentCount);
+    int MissingDeploymentCount,
+    IReadOnlyList<DeploymentTimeoutReconciliationFailure> Failures);
+
+public sealed record DeploymentTimeoutReconciliationFailure(Guid CommandId, string Reason);

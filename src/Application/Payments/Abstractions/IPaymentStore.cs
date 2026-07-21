@@ -59,7 +59,14 @@ public interface IPaymentStore
 
     Task<PaymentTransaction?> GetLatestPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default);
 
-    Task<PaymentTransaction?> GetLatestPaidPaymentTransactionByOrderIdAsync(Guid orderId, CancellationToken cancellationToken = default);
+    Task<PaymentTransaction?> GetAppliedPaymentSettlementByOrderIdAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> HasOtherUnresolvedDuplicatePaymentsAsync(
+        Guid orderId,
+        Guid excludingPaymentTransactionId,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<PaymentTransaction>> ListPaymentTransactionsByOrderIdAsync(
         Guid orderId,

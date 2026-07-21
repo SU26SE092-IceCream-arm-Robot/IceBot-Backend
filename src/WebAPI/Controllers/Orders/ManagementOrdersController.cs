@@ -15,6 +15,7 @@ public sealed class ManagementOrdersController : ControllerBase
     private readonly CancelManagementOrderCommandHandler _cancelHandler;
     private readonly MarkOrderRefundRequiredCommandHandler _refundRequiredHandler;
     private readonly RedispatchOrderExecutionCommandHandler _redispatchHandler;
+    private readonly RequestOrderItemProductionRemakeCommandHandler _productionRemakeHandler;
     private readonly RecordManualOrderItemFulfillmentEventCommandHandler _manualItemFulfillmentHandler;
     private readonly SetPackagedOrderItemFulfillmentCommandHandler _packagedItemFulfillmentHandler;
 
@@ -22,12 +23,14 @@ public sealed class ManagementOrdersController : ControllerBase
         CancelManagementOrderCommandHandler cancelHandler,
         MarkOrderRefundRequiredCommandHandler refundRequiredHandler,
         RedispatchOrderExecutionCommandHandler redispatchHandler,
+        RequestOrderItemProductionRemakeCommandHandler productionRemakeHandler,
         RecordManualOrderItemFulfillmentEventCommandHandler manualItemFulfillmentHandler,
         SetPackagedOrderItemFulfillmentCommandHandler packagedItemFulfillmentHandler)
     {
         _cancelHandler = cancelHandler;
         _refundRequiredHandler = refundRequiredHandler;
         _redispatchHandler = redispatchHandler;
+        _productionRemakeHandler = productionRemakeHandler;
         _manualItemFulfillmentHandler = manualItemFulfillmentHandler;
         _packagedItemFulfillmentHandler = packagedItemFulfillmentHandler;
     }
@@ -98,6 +101,27 @@ public sealed class ManagementOrdersController : ControllerBase
             UserContext = User.GetUserContext(),
             Reason = request.Reason
         }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{orderId:guid}/items/{orderItemId:guid}/production-remakes")]
+    [Authorize(Policy = "orders.manage")]
+    public async Task<IActionResult> RequestProductionRemake(
+        Guid orderId,
+        Guid orderItemId,
+        [FromBody] RequestProductionRemakeRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _productionRemakeHandler.HandleAsync(
+            new RequestOrderItemProductionRemakeCommand(
+                orderId,
+                orderItemId,
+                request.RemakeRequestId,
+                request.ProductionUnitNo,
+                request.ProductionUnitQuantity,
+                request.Reason,
+                User.GetUserContext()),
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

@@ -7,6 +7,8 @@ using Application.Tenants.Kiosks.Rules;
 using Application.Tenants.Stores;
 using Application.SalesCatalog.Rules;
 using Application.SalesCatalog.RuntimeMenus.Support;
+using Application.Devices.Telemetry;
+using Microsoft.Extensions.Options;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
 
@@ -14,10 +16,14 @@ public sealed class GetKioskRuntimeMenuQueryHandler
 {
     private static readonly TimeSpan SnapshotTtl = TimeSpan.FromSeconds(15);
     private readonly IMenuStore _menus;
+    private readonly EdgeTelemetryIngestionOptions _options;
 
-    public GetKioskRuntimeMenuQueryHandler(IMenuStore menus)
+    public GetKioskRuntimeMenuQueryHandler(
+        IMenuStore menus,
+        IOptions<EdgeTelemetryIngestionOptions>? options = null)
     {
         _menus = menus;
+        _options = options?.Value ?? new EdgeTelemetryIngestionOptions();
     }
 
     public async Task<ApiResult<RuntimeMenuResult>> HandleAsync(
@@ -39,10 +45,10 @@ public sealed class GetKioskRuntimeMenuQueryHandler
         }
 
         var now = DateTimeOffset.UtcNow;
-        var openingHoursError = StoreSalesAvailabilityRules.ValidateOpeningHours(kiosk.Store, now);
-        if (openingHoursError is not null)
+        var admissionError = StoreSalesAvailabilityRules.ValidateSalesAdmission(kiosk.Store, now);
+        if (admissionError is not null)
         {
-            return ApiResult<RuntimeMenuResult>.Fail(openingHoursError, 409);
+            return ApiResult<RuntimeMenuResult>.Fail(admissionError, 409);
         }
 
         var menus = await _menus.ListActiveMenusForKioskAsync(
@@ -79,6 +85,7 @@ public sealed class GetKioskRuntimeMenuQueryHandler
                     kiosk.Id,
                     key.ProductVariantId,
                     key.RecipeId,
+                    now.AddSeconds(-_options.ReadinessTimeoutSeconds),
                     cancellationToken);
             }
         }

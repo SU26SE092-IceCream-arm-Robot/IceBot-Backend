@@ -4,7 +4,6 @@
     {
         Provisioning = 1,
         Active = 2,
-        Maintenance = 4,
         Disabled = 5,
         Retired = 6
     }

@@ -167,6 +167,25 @@ the same occurrence merely because historical outbox rows were purged.
 - alert assignment, escalation, snooze, or suppression API;
 - configurable inventory thresholds beyond the current Low/Empty state mapping.
 
+## MQTT Credential Operational Alerts
+
+The MQTT credential reconciliation job derives actionable alerts from committed
+credential state. It does not create alerts for a transient broker error that
+the original request records and returns immediately.
+
+| Alert code | Trigger | Recovery |
+| --- | --- | --- |
+| `MQTT_CREDENTIAL_OPERATION_TIMEOUT` | Provisioning or rotation remains pending beyond the five-minute operation lease and is marked `Failed` | Resolve after an operator retry activates the credential |
+| `MQTT_CREDENTIAL_REVOKE_FAILED` | Automatic stale revocation retry fails and records `RevokeFailed` | Resolve when a later automatic or operator revocation reaches `Revoked` |
+
+Alerts are correlated by execution endpoint source and alert code under a
+PostgreSQL advisory lock. A repeated failed revocation retry increments
+`OccurrenceCount`; periodic scans do not create synthetic occurrences. Active
+alerts are scanned for recovery even after the credential no longer qualifies
+as stale, so successful manual repair also resolves the alert. Creation,
+occurrence, and resolution publish `AlertChanged` only after commit. These alerts
+use Error severity and do not trigger the Critical Firebase notification policy.
+
 ## Inventory Alert Automation
 
 The reconciliation job maps active dispenser state to `INVENTORY_LOW` or

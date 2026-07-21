@@ -4,6 +4,11 @@ using Domain.Operations.Entities;
 using Domain.Operations.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Application.Tenants.Kiosks.Rules;
+using Domain.ProductionExecution.Enums;
+using Domain.Sync.Enums;
+using Domain.Tenants.Entities;
 
 namespace Infrastructure.Operations.Persistence;
 
@@ -240,6 +245,21 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
         return _dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<bool> TrySaveNewTicketAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+               { SqlState: PostgresErrorCodes.UniqueViolation,
+                 ConstraintName: "IX_MaintenanceTickets_TicketNumber" })
+        {
+            return false;
+        }
+    }
+
     public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
@@ -256,4 +276,30 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
             throw;
         }
     }
+
+    public Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({KioskOperationalConcurrency.LockKey(kioskId)}, 0));",
+            cancellationToken);
+
+    public Task<bool> HasRunningExecutionAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.EdgeCommands.AnyAsync(command =>
+            command.KioskId == kioskId &&
+            command.CommandType == EdgeCommandType.ExecuteOrder &&
+            command.Status == EdgeCommandStatus.Accepted &&
+            !_dbContext.OrderExecutionRecords.Any(record =>
+                record.SourceCommandId == command.Id &&
+                (record.Status == ProductionExecutionStatus.Completed ||
+                 record.Status == ProductionExecutionStatus.Failed ||
+                 record.Status == ProductionExecutionStatus.RequiresManualIntervention)),
+            cancellationToken);
+
+    public Task AddOperationalStateTransitionAsync(
+        KioskOperationalStateTransition transition,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskOperationalStateTransitions.AddAsync(transition, cancellationToken).AsTask();
 }

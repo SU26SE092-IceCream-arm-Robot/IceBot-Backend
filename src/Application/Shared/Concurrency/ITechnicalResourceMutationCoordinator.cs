@@ -11,6 +11,8 @@ public sealed record TechnicalResourceMutationIdentity(string ResourceType, stri
     public static TechnicalResourceMutationIdentity Program(Guid id) => Resource("RobotProgram", id);
     public static TechnicalResourceMutationIdentity Product(Guid id) => Resource("Product", id);
     public static TechnicalResourceMutationIdentity Menu(Guid id) => Resource("Menu", id);
+    public static TechnicalResourceMutationIdentity ExecutionEndpoint(Guid id) =>
+        Resource("KioskExecutionEndpoint", id);
     public static TechnicalResourceMutationIdentity PackageInstallation(Guid id) =>
         Resource("ProductionPackageInstallation", id);
 

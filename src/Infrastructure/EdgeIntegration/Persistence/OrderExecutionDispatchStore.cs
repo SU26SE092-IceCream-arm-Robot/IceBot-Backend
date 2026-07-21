@@ -19,6 +19,8 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Devices.ExecutionEndpoints.Projections;
 using Application.Orders.Support;
+using Application.Tenants.Kiosks.Rules;
+using Domain.Tenants.Enums;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -54,9 +56,26 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             cancellationToken);
     }
 
+    public Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({KioskOperationalConcurrency.LockKey(kioskId)}, 0));",
+            cancellationToken);
+
+    public Task<bool> IsKioskOperationalAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
+            kiosk => kiosk.Id == kioskId &&
+                kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active &&
+                kiosk.OperationalState == KioskOperationalState.Operational,
+            cancellationToken);
+
     public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
         return _dbContext.Orders.WhereNotDeleted()
+            .Include(order => order.Kiosk)
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.Options)
                     .ThenInclude(option => option.IngredientRequirements)
@@ -149,6 +168,26 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             .FirstOrDefaultAsync(cancellationToken);
     }
 
+    public Task<EdgeCommand?> GetCommandByIdAsync(
+        Guid commandId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.EdgeCommands.AsNoTracking()
+            .FirstOrDefaultAsync(command => command.Id == commandId, cancellationToken);
+
+    public Task<List<Domain.ProductionExecution.Projections.ProductionExecutionRecord>>
+        ListProductionExecutionRecordsForOrderItemAsync(
+            Guid orderId,
+            Guid orderItemId,
+            CancellationToken cancellationToken = default) =>
+        _dbContext.ProductionExecutionRecords.AsNoTracking()
+            .Include(record => record.SourceCommand)
+            .Where(record =>
+                record.SourceCommand.OrderId == orderId &&
+                record.OrderItemId == orderItemId)
+            .OrderBy(record => record.SourceCommand.DispatchAttemptNo)
+            .ThenBy(record => record.ProductionUnitNo)
+            .ToListAsync(cancellationToken);
+
     public Task AddOrderStatusHistoryAsync(
         OrderStatusHistory history,
         CancellationToken cancellationToken = default)
@@ -182,6 +221,8 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             .Where(order =>
                 order.PaymentStatus == PaymentStatus.Paid &&
                 order.Status == OrderStatus.ReadyForFulfillment &&
+                order.Kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active &&
+                order.Kiosk.OperationalState == KioskOperationalState.Operational &&
                 order.OrderItems.Any(item => item.FulfillmentType == FulfillmentType.MachineProduced) &&
                 !_dbContext.EdgeCommands.Any(command =>
                     command.OrderId == order.Id &&

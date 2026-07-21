@@ -8,6 +8,7 @@ using Application.Payments.PaymentSessions.Notifications;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Application.Orders.PlaceOrder;
 
 namespace Infrastructure.Payments;
 
@@ -38,6 +39,12 @@ public static class PaymentsInfrastructureModule
                     options.RetryDelaySeconds is >= 5 and <= 3600 &&
                     options.BatchSize is >= 1 and <= 500,
                 "Payment-session reconciliation settings are invalid.")
+            .ValidateOnStart();
+        services.AddOptions<OrderPaymentWindowOptions>()
+            .Bind(config.GetSection(OrderPaymentWindowOptions.SectionName))
+            .Validate(
+                options => options.DurationMinutes is >= 1 and <= 120,
+                "Order payment window must be between 1 and 120 minutes.")
             .ValidateOnStart();
 
         services.AddHttpClient<PayOsPaymentGateway>((serviceProvider, client) =>

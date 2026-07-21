@@ -23,6 +23,14 @@ public sealed class ProductionPackageUpgradePreviewService(
         IReadOnlyCollection<string> requestedKeys,
         CancellationToken cancellationToken)
     {
+        var sourceInstallation = await upgrades.GetSourceInstallationAsync(
+            organizationId, sourceInstallationId, cancellationToken);
+        if (sourceInstallation is null)
+            return ProductionPackageUpgradePreviewContext.Fail("Source package installation not found.", 404);
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageRead, user, organizationId,
+                sourceInstallation.StoreId, sourceInstallation.KioskId))
+            return ProductionPackageUpgradePreviewContext.Fail("Access denied.", 403);
+
         ProductionPackageUpgradeSourceState? sourceState;
         try
         {
@@ -36,9 +44,6 @@ public sealed class ProductionPackageUpgradePreviewService(
         }
         if (sourceState is null)
             return ProductionPackageUpgradePreviewContext.Fail("Source package installation not found.", 404);
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.PackageRead, user, organizationId,
-                sourceState.SourceInstallation.StoreId, sourceState.SourceInstallation.KioskId))
-            return ProductionPackageUpgradePreviewContext.Fail("Access denied.", 403);
         if (sourceState.SourceInstallation.Status != ProductionPackageInstallationStatus.Installed ||
             sourceState.SourceInstallation.OwnershipMode != ProductionPackageOwnershipMode.PackageManaged)
             return ProductionPackageUpgradePreviewContext.Fail(

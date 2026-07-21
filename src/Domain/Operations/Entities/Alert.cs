@@ -166,6 +166,42 @@ public partial class Alert : SyncAggregateEntity
         };
     }
 
+    public static Alert RaiseFromExecutionEndpoint(
+        Guid kioskId,
+        Guid executionEndpointId,
+        string alertCode,
+        SeverityLevel severity,
+        string title,
+        string? message,
+        DateTimeOffset raisedAt)
+    {
+        if (kioskId == Guid.Empty || executionEndpointId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(alertCode) || string.IsNullOrWhiteSpace(title))
+        {
+            throw new DomainRuleException("Execution-endpoint alert identity, code, and title are required.");
+        }
+
+        return new Alert
+        {
+            KioskId = kioskId,
+            DeviceId = null,
+            AlertCode = alertCode.Trim(),
+            CorrelationKey = NormalizeCorrelationKey(alertCode),
+            Severity = severity,
+            Title = title.Trim(),
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
+            Status = AlertStatus.Open,
+            SourceType = "ExecutionEndpointMqttCredential",
+            SourceId = executionEndpointId,
+            RaisedAt = raisedAt,
+            LastOccurredAt = raisedAt,
+            OccurrenceCount = 1,
+            OriginNodeId = executionEndpointId,
+            Version = 1,
+            SyncedAt = raisedAt
+        };
+    }
+
     public void Acknowledge(Guid acknowledgedByAccountId, DateTimeOffset acknowledgedAt)
     {
         if (Status is AlertStatus.Resolved or AlertStatus.Suppressed)

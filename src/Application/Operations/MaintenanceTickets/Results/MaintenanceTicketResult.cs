@@ -16,6 +16,7 @@ public sealed class MaintenanceTicketResult
     public string? Description { get; init; }
     public string Priority { get; init; } = null!;
     public string Status { get; init; } = null!;
+    public string OperationalImpact { get; init; } = null!;
     public Guid? AssignedToAccountId { get; init; }
     public Guid? CreatedByAccountId { get; init; }
     public DateTimeOffset ReportedAt { get; init; }

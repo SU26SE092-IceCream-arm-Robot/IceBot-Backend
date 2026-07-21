@@ -7,5 +7,7 @@ public enum ExecutionEndpointMqttCredentialStatus
     Active = 2,
     PendingRotation = 3,
     Failed = 4,
-    Revoked = 5
+    Revoked = 5,
+    PendingRevoke = 6,
+    RevokeFailed = 7
 }

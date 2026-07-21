@@ -168,7 +168,8 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
             "ITEM", "Item", "PRODUCT", "Product", "VARIANT", "Variant", null,
             Domain.Catalog.Enums.FulfillmentType.MachineProduced, 1, amount);
-        order.Place(DateTimeOffset.UtcNow.AddMinutes(-10));
+        var placedAt = DateTimeOffset.UtcNow.AddMinutes(-10);
+        order.Place(placedAt, placedAt.AddMinutes(15));
         order.MarkPaid(amount, DateTimeOffset.UtcNow.AddMinutes(-9));
         var previousPayment = new PaymentTransaction
         {
@@ -199,7 +200,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         store.GetPaymentTransactionByProviderOrderCodeAsync(
                 "payos", currentPayment.ProviderOrderCode!, Arg.Any<CancellationToken>())
             .Returns(currentPayment);
-        store.GetLatestPaidPaymentTransactionByOrderIdAsync(order.Id, Arg.Any<CancellationToken>())
+        store.GetAppliedPaymentSettlementByOrderIdAsync(order.Id, Arg.Any<CancellationToken>())
             .Returns(previousPayment);
         var gateway = Substitute.For<IPaymentGateway>();
         gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
@@ -214,12 +215,68 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
 
         Assert.True(result.Succeeded, result.Message);
         Assert.Equal(PaymentTransactionStatus.Paid, currentPayment.Status);
-        Assert.Equal(amount * 2, order.PaidAmount);
+        Assert.Equal(PaymentSettlementDisposition.Primary, previousPayment.SettlementDisposition);
+        Assert.Equal(PaymentSettlementDisposition.DuplicateRefundRequired, currentPayment.SettlementDisposition);
+        Assert.Equal(amount, order.PaidAmount);
         Assert.Equal(Domain.Orders.Enums.OrderStatus.RefundRequired, order.Status);
         await dispatchStore.DidNotReceive().ExecuteSerializedAsync(
             Arg.Any<Guid>(),
             Arg.Any<Func<CancellationToken, Task<ApiResult<Application.EdgeIntegration.Dispatch.Results.OrderExecutionDispatchResult>>>>(),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task VerifiedPaidWebhookAfterLocalPaymentDeadline_RemainsAuthoritative()
+    {
+        const decimal amount = 30_000;
+        var order = new Order { Id = Guid.NewGuid(), KioskId = Guid.NewGuid(), OrderNumber = "ORDER-LATE-PAID" };
+        order.SetCurrency("VND");
+        order.AddItem(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
+            "ITEM", "Item", "PRODUCT", "Product", "VARIANT", "Variant", null,
+            Domain.Catalog.Enums.FulfillmentType.Packaged, 1, amount);
+        var placedAt = DateTimeOffset.UtcNow.AddMinutes(-20);
+        order.Place(placedAt, placedAt.AddMinutes(15));
+        var payment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(), OrderId = order.Id, Order = order, Provider = "payos",
+            ProviderOrderCode = "3333333333333", Amount = amount, Currency = "VND",
+            Status = PaymentTransactionStatus.Expired
+        };
+        var notification = new ProviderPaymentNotification
+        {
+            Provider = "payos", ProviderEventId = "event:late-paid",
+            ProviderOrderCode = payment.ProviderOrderCode, EventType = "PAID",
+            ProviderStatus = "PAID", IsPaid = true, PaidAmount = amount,
+            RawPayloadJson = "{\"paid\":true}"
+        };
+        var store = Substitute.For<IPaymentStore>();
+        store.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>()(CancellationToken.None));
+        store.GetPaymentCallbackAsync("payos", notification.ProviderEventId!, Arg.Any<CancellationToken>())
+            .Returns((PaymentCallback?)null);
+        store.GetPaymentTransactionByProviderOrderCodeAsync(
+                "payos", payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
+            .Returns(payment);
+        store.GetAppliedPaymentSettlementByOrderIdAsync(order.Id, Arg.Any<CancellationToken>())
+            .Returns((PaymentTransaction?)null);
+        var gateway = Substitute.For<IPaymentGateway>();
+        gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(notification);
+
+        var result = await CreateHandler(store, gateway).HandleAsync(
+            new HandlePaymentProviderNotificationCommand
+            {
+                Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{}" }
+            });
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(PaymentTransactionStatus.Paid, payment.Status);
+        Assert.Equal(PaymentSettlementDisposition.Primary, payment.SettlementDisposition);
+        Assert.Equal(Domain.Orders.Enums.PaymentStatus.Paid, order.PaymentStatus);
+        Assert.Equal(Domain.Orders.Enums.OrderStatus.ReadyForFulfillment, order.Status);
     }
 
     private static HandlePaymentProviderNotificationCommandHandler CreateHandler(

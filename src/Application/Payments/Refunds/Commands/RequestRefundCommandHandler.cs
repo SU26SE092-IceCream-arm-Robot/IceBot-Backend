@@ -45,6 +45,7 @@ public sealed class RequestRefundCommandHandler
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
+            await _paymentStore.AcquireOrderWorkflowLockAsync(command.OrderId, ct);
             var order = await _paymentStore.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null)
             {
@@ -72,7 +73,54 @@ public sealed class RequestRefundCommandHandler
                     409);
             }
 
-            var transaction = await _paymentStore.GetLatestPaidPaymentTransactionByOrderIdAsync(order.Id, ct);
+            var paidTransactions = (await _paymentStore.ListPaymentTransactionsByOrderIdAsync(order.Id, ct))
+                .Where(candidate =>
+                    candidate.Status == PaymentTransactionStatus.Paid &&
+                    candidate.SettlementDisposition != PaymentSettlementDisposition.DuplicateResolved)
+                .ToList();
+            var duplicatePayments = paidTransactions
+                .Where(candidate =>
+                    candidate.SettlementDisposition == PaymentSettlementDisposition.DuplicateRefundRequired)
+                .ToList();
+            PaymentTransaction? transaction;
+            if (command.PaymentTransactionId.HasValue)
+            {
+                transaction = paidTransactions.FirstOrDefault(candidate =>
+                    candidate.Id == command.PaymentTransactionId.Value);
+                if (transaction is null)
+                {
+                    return ApiResult<RefundResult>.Fail(
+                        "The selected paid transaction does not belong to this order.", 409);
+                }
+
+
+                if (duplicatePayments.Count > 0 &&
+                    transaction.SettlementDisposition != PaymentSettlementDisposition.DuplicateRefundRequired)
+                {
+                    return ApiResult<RefundResult>.Fail(
+                        "An unresolved duplicate payment must be selected before refunding the primary settlement.",
+                        409);
+                }
+            }
+            else
+            {
+                if (duplicatePayments.Count > 1)
+                {
+                    return ApiResult<RefundResult>.Fail(
+                        "PaymentTransactionId is required because this order has multiple duplicate payments awaiting resolution.",
+                        409);
+                }
+
+                transaction = duplicatePayments.SingleOrDefault() ?? paidTransactions
+                    .Where(candidate =>
+                        candidate.SettlementDisposition is PaymentSettlementDisposition.Primary or
+                            PaymentSettlementDisposition.Unassigned)
+                    .OrderByDescending(candidate =>
+                        candidate.SettlementDisposition == PaymentSettlementDisposition.Primary)
+                    .ThenBy(candidate => candidate.PaidAt ?? candidate.RequestedAt)
+                    .FirstOrDefault();
+            }
+
             if (transaction is null)
             {
                 return ApiResult<RefundResult>.Fail("No paid transaction found for this order.", 409);

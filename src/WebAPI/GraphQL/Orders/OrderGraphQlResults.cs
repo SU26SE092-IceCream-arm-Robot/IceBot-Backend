@@ -19,7 +19,7 @@ public sealed record OrderStatusHistoryPage(
     OrderPageInfo PageInfo);
 
 public sealed record OrderExecutionAttemptsPage(
-    IReadOnlyCollection<ExecutionAttemptResult> Items,
+    IReadOnlyCollection<ExecutionAttemptSummaryResult> Items,
     OrderPageInfo PageInfo);
 
 public sealed record FulfillmentQueuePage(

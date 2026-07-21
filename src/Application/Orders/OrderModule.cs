@@ -20,6 +20,7 @@ public static class OrderModule
         services.AddScoped<Management.Commands.CancelManagementOrderCommandHandler>();
         services.AddScoped<Management.Commands.MarkOrderRefundRequiredCommandHandler>();
         services.AddScoped<Management.Commands.RedispatchOrderExecutionCommandHandler>();
+        services.AddScoped<Management.Commands.RequestOrderItemProductionRemakeCommandHandler>();
         services.AddScoped<Management.Commands.RecordManualOrderItemFulfillmentEventCommandHandler>();
         services.AddScoped<Management.Commands.SetPackagedOrderItemFulfillmentCommandHandler>();
         services.AddScoped<Management.Automation.FulfillmentReminderService>();

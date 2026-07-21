@@ -242,6 +242,7 @@ public sealed class OrderStore : IOrderStore
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default)
     {
         var routes = await _dbContext.ExecutionEndpointReadinessProjections
@@ -249,6 +250,7 @@ public sealed class OrderStore : IOrderStore
             .Where(readiness =>
                 readiness.KioskId == kioskId && readiness.Readiness == ExecutionReadinessState.Ready &&
                 readiness.Safety == ExecutionSafetyState.Safe &&
+                readiness.CloudReceivedAt >= readinessReceivedAfter &&
                 readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
                 _dbContext.ConfigurationReleases.WhereNotDeleted().Any(release =>
                     release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
@@ -450,6 +452,7 @@ public sealed class OrderStore : IOrderStore
     }
 
     public Task<EdgeCommand?> GetExecutionAttemptAsync(
+        Guid orderId,
         Guid sourceCommandId,
         CancellationToken cancellationToken = default)
     {
@@ -457,6 +460,7 @@ public sealed class OrderStore : IOrderStore
             .Include(command => command.DeliveryAttempts)
             .FirstOrDefaultAsync(command =>
                 command.Id == sourceCommandId &&
+                command.OrderId == orderId &&
                 command.CommandType == EdgeCommandType.ExecuteOrder,
                 cancellationToken);
     }

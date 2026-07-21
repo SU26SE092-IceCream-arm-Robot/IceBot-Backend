@@ -5,8 +5,9 @@ namespace Application.Tenants.Stores;
 
 internal static class StoreResultMapper
 {
-    public static StoreResult ToResult(Store store)
+    public static StoreResult ToResult(Store store, DateTimeOffset? observedAt = null)
     {
+        var now = observedAt ?? DateTimeOffset.UtcNow;
         return new StoreResult
         {
             Id = store.Id,
@@ -25,6 +26,13 @@ internal static class StoreResultMapper
             PhoneNumber = store.PhoneNumber,
             Email = store.Email,
             OpeningHours = StoreOpeningHoursContract.Deserialize(store.OpeningHoursJson),
+            IsSalesPaused = store.IsSalesPausedAt(now),
+            SalesPausedAt = store.SalesPausedAt,
+            SalesPausedUntil = store.SalesPausedUntil,
+            SalesPauseReason = store.SalesPauseReason,
+            SalesPausedByAccountId = store.SalesPausedByAccountId,
+            SalesResumedAt = store.SalesResumedAt,
+            SalesResumedByAccountId = store.SalesResumedByAccountId,
             CreatedAt = store.CreatedAt,
             UpdatedAt = store.UpdatedAt
         };

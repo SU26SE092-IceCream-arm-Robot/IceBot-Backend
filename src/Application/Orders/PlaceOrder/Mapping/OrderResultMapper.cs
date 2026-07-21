@@ -25,6 +25,7 @@ internal static class OrderResultMapper
             TotalAmount = order.TotalAmount,
             PaidAmount = order.PaidAmount,
             PlacedAt = order.PlacedAt,
+            PaymentDeadlineAt = order.PaymentDeadlineAt,
             PaidAt = order.PaidAt,
             CompletedAt = order.CompletedAt,
             CancelledAt = order.CancelledAt,

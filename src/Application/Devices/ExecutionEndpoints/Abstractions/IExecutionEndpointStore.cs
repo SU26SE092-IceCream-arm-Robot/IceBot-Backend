@@ -65,6 +65,11 @@ public interface IExecutionEndpointStore
         Guid endpointId,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<Guid>> ListStaleMqttCredentialEndpointIdsAsync(
+        DateTimeOffset staleBefore,
+        int batchSize,
+        CancellationToken cancellationToken = default);
+
     Task<bool> CredentialReferenceExistsAsync(
         string credentialReference,
         CancellationToken cancellationToken = default);

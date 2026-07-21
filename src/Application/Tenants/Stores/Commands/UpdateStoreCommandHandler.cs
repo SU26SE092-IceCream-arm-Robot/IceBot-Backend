@@ -60,6 +60,16 @@ public sealed class UpdateStoreCommandHandler
             return ApiResult<StoreResult>.Fail(timeZoneError, 400);
         }
 
+        var now = DateTimeOffset.UtcNow;
+        var changesSalesScheduleClock =
+            !string.Equals(store.TimeZone, timeZone, StringComparison.OrdinalIgnoreCase) &&
+            (!string.IsNullOrWhiteSpace(store.OpeningHoursJson) || request.OpeningHours.Count > 0);
+        if (changesSalesScheduleClock && !store.IsSalesPausedAt(now))
+        {
+            return ApiResult<StoreResult>.Fail(
+                "Pause store sales before changing the time zone used by opening hours.", 409);
+        }
+
         store.Name = request.Name.Trim();
         store.StoreType = string.IsNullOrWhiteSpace(request.StoreType) ? "Retail" : request.StoreType.Trim();
         store.Address = request.Address?.Trim();
@@ -72,7 +82,7 @@ public sealed class UpdateStoreCommandHandler
         store.PhoneNumber = request.PhoneNumber?.Trim();
         store.Email = request.Email?.Trim().ToLowerInvariant();
         store.OpeningHoursJson = StoreOpeningHoursContract.Serialize(request.OpeningHours);
-        store.UpdatedAt = DateTimeOffset.UtcNow;
+        store.UpdatedAt = now;
         store.UpdatedByAccountId = userContext.AccountId;
 
         await _storeStore.SaveChangesAsync(cancellationToken);
