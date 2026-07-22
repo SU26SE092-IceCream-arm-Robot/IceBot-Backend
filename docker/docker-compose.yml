@@ -74,6 +74,9 @@ services:
 
       PublicOrderAccess__KeyRingDirectory: ${PUBLIC_ORDER_ACCESS_KEY_RING_DIR}
 
+      # CẤU HÌNH EMAIL INVITATION URL (Tùy theo cấu trúc section trong appsettings, thường là dạng này)
+      Email__InvitationBaseUrl: ${EMAIL_INVITATION_BASE_URL}
+
 volumes:
   icebot_postgres_data:
   icebot_minio_data:
