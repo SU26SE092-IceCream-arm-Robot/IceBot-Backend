@@ -60,7 +60,7 @@ Use transport by receiver and durability need, not by the broad label "realtime"
 | Cloud to Edge/Kiosk/Robot runtime | MQTT plus command pull / durable sync | Wake-up notifications, runtime command availability, device/robot event stream |
 | Edge/Kiosk to Cloud | REST batch sync or MQTT event notification | Heartbeats, device events, execution results, production-event checkpoints, and latest-state summaries |
 | Cloud to payment/external providers | HTTP SDK/webhook | Provider session creation, callback verification, external identity/email/payment operations |
-| Cloud internal async dispatch | Outbox/background worker | Reliable post-commit dispatch to MQTT, provider retry, sync fan-out, future durable realtime |
+| Cloud internal async dispatch | Database-backed workflow records and background workers | Post-commit MQTT wake-up, provider reconciliation, notification delivery, and bounded retry |
 | Snapshot/query/CRUD | REST/GraphQL | Initial state, detail reads, search/filter/list, commands, audit/history/reporting |
 
 Rules:
@@ -70,7 +70,7 @@ Rules:
 - REST/GraphQL remain the recovery path after reconnect, refresh, or missed realtime events.
 - Robot runtime messages should include ids, correlation/causation, timestamp, schema/contract version, and idempotency keys.
 - Payment/provider callbacks must not depend on SignalR or MQTT success.
-- Important machine commands should eventually use outbox-backed dispatch; best-effort SignalR is acceptable for UI notification in V1.
+- Durable machine-command truth remains in PostgreSQL; MQTT only wakes the receiver. Best-effort SignalR is acceptable for UI notification because REST/GraphQL provide recovery snapshots.
 
 ## Related Docs
 

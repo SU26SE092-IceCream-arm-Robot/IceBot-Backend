@@ -82,9 +82,9 @@ GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 ```
 
-## RBAC Support API Backlog
+## Implemented Account Access APIs
 
-These APIs are useful for making RBAC easier to manage and debug, but they are not required immediately:
+These account-specific access APIs are implemented:
 
 ```http
 PUT /api/v1/management/accounts/{accountId}/roles
@@ -92,9 +92,7 @@ GET /api/v1/management/accounts/{accountId}/effective-access
 GET /api/v1/me/access
 ```
 
-Current Tenant priority is scope/resource lookup so admins can choose valid tenant scopes.
-
-Immediate tenant support:
+Tenant scope/resource lookup lets admins choose valid assignment scopes:
 
 ```http
 GraphQL tenantTree

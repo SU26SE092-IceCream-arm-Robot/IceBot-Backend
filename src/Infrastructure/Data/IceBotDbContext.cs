@@ -23,6 +23,7 @@ using Domain.Identity.Entities;
 using Domain.Inventory.Entities;
 using Domain.Operations.Entities;
 using Domain.Orders.Entities;
+using Domain.Orders.Incidents;
 using Domain.Payments.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.ProductionConfiguration.Entities;
@@ -197,6 +198,8 @@ public class IceBotDbContext : DbContext
     public DbSet<ControllerArtifactSetItem> ControllerArtifactSetItems => Set<ControllerArtifactSetItem>();
     public DbSet<OrderExecutionRecord> OrderExecutionRecords => Set<OrderExecutionRecord>();
     public DbSet<ProductionExecutionRecord> ProductionExecutionRecords => Set<ProductionExecutionRecord>();
+    public DbSet<ProductionIncident> ProductionIncidents => Set<ProductionIncident>();
+    public DbSet<ProductionIncidentHistory> ProductionIncidentHistories => Set<ProductionIncidentHistory>();
 
     public DbSet<Alert> Alerts => Set<Alert>();
     public DbSet<MaintenanceTicket> MaintenanceTickets => Set<MaintenanceTicket>();

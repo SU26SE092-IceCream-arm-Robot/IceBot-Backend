@@ -2,6 +2,10 @@
 
 This document owns release authoring, execution endpoint provisioning, deployment, artifact download, verification, activation, rollback, and the artifact-specific deployment failure rules.
 
+## Search Keywords
+
+`configuration release`, `execution route`, `deployment preview`, `Full Edge deployment`, `low-cost deployment`, `artifact download`, `activation`, `rollback`, `deployment checksum`
+
 ## Step And API Lookup
 
 | Step | Actor | API / operation | Effect |

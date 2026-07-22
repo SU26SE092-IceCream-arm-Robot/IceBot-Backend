@@ -29,6 +29,89 @@ namespace IceBot.UnitTests.EdgeIntegration;
 public sealed class ExecutionReportIngestionTests
 {
     [Fact]
+    public async Task HandleAsync_RejectsRestartRecoveryWithoutProductionJobIdentity()
+    {
+        var unitOfWork = Substitute.For<IExecutionReportUnitOfWork>();
+        var handler = new IngestExecutionReportCommandHandler(
+            unitOfWork,
+            Substitute.For<IRealtimeNotificationPublisher>(),
+            Options.Create(new ExecutionReportIngestionOptions()));
+
+        var result = await handler.HandleAsync(new IngestExecutionReportCommand
+        {
+            KioskId = Guid.NewGuid(),
+            EndpointId = Guid.NewGuid(),
+            CommandId = Guid.NewGuid(),
+            SourceEventId = Guid.NewGuid(),
+            SequenceNumber = 1,
+            EdgeCreatedAt = DateTimeOffset.UtcNow,
+            ReportType = "ProductionExecution",
+            Status = "RequiresManualIntervention",
+            ErrorCode = ExecutionInterruptionCodes.ControllerRestarted
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "Runtime, controller, and power interruption reports must identify a production job and require manual intervention.",
+            result.Message);
+        await unitOfWork.DidNotReceive().GetEndpointForReportAuthAsync(
+            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task HandleAsync_RejectsManualInterventionWithoutReasonCode()
+    {
+        var unitOfWork = Substitute.For<IExecutionReportUnitOfWork>();
+        var handler = new IngestExecutionReportCommandHandler(
+            unitOfWork,
+            Substitute.For<IRealtimeNotificationPublisher>(),
+            Options.Create(new ExecutionReportIngestionOptions()));
+
+        var result = await handler.HandleAsync(new IngestExecutionReportCommand
+        {
+            KioskId = Guid.NewGuid(),
+            EndpointId = Guid.NewGuid(),
+            CommandId = Guid.NewGuid(),
+            SourceEventId = Guid.NewGuid(),
+            SequenceNumber = 1,
+            EdgeCreatedAt = DateTimeOffset.UtcNow,
+            ReportType = "ProductionExecution",
+            Status = "RequiresManualIntervention"
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Manual-intervention reports require an error code.", result.Message);
+    }
+
+    [Fact]
+    public async Task HandleAsync_RejectsLocalPersistenceFailureWithoutProductionJobIdentity()
+    {
+        var unitOfWork = Substitute.For<IExecutionReportUnitOfWork>();
+        var handler = new IngestExecutionReportCommandHandler(
+            unitOfWork,
+            Substitute.For<IRealtimeNotificationPublisher>(),
+            Options.Create(new ExecutionReportIngestionOptions()));
+
+        var result = await handler.HandleAsync(new IngestExecutionReportCommand
+        {
+            KioskId = Guid.NewGuid(),
+            EndpointId = Guid.NewGuid(),
+            CommandId = Guid.NewGuid(),
+            SourceEventId = Guid.NewGuid(),
+            SequenceNumber = 1,
+            EdgeCreatedAt = DateTimeOffset.UtcNow,
+            ReportType = "ProductionExecution",
+            Status = "RequiresManualIntervention",
+            ErrorCode = ExecutionPersistenceFailureCodes.LocalPersistenceLost
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(
+            "Local persistence failure reports must identify a production job and require manual intervention.",
+            result.Message);
+    }
+
+    [Fact]
     public async Task HandleAsync_RejectsStockEvidenceWithoutProductionJobIdentity()
     {
         var receiptStore = Substitute.For<IExecutionReportUnitOfWork>();

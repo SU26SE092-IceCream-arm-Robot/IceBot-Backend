@@ -1,11 +1,12 @@
 using System.Text.Json;
 using Domain.Common;
+using Domain.RobotConfiguration.Programs;
 
 namespace Application.EdgeIntegration.Dispatch.Contracts;
 
 public sealed record ExecuteOrderCommandPayload
 {
-    public int SchemaVersion { get; init; } = 3;
+    public int SchemaVersion { get; init; } = 4;
     public string ExecutionIntent { get; init; } = "Initial";
     public Guid? RemakeOfSourceCommandId { get; init; }
     public Guid CommandId { get; init; }
@@ -74,6 +75,7 @@ public sealed record ExecuteOrderRobotProgramPayload
     public Guid RobotProgramId { get; init; }
     public int ProgramManifestSchemaVersion { get; init; }
     public string ProgramManifestChecksum { get; init; } = string.Empty;
+    public RobotProgramRestartPolicy RestartPolicy { get; init; } = RobotProgramRestartPolicy.ManualOnly;
     public IReadOnlyList<ExecuteOrderArtifactPayload> Artifacts { get; init; } = [];
 }
 
@@ -141,7 +143,7 @@ public static class ExecuteOrderCommandPayloadCodec
 
     private static void ValidateFull(ExecuteOrderCommandPayload payload)
     {
-        if (payload.SchemaVersion != 3)
+        if (payload.SchemaVersion is not 3 and not 4)
             throw new DomainRuleException("Execute-order command payload schema version is unsupported.");
         var isInitial = string.Equals(payload.ExecutionIntent, "Initial", StringComparison.Ordinal);
         var isRemake = string.Equals(payload.ExecutionIntent, "Remake", StringComparison.Ordinal);
@@ -172,6 +174,8 @@ public static class ExecuteOrderCommandPayloadCodec
                         string.IsNullOrWhiteSpace(requirement.RequiredWorkcellCapabilityCode))) ||
                 line.RobotPrograms.Count == 0 || line.RobotPrograms.Any(program =>
                     program.RobotProgramId == Guid.Empty || program.BindingOrder <= 0 || program.Artifacts.Count == 0 ||
+                    !Enum.IsDefined(program.RestartPolicy) ||
+                    program.RestartPolicy != RobotProgramRestartPolicy.ManualOnly ||
                     program.Artifacts.Any(artifact => artifact.RobotArtifactId == Guid.Empty || artifact.RunOrder <= 0 ||
                         string.IsNullOrWhiteSpace(artifact.ArtifactChecksum)))))
             throw new DomainRuleException("Execute-order command payload contains an invalid order line or robot program manifest.");

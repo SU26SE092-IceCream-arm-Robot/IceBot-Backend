@@ -335,19 +335,24 @@ Already applied:
 - `Order`
 - `StockMovement`
 - `Kiosk`
+- `MaintenanceTicket`
+- `NotificationDelivery`
 
-Consider adding later when implementing persistence/query filters:
+The following operational evidence currently derives tenant ownership through
+its persisted Order, Kiosk, Device, endpoint, or inbox relationship instead of
+duplicating `OrganizationId`:
 
 - `OrderExecutionRecord`
 - `Alert`
-- `MaintenanceTicket`
 - `OperationLog`
 - `KioskHeartbeat`
 - `DeviceEvent`
 - `SyncEventInbox`
 - `SyncDeadLetter`
 
-These can be populated from the kiosk/store hierarchy at write time.
+Queries for these entities must start from a scoped owner or join through that
+owner. Adding direct `OrganizationId` later is a denormalization decision for a
+measured query/index need, not a prerequisite for tenant enforcement.
 
 ## Global Query Filter Guidance
 

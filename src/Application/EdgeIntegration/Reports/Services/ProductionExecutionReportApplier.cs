@@ -38,8 +38,13 @@ internal static class ProductionExecutionReportApplier
             unitOfWork, context, status, cancellationToken);
 
         if (command.SourceProductionJobId.HasValue && productionApplied)
+        {
             await OrderItemExecutionLifecycleApplier.ApplyJobEvidenceAsync(
                 unitOfWork, context, cancellationToken);
+            await ProductionIncidentEvidenceRecorder.RecordIfRequiredAsync(
+                unitOfWork, edgeCommand, command, status, physicalOutputState,
+                context.CloudReceivedAt, cancellationToken);
+        }
         else if (orderApplied)
             await OrderExecutionLifecycleApplier.ApplyAsync(
                 unitOfWork, context, status, cancellationToken);

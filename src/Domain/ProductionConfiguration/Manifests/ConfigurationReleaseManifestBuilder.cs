@@ -111,6 +111,7 @@ public static class ConfigurationReleaseManifestBuilder
                 program.Code,
                 ProgramManifestSchemaVersion = program.ManifestSchemaVersion,
                 ProgramManifestChecksum = program.ManifestChecksum,
+                program.RestartPolicy,
                 Artifacts = artifacts
             }
         };

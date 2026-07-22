@@ -266,15 +266,9 @@ Reason: if admin creates the password, admin knows the user's password. That con
 
 Current backend behavior does not force password change for active accounts created with `InitialPassword`. Therefore, do not use active account + temporary password as the normal onboarding method.
 
-If the project later needs temporary password onboarding as a first-class flow, add explicit fields such as:
-
-```text
-ForcePasswordChange
-PasswordChangedAt
-PasswordSetByAccountId
-```
-
-and restrict authenticated API access until the user changes the password.
+Temporary-password onboarding is not part of the current contract. It requires
+a separate forced-password-change lifecycle and restricted authenticated access;
+do not infer that behavior from `InitialPassword`.
 
 ## Account Status Rules
 

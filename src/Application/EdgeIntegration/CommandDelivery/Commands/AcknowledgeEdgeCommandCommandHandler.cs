@@ -18,6 +18,7 @@ using Domain.Sync.Enums;
 using Application.EdgeIntegration.Observability;
 using Application.EdgeIntegration.Reports;
 using Microsoft.Extensions.Options;
+using Application.EdgeIntegration.CommandDelivery.Rules;
 
 namespace Application.EdgeIntegration.CommandDelivery.Commands;
 
@@ -46,6 +47,9 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
         {
             return ApiResult<EdgeCommandAckResult>.Fail("Kiosk, execution endpoint, and command are required.", 400);
         }
+        var acknowledgementError = EdgeCommandAcknowledgementRules.Validate(command);
+        if (acknowledgementError is not null)
+            return ApiResult<EdgeCommandAckResult>.Fail(acknowledgementError, 400);
 
         var cloudReceivedAt = DateTimeOffset.UtcNow;
         var outcome = await _edgeCommandStore.ExecuteSerializedAsync(

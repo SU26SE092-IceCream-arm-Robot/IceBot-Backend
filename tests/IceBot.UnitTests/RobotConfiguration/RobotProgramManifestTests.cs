@@ -10,6 +10,7 @@ using Domain.RobotConfiguration.Programs;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Domain.RobotConfiguration.Artifacts;
 using Domain.Tenants.Enums;
 using Domain.RobotConfiguration.Programs.Manifests;
@@ -86,6 +87,8 @@ public sealed class RobotProgramManifestTests
         var manifest = RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!);
 
         Assert.Equal(program.Id, manifest.Id);
+        Assert.Equal(2, manifest.SchemaVersion);
+        Assert.Equal(RobotProgramRestartPolicy.ManualOnly, manifest.RestartPolicy);
         var item = Assert.Single(manifest.Artifacts);
         Assert.Equal(artifact.Id, item.RobotArtifact.Id);
         Assert.Equal(artifact.Checksum, item.RobotArtifact.Checksum);
@@ -104,6 +107,27 @@ public sealed class RobotProgramManifestTests
 
         var item = Assert.Single(RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!).Artifacts);
         Assert.Equal("EXTRA_NUTS", item.RequiredOptionCode);
+    }
+
+    [Fact]
+    public void Parse_LegacySchema1ManifestWithoutRestartPolicy_DefaultsToManualOnly()
+    {
+        var organizationId = Guid.NewGuid();
+        var artifact = TestData.PublishedArtifact(organizationId, "LEGACY", "legacy.lua", 'e');
+        var program = RobotProgram.CreateDraft(
+            "LEGACY_PROGRAM",
+            "Legacy program",
+            TenantScopeType.Organization,
+            organizationId);
+        program.AddArtifact(artifact.Id, 10);
+        program.Publish(DateTimeOffset.UtcNow, [Snapshot(artifact)]);
+        var node = JsonNode.Parse(program.ProgramManifestJson!)!.AsObject();
+        node[nameof(RobotProgramManifestDocument.SchemaVersion)] = 1;
+        node.Remove(nameof(RobotProgramManifestDocument.RestartPolicy));
+
+        var manifest = RobotProgramManifestBuilder.Parse(node.ToJsonString());
+
+        Assert.Equal(RobotProgramRestartPolicy.ManualOnly, manifest.RestartPolicy);
     }
 
     private static RobotArtifactManifestSnapshot Snapshot(RobotArtifact artifact) => new(

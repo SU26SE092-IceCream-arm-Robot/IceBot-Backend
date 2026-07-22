@@ -167,7 +167,8 @@ public sealed class EdgeControllerContractIntegrationTests
             AckStatus = status,
             AcknowledgedAt = DateTimeOffset.UtcNow,
             RejectionCode = rejectionCode,
-            RejectionMessage = rejectionMessage
+            RejectionMessage = rejectionMessage,
+            LocalStatePersisted = string.Equals(status, "Accepted", StringComparison.OrdinalIgnoreCase) ? true : null
         });
     }
 

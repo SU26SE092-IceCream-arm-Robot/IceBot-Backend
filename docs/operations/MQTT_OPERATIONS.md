@@ -156,3 +156,10 @@ subscriber setup.
 For multiple backend replicas, each replica needs a unique MQTT client id. Retained wake-ups remain disabled; durable command recovery comes from command pull, not broker retention.
 
 Backend publish outcomes are exported through `icebot.mqtt.wakeup.publish.attempts`. Broker-side connection/session/authentication metrics remain owned by Mosquitto/EMQX and should be scraped or exported separately; application metrics cannot observe subscriber disconnects that never reach the backend.
+
+## Related Docs
+
+- [Edge Command Contract](../iot/EDGE_COMMAND_CONTRACT.md)
+- [Deployment Configuration](DEPLOYMENT_CONFIG.md)
+- [Observability](OBSERVABILITY.md)
+- [Restart And Power Recovery](RESTART_AND_POWER_RECOVERY.md)

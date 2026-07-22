@@ -9,6 +9,7 @@ using Domain.Identity.ValueObjects;
 using Domain.Inventory.Entities;
 using Domain.Operations.Entities;
 using Domain.Orders.Entities;
+using Domain.Orders.Incidents;
 using Domain.Payments.Entities;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
@@ -99,5 +100,35 @@ internal sealed class OrderItemStatusHistoryConfiguration : IEntityTypeConfigura
             .HasFilter("\"SourceEventId\" IS NOT NULL");
         entity.HasOne<OrderItem>().WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne<Account>().WithMany().HasForeignKey(x => x.ChangedByAccountId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ProductionIncidentConfiguration : IEntityTypeConfiguration<ProductionIncident>
+{
+    public void Configure(EntityTypeBuilder<ProductionIncident> entity)
+    {
+        entity.ToTable("ProductionIncidents");
+        entity.HasIndex(x => new { x.SourceCommandId, x.SourceProductionJobId }).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.Status, x.CreatedAt });
+        entity.HasIndex(x => new { x.OrderId, x.OrderItemId, x.ProductionUnitNo });
+        entity.HasIndex(x => x.ResolutionRequestId).IsUnique()
+            .HasFilter(EfModelConfigurationConstants.NotNullAndActive(nameof(ProductionIncident.ResolutionRequestId)));
+        entity.Property(x => x.ResolutionRequestFingerprint).HasMaxLength(64);
+        entity.HasOne<Order>().WithMany().HasForeignKey(x => x.OrderId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<OrderItem>().WithMany().HasForeignKey(x => x.OrderItemId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasMany(x => x.History).WithOne(x => x.ProductionIncident)
+            .HasForeignKey(x => x.ProductionIncidentId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class ProductionIncidentHistoryConfiguration : IEntityTypeConfiguration<ProductionIncidentHistory>
+{
+    public void Configure(EntityTypeBuilder<ProductionIncidentHistory> entity)
+    {
+        entity.ToTable("ProductionIncidentHistories");
+        entity.HasIndex(x => new { x.ProductionIncidentId, x.OccurredAt });
+        entity.Property(x => x.Action).HasMaxLength(100);
+        entity.Property(x => x.Reason).HasMaxLength(1000);
     }
 }

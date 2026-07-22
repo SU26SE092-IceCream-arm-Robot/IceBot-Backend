@@ -135,6 +135,16 @@ public sealed class OrderExecutionDispatchReconciliationJobTests
                 CancellationToken cancellationToken = default) =>
             Task.FromResult(new List<Domain.ProductionExecution.Projections.ProductionExecutionRecord>());
 
+        public Task<bool> IsDefectiveOutputRemakeAuthorizedAsync(
+            Guid productionIncidentId,
+            Guid orderId,
+            Guid orderItemId,
+            int productionUnitNo,
+            int productionUnitQuantity,
+            Guid sourceCommandId,
+            Guid sourceProductionJobId,
+            CancellationToken cancellationToken = default) => Task.FromResult(false);
+
         public Task AddOrderStatusHistoryAsync(
             OrderStatusHistory history,
             CancellationToken cancellationToken = default) => Task.CompletedTask;

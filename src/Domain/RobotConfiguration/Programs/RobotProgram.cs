@@ -162,7 +162,7 @@ public partial class RobotProgram : RobotConfigurationEntity, IKioskScoped
     public void Publish(
         DateTimeOffset publishedAt,
         IReadOnlyCollection<RobotArtifactManifestSnapshot> artifactSnapshots,
-        int programManifestSchemaVersion = 1)
+        int programManifestSchemaVersion = 2)
     {
         EnsureDraft();
 
