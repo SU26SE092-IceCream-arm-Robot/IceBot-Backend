@@ -95,7 +95,8 @@ public sealed class DispatchOrderExecutionCommandHandler
         int productionUnitQuantity,
         Guid requestedByAccountId,
         string reason,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Guid? productionIncidentId = null)
     {
         if (!_options.Enabled)
             return ApiResult<OrderExecutionDispatchResult>.Fail("Order execution dispatch is disabled.", 503);
@@ -109,7 +110,7 @@ public sealed class DispatchOrderExecutionCommandHandler
             orderId,
             ct => RemakeLockedAsync(
                 remakeRequestId, orderId, orderItemId, productionUnitNo, productionUnitQuantity,
-                requestedByAccountId, reason.Trim(), ct),
+                requestedByAccountId, reason.Trim(), productionIncidentId, ct),
             cancellationToken);
         await PublishWakeUpAsync(result, cancellationToken);
         return result;
@@ -123,6 +124,7 @@ public sealed class DispatchOrderExecutionCommandHandler
         int productionUnitQuantity,
         Guid requestedByAccountId,
         string reason,
+        Guid? productionIncidentId,
         CancellationToken cancellationToken)
     {
         var existing = await _store.GetCommandByIdAsync(remakeRequestId, cancellationToken);
@@ -182,14 +184,28 @@ public sealed class DispatchOrderExecutionCommandHandler
         var targetRecords = Enumerable.Range(productionUnitNo, productionUnitQuantity)
             .Select(unitNo => snapshot.Units[unitNo - 1])
             .ToArray();
-        if (targetRecords.Any(record => record?.Status != ProductionExecutionStatus.Failed ||
-                record.PhysicalOutputState != PhysicalOutputState.No))
+        if (targetRecords.Any(record => record is null))
             return ApiResult<OrderExecutionDispatchResult>.Fail(
-                "Every remake unit must have failed with confirmed no physical output.", 409);
+                "Production remake requires terminal evidence for every requested unit.", 409);
         var sourceCommandIds = targetRecords.Select(record => record!.SourceCommandId).Distinct().ToArray();
         if (sourceCommandIds.Length != 1)
             return ApiResult<OrderExecutionDispatchResult>.Fail(
                 "Remake units must originate from one execution command.", 409);
+        var sourceProductionJobIds = targetRecords.Select(record => record!.SourceProductionJobId).Distinct().ToArray();
+        var hasConfirmedNoOutput = targetRecords.All(record =>
+            record?.Status == ProductionExecutionStatus.Failed &&
+            record.PhysicalOutputState == PhysicalOutputState.No);
+        var hasAuthorizedDefectiveOutput = productionIncidentId.HasValue && sourceProductionJobIds.Length == 1 &&
+            await _store.IsDefectiveOutputRemakeAuthorizedAsync(
+                productionIncidentId.Value, orderId, orderItemId,
+                productionUnitNo, productionUnitQuantity, sourceCommandIds[0],
+                sourceProductionJobIds[0], cancellationToken);
+        if (!hasConfirmedNoOutput && !hasAuthorizedDefectiveOutput)
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                productionIncidentId.HasValue
+                    ? "Defective-output remake requires a matching inspected production incident and selected remake resolution."
+                    : "Every remake unit must have failed with confirmed no physical output.",
+                409);
         var remakeOfSourceCommandId = sourceCommandIds[0];
 
         var endpoints = await _store.ListActiveEndpointsAsync(order.KioskId, cancellationToken);

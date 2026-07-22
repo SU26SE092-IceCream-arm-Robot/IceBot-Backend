@@ -193,6 +193,14 @@ The authenticated execution endpoint publishes a complete observed snapshot:
   "currentCommandId": null,
   "physicalOutputState": "No",
   "faultCode": null,
+  "localPersistenceHealth": {
+    "storageWritable": true,
+    "freeSpaceBytes": 10737418240,
+    "minimumRequiredFreeSpaceBytes": 1073741824,
+    "localDatabaseHealth": "Healthy",
+    "pendingEventCount": 0,
+    "maximumPendingEventCount": 10000
+  },
   "capabilities": [
     { "capabilityCode": "ICE_CREAM", "workcellCode": "CELL-A", "isAvailable": true }
   ]
@@ -204,6 +212,16 @@ are ignored, exact retries are duplicates, and reuse of one revision with
 different content returns conflict. `capabilities` is a complete replacement,
 not a patch. Cloud stores typed readiness and capability rows; it does not infer
 availability from heartbeat strings or generic summary payloads.
+
+`localPersistenceHealth` is required. `Healthy` database state, writable storage,
+free space at or above the reported minimum, and event backlog at or below the
+reported maximum are mandatory for command admission. Cloud derives the effective
+projection defensively: if any check fails, it persists `NotReady` with one of
+`LocalStorageNotWritable`, `InsufficientLocalStorage`, `LocalDatabaseUnhealthy`, or
+`EventBacklogLimitExceeded`, even if Edge requested `Ready`. Negative values, a
+non-positive threshold, or an unknown database-health value reject the snapshot.
+Disk usage and pending-sync values in heartbeat remain operational history; they do
+not replace this admission snapshot.
 
 `KioskStatus` remains lifecycle/connectivity. Readiness controls machine
 sellability and admission: online menu/order validation requires Ready + Safe

@@ -29,6 +29,13 @@ Each doc should answer one ownership question:
 
 Do not duplicate full explanations across docs. Link to the owning doc instead.
 
+Active backend documents must remain at or below 500 lines. When a document
+approaches that limit, split it by ownership and retain a short index in the
+original owner. A level-two or level-three section must remain at or below 120
+lines so retrieval does not receive one oversized mixed-ownership chunk. Files
+prefixed `HISTORICAL_`, `DEPRECATED_`, or `PROPOSAL_` belong in Vault rather
+than `IceBot-Backend/docs`.
+
 Use [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md) only when the right backend doc is unclear after direct retrieval, metadata filters, or path filters.
 
 ## Standard Shape

@@ -114,9 +114,13 @@ Entities:
 - `OrderItem`
 - `OrderStatusHistory`
 - `OrderItemStatusHistory`
+- `ProductionIncident`
+- `ProductionIncidentHistory`
 
 Orders may reference catalog, payment, kiosk, and execution evidence by id or snapshot, but should not depend on mutable Edge runtime state for historical truth.
 Each order item snapshots its fulfillment type. Manual lines use the strict staff preparation lifecycle; packaged lines use idempotent handoff/failure commands and never enter acceptance or preparation; machine-produced lines advance through authenticated production reports carrying order-item and production-unit identity. Item failure is represented by the Orders-owned `FulfillmentIssue` aggregate state and does not itself decide payment compensation.
+
+Production incident resolution is also Orders-owned. It records immutable execution provenance, exact production-unit range, inspection outcome, selected operational resolution, linked remake/refund identity, and append-only actor history. It may orchestrate a Payments-owned refund request, but it does not own payment settlement or provider behavior. Inventory consumption evidence remains immutable and is not reversed merely because an output is discarded or remade.
 
 ### Payments
 

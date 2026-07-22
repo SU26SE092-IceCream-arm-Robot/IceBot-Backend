@@ -20,6 +20,7 @@ public sealed class RobotProgramResult
     public string Name { get; init; } = null!;
     public string ScopeType { get; init; } = null!;
     public string Status { get; init; } = null!;
+    public string RestartPolicy { get; init; } = RobotProgramRestartPolicy.ManualOnly.ToString();
     public string? Description { get; init; }
     public string? ProgramManifestChecksum { get; init; }
     public DateTimeOffset? PublishedAt { get; init; }
@@ -42,6 +43,10 @@ public sealed class RobotProgramResult
             Name = program.Name,
             ScopeType = program.ScopeType.ToString(),
             Status = program.Status.ToString(),
+            RestartPolicy = program.Status == RobotProgramStatus.Draft ||
+                            string.IsNullOrWhiteSpace(program.ProgramManifestJson)
+                ? RobotProgramRestartPolicy.ManualOnly.ToString()
+                : RobotProgramManifestBuilder.Parse(program.ProgramManifestJson).RestartPolicy.ToString(),
             Description = program.Description,
             ProgramManifestChecksum = program.ProgramManifestChecksum,
             PublishedAt = program.PublishedAt,

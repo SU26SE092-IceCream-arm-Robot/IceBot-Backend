@@ -8,6 +8,7 @@ using Application.Shared.Wrappers;
 using Domain.Devices.Catalog;
 using Microsoft.Extensions.Options;
 using Domain.Devices.ExecutionEndpoints.Projections;
+using Application.Devices.Connectivity.Rules;
 
 namespace Application.Devices.Connectivity.Commands;
 public sealed class IngestExecutionReadinessCommandHandler
@@ -24,6 +25,15 @@ public sealed class IngestExecutionReadinessCommandHandler
             return ApiResult<ExecutionReadinessResult>.Fail("Readiness source identity and positive revision are required.", 400);
         if (command.ExecutorReportedAt > DateTimeOffset.UtcNow.AddSeconds(_options.MaxFutureClockSkewSeconds))
             return ApiResult<ExecutionReadinessResult>.Fail("Readiness timestamp is too far in the future.", 400);
+        if (command.LocalPersistenceHealth is null)
+            return ApiResult<ExecutionReadinessResult>.Fail("Local persistence health is required.", 400);
+        var persistenceError = LocalPersistenceReadinessRules.Validate(command.LocalPersistenceHealth);
+        if (persistenceError is not null)
+            return ApiResult<ExecutionReadinessResult>.Fail(persistenceError, 400);
+        var effective = LocalPersistenceReadinessRules.Apply(
+            command.LocalPersistenceHealth,
+            command.Readiness,
+            command.FaultCode);
         var codes = command.Capabilities.Select(x => x.CapabilityCode?.Trim().ToUpperInvariant()).ToArray();
         if (codes.Any(string.IsNullOrWhiteSpace) || codes.Distinct(StringComparer.Ordinal).Count() != codes.Length)
             return ApiResult<ExecutionReadinessResult>.Fail("Capability codes must be non-empty and unique.", 400);
@@ -48,12 +58,12 @@ public sealed class IngestExecutionReadinessCommandHandler
             if (current is null)
             {
                 current = ExecutionEndpointReadinessProjection.Create(command.KioskId, endpoint.Id, command.SourceExecutorId,
-                    command.StateRevision, command.Readiness, command.Activity, command.Safety, command.CurrentCommandId,
-                    command.PhysicalOutputState, command.FaultCode, command.ExecutorReportedAt, now);
+                    command.StateRevision, effective.Readiness, command.Activity, command.Safety, command.CurrentCommandId,
+                    command.PhysicalOutputState, effective.FaultCode, command.ExecutorReportedAt, now);
                 await _store.AddProjectionAsync(current, innerCt);
             }
-            else current.Apply(command.StateRevision, command.Readiness, command.Activity, command.Safety,
-                command.CurrentCommandId, command.PhysicalOutputState, command.FaultCode, command.ExecutorReportedAt, now);
+            else current.Apply(command.StateRevision, effective.Readiness, command.Activity, command.Safety,
+                command.CurrentCommandId, command.PhysicalOutputState, effective.FaultCode, command.ExecutorReportedAt, now);
 
             _store.ReplaceCapabilities(current, command.Capabilities.Select(x => new ExecutionEndpointCapabilityProjection
             {
@@ -68,7 +78,7 @@ public sealed class IngestExecutionReadinessCommandHandler
             await _publisher.PublishExecutionReadinessChangedAsync(new ExecutionReadinessChangedEvent
             {
                 KioskId = command.KioskId, EndpointId = command.EndpointId, StateRevision = command.StateRevision,
-                Readiness = command.Readiness.ToString(), Activity = command.Activity.ToString(), Safety = command.Safety.ToString(),
+                Readiness = effective.Readiness.ToString(), Activity = command.Activity.ToString(), Safety = command.Safety.ToString(),
                 OccurredAt = DateTimeOffset.UtcNow
             }, ct);
         return result;
@@ -80,9 +90,13 @@ public sealed class IngestExecutionReadinessCommandHandler
 
     private static bool Matches(ExecutionEndpointReadinessProjection current, IngestExecutionReadinessCommand command)
     {
-        if (current.Readiness != command.Readiness || current.Activity != command.Activity || current.Safety != command.Safety ||
+        var effective = LocalPersistenceReadinessRules.Apply(
+            command.LocalPersistenceHealth,
+            command.Readiness,
+            command.FaultCode);
+        if (current.Readiness != effective.Readiness || current.Activity != command.Activity || current.Safety != command.Safety ||
             current.CurrentCommandId != command.CurrentCommandId || current.PhysicalOutputState != command.PhysicalOutputState ||
-            !string.Equals(current.FaultCode, string.IsNullOrWhiteSpace(command.FaultCode) ? null : command.FaultCode.Trim(), StringComparison.Ordinal)) return false;
+            !string.Equals(current.FaultCode, effective.FaultCode, StringComparison.Ordinal)) return false;
         var expected = command.Capabilities.OrderBy(x => x.CapabilityCode, StringComparer.OrdinalIgnoreCase).ToArray();
         var actual = current.Capabilities.OrderBy(x => x.CapabilityCode, StringComparer.OrdinalIgnoreCase).ToArray();
         return expected.Length == actual.Length && expected.Zip(actual).All(pair =>

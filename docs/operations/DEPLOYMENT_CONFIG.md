@@ -254,3 +254,10 @@ When enabled, diagnostics performs provider reachability checks without sending 
 - Keep `Diagnostics__EnableExternalPing=false` unless the deployment check intentionally needs live SMTP/Firebase/PayOS reachability.
 - IoT runtime endpoints require HTTPS. Full Edge client certificates are accepted at the TLS handshake and authenticated by the provisioned SHA-256 fingerprint in WebAPI; do not terminate mTLS at an untrusted proxy.
 - After applying the execution transport-security migration, rotate any pre-existing low-cost credential binding that has no ECDSA public key and any Full Edge binding whose reference is not the normalized certificate SHA-256 fingerprint.
+
+## Related Docs
+
+- [Observability](OBSERVABILITY.md)
+- [MQTT Operations](MQTT_OPERATIONS.md)
+- [Robot Artifact Operational Smoke Test](ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md)
+- [API Surface Rules](../api/API_SURFACE_RULES.md)

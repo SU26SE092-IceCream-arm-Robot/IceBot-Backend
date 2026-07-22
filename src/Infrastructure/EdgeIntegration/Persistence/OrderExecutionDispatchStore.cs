@@ -21,6 +21,7 @@ using Domain.Devices.ExecutionEndpoints.Projections;
 using Application.Orders.Support;
 using Application.Tenants.Kiosks.Rules;
 using Domain.Tenants.Enums;
+using Domain.Orders.Incidents;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -187,6 +188,28 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             .OrderBy(record => record.SourceCommand.DispatchAttemptNo)
             .ThenBy(record => record.ProductionUnitNo)
             .ToListAsync(cancellationToken);
+
+    public Task<bool> IsDefectiveOutputRemakeAuthorizedAsync(
+        Guid productionIncidentId,
+        Guid orderId,
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
+        Guid sourceCommandId,
+        Guid sourceProductionJobId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.ProductionIncidents.AsNoTracking().AnyAsync(incident =>
+            incident.Id == productionIncidentId &&
+            incident.OrderId == orderId &&
+            incident.OrderItemId == orderItemId &&
+            incident.ProductionUnitNo == productionUnitNo &&
+            incident.ProductionUnitQuantity == productionUnitQuantity &&
+            incident.SourceCommandId == sourceCommandId &&
+            incident.SourceProductionJobId == sourceProductionJobId &&
+            incident.InspectionOutcome == ProductionInspectionOutcome.Defective &&
+            incident.Resolution == ProductionIncidentResolution.RequestRemake &&
+            incident.Status == ProductionIncidentStatus.ResolutionSelected,
+            cancellationToken);
 
     public Task AddOrderStatusHistoryAsync(
         OrderStatusHistory history,

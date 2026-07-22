@@ -46,6 +46,7 @@ public sealed class RequestOrderItemProductionRemakeCommandHandler
             command.ProductionUnitQuantity,
             command.UserContext.AccountId,
             command.Reason,
-            cancellationToken);
+            cancellationToken,
+            command.ProductionIncidentId);
     }
 }

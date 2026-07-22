@@ -85,7 +85,7 @@ Response:
 Rules:
 
 - Edge must deduplicate by `commandId`.
-- New `ExecuteOrder` payloads include `SchemaVersion = 3`, `executionIntent`, and a `productionUnitStartNo` on each line. Edge must reject unsupported schema versions; Cloud may read release provenance from legacy payloads without treating those payloads as fully executable contracts. Each selected option can include immutable ingredient requirements (`ingredientId`, code/name snapshots, quantity per option, unit, required workcell capability); Edge must use this order snapshot rather than live catalog data.
+- New `ExecuteOrder` payloads include `SchemaVersion = 4`, `executionIntent`, a `productionUnitStartNo` on each line, and the immutable `restartPolicy` of every selected robot program. V1 emits and accepts only `ManualOnly`; schema-3 payloads without the field are interpreted as `ManualOnly`. Edge must reject unsupported schema versions or restart policies. Cloud may read release provenance from older payloads without treating unsupported payloads as fully executable contracts. Each selected option can include immutable ingredient requirements (`ingredientId`, code/name snapshots, quantity per option, unit, required workcell capability); Edge must use this order snapshot rather than live catalog data.
 - An ordered artifact may include `RequiredOptionCode`. Edge executes that artifact only when the same order line contains a selected option with the matching normalized code; otherwise Edge skips it without changing the remaining `RunOrder`. This is conditional file selection, not a Lua runtime parameter.
 - Deployment commands include typed Cloud correlation fields for deployment ownership. `PayloadJson` is execution data, not the authoritative link used by timeout reconciliation.
 - Pull first materializes any short-lived artifact download URLs. Only after payload enrichment succeeds does it mark returned commands as `Delivered` and record a delivery attempt.
@@ -187,6 +187,7 @@ Request:
 {
   "ackStatus": "Accepted",
   "acknowledgedAt": "2026-05-21T10:00:05Z",
+  "localStatePersisted": true,
   "rejectionCode": null,
   "rejectionMessage": null,
   "physicalOutputMayHaveOccurred": null
@@ -210,6 +211,8 @@ boundary, not this endpoint.
 For `ExecuteOrder` commands:
 
 - `Accepted` may move `Order` from `ReadyForFulfillment` to `Accepted` when aggregate line state allows it.
+- `Accepted` requires `localStatePersisted=true`. Edge sends it only after one local transaction durably records the command, production/deployment jobs, immutable provenance, and the ACK outbox entry. Persisting after ACK is invalid because a crash would leave Cloud with an accepted command that Edge cannot recover.
+- If that local transaction cannot commit, Edge responds `Rejected` with `LocalPersistenceUnavailable`, `LocalDatabaseCorrupt`, `InsufficientLocalStorage`, or `EventBacklogLimitExceeded`. It must not start physical execution.
 - `ExecutorBusy` is temporary: the command returns to `PendingDelivery` and the order remains `ReadyForFulfillment`.
 - `Rejected` with `physicalOutputMayHaveOccurred` absent or `false` moves the order to `ExecutionRejected`.
 - `Rejected` with `physicalOutputMayHaveOccurred=true` moves the paid order to `RefundRequired` because staff support or compensation may be required.
@@ -318,6 +321,8 @@ Rules:
 - Job/unit evidence is the Cloud authority for per-unit production outcomes. Non-overlapping ranges update `ProductionExecutionRecord`, optional stock evidence, effective completed/failed/in-progress counts, and the affected machine line in one transaction. A line completes only after all expected units are covered by effective `Completed` evidence; one failed unit moves a paid order to `FulfillmentIssue` while successful unit and inventory evidence remain intact.
 - A report with `sourceProductionJobId=null` remains the Edge-computed order observation and updates `OrderExecutionRecord`. When any job evidence exists, a final summary requires complete coverage and must agree with the Cloud-derived aggregate; contradictory final summaries are rejected. A non-final summary may arrive behind newer unit evidence and cannot rewind the business lifecycle.
 - A remake is a new `ExecuteOrder` command with `executionIntent=Remake`, `remakeOfSourceCommandId`, and an exact `productionUnitStartNo`/quantity range. Cloud creates it only for failed units with confirmed no physical output. Evidence from the later remake attempt supersedes the failed outcome for those units; all earlier execution and stock evidence remains immutable.
+- If Edge or a controller restarts during an active production job, Edge reports that exact job as `RequiresManualIntervention` with `errorCode` equal to `RuntimeRestarted`, `ControllerRestarted`, or `PowerInterrupted`. The report includes the exact unit range and `physicalOutputMayHaveOccurred`; unknown is represented by `null`. Cloud never automatically replays an accepted command, resumes Lua, or restarts the artifact list. See [Restart And Power Recovery](../operations/RESTART_AND_POWER_RECOVERY.md).
+- If local persistence becomes unavailable after acceptance, Edge stops admitting new work and reports each affected active production job as `RequiresManualIntervention/LocalPersistenceLost`. It preserves exact unit identity and reports physical output as `true`, `false`, or `null`; inability to persist evidence must never be translated to `false`.
 - Changed lines publish `OrderItemFulfillmentChanged`; aggregate order transitions publish `OrderStatusChanged`; applied order-summary observations publish `OrderExecutionObservationChanged` through SignalR after commit.
 - `stockMovements` is typed append-only consumption evidence and is accepted only on a report with `sourceProductionJobId`. Every item must identify the same `OrderItemId` as that job report. Each item has its own globally unique `sourceEventId`; duplicates are serialized by evidence identity and ignored even when two different reports arrive concurrently. The dispenser must belong to the reporting kiosk. Evidence freshness is independent from lifecycle projection freshness, so a sequence-stale job observation can still append previously unseen physical evidence.
 - A supplied `balanceAfter` updates the observed dispenser estimate. Without it, Cloud records evidence without guessing a new balance. Inventory evidence does not gate runtime-menu sellability or order creation in V1.

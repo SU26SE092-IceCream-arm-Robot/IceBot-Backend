@@ -1,6 +1,7 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Inventory.Entities;
 using Domain.Orders.Entities;
+using Domain.Orders.Incidents;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
@@ -57,6 +58,9 @@ public interface IProductionExecutionReportStore
     Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task AddOrderStatusHistoryAsync(OrderStatusHistory history, CancellationToken cancellationToken = default);
     Task AddOrderItemStatusHistoryAsync(OrderItemStatusHistory history, CancellationToken cancellationToken = default);
+    Task<ProductionIncident?> GetProductionIncidentBySourceAsync(
+        Guid sourceCommandId, Guid sourceProductionJobId, CancellationToken cancellationToken = default);
+    Task AddProductionIncidentAsync(ProductionIncident incident, CancellationToken cancellationToken = default);
 }
 
 public interface IExecutionStockEvidenceStore

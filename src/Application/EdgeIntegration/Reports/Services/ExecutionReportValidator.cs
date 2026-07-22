@@ -2,6 +2,7 @@ using Application.EdgeIntegration.CommandDelivery.Commands;
 using Application.EdgeIntegration.Dispatch.Commands;
 using Application.EdgeIntegration.Reports.Commands;
 using Application.EdgeIntegration.Timeouts.Commands;
+using Application.EdgeIntegration.Reports.Contracts;
 
 namespace Application.EdgeIntegration.Reports.Services;
 
@@ -45,6 +46,18 @@ internal static class ExecutionReportValidator
             string.Equals(command.Status, "Failed", StringComparison.OrdinalIgnoreCase) &&
             !command.PhysicalOutputMayHaveOccurred.HasValue)
             return "Failed production execution reports must state whether physical output may have occurred.";
+        var isProductionExecution = string.Equals(
+            command.ReportType, "ProductionExecution", StringComparison.OrdinalIgnoreCase);
+        var requiresManualIntervention = string.Equals(
+            command.Status, "RequiresManualIntervention", StringComparison.OrdinalIgnoreCase);
+        if (isProductionExecution && requiresManualIntervention && string.IsNullOrWhiteSpace(command.ErrorCode))
+            return "Manual-intervention reports require an error code.";
+        if (ExecutionInterruptionCodes.IsRestartRecoveryCode(command.ErrorCode) &&
+            (!isProductionExecution || !requiresManualIntervention || !command.SourceProductionJobId.HasValue))
+            return "Runtime, controller, and power interruption reports must identify a production job and require manual intervention.";
+        if (ExecutionPersistenceFailureCodes.IsPersistenceFailureCode(command.ErrorCode) &&
+            (!isProductionExecution || !requiresManualIntervention || !command.SourceProductionJobId.HasValue))
+            return "Local persistence failure reports must identify a production job and require manual intervention.";
         return null;
     }
 }

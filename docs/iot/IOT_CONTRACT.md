@@ -69,7 +69,7 @@ MQTT is the machine-to-machine runtime integration boundary. It is separate from
 
 ## System Flow
 
-End-to-end checkout, payment, edge dispatch, and robot execution flow lives in [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md). Failure flows live in [Failure Flows](../flows/FAILURE_FLOWS.md).
+End-to-end checkout, payment, edge dispatch, and robot execution flow lives in [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md). Failure routing lives in [Failure Flow Index](../flows/FAILURE_FLOW_INDEX.md).
 
 This document focuses on API/message contract shape, source-of-truth boundaries, state mapping, and idempotency requirements.
 
@@ -173,7 +173,7 @@ Retry behavior:
 
 ## Failure Paths
 
-Failure flows live in [Failure Flows](../flows/FAILURE_FLOWS.md).
+Failure ownership is routed by [Failure Flow Index](../flows/FAILURE_FLOW_INDEX.md).
 
 Contract-level rules:
 
@@ -194,7 +194,7 @@ Current security contract:
 - Edge to Cloud: execution-endpoint credentials; `FullEdge` uses mutual TLS and `LowCostController` uses signed-command TLS.
 - MQTT: per-kiosk credential/topic authorization.
 
-Future hardening:
+Excluded From Current Contract:
 
 - Per-device key rotation.
 - Command payload checksum/signature.
@@ -213,7 +213,6 @@ Future hardening:
 - [Architecture](../../ARCHITECTURE.md)
 - [API Surface Rules](../api/API_SURFACE_RULES.md)
 - [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md)
-- [Failure Flows](../flows/FAILURE_FLOWS.md)
-- [Historical Step-First Local Edge Runtime ERD](HISTORICAL_STEP_FIRST_LOCAL_EDGE_RUNTIME_ERD.md) (comparison only)
+- [Failure Flow Index](../flows/FAILURE_FLOW_INDEX.md)
 - [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
 - [JSON Field Rules](../data/JSON_FIELD_RULES.md)

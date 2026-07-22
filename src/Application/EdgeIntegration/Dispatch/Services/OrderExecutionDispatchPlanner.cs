@@ -189,16 +189,23 @@ internal static class OrderExecutionDispatchPlanner
         RouteCode = selected.Route.RouteCode,
         RequiredCapabilitiesJson = selected.Route.RequiredCapabilitiesJson,
         ProductionDefinitionChecksum = selected.Route.ProductionDefinitionChecksum,
-        RobotPrograms = selected.Bindings.Select(binding => new ExecuteOrderRobotProgramPayload
+        RobotPrograms = selected.Bindings.Select(BuildRobotProgram).ToArray()
+    };
+
+    private static ExecuteOrderRobotProgramPayload BuildRobotProgram(ExecutionRouteRobotBinding binding)
+    {
+        var manifest = RobotProgramManifestBuilder.Parse(binding.RobotProgram.ProgramManifestJson
+            ?? throw new DomainRuleException("Published robot program manifest is missing."));
+
+        return new ExecuteOrderRobotProgramPayload
         {
             BindingOrder = binding.BindingOrder,
             RequiredWorkcellCapabilityCode = binding.RequiredWorkcellCapabilityCode,
             RobotProgramId = binding.RobotProgram.Id,
             ProgramManifestSchemaVersion = binding.RobotProgram.ProgramManifestSchemaVersion,
             ProgramManifestChecksum = binding.RobotProgram.ProgramManifestChecksum!,
-            Artifacts = RobotProgramManifestBuilder.Parse(binding.RobotProgram.ProgramManifestJson
-                    ?? throw new DomainRuleException("Published robot program manifest is missing."))
-                .Artifacts.OrderBy(artifact => artifact.RunOrder)
+            RestartPolicy = manifest.RestartPolicy,
+            Artifacts = manifest.Artifacts.OrderBy(artifact => artifact.RunOrder)
                 .Select(artifact => new ExecuteOrderArtifactPayload
                 {
                     RobotArtifactId = artifact.RobotArtifact.Id,
@@ -212,8 +219,8 @@ internal static class OrderExecutionDispatchPlanner
                     TechnicalContractChecksum = artifact.RobotArtifact.TechnicalContractChecksum,
                     RequiredOptionCode = artifact.RequiredOptionCode
                 }).ToArray()
-        }).ToArray()
-    };
+        };
+    }
 }
 
 internal sealed record OrderExecutionDispatchCandidate(

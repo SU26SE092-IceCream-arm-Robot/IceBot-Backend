@@ -4,6 +4,7 @@ using Application.EdgeIntegration.Abstractions;
 using Domain.Devices.Catalog;
 using Domain.Inventory.Entities;
 using Domain.Orders.Entities;
+using Domain.Orders.Incidents;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
@@ -130,6 +131,20 @@ public sealed class ExecutionReportStore :
     {
         return _dbContext.ProductionExecutionRecords.AddAsync(record, cancellationToken).AsTask();
     }
+
+    public Task<ProductionIncident?> GetProductionIncidentBySourceAsync(
+        Guid sourceCommandId,
+        Guid sourceProductionJobId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.ProductionIncidents.FirstOrDefaultAsync(incident =>
+            incident.SourceCommandId == sourceCommandId &&
+            incident.SourceProductionJobId == sourceProductionJobId,
+            cancellationToken);
+
+    public Task AddProductionIncidentAsync(
+        ProductionIncident incident,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.ProductionIncidents.AddAsync(incident, cancellationToken).AsTask();
 
     public Task<OrderExecutionRecord?> GetOrderExecutionRecordAsync(
         Guid sourceCommandId,

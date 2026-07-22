@@ -10,4 +10,5 @@ public sealed class AcknowledgeEdgeCommandCommand
     public string? RejectionCode { get; init; }
     public string? RejectionMessage { get; init; }
     public bool? PhysicalOutputMayHaveOccurred { get; init; }
+    public bool? LocalStatePersisted { get; init; }
 }

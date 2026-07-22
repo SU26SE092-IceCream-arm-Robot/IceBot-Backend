@@ -1,6 +1,7 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Catalog;
 using Domain.ProductionExecution.Enums;
+using Application.Devices.Connectivity.Contracts;
 
 namespace Application.Devices.Connectivity.Commands;
 public sealed class IngestExecutionReadinessCommand
@@ -16,6 +17,7 @@ public sealed class IngestExecutionReadinessCommand
     public Guid? CurrentCommandId { get; init; }
     public PhysicalOutputState PhysicalOutputState { get; init; } = PhysicalOutputState.Unknown;
     public string? FaultCode { get; init; }
+    public required LocalPersistenceHealthInput LocalPersistenceHealth { get; init; }
     public IReadOnlyCollection<ExecutionCapabilityInput> Capabilities { get; init; } = [];
 }
 public sealed record ExecutionCapabilityInput(string CapabilityCode, string? WorkcellCode, bool IsAvailable, string? UnavailableReason);

@@ -1,87 +1,68 @@
 # Backend Critical Rule Checklist
 
-Use this checklist before backend handoff or deployment smoke testing when automated tests do not yet cover the rule.
-
-This file lists IceBot-specific business rules. For scope freezing, workflow
-mapping, invariant coverage, failure scenarios, and completion evidence, use
-[Vertical Slice Review](VERTICAL_SLICE_REVIEW.md). Do not copy the generic gate
-into each business-rule section.
+Use this checklist only for handoff checks that need deployed infrastructure, provider credentials, a real client, or physical runtime evidence. Domain and persistence invariants belong in automated tests and their owning contract documents.
 
 ## Search Keywords
 
-`critical rule checklist`, `manual backend verification`, `maintenance lifecycle`, `refund status`, `kiosk active sales`, `enum string`, `accounts read manage`, `payment webhook`
+`manual backend verification`, `deployment handoff`, `external provider smoke`, `physical robot smoke`, `MQTT recovery`, `PayOS callback`, `Firebase delivery`, `SMTP invitation`
 
-## Maintenance Ticket Lifecycle
+## Automated Coverage Boundary
 
-Verify:
+Do not manually duplicate these checks during every handoff:
 
-- `Open -> Assigned` succeeds.
-- `Open -> InProgress` succeeds.
-- `Assigned -> InProgress` succeeds.
-- `InProgress -> Resolved` succeeds.
-- `Resolved -> Closed` succeeds.
-- `Open/Assigned/InProgress -> Cancelled` succeeds with a reason.
-- `Resolved -> Cancelled` fails.
-- `Closed -> Resolved` fails.
-- `InProgress -> Assigned` fails.
-- `Cancelled -> any other status` fails.
+| Rule family | Primary automated evidence |
+| --- | --- |
+| Manual, Packaged, and MachineProduced fulfillment transitions | `OrderItemFulfillmentTests`, `PaidOrderFulfillmentConcurrencyIntegrationTests` |
+| Production incident lifecycle and exact-unit remake | `ProductionIncidentTests`, Edge production integration tests |
+| Duplicate payment settlement and refund targeting | `PaymentWebhookConcurrencyIntegrationTests`, `RefundConfirmationTests` |
+| Kiosk operational-state sales gating | `KioskOperationalStateTests` and checkout/runtime-menu tests |
+| Production Package installation and upgrade invariants | Production Package integration tests |
+| MQTT credential lifecycle | MQTT credential unit and integration tests |
 
-## Refund Status Behavior
+If one of these test suites is disabled or failing, report that missing evidence instead of replacing it with an undocumented manual assumption.
 
-Verify:
+## Deployment Environment
 
-- Marking a paid order refund-required sets order support state without provider refund integration.
-- Requesting a refund uses `Idempotency-Key`.
-- Processing `FullMoneyRefund` sets payment status to `Refunded` only when staff confirms actual money refund.
-- Processing voucher compensation does not set payment status to `Refunded`.
-- Rejecting or cancelling a refund keeps the order in `RefundRequired`.
+Verify against the target environment:
 
-## Kiosk Online Sales
+- migrations apply to an empty database and the intended upgrade baseline;
+- required object-storage buckets exist or startup fails according to configured bucket ownership;
+- PostgreSQL, MinIO, MQTT, SMTP, PayOS, and Firebase settings satisfy startup validation;
+- health endpoints distinguish startup readiness from optional dependency degradation;
+- secrets are supplied through the deployment secret mechanism and do not appear in responses or logs.
 
-Verify:
+## External Provider Smoke
 
-- New online order/payment session is allowed only when lifecycle is `KioskStatus.Active` and connectivity is `Online` or `Degraded`.
-- `Maintenance`, `Disabled`, `Retired`, `Unknown` connectivity, and `Unreachable` connectivity do not allow new Cloud online sales.
-- Offline sale support requires a future offline session/capability; it is not inferred from lifecycle or connectivity fields.
+Verify with non-production provider credentials where available:
 
-## Order Item Fulfillment
+- PayOS accepts a valid signed callback and rejects an invalid signature;
+- a duplicate PayOS callback does not create a second settlement;
+- SMTP invitation delivery produces only the configured invitation URL;
+- Firebase sends a critical operational notification to an eligible registered device;
+- an invalid Firebase token is retired without retrying it indefinitely.
 
-Verify:
+## Edge And Robot Smoke
 
-- Manual items alone accept strict `Pending -> Accepted -> Preparing -> Completed` transitions and require a reason when failed.
-- Packaged items use only the packaged commands: idempotent `Pending -> Completed` through `fulfill`, or `Pending -> Failed` through `fail` with a required reason. They never enter `Accepted` or `Preparing`.
-- Machine-produced items reject management fulfillment commands and advance only from authenticated execution reports.
-- A mixed order completes only after every item is completed.
-- Every mutation that can aggregate or transition the same order uses the shared `OrderId` workflow lock; command ACK/report/timeout additionally serialize by `EdgeCommand.Id`.
-- Concurrent command pulls allocate delivery-attempt numbers under the target execution-endpoint lock while preserving the original `EdgeCommand.Id`.
-- A failed paid item creates `FulfillmentIssue`; remaining items may still progress and whole-order refund is never inferred automatically.
-- Manual and packaged fulfillment writes require `fulfillmentEventId`; same id and same payload is idempotent, while payload mismatch is rejected.
-- V1 manual/packaged transitions apply to the entire order line quantity; partial line fulfillment is unsupported.
-- Packaged options are `CommercialOnly`; machine-produced production-affecting options require route support.
-- Customer order responses do not expose backend-only `FulfillmentType`.
+Verify only when the real Edge/controller runtime is available:
 
-## Enum Inputs
+- MQTT wake-up is followed by durable command pull;
+- command ACK and execution reports preserve the original `CommandId`;
+- artifact checksum and production-definition provenance are verified before activation;
+- restart during execution follows the published restart policy and does not assume an unsafe resume;
+- uncertain, partial, or defective physical output opens the expected production incident;
+- Edge refuses a command when it cannot persist state before ACK.
 
-Verify:
+## Recovery Smoke
 
-- JSON request body enum values are accepted as strings.
-- JSON request body enum integer values are rejected.
-- Query string enum filters return `400` for invalid values.
+- restart MQTT and confirm pending commands remain pullable;
+- temporarily interrupt MinIO reads and confirm immutable artifact recovery behavior;
+- restart Cloud/API during a pending workflow and confirm reconciliation resumes without duplicate effects;
+- confirm stuck-workflow timeout and retry-failure metrics are emitted and alertable.
 
-## Account Authorization
+## Related Docs
 
-Verify:
-
-- `accounts.read` allows `SystemAdmin`, `OrgAdmin`, and `Manager`.
-- `accounts.manage` allows `SystemAdmin` only.
-- Scoped account reads are filtered for non-`SystemAdmin`.
-- Account mutations remain denied for `OrgAdmin` and `Manager`.
-
-## Payment Webhook
-
-Verify:
-
-- Invalid PayOS signature returns a failure response and does not mark payment paid.
-- Duplicate webhook callback is treated as already processed.
-- Late cancelled/expired callback does not override an already paid order.
-- Missing PayOS config returns service-unavailable behavior instead of leaking secrets.
+- [Vertical Slice Review](VERTICAL_SLICE_REVIEW.md)
+- [Working Protocol](WORKING_PROTOCOL.md)
+- [Deployment Configuration](../operations/DEPLOYMENT_CONFIG.md)
+- [Robot Artifact Operational Smoke Test](../operations/ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md)
+- [Restart And Power Recovery](../operations/RESTART_AND_POWER_RECOVERY.md)

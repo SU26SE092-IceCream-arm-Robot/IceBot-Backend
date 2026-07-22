@@ -196,3 +196,10 @@ alerts, and publishes SignalR only for committed transitions. When
 creates one linked maintenance ticket. Empty also creates a durable push for the
 scoped operational recipients. Healthy recovery resolves the alert; it does not
 close the maintenance ticket automatically.
+
+## Related Docs
+
+- [Operations Support Flow](OPERATIONS_SUPPORT_FLOW.md)
+- [Maintenance Ticket Flow](MAINTENANCE_TICKET_FLOW.md)
+- [Edge Sync and Telemetry Contract](../iot/EDGE_SYNC_TELEMETRY_CONTRACT.md)
+- [Observability](../operations/OBSERVABILITY.md)

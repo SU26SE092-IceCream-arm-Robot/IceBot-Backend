@@ -66,6 +66,16 @@ public interface IOrderExecutionDispatchStore
         Guid orderItemId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> IsDefectiveOutputRemakeAuthorizedAsync(
+        Guid productionIncidentId,
+        Guid orderId,
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
+        Guid sourceCommandId,
+        Guid sourceProductionJobId,
+        CancellationToken cancellationToken = default);
+
     Task AddOrderStatusHistoryAsync(
         OrderStatusHistory history,
         CancellationToken cancellationToken = default);

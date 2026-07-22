@@ -1,6 +1,6 @@
 # Maintenance Ticket Flow
 
-This document describes the V1 manual maintenance/support ticket workflow.
+This document describes the maintenance/support ticket workflow, including manual creation and the bounded inventory-alert automation entry point.
 
 ## Search Keywords
 
@@ -8,17 +8,18 @@ This document describes the V1 manual maintenance/support ticket workflow.
 
 ## Scope
 
-Maintenance Ticket V1 is a manual operations/support workflow.
+Maintenance Ticket is an operations/support work-management aggregate. Most
+tickets are created manually; configured inventory-empty alert automation may
+create one ticket linked to the alert.
 
 It is not:
 
-- an alert engine;
-- an auto-ticket generation system;
+- the owner of alert correlation or lifecycle;
 - a chat workflow;
 - a robot runtime workflow;
 - a long-term analytics aggregate.
 
-Tickets are kiosk-scoped work items. They may optionally link supporting evidence such as device, order, or device event references.
+Tickets are kiosk-scoped work items. They may optionally link supporting evidence such as device, order, device event, or alert references.
 
 Each ticket declares `OperationalImpact`: `None`, `BlocksNewOrders`, or `RequestsEmergencyStop`. Starting a blocking ticket atomically moves the kiosk to `Maintenance`; an emergency-impact ticket moves it to `EmergencyStopRequested`. A normal evidence-only ticket does not affect sales.
 
@@ -42,6 +43,15 @@ Alternative cancellation path:
 Open / Assigned / InProgress ticket
   -> cancelled with reason
   -> no further lifecycle transition in V1
+```
+
+Bounded automated entry path:
+
+```text
+InventoryAlertReconciler detects INVENTORY_EMPTY
+  -> raises or correlates the Alert
+  -> optionally creates one linked Open maintenance ticket
+  -> later alert recovery does not close the ticket
 ```
 
 ## Status Lifecycle
@@ -95,19 +105,23 @@ Evidence links should stay lightweight. Do not embed full order, account, event 
 
 ## API Surface
 
-Management REST endpoints are listed in [API Surface Rules](../api/API_SURFACE_RULES.md#management-rest-surface).
+Management REST endpoints are listed in [Management API Surface](../api/MANAGEMENT_API_SURFACE.md).
 
-V1 does not expose a GraphQL maintenance aggregate. Add one later only when the management UI needs an aggregated read model.
+V1 does not expose a GraphQL maintenance aggregate. REST remains the current maintenance read/write surface.
 
-## Deferred
+## Excluded From Current Contract
 
-Do not implement these in V1 unless explicitly requested:
+The current contract excludes:
 
-- auto-create ticket from device event;
-- alert state machine;
 - chat/comment thread;
 - ticket reopen;
-- SLA/escalation workflow;
+- ticket SLA/escalation workflow;
+- a GraphQL maintenance aggregate.
+
+Inventory alert automation is implemented separately: when configured, an
+`INVENTORY_EMPTY` alert creates one linked maintenance ticket. General device
+events do not automatically create tickets, and resolving the alert does not
+close its ticket.
 - GraphQL maintenance dashboard aggregate;
 - robot runtime integration.
 

@@ -9,4 +9,5 @@ public sealed record RequestOrderItemProductionRemakeCommand(
     int ProductionUnitNo,
     int ProductionUnitQuantity,
     string Reason,
-    CurrentUserContext UserContext);
+    CurrentUserContext UserContext,
+    Guid? ProductionIncidentId = null);

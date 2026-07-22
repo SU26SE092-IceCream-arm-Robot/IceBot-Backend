@@ -212,6 +212,12 @@ Latest attempt DeliveryFailed
 
 `ExecutorBusy` stays on the same attempt and is redelivered. `RefundRequired`, possible physical output, production `Failed`, and `RequiresManualIntervention` are support/refund paths, not automatic retry paths. The configured maximum attempt count is enforced inside the same order-level transaction.
 
+An Edge, controller, or store-power restart during an accepted production job does not
+cancel the paid order and does not authorize automatic replay. The affected job is
+reported as `RequiresManualIntervention` with exact unit identity and physical-output
+evidence. Completed units and stock evidence remain immutable. The complete recovery
+matrix is defined in [Restart And Power Recovery](../operations/RESTART_AND_POWER_RECOVERY.md).
+
 Cloud serializes every payment/fulfillment mutation that can change or authorize use
 of an `Order` aggregate by `OrderId`. This includes payment-session creation, signed
 payment application, payment reconciliation, cancellation/refund-required decisions,
@@ -250,7 +256,7 @@ Check:
 4. Cloud ingests events through SyncEventInbox.
 5. Cloud deduplicates by eventId/source node.
 6. Job/unit reports carry `sourceProductionJobId`, `orderItemId`, `productionUnitNo`, and `productionUnitQuantity`. Cloud rejects overlapping ranges, persists `ProductionExecutionRecord` and optional stock evidence, then derives the effective unit outcome for the machine line.
-7. A machine line completes only when every expected unit is effectively complete. Any failed unit moves a paid Order to `FulfillmentIssue` without removing successful-unit or stock evidence. The Edge order-summary report (`sourceProductionJobId = null`) updates execution observation and must agree with complete job evidence before it can be final.
+7. A machine line completes only when every expected unit is effectively complete. Any failed unit moves a paid Order to `FulfillmentIssue` without removing successful-unit or stock evidence. In the same ingestion transaction, failed or manual-intervention job evidence opens one production incident for that immutable job/unit range. The Edge order-summary report (`sourceProductionJobId = null`) updates execution observation and must agree with complete job evidence before it can be final.
 8. Cloud appends OrderStatusHistory and typed stock-consumption evidence supplied by Edge.
 9. After commit, Cloud publishes OrderItemFulfillmentChanged for changed lines, OrderStatusChanged when the aggregate status changes, OrderExecutionObservationChanged for an applied order summary, and InventoryChanged for stock evidence.
 10. Cloud returns accepted/duplicate/rejected result.
@@ -264,6 +270,8 @@ and falls back to the organization OrgAdmin. The reminder does not advance or
 fail the item; management fulfillment commands remain authoritative.
 
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
+
+Production incident handling is a separate operational phase after evidence ingestion. Staff inspect possible output, then choose delivery, discard, exact-unit remake, technical review, no action, or explicitly acknowledged full-order refund/voucher. Remake and compensation identities are linked back to the incident. Successful-unit and stock evidence remain historical truth; resolution does not erase them. See [Production Incident Resolution Flow](PRODUCTION_INCIDENT_RESOLUTION_FLOW.md).
 
 Mixed fulfillment is one aggregate workflow even though individual lines have
 different authorities. Concurrent completion of Manual, Packaged, and
@@ -285,7 +293,7 @@ These events allow checkout UIs to automatically update payment success/failure 
 ## Related Docs
 
 - [System Flows](SYSTEM_FLOWS.md)
-- [Failure Flows](FAILURE_FLOWS.md)
+- [Failure Flow Index](FAILURE_FLOW_INDEX.md)
 - [Catalog Runtime Menu Flow](CATALOG_RUNTIME_MENU_FLOW.md)
 - [IoT Contract](../iot/IOT_CONTRACT.md)
 - [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)

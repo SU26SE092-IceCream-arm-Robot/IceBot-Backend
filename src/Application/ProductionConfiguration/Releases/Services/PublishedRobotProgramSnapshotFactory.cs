@@ -68,6 +68,7 @@ public static class PublishedRobotProgramSnapshotFactory
                 item.RobotArtifact.ContentLengthBytes,
                 item.RobotArtifact.TechnicalContractId,
                 item.RobotArtifact.TechnicalContractChecksum,
-                item.RequiredOptionCode)).ToArray());
+                item.RequiredOptionCode)).ToArray(),
+            manifest.RestartPolicy);
     }
 }

@@ -24,6 +24,12 @@ public static class OrderModule
         services.AddScoped<Management.Commands.RecordManualOrderItemFulfillmentEventCommandHandler>();
         services.AddScoped<Management.Commands.SetPackagedOrderItemFulfillmentCommandHandler>();
         services.AddScoped<Management.Automation.FulfillmentReminderService>();
+        services.AddScoped<IncidentResolution.ListProductionIncidentsQueryHandler>();
+        services.AddScoped<IncidentResolution.GetProductionIncidentQueryHandler>();
+        services.AddScoped<IncidentResolution.OpenProductionIncidentCommandHandler>();
+        services.AddScoped<IncidentResolution.RecordProductionInspectionCommandHandler>();
+        services.AddScoped<IncidentResolution.SelectProductionIncidentResolutionCommandHandler>();
+        services.AddScoped<IncidentResolution.CompleteProductionIncidentCommandHandler>();
 
         return services;
     }

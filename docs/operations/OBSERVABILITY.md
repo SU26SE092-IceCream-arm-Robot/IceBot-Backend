@@ -172,3 +172,10 @@ For production environments:
 2. **Logs via OTLP**: If using an OTLP collector, enable `Observability:Serilog:OtlpSinkEnabled=true`.
 3. **Traces/Metrics**: Enable the OTLP exporter (`Observability:OpenTelemetry:OtlpExporterEnabled=true`) and point `OtlpEndpoint` to an OpenTelemetry Collector or APM ingest endpoint (e.g., Jaeger, Prometheus, Datadog).
 4. **Debug Body Logging**: Keep `Observability:DebugBodyLogging:Enabled = false` unless actively diagnosing a live production payload issue.
+
+## Related Docs
+
+- [Deployment Configuration](DEPLOYMENT_CONFIG.md)
+- [MQTT Operations](MQTT_OPERATIONS.md)
+- [Alert Lifecycle Flow](../flows/ALERT_LIFECYCLE_FLOW.md)
+- [Restart And Power Recovery](RESTART_AND_POWER_RECOVERY.md)

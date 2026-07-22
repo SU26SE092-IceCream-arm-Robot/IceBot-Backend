@@ -1,6 +1,8 @@
 using Application.EdgeIntegration.Dispatch.Contracts;
 using Application.EdgeIntegration.Reports.Contracts;
 using Domain.Common;
+using Domain.RobotConfiguration.Programs;
+using System.Text.Json.Nodes;
 
 namespace IceBot.UnitTests.EdgeIntegration;
 
@@ -92,9 +94,11 @@ public sealed class ExecuteOrderCommandPayloadTests
         var json = ExecuteOrderCommandPayloadCodec.Serialize(payload);
         var restored = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(json);
 
-        Assert.Equal(3, restored.SchemaVersion);
+        Assert.Equal(4, restored.SchemaVersion);
         Assert.Equal(payload.CommandId, restored.CommandId);
         Assert.Single(restored.OrderLines);
+        Assert.All(restored.OrderLines.SelectMany(line => line.RobotPrograms),
+            program => Assert.Equal(RobotProgramRestartPolicy.ManualOnly, program.RestartPolicy));
     }
 
     [Fact]
@@ -111,6 +115,50 @@ public sealed class ExecuteOrderCommandPayloadTests
 
         Assert.Equal(
             "Execute-order command payload has incomplete active artifact-set provenance.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void LegacySchema3Payload_WithoutRestartPolicy_DefaultsToManualOnly()
+    {
+        var node = JsonNode.Parse(ExecuteOrderCommandPayloadCodec.Serialize(CreateValidPayload()))!.AsObject();
+        node[nameof(ExecuteOrderCommandPayload.SchemaVersion)] = 3;
+        var program = node[nameof(ExecuteOrderCommandPayload.OrderLines)]![0]!
+            [nameof(ExecuteOrderLinePayload.RobotPrograms)]![0]!.AsObject();
+        program.Remove(nameof(ExecuteOrderRobotProgramPayload.RestartPolicy));
+
+        var restored = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(node.ToJsonString());
+
+        Assert.Equal(
+            RobotProgramRestartPolicy.ManualOnly,
+            restored.OrderLines[0].RobotPrograms[0].RestartPolicy);
+    }
+
+    [Fact]
+    public void FullPayload_RejectsUnsupportedRestartPolicy()
+    {
+        var payload = CreateValidPayload() with
+        {
+            OrderLines =
+            [
+                CreateValidPayload().OrderLines[0] with
+                {
+                    RobotPrograms =
+                    [
+                        CreateValidPayload().OrderLines[0].RobotPrograms[0] with
+                        {
+                            RestartPolicy = RobotProgramRestartPolicy.ResumeFromCheckpoint
+                        }
+                    ]
+                }
+            ]
+        };
+
+        var exception = Assert.Throws<DomainRuleException>(() =>
+            ExecuteOrderCommandPayloadCodec.Serialize(payload));
+
+        Assert.Equal(
+            "Execute-order command payload contains an invalid order line or robot program manifest.",
             exception.Message);
     }
 

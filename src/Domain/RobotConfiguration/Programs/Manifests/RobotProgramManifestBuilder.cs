@@ -36,7 +36,8 @@ public static class RobotProgramManifestBuilder
             program.Id,
             program.Code,
             schemaVersion,
-            artifacts);
+            artifacts,
+            RobotProgramRestartPolicy.ManualOnly);
         var json = JsonSerializer.Serialize(document);
         var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(json))).ToLowerInvariant();
         return new RobotProgramManifest(document, json, checksum);
@@ -54,9 +55,16 @@ public static class RobotProgramManifestBuilder
             var document = JsonSerializer.Deserialize<RobotProgramManifestDocument>(manifestJson)
                 ?? throw new DomainRuleException("Published robot program manifest is empty.");
             if (document.Id == Guid.Empty || string.IsNullOrWhiteSpace(document.Code) ||
-                document.SchemaVersion <= 0 || document.Artifacts.Count == 0)
+                document.SchemaVersion is not 1 and not 2 || document.Artifacts.Count == 0 ||
+                !Enum.IsDefined(document.RestartPolicy))
             {
                 throw new DomainRuleException("Published robot program manifest is invalid.");
+            }
+
+            if (document.RestartPolicy != RobotProgramRestartPolicy.ManualOnly)
+            {
+                throw new DomainRuleException(
+                    "The current robot runtime supports only ManualOnly restart policy.");
             }
 
             return document;
@@ -147,7 +155,8 @@ public sealed record RobotProgramManifestDocument(
     Guid Id,
     string Code,
     int SchemaVersion,
-    IReadOnlyList<RobotProgramManifestItem> Artifacts);
+    IReadOnlyList<RobotProgramManifestItem> Artifacts,
+    RobotProgramRestartPolicy RestartPolicy = RobotProgramRestartPolicy.ManualOnly);
 
 public sealed record RobotProgramManifestItem(
     Guid Id,

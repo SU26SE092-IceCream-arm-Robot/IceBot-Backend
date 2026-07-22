@@ -75,3 +75,9 @@ Extract the `token` from the response.
 - **ManagementDashboardHub**: `DashboardInvalidated`
 
 `DeviceEventCreated` is emitted for a newly committed device event. `AlertChanged` is also emitted when Error/Critical telemetry creates an actionable alert and when that alert is acknowledged or resolved.
+
+## Related Docs
+
+- [SignalR Realtime Contract](../api/SIGNALR_REALTIME_CONTRACT.md)
+- [API Surface Rules](../api/API_SURFACE_RULES.md)
+- [Observability](OBSERVABILITY.md)
