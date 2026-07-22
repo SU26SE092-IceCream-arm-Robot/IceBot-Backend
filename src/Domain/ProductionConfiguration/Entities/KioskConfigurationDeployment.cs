@@ -37,6 +37,12 @@ public class KioskConfigurationDeployment : BusinessEntity
 
     public string? FailureReason { get; private set; }
 
+    public string ValidationReportChecksum { get; private set; } = null!;
+    public string RiskLevel { get; private set; } = null!;
+    public string WarningCodesJson { get; private set; } = null!;
+    public Guid? RiskAcknowledgedByAccountId { get; private set; }
+    public DateTimeOffset? RiskAcknowledgedAt { get; private set; }
+
     public virtual ConfigurationRelease ConfigurationRelease { get; private set; } = null!;
 
     public virtual Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint KioskExecutionEndpoint { get; private set; } = null!;
@@ -55,7 +61,12 @@ public class KioskConfigurationDeployment : BusinessEntity
         int attemptNo,
         string idempotencyKey,
         DateTimeOffset requestedAt,
-        Guid? requestedByAccountId = null)
+        Guid? requestedByAccountId = null,
+        string validationReportChecksum = "legacy",
+        string riskLevel = "Legacy",
+        string warningCodesJson = "[]",
+        Guid? riskAcknowledgedByAccountId = null,
+        DateTimeOffset? riskAcknowledgedAt = null)
     {
         if (kioskId == Guid.Empty || organizationId == Guid.Empty || endpointId == Guid.Empty || edgeRuntimeId == Guid.Empty ||
             configurationReleaseId == Guid.Empty || string.IsNullOrWhiteSpace(releaseChecksum))
@@ -79,7 +90,14 @@ public class KioskConfigurationDeployment : BusinessEntity
             IdempotencyKey = idempotencyKey.Trim(),
             AttemptNo = attemptNo,
             RequestedAt = requestedAt,
-            RequestedByAccountId = requestedByAccountId
+            RequestedByAccountId = requestedByAccountId,
+            ValidationReportChecksum = validationReportChecksum,
+            RiskLevel = riskLevel,
+            WarningCodesJson = warningCodesJson,
+            RiskAcknowledgedByAccountId = riskAcknowledgedByAccountId ?? requestedByAccountId,
+            RiskAcknowledgedAt = (riskAcknowledgedByAccountId ?? requestedByAccountId).HasValue
+                ? riskAcknowledgedAt ?? requestedAt
+                : null
         };
     }
 

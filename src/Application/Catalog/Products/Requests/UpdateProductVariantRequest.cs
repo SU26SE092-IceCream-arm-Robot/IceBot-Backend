@@ -20,15 +20,10 @@ public sealed class UpdateProductVariantRequest
 
     public decimal? BasePrice { get; set; }
 
-    public string? Currency { get; set; }
-
-    public bool? IsAvailable { get; set; }
-
     public int? DisplayOrder { get; set; }
 
     public int? PreparationTimeSeconds { get; set; }
 
     public string? ImageUrl { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

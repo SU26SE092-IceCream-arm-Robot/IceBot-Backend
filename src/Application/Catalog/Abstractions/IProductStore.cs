@@ -41,6 +41,19 @@ public interface IProductStore
         bool asNoTracking = true,
         CancellationToken cancellationToken = default);
 
+    Task<OptionGroup?> GetOptionGroupByIdAsync(
+        Guid productId,
+        long optionGroupId,
+        bool asNoTracking = true,
+        CancellationToken cancellationToken = default);
+
+    Task<ProductOption?> GetProductOptionByIdAsync(
+        Guid productId,
+        long optionGroupId,
+        Guid productOptionId,
+        bool asNoTracking = true,
+        CancellationToken cancellationToken = default);
+
     Task<bool> ProductCodeExistsAsync(
         Guid? organizationId,
         Guid? storeId,
@@ -55,6 +68,33 @@ public interface IProductStore
         Guid? excludedVariantId = null,
         CancellationToken cancellationToken = default);
 
+    Task<bool> OptionGroupCodeExistsAsync(
+        Guid productId,
+        string code,
+        long? excludedOptionGroupId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> ProductOptionCodeExistsAsync(
+        long optionGroupId,
+        string code,
+        Guid? excludedProductOptionId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> HasOtherDefaultOptionAsync(
+        long optionGroupId,
+        Guid? excludedProductOptionId = null,
+        CancellationToken cancellationToken = default);
+
+    Task<bool> IsOptionGroupReferencedByMenuItemsAsync(long optionGroupId, CancellationToken cancellationToken = default);
+
+    Task<bool> IsProductOptionReferencedByMenuItemsAsync(Guid productOptionId, CancellationToken cancellationToken = default);
+
+    Task<bool> IsProductReferencedByMenuItemsAsync(Guid productId, CancellationToken cancellationToken = default);
+
+    Task<bool> IsProductVariantReferencedByMenuItemsAsync(Guid productVariantId, CancellationToken cancellationToken = default);
+
+    Task<List<Ingredient>> ListIngredientsByIdsAsync(IReadOnlyCollection<Guid> ingredientIds, CancellationToken cancellationToken = default);
+
     Task<bool> ProductCategoryExistsAsync(long categoryId, CancellationToken cancellationToken = default);
 
     Task<bool> TenantScopeExistsAsync(
@@ -66,6 +106,16 @@ public interface IProductStore
     Task AddProductAsync(Product product, CancellationToken cancellationToken = default);
 
     Task AddProductVariantAsync(ProductVariant variant, CancellationToken cancellationToken = default);
+
+    Task AddOptionGroupAsync(OptionGroup optionGroup, CancellationToken cancellationToken = default);
+
+    Task AddProductOptionAsync(ProductOption productOption, CancellationToken cancellationToken = default);
+
+    void RemoveOptionGroup(OptionGroup optionGroup);
+
+    void RemoveProductOption(ProductOption productOption);
+
+    void ReplaceProductOptionIngredientRequirements(ProductOption option, IReadOnlyCollection<ProductOptionIngredientRequirement> replacements);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

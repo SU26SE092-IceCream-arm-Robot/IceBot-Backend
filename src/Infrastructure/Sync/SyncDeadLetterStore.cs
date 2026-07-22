@@ -5,6 +5,7 @@ using Application.Sync.Abstractions;
 using Domain.Sync.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Domain.Sync.Enums;
 
 namespace Infrastructure.Sync;
 
@@ -13,10 +14,10 @@ public sealed class SyncDeadLetterStore : ISyncDeadLetterStore
     private readonly IceBotDbContext _db;
     public SyncDeadLetterStore(IceBotDbContext db) => _db = db;
 
-    public async Task<(IReadOnlyList<SyncDeadLetter> Items, int Total)> ListAsync(string? status, string? eventType, int page, int pageSize, CancellationToken ct = default)
+    public async Task<(IReadOnlyList<SyncDeadLetter> Items, int Total)> ListAsync(SyncDeadLetterStatus? status, string? eventType, int page, int pageSize, CancellationToken ct = default)
     {
         var query = _db.SyncDeadLetters.AsNoTracking().Include(x => x.Kiosk).AsQueryable();
-        if (Enum.TryParse<Domain.Sync.Enums.SyncDeadLetterStatus>(status, true, out var parsed)) query = query.Where(x => x.Status == parsed);
+        if (status.HasValue) query = query.Where(x => x.Status == status.Value);
         if (!string.IsNullOrWhiteSpace(eventType)) query = query.Where(x => x.EventType == eventType.Trim());
         var total = await query.CountAsync(ct);
         var items = await query.OrderByDescending(x => x.FailedAt).Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(ct);
@@ -40,4 +41,26 @@ public sealed class SyncDeadLetterStore : ISyncDeadLetterStore
     public Task AddRetryAttemptAsync(SyncDeadLetterRetryAttempt attempt, CancellationToken ct = default) =>
         _db.SyncDeadLetterRetryAttempts.AddAsync(attempt, ct).AsTask();
     public Task SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
+
+    public async Task<T> ExecuteSerializedAsync<T>(
+        Guid deadLetterId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await _db.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"sync-dead-letter:{deadLetterId:D}"}, 0))",
+            ct);
+        try
+        {
+            var result = await action(ct);
+            await transaction.CommitAsync(ct);
+            return result;
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
 }

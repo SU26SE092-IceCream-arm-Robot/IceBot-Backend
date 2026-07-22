@@ -47,6 +47,14 @@ public sealed class CreateInternalAccountCommandHandler
             return ApiResult<InternalAccountResult>.Fail("Account already exists.", 409);
         }
 
+        var googleEmail = request.GoogleLoginEnabled
+            ? InternalAccountNormalizer.NormalizeEmail(request.GoogleEmail!)
+            : null;
+        if (googleEmail is not null && await _accounts.GoogleEmailExistsAsync(googleEmail, cancellationToken: cancellationToken))
+        {
+            return ApiResult<InternalAccountResult>.Fail("Google email already belongs to another account.", 409);
+        }
+
         var roles = new List<(Role Role, AccountRoleScopeRequest Scope)>();
         foreach (var roleScope in request.Roles)
         {
@@ -71,7 +79,7 @@ public sealed class CreateInternalAccountCommandHandler
             Status = request.CreateInvitation ? AccountStatus.Invited : AccountStatus.Active,
             LocalLoginEnabled = request.LocalLoginEnabled,
             GoogleLoginEnabled = request.GoogleLoginEnabled,
-            GoogleEmail = request.GoogleLoginEnabled ? InternalAccountNormalizer.NormalizeEmail(request.GoogleEmail!) : null,
+            GoogleEmail = googleEmail,
             Password = (request.LocalLoginEnabled && !request.CreateInvitation && !string.IsNullOrWhiteSpace(request.InitialPassword))
                 ? HashedPassword.From(_passwordHasher.HashPassword(request.InitialPassword))
                 : null,

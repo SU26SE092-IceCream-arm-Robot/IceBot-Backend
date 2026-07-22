@@ -1,3 +1,5 @@
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using Domain.Common;
 using Domain.ProductionConfiguration.ValueObjects;
 
@@ -19,6 +21,7 @@ public class ControllerArtifactSetItem : AuditedEntity
     public int RunOrder { get; private set; }
     public int ParametersSchemaVersion { get; private set; }
     public string? ParametersJson { get; private set; }
+    public string? RequiredOptionCode { get; private set; }
 
     public virtual ControllerArtifactSetDeployment ControllerArtifactSetDeployment { get; private set; } = null!;
 
@@ -42,7 +45,8 @@ public class ControllerArtifactSetItem : AuditedEntity
             StorageKey = snapshot.StorageKey, RuntimeTargetCode = snapshot.RuntimeTargetCode,
             MachineModelCode = snapshot.MachineModelCode, DeviceId = snapshot.DeviceId,
             ContentLengthBytes = snapshot.ContentLengthBytes, RunOrder = snapshot.RunOrder,
-            ParametersSchemaVersion = snapshot.ParametersSchemaVersion, ParametersJson = snapshot.ParametersJson
+            ParametersSchemaVersion = snapshot.ParametersSchemaVersion, ParametersJson = snapshot.ParametersJson,
+            RequiredOptionCode = snapshot.RequiredOptionCode
         };
     }
 }

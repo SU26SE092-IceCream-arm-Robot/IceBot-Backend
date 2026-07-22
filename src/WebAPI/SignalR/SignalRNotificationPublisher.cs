@@ -46,6 +46,35 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         await PublishDashboardInvalidatedAsync(dashboardEvt, ct);
     }
 
+    public async Task PublishOrderItemFulfillmentChangedAsync(
+        OrderItemFulfillmentChangedEvent evt,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await _orderHubContext.Clients.Group($"order:{evt.OrderId}")
+                .SendAsync("OrderItemFulfillmentChanged", evt, ct);
+            await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}")
+                .SendAsync("OrderItemFulfillmentChanged", evt, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to publish SignalR OrderItemFulfillmentChanged event for order item {OrderItemId}.",
+                evt.OrderItemId);
+        }
+
+        await PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
+        {
+            Scope = "Organization",
+            OrganizationId = evt.OrganizationId,
+            StoreId = evt.StoreId,
+            Reason = "OrderItemFulfillmentChanged",
+            UpdatedAt = evt.UpdatedAt
+        }, ct);
+    }
+
     public async Task PublishOrderExecutionObservationChangedAsync(
         OrderExecutionObservationChangedEvent evt,
         CancellationToken ct = default)
@@ -106,6 +135,33 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
             UpdatedAt = evt.UpdatedAt
         };
         await PublishDashboardInvalidatedAsync(dashboardEvt, ct);
+    }
+
+    public async Task PublishKioskOperationalStateChangedAsync(
+        KioskOperationalStateChangedEvent evt,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}")
+                .SendAsync("KioskOperationalStateChanged", evt, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                ex,
+                "Failed to publish SignalR KioskOperationalStateChanged event for kiosk {KioskId}.",
+                evt.KioskId);
+        }
+
+        await PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
+        {
+            Scope = "Organization",
+            OrganizationId = evt.OrganizationId,
+            StoreId = evt.StoreId,
+            Reason = "KioskOperationalStateChanged",
+            UpdatedAt = evt.ChangedAt
+        }, ct);
     }
 
     public async Task PublishDeviceEventCreatedAsync(DeviceEventCreatedEvent evt, CancellationToken ct = default)

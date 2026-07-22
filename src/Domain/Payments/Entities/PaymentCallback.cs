@@ -62,5 +62,13 @@ public partial class PaymentCallback : AppendOnlyEntity
         ProcessingStatus = CanRetry ? PaymentCallbackProcessingStatus.Failed : PaymentCallbackProcessingStatus.Ignored;
     }
 
+    public void MarkIgnored(string reason, DateTimeOffset ignoredAt)
+    {
+        LastError = reason;
+        LastAttemptAt = ignoredAt;
+        NextRetryAt = null;
+        ProcessingStatus = PaymentCallbackProcessingStatus.Ignored;
+    }
+
     public bool CanRetry => ProcessingAttempts < MaxProcessingAttempts;
 }

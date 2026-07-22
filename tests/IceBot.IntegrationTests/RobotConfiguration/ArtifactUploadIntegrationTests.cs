@@ -1,13 +1,16 @@
+using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
+using Application.RobotConfiguration.Storage.Abstractions;
 using System.Text;
 using Application.Identity.Tokens.Claims;
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Services;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Storage.Services;
 using Domain.Common.Enums;
 using Domain.Tenants.Entities;
 using IceBot.IntegrationTests.Infrastructure;
-using Infrastructure.RobotConfiguration.Persistence;
+using Infrastructure.RobotConfiguration.Artifacts.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Infrastructure.Concurrency;
 
 namespace IceBot.IntegrationTests.RobotConfiguration;
 
@@ -64,10 +67,11 @@ public sealed class ArtifactUploadIntegrationTests
 
     private UploadRobotArtifactCommandHandler CreateHandler(
         global::Infrastructure.Data.IceBotDbContext dbContext,
-        Application.RobotConfiguration.Abstractions.IArtifactObjectStorage storage) =>
+        Application.RobotConfiguration.Storage.Abstractions.IArtifactObjectStorage storage) =>
         new(
-            new RobotConfigurationStore(dbContext),
-            new ArtifactUploadContentService(storage, NullLogger<ArtifactUploadContentService>.Instance));
+            new RobotArtifactStore(dbContext),
+            new ArtifactUploadContentService(storage, NullLogger<ArtifactUploadContentService>.Instance),
+            new PostgresTechnicalResourceMutationCoordinator(dbContext));
 
     private static UploadRobotArtifactCommand UploadCommand(Guid organizationId, string code, string fileName)
     {
@@ -102,13 +106,13 @@ public sealed class ArtifactUploadIntegrationTests
     }
 
     private static async Task EnsureBucketAsync(
-        Application.RobotConfiguration.Abstractions.IArtifactObjectStorage storage)
+        Application.RobotConfiguration.Storage.Abstractions.IArtifactObjectStorage storage)
     {
         var bytes = Encoding.UTF8.GetBytes("bucket-ready");
         var key = $"integration-bootstrap/{Guid.NewGuid():N}";
         await using var content = new MemoryStream(bytes);
         await storage.WriteImmutableAsync(
-            new Application.RobotConfiguration.Abstractions.ArtifactObjectWriteRequest(
+            new Application.RobotConfiguration.Storage.Abstractions.ArtifactObjectWriteRequest(
                 key,
                 "application/octet-stream",
                 bytes.Length,
@@ -117,11 +121,11 @@ public sealed class ArtifactUploadIntegrationTests
         await storage.DeleteIfExistsAsync(key);
     }
 
-    private static async Task<IReadOnlyList<Application.RobotConfiguration.Abstractions.ArtifactObjectInfo>> ListObjectsAsync(
-        Application.RobotConfiguration.Abstractions.IArtifactObjectStorage storage,
+    private static async Task<IReadOnlyList<Application.RobotConfiguration.Storage.Abstractions.ArtifactObjectInfo>> ListObjectsAsync(
+        Application.RobotConfiguration.Storage.Abstractions.IArtifactObjectStorage storage,
         string prefix)
     {
-        var results = new List<Application.RobotConfiguration.Abstractions.ArtifactObjectInfo>();
+        var results = new List<Application.RobotConfiguration.Storage.Abstractions.ArtifactObjectInfo>();
         await foreach (var item in storage.ListAsync(prefix))
         {
             results.Add(item);

@@ -7,6 +7,25 @@ namespace Application.Payments.PaymentSessions.Support;
 
 internal static class PaymentNotificationApplier
 {
+    public static string? ValidateNotification(
+        PaymentTransaction paymentTransaction,
+        ProviderPaymentNotification notification)
+    {
+        if (!notification.IsPaid)
+        {
+            return null;
+        }
+
+        if (!notification.PaidAmount.HasValue)
+        {
+            return "Paid webhook amount is required.";
+        }
+
+        return notification.PaidAmount.Value == paymentTransaction.Amount
+            ? null
+            : "Paid webhook amount does not match the payment transaction amount.";
+    }
+
     public static void ApplyNotification(PaymentTransaction paymentTransaction, ProviderPaymentNotification notification)
     {
         paymentTransaction.ProviderPaymentLinkId = notification.ProviderPaymentLinkId ?? paymentTransaction.ProviderPaymentLinkId;
@@ -18,31 +37,46 @@ internal static class PaymentNotificationApplier
 
         if (notification.IsPaid)
         {
+            if (paymentTransaction.Status == PaymentTransactionStatus.Refunded)
+            {
+                return;
+            }
+
             var paidAt = notification.ProviderPaidAt ?? DateTimeOffset.UtcNow;
-            var paidAmount = notification.PaidAmount ?? paymentTransaction.Amount;
             paymentTransaction.MarkPaid(notification.ProviderTransactionId, paidAt, notification.RawPayloadJson);
-            paymentTransaction.Order.MarkPaid(paidAmount, paidAt);
             return;
         }
 
         if (notification.IsCancelled)
         {
-            paymentTransaction.Cancel(DateTimeOffset.UtcNow);
-            if (paymentTransaction.Order.PaymentStatus != PaymentStatus.Paid)
+            if (paymentTransaction.Status == PaymentTransactionStatus.Refunded)
             {
-                paymentTransaction.Order.PaymentStatus = PaymentStatus.Cancelled;
+                return;
+            }
+
+            paymentTransaction.Cancel(DateTimeOffset.UtcNow);
+            if (CanMarkOrderPaymentCancelled(paymentTransaction.Order.PaymentStatus))
+            {
+                paymentTransaction.Order.MarkPaymentCancelled();
             }
             return;
         }
 
         if (notification.IsExpired)
         {
-            paymentTransaction.Cancel(DateTimeOffset.UtcNow);
-            paymentTransaction.Status = PaymentTransactionStatus.Expired;
-            if (paymentTransaction.Order.PaymentStatus != PaymentStatus.Paid)
+            if (paymentTransaction.Status == PaymentTransactionStatus.Refunded)
             {
-                paymentTransaction.Order.PaymentStatus = PaymentStatus.Cancelled;
+                return;
+            }
+
+            paymentTransaction.MarkExpired(DateTimeOffset.UtcNow);
+            if (CanMarkOrderPaymentCancelled(paymentTransaction.Order.PaymentStatus))
+            {
+                paymentTransaction.Order.MarkPaymentCancelled();
             }
         }
     }
+
+    private static bool CanMarkOrderPaymentCancelled(PaymentStatus status) =>
+        status is not (PaymentStatus.Paid or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded);
 }

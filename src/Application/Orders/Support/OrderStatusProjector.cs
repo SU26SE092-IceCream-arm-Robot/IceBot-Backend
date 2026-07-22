@@ -1,0 +1,164 @@
+using Domain.Orders.Entities;
+using Domain.Orders.Enums;
+using Domain.Payments.Enums;
+using Domain.ProductionExecution.Enums;
+using Domain.ProductionExecution.Projections;
+
+namespace Application.Orders.Support;
+
+public static class OrderStatusProjector
+{
+    public static (string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport) ProjectFromOrderAndExecution(
+        Order order,
+        OrderExecutionRecord? executionRecord,
+        PaymentTransactionStatus? latestTransactionStatus = null,
+        DateTimeOffset? observedAt = null)
+    {
+        if ((order.Status is OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted or OrderStatus.Preparing) &&
+            executionRecord is not null)
+        {
+            var executionProjection = executionRecord.CustomerExecutionStatus switch
+            {
+                CustomerExecutionStatus.Delayed =>
+                    ("Delayed", "Your order is taking longer than expected. Production is still being monitored.", false, false),
+                CustomerExecutionStatus.PendingRecovery =>
+                    ("PendingRecovery", "Connection to the machine was interrupted. We are checking your order.", false, false),
+                CustomerExecutionStatus.SupportRequired =>
+                    ("SupportRequired", "We could not confirm production progress. Please contact staff for support.", false, true),
+                _ => ((string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport)?)null
+            };
+
+            if (executionProjection.HasValue)
+            {
+                return executionProjection.Value;
+            }
+        }
+
+        return ProjectFromOrder(order, latestTransactionStatus, observedAt);
+    }
+
+    public static (string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport) ProjectFromOrder(
+        Order order,
+        PaymentTransactionStatus? latestTransactionStatus = null,
+        DateTimeOffset? observedAt = null)
+    {
+        if (order.Status == OrderStatus.Draft)
+        {
+            return ("Draft", "Order is not placed yet.", false, false);
+        }
+
+        if (order.Status == OrderStatus.PendingPayment)
+        {
+            if (HasPaymentWindowExpired(order, observedAt ?? DateTimeOffset.UtcNow))
+            {
+                return ("PaymentExpired", "The order payment window expired. Please place a new order.", false, false);
+            }
+
+            if (order.PaymentStatus == PaymentStatus.Cancelled)
+            {
+                return ("PaymentCancelled", "Payment was cancelled. You can try paying again.", true, false);
+            }
+            if (order.PaymentStatus == PaymentStatus.Failed)
+            {
+                return ("PaymentFailed", "Payment failed. You can try paying again.", true, false);
+            }
+            if (latestTransactionStatus == PaymentTransactionStatus.Expired)
+            {
+                return ("PaymentExpired", "Payment session expired. Please retry.", true, false);
+            }
+
+            return ("WaitingForPayment", "Waiting for payment. Please scan the QR code.", true, false);
+        }
+
+        if (order.Status is OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted or OrderStatus.Preparing)
+        {
+            return ("Preparing", "Payment successful. Preparing your order.", false, false);
+        }
+
+        if (order.Status == OrderStatus.Ready)
+        {
+            return ("Ready", "Your order is ready. Please pick it up!", false, false);
+        }
+
+        if (order.Status == OrderStatus.Completed)
+        {
+            return ("Completed", "Order completed. Thank you!", false, false);
+        }
+
+        if (order.Status == OrderStatus.Cancelled)
+        {
+            if (order.PaymentStatus == PaymentStatus.Paid)
+            {
+                return ("RefundRequired", "Order cancelled after payment. Please contact staff for a refund.", false, true);
+            }
+            return ("Cancelled", "Order cancelled.", false, false);
+        }
+
+        if (order.Status == OrderStatus.FulfillmentIssue)
+        {
+            return ("SupportRequired", "Part of your order could not be fulfilled. Staff are reviewing it.", false, true);
+        }
+
+        if (order.Status is OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)
+        {
+            return ("RefundRequired", "Order execution failed. Please contact staff for support.", false, true);
+        }
+
+        if (order.Status == OrderStatus.Refunded)
+        {
+            return ("Refunded", "Order has been refunded.", false, false);
+        }
+
+        if (order.Status == OrderStatus.Compensated)
+        {
+            return ("Compensated", "Order has been compensated (Voucher issued).", false, false);
+        }
+
+        return ("Unknown", "Unknown order state.", false, false);
+    }
+
+    public static (string CustomerStatus, string CustomerStatusMessage, bool CanRetryPayment, bool RequiresStaffSupport) ProjectFromTransaction(
+        PaymentTransactionStatus transactionStatus,
+        Order order,
+        DateTimeOffset? observedAt = null)
+    {
+        var paymentWindowOpen = !HasPaymentWindowExpired(order, observedAt ?? DateTimeOffset.UtcNow);
+        if (order.PaymentStatus == PaymentStatus.Paid ||
+            order.Status is OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted or OrderStatus.Preparing or OrderStatus.Ready or OrderStatus.Completed)
+        {
+            return ProjectFromOrder(order, observedAt: observedAt);
+        }
+
+        if (transactionStatus == PaymentTransactionStatus.Paid)
+        {
+            return ("Preparing", "Payment successful. Preparing your order.", false, false);
+        }
+
+        if (transactionStatus == PaymentTransactionStatus.Cancelled)
+        {
+            return ("PaymentCancelled", "Payment was cancelled. You can try paying again.", order.Status == OrderStatus.PendingPayment && paymentWindowOpen, false);
+        }
+
+        if (transactionStatus == PaymentTransactionStatus.Expired)
+        {
+            return ("PaymentExpired", "Payment session expired. Please retry.", order.Status == OrderStatus.PendingPayment && paymentWindowOpen, false);
+        }
+
+        if (transactionStatus == PaymentTransactionStatus.Failed)
+        {
+            return ("PaymentFailed", "Payment failed. You can try paying again.", order.Status == OrderStatus.PendingPayment && paymentWindowOpen, false);
+        }
+
+        if (transactionStatus == PaymentTransactionStatus.Refunded)
+        {
+            return ("Refunded", "Order refunded.", false, false);
+        }
+
+        return paymentWindowOpen
+            ? ("WaitingForPayment", "Waiting for payment. Please scan the QR code.", true, false)
+            : ("PaymentExpired", "The order payment window expired. Please place a new order.", false, false);
+    }
+
+    private static bool HasPaymentWindowExpired(Order order, DateTimeOffset observedAt) =>
+        order.PaymentDeadlineAt != default && order.PaymentDeadlineAt <= observedAt;
+}

@@ -1,5 +1,9 @@
 # Observability
 
+## Search Keywords
+
+`observability`, `Serilog`, `OpenTelemetry`, `OTLP`, `Aspire Dashboard`, `trace`, `metric`, `structured log`, `debug body logging`
+
 This document outlines the observability strategy for IceBot Backend. It uses a combination of **Serilog** for structured logging and **OpenTelemetry** for traces, metrics, and correlation.
 
 ## 1. Architecture Strategy
@@ -96,7 +100,28 @@ The `IceBot.Payments.PayOS` meter adds provider-specific failure classification 
 | Metric | Type | Meaning | Bounded tags |
 | --- | --- | --- | --- |
 | `icebot.mqtt.wakeup.publish.attempts` | Counter | MQTT wake-up outcomes, including disabled/succeeded/failed | `outcome`, `command.type` |
+| `icebot.mqtt.credentials.reconciliation.outcomes` | Counter | Durable MQTT credential reconciliation outcomes | `outcome` |
+| `icebot.mqtt.credentials.operation.timeouts` | Counter | Provisioning or rotation operations that exceeded the five-minute lease | `operation` |
+| `icebot.mqtt.credentials.revocation.retry.attempts` | Counter | Automatic stale revocation retries | `outcome` |
+| `icebot.mqtt.credentials.stale.candidates` | Observable gauge | Stale credential operations selected by the latest scan | none |
 | `icebot.payos.request.failures` | Counter | Final PayOS timeout, open-circuit, or transient failures | `provider`, `operation`, `failure.kind` |
+| `icebot.payment_session.reconciliation.outcomes` | Counter | Recovery outcomes for incomplete provider-session creation responses | `outcome` |
+| `icebot.payment_session.interventions` | Counter | Sessions requiring operator investigation after terminal reconciliation outcomes | `intervention` |
+| `icebot.payment_session.reconciliation.pending_age` | Histogram (seconds) | Age of an incomplete session when a reconciliation attempt starts | none |
+| `icebot.production_package.upgrade.preview` | Counter | Upgrade preview outcomes | `outcome`, `has_blockers` |
+| `icebot.production_package.upgrade.materialization` | Counter | Successor materialization outcomes | `outcome` |
+| `icebot.production_package.upgrade.cutover` | Counter | Cutover outcomes | `outcome` |
+| `icebot.production_package.upgrade.rollback_attempt` | Counter | Created rollback deployment attempts | `profile`, `attempt_no` |
+| `icebot.production_package.upgrade.rollback` | Counter | Aggregate rollback outcomes | `outcome` |
+| `icebot.production_package.upgrade.rollback_pending_age` | Histogram (seconds) | Age of an upgrade waiting for rollback activation | none |
+| `icebot.notification_delivery.outcomes` | Counter | Durable push delivery outcomes | `status`, `notification.type` |
+| `icebot.notification_delivery.processing_lag` | Histogram (seconds) | Time from scheduled attempt to worker claim | none |
+| `icebot.notification_delivery.due_batch_size` | Histogram | Number of due deliveries selected per scan | none |
+| `icebot.notification.push.timed_out` | Counter | Firebase push attempts stopped by the per-delivery operation timeout; retry remains owned by the durable delivery worker | none |
+| `icebot.automation.runs` | Counter | Outcome of operational reconciliation and retention runs | `automation.job`, `outcome` |
+| `icebot.automation.candidate.failures` | Counter | Candidate-level failures isolated so later candidates or stages can continue | `automation.job` |
+| `icebot.automation.run.duration` | Histogram (seconds) | Duration of each operational automation run or reconciliation stage | `automation.job`, `outcome` |
+| `icebot.automation.last_success.unix_time` | Observable gauge | Unix timestamp of the last fully successful automation run | `automation.job` |
 | `icebot.edge.command.pull.latency` | Histogram (seconds) | Durable command creation until it is returned by command pull | `command.type` |
 | `icebot.edge.command.ack.latency` | Histogram (seconds) | Command delivery until Cloud receives the first state-changing ACK | `command.type`, `ack.status` |
 | `icebot.edge.execution.report.lag` | Histogram (seconds) | Executor-reported timestamp until Cloud receives a new report | `report.type` |
@@ -110,16 +135,33 @@ Rules:
 - Duplicate ACKs and duplicate execution reports do not add latency/transition measurements.
 - The stale/unreachable gauge is refreshed from PostgreSQL every 30 seconds; it is not an in-memory lifecycle counter.
 - IDs such as command, order, kiosk, endpoint, or device must never be metric tags. Use traces/logs for entity-level investigation.
+- Production-package upgrade tags are bounded outcomes only. Endpoint and upgrade identities remain in the typed detail/audit read model.
+- Notification metrics use bounded status/type tags only. Delivery, account, kiosk, and tenant identifiers remain in diagnostics reads and logs.
 - PayOS `failure.kind` is bounded to `timeout`, `circuit_open`, and `transient`; HTTP payment-creation `POST` requests are not retried.
+- Payment-session reconciliation uses the persisted provider order code. `AwaitingWebhook` means provider lookup reported paid while Cloud is still waiting for the signed webhook; it must be investigated through order-scoped payment diagnostics rather than treated as fulfillment success.
+- Alert on any sustained increase of `icebot.payment_session.interventions`, especially `AwaitingWebhook`, `IdentityMismatch`, and `AmountMismatch`. Use the tenant-scoped intervention queue to identify affected orders; metric tags intentionally contain no payment or order IDs.
 - MQTT disabled is an explicit outcome, not a publish failure. Alert only on `outcome=failed` when MQTT is expected to be enabled.
+- MQTT credential metrics use only bounded operation/outcome tags. Endpoint identity remains in structured logs and management alerts.
+- Alert when an enabled automation job has no recent `last_success` update, when `partial_failure` is sustained, or when candidate failures grow. Inspect logs by job and candidate ID; IDs deliberately remain out of metric tags.
 
 Suggested initial alerts:
 
 - sustained increase of MQTT `failed` outcomes;
+- any sustained non-zero `icebot.mqtt.credentials.stale.candidates` gauge;
+- growth of `icebot.mqtt.credentials.operation.timeouts` or failed MQTT credential revocation retries;
+- any `icebot.payment_session.interventions{intervention="IdentityMismatch"}` or
+  `{intervention="AmountMismatch"}` occurrence;
+- sustained non-zero
+  `icebot.payment_session.interventions{intervention="AwaitingWebhook"}` or
+  `{intervention="RetryExhausted"}`;
+- payment-session reconciliation pending-age p95 above the configured stale and
+  retry budget;
 - p95 pull or ACK latency above the command expiry budget;
 - p95 report lag above the report reconciliation threshold;
 - non-zero Unreachable gauge for a sustained interval;
 - growing Stale gauge combined with low heartbeat freshness.
+- no successful operational-automation run within two expected job intervals; and
+- sustained `icebot.notification.push.timed_out` growth while notification delivery remains enabled.
 
 Exact thresholds are deployment-specific and should be tuned from observed baselines rather than hardcoded in application code.
 

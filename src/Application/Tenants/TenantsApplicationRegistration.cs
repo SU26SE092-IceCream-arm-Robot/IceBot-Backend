@@ -1,5 +1,6 @@
 using Application.Tenants.Kiosks.Commands;
 using Application.Tenants.Kiosks.Queries;
+using Application.Tenants.Onboarding;
 using Application.Tenants.Organizations.Commands;
 using Application.Tenants.Organizations.Queries;
 using Application.Tenants.RoleScopes.Queries;
@@ -21,6 +22,7 @@ public static class TenantsApplicationRegistration
         services.AddScoped<CreateKioskCommandHandler>();
         services.AddScoped<UpdateKioskCommandHandler>();
         services.AddScoped<SetKioskStatusCommandHandler>();
+        services.AddScoped<SetKioskOperationalStateCommandHandler>();
 
         services.AddScoped<ListStoresQueryHandler>();
         services.AddScoped<GetStoreQueryHandler>();
@@ -28,6 +30,8 @@ public static class TenantsApplicationRegistration
         services.AddScoped<UpdateStoreCommandHandler>();
         services.AddScoped<DisableStoreCommandHandler>();
         services.AddScoped<ActivateStoreCommandHandler>();
+        services.AddScoped<PauseStoreSalesCommandHandler>();
+        services.AddScoped<ResumeStoreSalesCommandHandler>();
 
         services.AddScoped<ListOrganizationsQueryHandler>();
         services.AddScoped<GetOrganizationQueryHandler>();
@@ -37,6 +41,7 @@ public static class TenantsApplicationRegistration
         services.AddScoped<ActivateOrganizationCommandHandler>();
 
         services.AddScoped<GetTenantTreeQueryHandler>();
+        services.AddScoped<FranchiseOnboardingService>();
         return services;
     }
 }

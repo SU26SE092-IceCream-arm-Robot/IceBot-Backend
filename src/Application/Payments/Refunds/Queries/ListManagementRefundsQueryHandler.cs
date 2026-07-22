@@ -2,6 +2,7 @@ using Application.Payments.Abstractions;
 using Application.Payments.Refunds.Mapping;
 using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.Payments.Refunds.Queries;
 
@@ -20,6 +21,7 @@ public sealed class ListManagementRefundsQueryHandler
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.RefundsManage, query.UserContext);
 
         var totalCount = await _paymentStore.CountRefundsAsync(
             query.Search,
@@ -28,9 +30,9 @@ public sealed class ListManagementRefundsQueryHandler
             query.StoreId,
             query.KioskId,
             query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             cancellationToken);
 
         var refunds = await _paymentStore.ListRefundsAsync(
@@ -40,9 +42,9 @@ public sealed class ListManagementRefundsQueryHandler
             query.StoreId,
             query.KioskId,
             query.UserContext.IsSystemAdmin,
-            query.UserContext.AllowedOrganizationIds,
-            query.UserContext.AllowedStoreIds,
-            query.UserContext.AllowedKioskIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             pageNumber,
             pageSize,
             cancellationToken);

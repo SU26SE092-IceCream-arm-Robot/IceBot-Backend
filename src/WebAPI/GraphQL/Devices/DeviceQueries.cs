@@ -1,5 +1,12 @@
-using Application.Devices.Queries;
-using Application.Devices.Results;
+using Application.Devices.Catalog.Queries;
+using Application.Devices.ExecutionEndpoints.Queries;
+using Application.Devices.Telemetry.Queries;
+using Application.Devices.Connectivity.Queries;
+using Application.Devices.Catalog.Results;
+using Application.Devices.ExecutionEndpoints.Results;
+using Application.Devices.Telemetry.Results;
+using Application.Devices.Connectivity.Results;
+using Application.Devices.Credentials.Results;
 using HotChocolate.Authorization;
 using System.Security.Claims;
 using WebAPI.Authorization;

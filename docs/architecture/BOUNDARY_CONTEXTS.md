@@ -23,6 +23,7 @@ This project keeps one Domain project, but domain entities are grouped by bounde
 | Payments | `Domain.Payments` | payment transactions, callbacks, refunds, payment methods |
 | Robot Configuration | `Domain.RobotConfiguration` | robot Lua artifacts and reusable robot manifests |
 | Production Configuration | `Domain.ProductionConfiguration` | configuration releases, routes, robot bindings and deployment records |
+| Production Packages | `Domain.ProductionPackages` | reusable package/version manifests, deterministic installation provenance, and composition audit; references Catalog and RobotConfiguration by IDs/snapshots |
 | Production Execution | `Domain.ProductionExecution` | Cloud execution projections from executor evidence |
 | Devices | `Domain.Devices` | device catalog, telemetry, heartbeats and kiosk execution endpoints |
 | Inventory | `Domain.Inventory` | dispenser state, stock movements |
@@ -34,12 +35,14 @@ This project keeps one Domain project, but domain entities are grouped by bounde
 
 Namespace: `Domain.Identity`
 
-Owns accounts, roles, login devices, and refresh tokens.
+Owns accounts, roles, notification-device registrations, and refresh tokens.
+
+`AccountNotificationDevice` is an FCM installation registry. Firebase delivery targets active registrations by account and invalidates provider-rejected tokens; recipient policy belongs to the calling product workflow. It is not a trusted-session or login-security model.
 
 Entities:
 
 - `Account`
-- `AccountDevice`
+- `AccountNotificationDevice`
 - `PasswordResetRequest`
 - `RefreshToken`
 - `Role`
@@ -82,6 +85,10 @@ Entities:
 - `RecipeItem`
 - `Ingredient`
 
+`Product` owns `OptionGroup`, and `OptionGroup` owns `ProductOption`. Options inherit Product tenant scope and currency. `MenuItem` stores only selected option ids as Sales Catalog membership; placed orders store immutable `OrderItemOption` snapshots rather than live Catalog references.
+
+`Recipe` belongs to one `ProductVariant` and inherits the owning Product tenant scope. `RecipeItem` declares ingredient requirements and ordering for recipe data; it is not robot motion or artifact execution orchestration. Ingredients are global reference definitions in V1, while Inventory owns kiosk/device dispenser state and stock movement.
+
 ### Sales Catalog
 
 Namespace: `Domain.SalesCatalog`
@@ -106,8 +113,10 @@ Entities:
 - `Order`
 - `OrderItem`
 - `OrderStatusHistory`
+- `OrderItemStatusHistory`
 
 Orders may reference catalog, payment, kiosk, and execution evidence by id or snapshot, but should not depend on mutable Edge runtime state for historical truth.
+Each order item snapshots its fulfillment type. Manual lines use the strict staff preparation lifecycle; packaged lines use idempotent handoff/failure commands and never enter acceptance or preparation; machine-produced lines advance through authenticated production reports carrying order-item and production-unit identity. Item failure is represented by the Orders-owned `FulfillmentIssue` aggregate state and does not itself decide payment compensation.
 
 ### Payments
 
@@ -123,6 +132,8 @@ Entities:
 - `Refund`
 
 Provider payloads are external evidence. Idempotency and retry decisions must use typed columns.
+
+`PaymentMethod` is a reference/status catalog. Provider credentials and provider-specific settings remain in application configuration or secret storage, not database JSON or management DTOs.
 
 Current refund phase is manual cash refund. Auto provider refund or payout integration can be added later, but should not be assumed in the first implementation.
 
@@ -177,6 +188,8 @@ Namespace: `Domain.Devices`
 
 Owns physical device catalog, installed devices, device events, and edge telemetry.
 
+`DeviceType` and `DeviceModel` form a global technical catalog owned by Devices. They are not tenant-scoped. Tenant-scoped `Device` records reference the catalog by ID; catalog lifecycle changes prevent future assignment without rewriting installed-device history.
+
 Entities:
 
 - `DeviceType`
@@ -192,14 +205,16 @@ Entities:
 
 Namespace: `Domain.Inventory`
 
-Owns ingredient dispenser state and stock movement reporting.
+Owns Cloud ingredient-dispenser topology, current dispenser state, and stock movement reporting.
 
 Entities:
 
 - `IngredientDispenserState`
 - `StockMovement`
 
-`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory owns runtime state and quantity movement.
+`Ingredient` remains in Catalog because it defines what a recipe uses. Inventory binds a kiosk device/container to one ingredient, owns that binding lifecycle, replacement/rebind audit, topology-change history, and stock movement history. Device retirement coordinates with Inventory so active bindings cannot outlive their owning hardware. Configuration Release does not create or rebind Cloud dispenser topology in V1.
+
+Inventory also owns the computed operational readiness projection used by Production Configuration. Production Configuration supplies release route/Recipe identities and consumes warnings or blocking results; ownership of dispenser topology remains in Inventory.
 
 ### Operations
 

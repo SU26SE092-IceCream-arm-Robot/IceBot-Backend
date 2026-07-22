@@ -18,7 +18,6 @@ internal static class OrganizationResultMapper
             PhoneNumber = org.PhoneNumber,
             Address = org.Address,
             Status = org.Status.ToString(),
-            MetadataJson = org.MetadataJson,
             CreatedAt = org.CreatedAt,
             UpdatedAt = org.UpdatedAt
         };

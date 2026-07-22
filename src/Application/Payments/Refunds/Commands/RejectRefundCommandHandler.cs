@@ -34,6 +34,7 @@ public sealed class RejectRefundCommandHandler
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
+            await _paymentStore.AcquireRefundLockAsync(command.RefundId, ct);
             var refund = await _paymentStore.GetRefundByIdAsync(command.RefundId, ct);
             if (refund is null)
             {

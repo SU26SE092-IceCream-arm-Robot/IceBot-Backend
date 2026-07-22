@@ -1,11 +1,10 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.ValueObjects;
-using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -34,6 +33,11 @@ public class ControllerArtifactSetDeployment : AuditedEntity
     public Guid? LastControllerReportId { get; private set; }
     public string? FailureCode { get; private set; }
     public string? FailureReason { get; private set; }
+    public string ValidationReportChecksum { get; private set; } = null!;
+    public string RiskLevel { get; private set; } = null!;
+    public string WarningCodesJson { get; private set; } = null!;
+    public Guid? RiskAcknowledgedByAccountId { get; private set; }
+    public DateTimeOffset? RiskAcknowledgedAt { get; private set; }
 
     public IReadOnlyCollection<ControllerArtifactSetItem> Items => _items;
 
@@ -52,7 +56,12 @@ public class ControllerArtifactSetDeployment : AuditedEntity
         long maxArtifactStorageBytes,
         Guid? requestedByAccountId,
         DateTimeOffset requestedAt,
-        IEnumerable<ControllerArtifactSetItemSnapshot> items)
+        IEnumerable<ControllerArtifactSetItemSnapshot> items,
+        string validationReportChecksum = "legacy",
+        string riskLevel = "Legacy",
+        string warningCodesJson = "[]",
+        Guid? riskAcknowledgedByAccountId = null,
+        DateTimeOffset? riskAcknowledgedAt = null)
     {
         if (kioskId == Guid.Empty || organizationId == Guid.Empty || endpointId == Guid.Empty || controllerId == Guid.Empty || releaseId == Guid.Empty ||
             string.IsNullOrWhiteSpace(releaseChecksum) ||
@@ -71,7 +80,14 @@ public class ControllerArtifactSetDeployment : AuditedEntity
             MaxArtifactCount = maxArtifactCount,
             MaxArtifactStorageBytes = maxArtifactStorageBytes,
             RequestedByAccountId = requestedByAccountId,
-            RequestedAt = requestedAt
+            RequestedAt = requestedAt,
+            ValidationReportChecksum = validationReportChecksum,
+            RiskLevel = riskLevel,
+            WarningCodesJson = warningCodesJson,
+            RiskAcknowledgedByAccountId = riskAcknowledgedByAccountId ?? requestedByAccountId,
+            RiskAcknowledgedAt = (riskAcknowledgedByAccountId ?? requestedByAccountId).HasValue
+                ? riskAcknowledgedAt ?? requestedAt
+                : null
         };
 
         var selected = items?.ToArray() ?? [];

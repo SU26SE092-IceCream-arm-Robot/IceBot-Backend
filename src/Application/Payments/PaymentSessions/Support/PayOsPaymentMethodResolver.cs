@@ -5,14 +5,14 @@ namespace Application.Payments.PaymentSessions.Support;
 
 internal static class PayOsPaymentMethodResolver
 {
-    private const string PayOsMethodCode = "payos";
+    public const string MethodCode = "payos";
 
     public static async Task<PaymentMethod> EnsurePayOsPaymentMethodAsync(
         IPaymentStore paymentStore,
         string providerCode,
         CancellationToken cancellationToken)
     {
-        var paymentMethod = await paymentStore.GetPaymentMethodByCodeAsync(PayOsMethodCode, cancellationToken);
+        var paymentMethod = await paymentStore.GetPaymentMethodByCodeAsync(MethodCode, cancellationToken);
         if (paymentMethod is not null)
         {
             return paymentMethod;
@@ -20,7 +20,7 @@ internal static class PayOsPaymentMethodResolver
 
         paymentMethod = new PaymentMethod
         {
-            Code = PayOsMethodCode,
+            Code = MethodCode,
             Name = "PayOS",
             Description = "PayOS payment gateway",
             Provider = providerCode,

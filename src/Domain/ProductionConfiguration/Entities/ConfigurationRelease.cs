@@ -1,10 +1,12 @@
+using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.Programs;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Tenants.Entities;
 using Domain.ProductionConfiguration.ValueObjects;
-using Domain.RobotConfiguration.Manifests;
+using Domain.RobotConfiguration.Programs.Manifests;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -71,7 +73,8 @@ public class ConfigurationRelease : BusinessEntity
         Guid recipeId,
         string routeCode,
         int priority,
-        string? requiredCapabilitiesJson = null)
+        string? requiredCapabilitiesJson,
+        IReadOnlyCollection<string> supportedOptionCodes)
     {
         EnsureDraft();
 
@@ -80,7 +83,8 @@ public class ConfigurationRelease : BusinessEntity
             throw new DomainRuleException("A configuration release can contain only one route with the same code.");
         }
 
-        var route = ExecutionRoute.Create(productVariantId, recipeId, routeCode, priority, requiredCapabilitiesJson);
+        var route = ExecutionRoute.Create(productVariantId, recipeId, routeCode, priority,
+            requiredCapabilitiesJson, supportedOptionCodes);
         _executionRoutes.Add(route);
         return route;
     }
@@ -94,6 +98,7 @@ public class ConfigurationRelease : BusinessEntity
     public IReadOnlyCollection<ExecutionRoute> ReplaceRoutes(
         IEnumerable<(Guid ProductVariantId, Guid RecipeId, string RouteCode, int Priority,
             string? RequiredCapabilitiesJson,
+            IReadOnlyCollection<string> SupportedOptionCodes,
             IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)> Bindings)> replacements)
     {
         EnsureDraft();
@@ -102,7 +107,7 @@ public class ConfigurationRelease : BusinessEntity
         foreach (var replacement in replacements)
         {
             var route = AddRoute(replacement.ProductVariantId, replacement.RecipeId, replacement.RouteCode,
-                replacement.Priority, replacement.RequiredCapabilitiesJson);
+                replacement.Priority, replacement.RequiredCapabilitiesJson, replacement.SupportedOptionCodes);
             foreach (var binding in replacement.Bindings)
                 route.AddRobotBinding(binding.RobotProgramId, binding.BindingOrder, binding.CapabilityCode);
         }
@@ -113,20 +118,9 @@ public class ConfigurationRelease : BusinessEntity
     public void Publish(
         DateTimeOffset publishedAt,
         Guid publishedByAccountId,
-        IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots,
-        FullEdgeReleaseBundleDescriptor fullEdgeBundle)
+        IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
-        var contentManifest = PreparePublication(publishedByAccountId, programSnapshots);
-
-        if (fullEdgeBundle.ContentLengthBytes <= 0 ||
-            fullEdgeBundle.ArtifactCount <= 0 ||
-            string.IsNullOrWhiteSpace(fullEdgeBundle.StorageKey) ||
-            string.IsNullOrWhiteSpace(fullEdgeBundle.Checksum))
-        {
-            throw new DomainRuleException("A valid Full Edge release bundle is required before publication.");
-        }
-
-        var manifest = ConfigurationReleaseManifestBuilder.AttachFullEdgeBundle(contentManifest, fullEdgeBundle);
+        var manifest = PreparePublication(publishedByAccountId, programSnapshots);
         ManifestJson = manifest.Json;
         ReleaseChecksum = manifest.Checksum;
         PublishedAt = publishedAt;
@@ -189,8 +183,8 @@ public class ConfigurationRelease : BusinessEntity
     {
         if ((Status != ConfigurationReleaseStatus.Published &&
                 !(allowRetiredRelease && Status == ConfigurationReleaseStatus.Retired)) ||
-            endpoint.ExecutionProfile != Domain.Devices.Enums.KioskExecutionProfile.FullEdge ||
-            endpoint.Status != Domain.Devices.Enums.KioskExecutionEndpointStatus.Active ||
+            endpoint.ExecutionProfile != KioskExecutionProfile.FullEdge ||
+            endpoint.Status != KioskExecutionEndpointStatus.Active ||
             endpoint.FullEdgeRuntimeId != edgeRuntimeId)
         {
             throw new DomainRuleException("Only a published release can deploy to its active Full Edge endpoint.");

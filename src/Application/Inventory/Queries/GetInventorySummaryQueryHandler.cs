@@ -1,6 +1,7 @@
 using Application.Inventory.Abstractions;
 using Application.Inventory.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 
 namespace Application.Inventory.Queries;
 
@@ -18,14 +19,15 @@ public sealed class GetInventorySummaryQueryHandler
         CancellationToken cancellationToken = default)
     {
         var userContext = query.UserContext;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.InventoryView, userContext);
 
         var summary = await _inventoryStore.GetInventorySummaryAsync(
             query.KioskId,
             query.StoreId,
             userContext.IsSystemAdmin,
-            userContext.AllowedOrganizationIds,
-            userContext.AllowedStoreIds,
-            userContext.AllowedKioskIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             cancellationToken);
 
         return ApiResult<InventorySummaryResult>.Success(summary, "Inventory summary retrieved successfully.");

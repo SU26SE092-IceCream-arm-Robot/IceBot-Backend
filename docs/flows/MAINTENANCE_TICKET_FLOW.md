@@ -20,6 +20,10 @@ It is not:
 
 Tickets are kiosk-scoped work items. They may optionally link supporting evidence such as device, order, or device event references.
 
+Each ticket declares `OperationalImpact`: `None`, `BlocksNewOrders`, or `RequestsEmergencyStop`. Starting a blocking ticket atomically moves the kiosk to `Maintenance`; an emergency-impact ticket moves it to `EmergencyStopRequested`. A normal evidence-only ticket does not affect sales.
+
+`EmergencyStopRequested` only holds new Cloud work and records that immediate safety intervention is required. It does not send a hardware command and does not assert that the robot stopped. Physical `EmergencyStopped` truth belongs to the typed Edge safety projection.
+
 ## Flow
 
 ```text
@@ -52,6 +56,8 @@ Allowed V1 transitions:
 | `Resolved` | close | `Closed` |
 | `Open` / `Assigned` / `InProgress` | cancel | `Cancelled` |
 
+Resolving, closing, or cancelling a ticket does not automatically return the kiosk to `Operational`. An authorized operator must verify the kiosk and explicitly resume it. This avoids reopening sales while another ticket, cleaning task, restock, or safety condition remains active.
+
 Forbidden V1 transitions:
 
 - `Resolved -> Cancelled`
@@ -69,6 +75,12 @@ Forbidden V1 transitions:
 | `maintenance.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Assign, start, resolve, close, cancel, or update tickets within assigned scope |
 
 Staff can create and view tickets in assigned scope, but cannot assign, resolve, close, or cancel by default.
+
+An assignee must be an active account with an active `Technician`, `Manager`, or
+`OrgAdmin` role assignment that matches the ticket kiosk, store, or organization
+on that same role-scope record. An account's role in another tenant does not make
+it assignable. A push-notification device is optional and does not determine
+assignment eligibility.
 
 ## Evidence Links
 

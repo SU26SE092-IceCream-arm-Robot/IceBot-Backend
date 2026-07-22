@@ -15,26 +15,23 @@ public sealed class GetOrderExecutionAttemptsQueryHandler
         _orderStore = orderStore;
     }
 
-    public async Task<PagedResult<ExecutionAttemptResult>> HandleAsync(
+    public async Task<PagedResult<ExecutionAttemptSummaryResult>> HandleAsync(
         GetOrderExecutionAttemptsQuery query,
         CancellationToken cancellationToken = default)
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
-        var order = await _orderStore.GetOrderByIdAsync(query.OrderId, cancellationToken);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersView, query.UserContext);
+        var order = await _orderStore.GetManagementOrderByIdAsync(
+            query.OrderId,
+            query.UserContext.IsSystemAdmin,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
+            cancellationToken);
         if (order is null)
         {
-            return PagedResult<ExecutionAttemptResult>.Fail("Order not found.", 404, pageNumber, pageSize);
-        }
-
-        if (!ScopeAccessRules.CanAccessScopedRow(
-                ScopeRoleSets.OrdersView,
-                query.UserContext,
-                order.OrganizationId,
-                order.StoreId,
-                order.KioskId))
-        {
-            return PagedResult<ExecutionAttemptResult>.Forbidden("Access denied.", pageNumber, pageSize);
+            return PagedResult<ExecutionAttemptSummaryResult>.Fail("Order not found.", 404, pageNumber, pageSize);
         }
 
         var totalCount = await _orderStore.CountExecutionAttemptsAsync(order.Id, cancellationToken);
@@ -47,8 +44,8 @@ public sealed class GetOrderExecutionAttemptsQueryHandler
         var records = await _orderStore.ListOrderExecutionRecordsAsync(commandIds, cancellationToken);
         var recordsByCommand = records.ToDictionary(record => record.SourceCommandId);
 
-        return PagedResult<ExecutionAttemptResult>.Success(
-            commands.Select(command => ExecutionAttemptResultMapper.ToResult(
+        return PagedResult<ExecutionAttemptSummaryResult>.Success(
+            commands.Select(command => ExecutionAttemptResultMapper.ToSummary(
                 command,
                 recordsByCommand.GetValueOrDefault(command.Id))),
             totalCount,

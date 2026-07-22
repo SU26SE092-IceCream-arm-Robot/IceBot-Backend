@@ -1,12 +1,22 @@
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.ValueObjects;
 using Domain.ProductionConfiguration.Manifests;
-using Application.ProductionConfiguration.Abstractions;
-using Application.ProductionConfiguration.Commands;
-using Application.ProductionConfiguration.Services;
-using Application.RobotConfiguration.Abstractions;
+using Application.ProductionConfiguration.Releases.Abstractions;
+using Application.ProductionConfiguration.Releases.Commands;
+using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Releases.Services;
+using Application.ProductionConfiguration.Readiness.Services;
+using Application.Inventory.Abstractions;
+using Application.ProductionConfiguration;
+using Application.ProductionConfiguration.Deployments;
+using Application.ProductionConfiguration.Readiness;
+using Microsoft.Extensions.Options;
+using Application.RobotConfiguration.Artifacts.Abstractions;
 using IceBot.UnitTests.TestSupport;
 using NSubstitute;
 
@@ -21,7 +31,7 @@ public sealed class ConfigurationReleaseTests
 
         var exception = Assert.Throws<DomainRuleException>(() =>
             release.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(),
-                new Dictionary<Guid, PublishedRobotProgramSnapshot>(), Bundle()));
+                new Dictionary<Guid, PublishedRobotProgramSnapshot>()));
 
         Assert.Equal("Cannot publish a configuration release without execution routes.", exception.Message);
         Assert.Equal(ConfigurationReleaseStatus.Draft, release.Status);
@@ -39,6 +49,7 @@ public sealed class ConfigurationReleaseTests
                 "DEFAULT",
                 0,
                 null,
+                Array.Empty<string>(),
                 (IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)>)
                 [
                     (Guid.NewGuid(), 1, "ROBOT_ARM")
@@ -47,7 +58,7 @@ public sealed class ConfigurationReleaseTests
 
         var exception = Assert.Throws<DomainRuleException>(() =>
             release.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(),
-                new Dictionary<Guid, PublishedRobotProgramSnapshot>(), Bundle()));
+                new Dictionary<Guid, PublishedRobotProgramSnapshot>()));
 
         Assert.Equal("Configuration release bindings require published robot program snapshots.", exception.Message);
         Assert.Equal(ConfigurationReleaseStatus.Draft, release.Status);
@@ -68,6 +79,7 @@ public sealed class ConfigurationReleaseTests
                 "DEFAULT",
                 0,
                 null,
+                new[] { "oreo" },
                 (IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)>)
                 [(programId, 1, "ROBOT_ARM")]
             )
@@ -90,6 +102,7 @@ public sealed class ConfigurationReleaseTests
         Assert.Contains("\"ExecutionRoutes\"", content.Json);
         Assert.Contains($"\"BundleEntryName\":\"artifacts/{artifactId:D}.lua\"", content.Json);
         Assert.Contains("\"ContentLengthBytes\":123", content.Json);
+        Assert.Contains("\"SupportedOptionCodes\":[\"OREO\"]", content.Json);
         Assert.DoesNotContain("FullEdgeBundle", content.Json);
     }
 
@@ -97,12 +110,13 @@ public sealed class ConfigurationReleaseTests
     public async Task InvalidReleaseIsRejectedBeforeObjectStorageIo()
     {
         var release = ConfigurationRelease.CreateDraft(Guid.NewGuid(), 1);
-        var store = Substitute.For<IProductionConfigurationStore>();
+        var store = Substitute.For<IConfigurationReleaseStore>();
         store.GetReleaseForPublishAsync(release.Id, Arg.Any<CancellationToken>()).Returns(release);
         var storage = Substitute.For<IArtifactObjectStorage>();
         var handler = new PublishConfigurationReleaseCommandHandler(
             store,
-            new FullEdgeReleaseBundleService(storage));
+            ReadinessGuard(),
+            new ProductionDefinitionPublicationService());
 
         var result = await handler.HandleAsync(new PublishConfigurationReleaseCommand
         {
@@ -123,6 +137,7 @@ public sealed class ConfigurationReleaseTests
             Arg.Any<CancellationToken>());
     }
 
-    private static FullEdgeReleaseBundleDescriptor Bundle() =>
-        new(1, "robot-artifacts/release-bundles/test.zip", new string('a', 64), 100, 1);
+    private static ProductionInventoryReadinessGuard ReadinessGuard() => new(
+        Substitute.For<IInventoryReadinessEvaluator>(),
+        Options.Create(new InventoryReadinessPolicyOptions()));
 }

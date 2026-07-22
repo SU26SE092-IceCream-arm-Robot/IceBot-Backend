@@ -1,6 +1,8 @@
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
 using Domain.Common;
-using Domain.RobotConfiguration.Entities;
-using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace IceBot.UnitTests.RobotConfiguration;
 
@@ -24,6 +26,7 @@ public sealed class RobotArtifactTests
     {
         var artifact = CreateDraft();
 
+        artifact.AssignTechnicalContract(Guid.NewGuid(), new string('c', 64));
         artifact.Publish();
 
         Assert.Equal(RobotArtifactStatus.Published, artifact.Status);

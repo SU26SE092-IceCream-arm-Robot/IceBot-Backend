@@ -111,7 +111,7 @@ public class IdentityBootstrapHostedService : IHostedService
         var normalizedUserName = NormalizeUserName(userName);
         var normalizedEmail = NormalizeEmail(email);
 
-        var existingAccount = await dbContext.Accounts
+        var existingAccount = await dbContext.Accounts.WhereNotDeleted()
             .Include(x => x.AccountRoles)
             .FirstOrDefaultAsync(
                 x => x.UserName == normalizedUserName || x.Email == normalizedEmail,

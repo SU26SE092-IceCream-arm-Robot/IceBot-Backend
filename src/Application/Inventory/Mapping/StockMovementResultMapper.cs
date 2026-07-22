@@ -18,11 +18,15 @@ internal static class StockMovementResultMapper
             IngredientName = m.Ingredient?.Name,
             MovementType = m.MovementType,
             Quantity = m.Quantity,
+            BalanceBefore = m.BalanceBefore,
             BalanceAfter = m.BalanceAfter,
             Unit = m.Unit,
             ReasonCode = m.ReasonCode,
             Notes = m.Notes,
-            OccurredAt = m.OccurredAt
+            OccurredAt = m.OccurredAt,
+            ActorAccountId = m.CreatedByAccountId,
+            ActorName = m.CreatedByAccount?.FullName,
+            ActorEmail = m.CreatedByAccount?.Email
         };
     }
 }

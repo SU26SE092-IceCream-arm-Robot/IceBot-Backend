@@ -1,5 +1,9 @@
 # Robot Artifact Operational Smoke Test
 
+## Search Keywords
+
+`robot artifact smoke test`, `Lua upload`, `RobotProgram`, `configuration release`, `deployment`, `execution endpoint`, `MinIO`, `artifact checksum`
+
 Use this workflow to validate PostgreSQL migrations, MinIO object storage, execution-endpoint compatibility, and the complete artifact authoring/deployment path.
 
 The end-to-end business flow and API lookup remain owned by [Robot Lua Artifact Flow](../flows/ROBOT_LUA_ARTIFACT_FLOW.md). This document owns only operational setup and executable verification.

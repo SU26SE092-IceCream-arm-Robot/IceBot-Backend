@@ -4,6 +4,9 @@ using Domain.ProductionExecution.Projections;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
+using Application.SalesCatalog.ReadModels;
+using Application.Orders.PlaceOrder.ReadModels;
+using Domain.Devices.Connectivity;
 
 namespace Application.Orders.Abstractions;
 
@@ -22,16 +25,42 @@ public interface IOrderStore
         CancellationToken cancellationToken = default);
 
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<KioskConnectivityProjection?> GetKioskConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
-    Task<MenuItem?> GetMenuItemByIdAsync(Guid menuItemId, CancellationToken cancellationToken = default);
+    Task<MenuItem?> GetMenuItemForKioskAsync(
+        Guid menuItemId,
+        Guid? organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
 
-    Task<bool> HasActiveProductionRouteAsync(
+    Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
+        Guid menuItemId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<MenuItemOptionGroupReadModel>> ListMenuItemOptionGroupsAsync(
+        Guid menuItemId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<ProductOptionIngredientRequirementReadModel>> ListProductOptionIngredientRequirementsAsync(
+        IReadOnlyCollection<Guid> productOptionIds,
+        CancellationToken cancellationToken = default);
+
+    Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default);
 
     Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default);
+    Task<Order?> GetManagementOrderByIdAsync(
+        Guid orderId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default);
 
     Task<int> CountOrdersAsync(
         string? search,
@@ -69,6 +98,20 @@ public interface IOrderStore
         int pageSize,
         CancellationToken cancellationToken = default);
 
+    Task<OrderItemStatusHistory?> GetOrderItemStatusHistoryBySourceEventIdAsync(
+        Guid orderItemId,
+        Guid sourceEventId,
+        CancellationToken cancellationToken = default);
+
+    Task AcquireFulfillmentEventLockAsync(
+        Guid orderItemId,
+        Guid sourceEventId,
+        CancellationToken cancellationToken = default);
+
+    Task AcquireOrderWorkflowLockAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default);
+
     Task<int> CountExecutionAttemptsAsync(
         Guid orderId,
         CancellationToken cancellationToken = default);
@@ -80,6 +123,7 @@ public interface IOrderStore
         CancellationToken cancellationToken = default);
 
     Task<EdgeCommand?> GetExecutionAttemptAsync(
+        Guid orderId,
         Guid sourceCommandId,
         CancellationToken cancellationToken = default);
 
@@ -109,13 +153,21 @@ public interface IOrderStore
 
     Task<Order?> GetOrderByIdempotencyKeyAsync(string idempotencyKey, CancellationToken cancellationToken = default);
 
+    Task AcquireIdempotencyLockAsync(string scopedIdempotencyKey, CancellationToken cancellationToken = default);
+
     Task<Order?> GetOrderByClientOrderIdAsync(Guid kioskId, string clientOrderId, CancellationToken cancellationToken = default);
 
     Task AddOrderAsync(Order order, CancellationToken cancellationToken = default);
 
     Task AddOrderStatusHistoryAsync(OrderStatusHistory history, CancellationToken cancellationToken = default);
 
+    Task AddOrderItemStatusHistoryAsync(OrderItemStatusHistory history, CancellationToken cancellationToken = default);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
+
+    Task<T> ExecuteCheckoutTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
 }

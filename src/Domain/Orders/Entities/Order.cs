@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.Catalog.Enums;
 using Domain.Orders.Enums;
 using Domain.Tenants.Entities;
 
@@ -28,33 +29,37 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public string? ExternalChannel { get; set; }
 
-    public OrderStatus Status { get; set; } = OrderStatus.Draft;
+    public OrderStatus Status { get; private set; } = OrderStatus.Draft;
 
-    public PaymentStatus PaymentStatus { get; set; } = PaymentStatus.Unpaid;
+    public PaymentStatus PaymentStatus { get; private set; } = PaymentStatus.Unpaid;
 
-    public string Currency { get; set; } = "VND";
+    public string Currency { get; private set; } = "VND";
 
-    public decimal SubtotalAmount { get; set; }
+    public decimal SubtotalAmount { get; private set; }
 
-    public decimal DiscountAmount { get; set; }
+    public decimal DiscountAmount { get; private set; }
 
-    public decimal TaxAmount { get; set; }
+    public decimal TaxAmount { get; private set; }
 
-    public decimal TotalAmount { get; set; }
+    public decimal TotalAmount { get; private set; }
 
-    public decimal PaidAmount { get; set; }
+    public decimal PaidAmount { get; private set; }
 
     public string? CustomerName { get; set; }
 
     public string? CustomerPhoneNumber { get; set; }
 
-    public DateTimeOffset PlacedAt { get; set; }
+    public DateTimeOffset PlacedAt { get; private set; }
 
-    public DateTimeOffset? PaidAt { get; set; }
+    public DateTimeOffset PaymentDeadlineAt { get; private set; }
 
-    public DateTimeOffset? CompletedAt { get; set; }
+    public DateTimeOffset? PaidAt { get; private set; }
 
-    public DateTimeOffset? CancelledAt { get; set; }
+    public OrderStatus? StatusBeforeDuplicatePaymentIntervention { get; private set; }
+
+    public DateTimeOffset? CompletedAt { get; private set; }
+
+    public DateTimeOffset? CancelledAt { get; private set; }
 
     public string? Notes { get; set; }
 
@@ -65,6 +70,17 @@ public partial class Order : BusinessEntity, IStoreScoped
     public virtual Store? Store { get; set; }
 
     public virtual ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
+
+    public void SetCurrency(string currency)
+    {
+        EnsureEditable();
+        if (string.IsNullOrWhiteSpace(currency))
+        {
+            throw new DomainRuleException("Order currency is required.");
+        }
+
+        Currency = currency.Trim().ToUpperInvariant();
+    }
 
     public OrderItem AddItem(
         Guid menuItemId,
@@ -78,11 +94,11 @@ public partial class Order : BusinessEntity, IStoreScoped
         string productVariantCodeSnapshot,
         string productVariantNameSnapshot,
         int? recipeVersionSnapshot,
+        FulfillmentType fulfillmentType,
         int quantity,
         decimal unitPrice,
         decimal discountAmount = 0,
         string? clientLineId = null,
-        string? optionsJson = null,
         string? recipeSnapshotJson = null)
     {
         EnsureEditable();
@@ -105,11 +121,11 @@ public partial class Order : BusinessEntity, IStoreScoped
             productVariantCodeSnapshot,
             productVariantNameSnapshot,
             recipeVersionSnapshot,
+            fulfillmentType,
             quantity,
             unitPrice,
             discountAmount,
             clientLineId,
-            optionsJson,
             recipeSnapshotJson);
 
         OrderItems.Add(orderItem);
@@ -141,7 +157,7 @@ public partial class Order : BusinessEntity, IStoreScoped
         }
     }
 
-    public void Place(DateTimeOffset placedAt)
+    public void Place(DateTimeOffset placedAt, DateTimeOffset paymentDeadlineAt)
     {
         if (Status != OrderStatus.Draft)
         {
@@ -153,8 +169,14 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Cannot place an order without items.");
         }
 
+        if (paymentDeadlineAt <= placedAt)
+        {
+            throw new DomainRuleException("Order payment deadline must be after placement time.");
+        }
+
         RecalculateTotals();
         PlacedAt = placedAt;
+        PaymentDeadlineAt = paymentDeadlineAt;
         Status = OrderStatus.PendingPayment;
     }
 
@@ -165,6 +187,11 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Paid amount must be greater than zero.");
         }
 
+        if (PaymentStatus is PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded)
+        {
+            throw new DomainRuleException("A refunded order payment cannot be marked as paid.");
+        }
+
         PaidAmount += paidAmount;
         PaidAt = paidAt;
 
@@ -172,17 +199,46 @@ public partial class Order : BusinessEntity, IStoreScoped
             ? PaymentStatus.Paid
             : PaymentStatus.Authorized;
 
-        if (PaymentStatus == PaymentStatus.Paid && Status == OrderStatus.PendingPayment)
+        if (PaymentStatus != PaymentStatus.Paid)
         {
-            Status = OrderStatus.ReadyForExecution;
+            return;
         }
+
+        if (Status == OrderStatus.PendingPayment)
+        {
+            Status = OrderStatus.ReadyForFulfillment;
+        }
+        else if (Status == OrderStatus.Cancelled)
+        {
+            Status = OrderStatus.RefundRequired;
+        }
+    }
+
+    public void MarkPaymentCancelled()
+    {
+        if (PaymentStatus is PaymentStatus.Paid or PaymentStatus.PartiallyRefunded or PaymentStatus.Refunded)
+        {
+            throw new DomainRuleException("A paid or refunded order payment status cannot be cancelled.");
+        }
+
+        PaymentStatus = PaymentStatus.Cancelled;
+    }
+
+    public void MarkPaymentRefunded()
+    {
+        if (PaymentStatus != PaymentStatus.Paid || Status is not (OrderStatus.Refunded or OrderStatus.Compensated))
+        {
+            throw new DomainRuleException("Only a completed refund can mark an order payment as refunded.");
+        }
+
+        PaymentStatus = PaymentStatus.Refunded;
     }
 
     public void MarkExecutionRejected(string? notes = null)
     {
-        if (Status is not (OrderStatus.Paid or OrderStatus.ReadyForExecution or OrderStatus.Accepted))
+        if (Status is not (OrderStatus.Paid or OrderStatus.ReadyForFulfillment or OrderStatus.Accepted))
         {
-            throw new DomainRuleException("Only paid or execution-ready orders can be rejected by execution.");
+            throw new DomainRuleException("Only paid or fulfillment-ready orders can be rejected by execution.");
         }
 
         Status = OrderStatus.ExecutionRejected;
@@ -191,9 +247,9 @@ public partial class Order : BusinessEntity, IStoreScoped
 
     public void MarkAccepted()
     {
-        if (Status != OrderStatus.ReadyForExecution)
+        if (Status != OrderStatus.ReadyForFulfillment)
         {
-            throw new DomainRuleException("Only execution-ready orders can be accepted by an executor.");
+            throw new DomainRuleException("Only fulfillment-ready orders can be accepted.");
         }
 
         Status = OrderStatus.Accepted;
@@ -212,24 +268,89 @@ public partial class Order : BusinessEntity, IStoreScoped
         }
 
         Status = OrderStatus.RefundRequired;
+        StatusBeforeDuplicatePaymentIntervention = null;
+        Notes = notes ?? Notes;
+    }
+
+    public void MarkOverpaymentRefundRequired(string? notes = null)
+    {
+        if (PaymentStatus != PaymentStatus.Paid || PaidAmount <= TotalAmount)
+        {
+            throw new DomainRuleException("Only an overpaid order can require an overpayment refund.");
+        }
+
+        Status = OrderStatus.RefundRequired;
+        StatusBeforeDuplicatePaymentIntervention = null;
+        Notes = notes ?? Notes;
+    }
+
+    public void MarkDuplicatePaymentRefundRequired(string? notes = null)
+    {
+        if (PaymentStatus != PaymentStatus.Paid)
+        {
+            throw new DomainRuleException("Only a paid order can require duplicate-payment intervention.");
+        }
+
+        if (Status != OrderStatus.RefundRequired)
+        {
+            StatusBeforeDuplicatePaymentIntervention = Status;
+        }
+
+        Status = OrderStatus.RefundRequired;
+        Notes = notes ?? Notes;
+    }
+
+    public void ResolveDuplicatePaymentIntervention()
+    {
+        if (Status != OrderStatus.RefundRequired || !StatusBeforeDuplicatePaymentIntervention.HasValue)
+        {
+            return;
+        }
+
+        Status = StatusBeforeDuplicatePaymentIntervention.Value;
+        StatusBeforeDuplicatePaymentIntervention = null;
+    }
+
+    public void MarkFulfillmentIssue(string? notes = null)
+    {
+        if (PaymentStatus != PaymentStatus.Paid)
+        {
+            throw new DomainRuleException("Only paid orders can enter fulfillment issue review.");
+        }
+
+        if (Status is OrderStatus.Completed or OrderStatus.Cancelled or OrderStatus.Refunded or
+            OrderStatus.Compensated or OrderStatus.RefundRequired)
+        {
+            throw new DomainRuleException("A terminal order cannot enter fulfillment issue review.");
+        }
+
+        Status = OrderStatus.FulfillmentIssue;
         Notes = notes ?? Notes;
     }
 
     public void MarkPreparing()
     {
-        if (Status is not (OrderStatus.ReadyForExecution or OrderStatus.Accepted))
+        if (Status is not (OrderStatus.ReadyForFulfillment or OrderStatus.Accepted))
         {
-            throw new DomainRuleException("Only execution-ready or accepted orders can be prepared.");
+            throw new DomainRuleException("Only fulfillment-ready or accepted orders can be prepared.");
         }
 
         Status = OrderStatus.Preparing;
     }
 
+    public void BeginFulfillmentRecovery()
+    {
+        if (PaymentStatus != PaymentStatus.Paid || Status != OrderStatus.FulfillmentIssue)
+            throw new DomainRuleException("Only a paid order with a fulfillment issue can begin recovery.");
+        Status = OrderStatus.Preparing;
+    }
+
     public void Complete(DateTimeOffset completedAt)
     {
-        if (Status is OrderStatus.Cancelled or OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)
+        if (Status is OrderStatus.Cancelled or OrderStatus.Failed or OrderStatus.ExecutionRejected or
+            OrderStatus.RefundRequired or OrderStatus.FulfillmentIssue)
         {
-            throw new DomainRuleException("Cannot complete a cancelled, failed, rejected, or refund-required order.");
+            throw new DomainRuleException("Cannot complete an order with a terminal status or unresolved fulfillment issue.");
         }
 
         Status = OrderStatus.Completed;
@@ -254,7 +375,7 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Only a paid execution-rejected order can be prepared for redispatch.");
         }
 
-        Status = OrderStatus.ReadyForExecution;
+        Status = OrderStatus.ReadyForFulfillment;
     }
 
     public void Cancel(DateTimeOffset cancelledAt, string? notes = null)
@@ -276,6 +397,7 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Only refund-required orders can be marked as refunded.");
         }
         Status = OrderStatus.Refunded;
+        StatusBeforeDuplicatePaymentIntervention = null;
     }
 
     public void MarkCompensated()
@@ -285,6 +407,7 @@ public partial class Order : BusinessEntity, IStoreScoped
             throw new DomainRuleException("Only refund-required orders can be marked as compensated.");
         }
         Status = OrderStatus.Compensated;
+        StatusBeforeDuplicatePaymentIntervention = null;
     }
 
     private void EnsureEditable()

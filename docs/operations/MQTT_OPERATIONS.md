@@ -1,5 +1,9 @@
 # MQTT Operations
 
+## Search Keywords
+
+`MQTT`, `Mosquitto`, `broker`, `execution endpoint`, `MQTT credential`, `topic ACL`, `wake-up notification`, `command pull`, `TLS`
+
 ## Ownership
 
 MQTT is a best-effort command-available wake-up channel. `EdgeCommand` in PostgreSQL and the authenticated command-pull API remain authoritative.
@@ -111,15 +115,39 @@ or Git.
 Management lifecycle:
 
 ```text
-POST   /api/v1/management/execution-endpoints/{id}/mqtt-credential   provision
-PATCH  /api/v1/management/execution-endpoints/{id}/mqtt-credential   rotate
-DELETE /api/v1/management/execution-endpoints/{id}/mqtt-credential   revoke
+POST   /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   provision
+PATCH  /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   rotate
+DELETE /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   revoke
 ```
 
 Broker mutation and database audit cannot share a distributed transaction.
-The handler serializes each endpoint operation and uses idempotent broker
-upsert. A failed or interrupted operation is retried through the same endpoint;
-durable command polling remains available while MQTT credentials are repaired.
+The handler commits a durable `PendingProvision`, `PendingRotation`, or
+`PendingRevoke` intent before broker I/O, uses idempotent broker mutation, and
+finalizes only the credential version that created that intent. Broker failure
+is recorded as `Failed` or `RevokeFailed`. A recent pending operation rejects a
+concurrent mutation. The reconciliation job processes operations that remain
+pending for five minutes: provisioning and rotation become `Failed` because the
+one-time secret cannot be recovered after a crash, while revocation is claimed
+with a new credential version and retried automatically. A stale `RevokeFailed`
+operation is also retried. Provisioning or rotation can then be retried through
+the same management endpoint, which replaces any broker credential whose secret
+was not returned. Cancellation or a process crash cannot roll back a broker
+mutation that already occurred. Durable command polling remains available while
+MQTT credentials are repaired.
+
+The job runs only when `MqttCredentialProvisioning:Enabled` is true. Configure
+`ReconciliationIntervalSeconds` and `ReconciliationBatchSize` for scan cadence
+and bounded work. It reports through the `mqtt_credential_reconciliation`
+operational-automation metric and logs endpoint-level outcomes that require an
+operator retry.
+
+The dedicated `IceBot.MqttCredentialLifecycle` meter reports stale candidate
+count, timeout transitions, reconciliation outcomes, and automatic revocation
+retry results. A lease timeout opens or correlates
+`MQTT_CREDENTIAL_OPERATION_TIMEOUT`; a failed automatic revocation retry opens
+or correlates `MQTT_CREDENTIAL_REVOKE_FAILED`. These Error alerts are visible in
+the normal tenant-scoped alert queue and through `AlertChanged`. A successful
+manual or automatic repair resolves the active alert during the next scan.
 An endpoint with a non-revoked MQTT credential cannot be retired; revoke the
 broker client first. Disabling an endpoint blocks command pull/dispatch but does
 not rotate or delete its MQTT identity, so reactivation can preserve the same

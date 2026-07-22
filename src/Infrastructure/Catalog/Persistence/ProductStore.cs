@@ -27,7 +27,7 @@ public sealed class ProductStore : IProductStore
         CancellationToken cancellationToken = default)
     {
         return ApplyProductFilters(
-                _dbContext.Products.AsNoTracking(),
+                _dbContext.Products.WhereNotDeleted().AsNoTracking(),
                 search,
                 organizationId,
                 storeId,
@@ -55,9 +55,12 @@ public sealed class ProductStore : IProductStore
         CancellationToken cancellationToken = default)
     {
         return ApplyProductFilters(
-                _dbContext.Products
+                _dbContext.Products.WhereNotDeleted()
                     .AsNoTracking()
-                    .Include(product => product.ProductVariants),
+                    .Include(product => product.ProductVariants)
+                    .Include(product => product.OptionGroups)
+                        .ThenInclude(group => group.ProductOptions)
+                            .ThenInclude(option => option.IngredientRequirements),
                 search,
                 organizationId,
                 storeId,
@@ -79,8 +82,11 @@ public sealed class ProductStore : IProductStore
         bool asNoTracking = true,
         CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Products
+        var query = _dbContext.Products.WhereNotDeleted()
             .Include(product => product.ProductVariants)
+            .Include(product => product.OptionGroups)
+                .ThenInclude(group => group.ProductOptions)
+                    .ThenInclude(option => option.IngredientRequirements)
             .Where(product => product.Id == productId);
 
         if (asNoTracking)
@@ -108,6 +114,34 @@ public sealed class ProductStore : IProductStore
         return query.FirstOrDefaultAsync(cancellationToken);
     }
 
+    public Task<OptionGroup?> GetOptionGroupByIdAsync(
+        Guid productId,
+        long optionGroupId,
+        bool asNoTracking = true,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.OptionGroups
+            .Include(group => group.ProductOptions)
+                .ThenInclude(option => option.IngredientRequirements)
+            .Where(group => group.ProductId == productId && group.Id == optionGroupId);
+        return (asNoTracking ? query.AsNoTracking() : query).FirstOrDefaultAsync(cancellationToken);
+    }
+
+    public Task<ProductOption?> GetProductOptionByIdAsync(
+        Guid productId,
+        long optionGroupId,
+        Guid productOptionId,
+        bool asNoTracking = true,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.ProductOptions
+            .Include(option => option.OptionGroup)
+            .Include(option => option.IngredientRequirements)
+            .Where(option => option.Id == productOptionId && option.OptionGroupId == optionGroupId &&
+                             option.OptionGroup.ProductId == productId);
+        return (asNoTracking ? query.AsNoTracking() : query).FirstOrDefaultAsync(cancellationToken);
+    }
+
     public Task<bool> ProductCodeExistsAsync(
         Guid? organizationId,
         Guid? storeId,
@@ -116,7 +150,7 @@ public sealed class ProductStore : IProductStore
         Guid? excludedProductId = null,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.Products.AnyAsync(
+        return _dbContext.Products.WhereNotDeleted().AnyAsync(
             product =>
                 product.OrganizationId == organizationId &&
                 product.StoreId == storeId &&
@@ -140,6 +174,63 @@ public sealed class ProductStore : IProductStore
             cancellationToken);
     }
 
+    public Task<bool> OptionGroupCodeExistsAsync(
+        Guid productId,
+        string code,
+        long? excludedOptionGroupId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.OptionGroups.AnyAsync(group =>
+            group.ProductId == productId && group.Code == code &&
+            (!excludedOptionGroupId.HasValue || group.Id != excludedOptionGroupId.Value), cancellationToken);
+    }
+
+    public Task<bool> ProductOptionCodeExistsAsync(
+        long optionGroupId,
+        string code,
+        Guid? excludedProductOptionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ProductOptions.AnyAsync(option =>
+            option.OptionGroupId == optionGroupId && option.Code == code && option.DeletedAt == null &&
+            (!excludedProductOptionId.HasValue || option.Id != excludedProductOptionId.Value), cancellationToken);
+    }
+
+    public Task<bool> HasOtherDefaultOptionAsync(
+        long optionGroupId,
+        Guid? excludedProductOptionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.ProductOptions.AnyAsync(option =>
+            option.OptionGroupId == optionGroupId && option.IsDefault && option.DeletedAt == null &&
+            (!excludedProductOptionId.HasValue || option.Id != excludedProductOptionId.Value), cancellationToken);
+    }
+
+    public Task<bool> IsOptionGroupReferencedByMenuItemsAsync(long optionGroupId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.MenuItemProductOptions.AnyAsync(membership =>
+            _dbContext.ProductOptions.Any(option => option.Id == membership.ProductOptionId && option.OptionGroupId == optionGroupId),
+            cancellationToken);
+    }
+
+    public Task<bool> IsProductOptionReferencedByMenuItemsAsync(Guid productOptionId, CancellationToken cancellationToken = default)
+    {
+        return _dbContext.MenuItemProductOptions.AnyAsync(membership => membership.ProductOptionId == productOptionId, cancellationToken);
+    }
+
+    public Task<bool> IsProductReferencedByMenuItemsAsync(
+        Guid productId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.MenuItems.AnyAsync(item => item.ProductId == productId, cancellationToken);
+
+    public Task<bool> IsProductVariantReferencedByMenuItemsAsync(
+        Guid productVariantId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.MenuItems.AnyAsync(item => item.ProductVariantId == productVariantId, cancellationToken);
+
+    public Task<List<Ingredient>> ListIngredientsByIdsAsync(IReadOnlyCollection<Guid> ingredientIds, CancellationToken cancellationToken = default) =>
+        _dbContext.Ingredients.Where(ingredient => ingredientIds.Contains(ingredient.Id)).ToListAsync(cancellationToken);
+
     public Task<bool> ProductCategoryExistsAsync(long categoryId, CancellationToken cancellationToken = default)
     {
         return _dbContext.ProductCategories.AnyAsync(category => category.Id == categoryId, cancellationToken);
@@ -151,18 +242,18 @@ public sealed class ProductStore : IProductStore
         Guid? kioskId,
         CancellationToken cancellationToken = default)
     {
-        if (!await _dbContext.Organizations.AnyAsync(x => x.Id == organizationId, cancellationToken))
+        if (!await _dbContext.Organizations.WhereNotDeleted().AnyAsync(x => x.Id == organizationId, cancellationToken))
         {
             return false;
         }
 
-        if (storeId.HasValue && !await _dbContext.Stores.AnyAsync(
+        if (storeId.HasValue && !await _dbContext.Stores.WhereNotDeleted().AnyAsync(
                 x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
         {
             return false;
         }
 
-        return !kioskId.HasValue || await _dbContext.Kiosks.AnyAsync(
+        return !kioskId.HasValue || await _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
             x => x.Id == kioskId && x.OrganizationId == organizationId &&
                  (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
     }
@@ -175,6 +266,38 @@ public sealed class ProductStore : IProductStore
     public async Task AddProductVariantAsync(ProductVariant variant, CancellationToken cancellationToken = default)
     {
         await _dbContext.ProductVariants.AddAsync(variant, cancellationToken);
+    }
+
+    public Task AddOptionGroupAsync(OptionGroup optionGroup, CancellationToken cancellationToken = default) =>
+        _dbContext.OptionGroups.AddAsync(optionGroup, cancellationToken).AsTask();
+
+    public Task AddProductOptionAsync(ProductOption productOption, CancellationToken cancellationToken = default) =>
+        _dbContext.ProductOptions.AddAsync(productOption, cancellationToken).AsTask();
+
+    public void RemoveOptionGroup(OptionGroup optionGroup)
+    {
+        _dbContext.ProductOptionIngredientRequirements.RemoveRange(
+            optionGroup.ProductOptions.SelectMany(option => option.IngredientRequirements));
+        _dbContext.ProductOptions.RemoveRange(optionGroup.ProductOptions);
+        _dbContext.OptionGroups.Remove(optionGroup);
+    }
+
+    public void RemoveProductOption(ProductOption productOption)
+    {
+        _dbContext.ProductOptionIngredientRequirements.RemoveRange(productOption.IngredientRequirements);
+        _dbContext.ProductOptions.Remove(productOption);
+    }
+
+    public void ReplaceProductOptionIngredientRequirements(
+        ProductOption option,
+        IReadOnlyCollection<ProductOptionIngredientRequirement> replacements)
+    {
+        _dbContext.ProductOptionIngredientRequirements.RemoveRange(option.IngredientRequirements);
+        option.IngredientRequirements.Clear();
+        foreach (var replacement in replacements)
+        {
+            option.IngredientRequirements.Add(replacement);
+        }
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

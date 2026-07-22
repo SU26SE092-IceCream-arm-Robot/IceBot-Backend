@@ -14,7 +14,6 @@ These fields can affect runtime behavior. They are mutable only while the owning
 
 Fields:
 
-- `PaymentMethod.ConfigJson` with `ConfigSchemaVersion`
 - `DeviceModel.CapabilitiesJson` with `CapabilitiesSchemaVersion`
 - `Kiosk.SettingsJson` with `SettingsSchemaVersion`
 - `Store.OpeningHoursJson` with `OpeningHoursSchemaVersion`
@@ -23,8 +22,17 @@ Fields:
 - `RobotArtifact.MetadataJson`
 - `ConfigurationRelease.ManifestJson` with `ReleaseManifestSchemaVersion`
 - `ExecutionRoute.RequiredCapabilitiesJson`
+  - When present, this field must use schema version `1`: `{ "schemaVersion": 1, "requires": [{ "code": "...", "minVersion": "...", "required": true }] }`.
+  - Codes must match capability codes already declared by the same route's robot bindings. Unknown fields are rejected.
+  - Cloud validates required codes against endpoint readiness. Endpoint readiness does not yet report capability versions, so a required `minVersion` makes the route unavailable to runtime-menu and checkout and produces `CapabilityVersionUnverifiable` for deployment/dispatch instead of being ignored.
+- `ExecutionRoute.SupportedOptionCodesJson`
+  - Internal JSON storage for the normalized production-affecting option codes supported by one route.
+  - Management APIs expose `supportedOptionCodes` as a typed string collection; clients do not send JSON.
+  - The value is included in immutable production-definition and release checksums and is enforced by runtime-menu, order, readiness, and dispatch flows.
 - `EdgeCommand.PayloadJson`
 - `IngredientDispenserState.LevelToQuantityProfileJson` with `LevelToQuantityProfileSchemaVersion`
+  - API contracts expose typed `Low`, `Medium`, and `Full` points; FE does not send JSON or schema version.
+  - This mapping is categorical and is not a numeric sensor calibration profile.
 
 Rules:
 
@@ -39,7 +47,7 @@ These fields preserve the state used at the time of an order or robot job. They 
 
 Fields:
 
-- `OrderItem.OptionsJson` with `OptionsSchemaVersion`
+- Product-option selections are stored as typed `OrderItemOption` snapshots. Anonymous checkout payloads and Edge execution commands must not carry arbitrary option JSON.
 - `OrderItem.RecipeSnapshotJson` with `RecipeSnapshotSchemaVersion`
 - `OrderExecutionRecord` and `ProductionExecutionRecord` keep typed projection fields rather than raw executor payloads.
 - `PaymentTransaction.RawRequestJson`
@@ -99,6 +107,8 @@ Rules:
 - `*SnapshotJson`: immutable historical copy.
 - `PayloadJson`, `HeadersJson`, `Raw*Json`: external evidence/debug payload.
 - `MetadataJson`: optional extension data only.
+- Generic metadata columns are persistence extension points, not default frontend editing contracts. Normal organization, catalog, and menu APIs expose typed fields only; technical artifact authoring may expose metadata when the artifact workflow owns a concrete use case.
+- `Kiosk.SettingsJson` and `Device.MetadataJson` remain persistence extension points but are not exposed through normal management CRUD until a typed use case exists. `Store.OpeningHoursJson` is an internal serialized representation; frontend contracts use typed day/open/close fields.
 
 ## Sync Boundary
 

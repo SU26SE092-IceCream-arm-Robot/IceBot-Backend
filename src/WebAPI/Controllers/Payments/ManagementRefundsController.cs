@@ -105,6 +105,7 @@ public sealed class ManagementRefundsController : ControllerBase
         var command = new RequestRefundCommand
         {
             OrderId = orderId,
+            PaymentTransactionId = request.PaymentTransactionId,
             UserContext = User.GetUserContext(),
             RefundMethod = request.RefundMethod,
             Reason = request.Reason,

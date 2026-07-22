@@ -1,8 +1,15 @@
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.ArtifactTemplates.Results;
+using Application.RobotConfiguration.ArtifactTemplates.Queries;
+using Application.RobotConfiguration.ArtifactTemplates.Commands;
+using Domain.RobotConfiguration.ArtifactTemplates;
 using System.Reflection;
 using Application.Identity.Tokens.Claims;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
-using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace IceBot.UnitTests.TestSupport;
 
@@ -31,12 +38,14 @@ internal static class TestData
             "FR5",
             128,
             DateTimeOffset.UtcNow);
+        artifact.AssignTechnicalContract(Guid.NewGuid(), new string('c', 64));
         artifact.Publish();
         return artifact;
     }
 
-    public static RobotArtifactTemplate DraftTemplate(string code = "PREPARE") =>
-        RobotArtifactTemplate.CreateDraft(
+    public static RobotArtifactTemplate DraftTemplate(string code = "PREPARE")
+    {
+        var template = RobotArtifactTemplate.CreateDraft(
             code,
             code,
             $"robot-artifact-templates/{Guid.NewGuid():D}/template.lua",
@@ -46,6 +55,9 @@ internal static class TestData
             "FR5",
             128,
             DateTimeOffset.UtcNow);
+        template.AssignTechnicalContract(Guid.NewGuid(), new string('c', 64));
+        return template;
+    }
 
     public static ConfigurationRelease RetiredRelease(Guid organizationId)
     {

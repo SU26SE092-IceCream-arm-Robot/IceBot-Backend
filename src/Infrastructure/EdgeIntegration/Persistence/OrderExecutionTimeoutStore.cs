@@ -1,6 +1,6 @@
 using Domain.Devices.Telemetry;
 using Application.EdgeIntegration.Abstractions;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.ProductionExecution.Enums;
 using Domain.ProductionExecution.Projections;
@@ -8,6 +8,8 @@ using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Application.Orders.Support;
+using Application.EdgeIntegration.CommandDelivery.Services;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -27,7 +29,7 @@ public sealed class OrderExecutionTimeoutStore : IOrderExecutionTimeoutStore
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({$"order-execution-timeout:{sourceCommandId:D}"}, 0));",
+            $"SELECT pg_advisory_xact_lock(hashtextextended({EdgeCommandConcurrency.CommandLockKey(sourceCommandId)}, 0));",
             cancellationToken);
         var result = await action(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -51,8 +53,8 @@ public sealed class OrderExecutionTimeoutStore : IOrderExecutionTimeoutStore
                         command.RespondedAt <= acceptedCutoff) ||
                      _dbContext.OrderExecutionRecords.Any(record =>
                          record.SourceCommandId == command.Id &&
-                         ((record.Status == ProductionExecutionStatus.Accepted && record.LastExecutorReportedAt <= acceptedCutoff) ||
-                          (record.Status == ProductionExecutionStatus.Running && record.LastExecutorReportedAt <= runningCutoff)))))))
+                         ((record.Status == ProductionExecutionStatus.Accepted && record.CloudReceivedAt <= acceptedCutoff) ||
+                          (record.Status == ProductionExecutionStatus.Running && record.CloudReceivedAt <= runningCutoff)))))))
             .OrderBy(command => command.CommandExpiryAt)
             .ThenBy(command => command.RespondedAt)
             .ThenBy(command => command.Id)
@@ -74,6 +76,13 @@ public sealed class OrderExecutionTimeoutStore : IOrderExecutionTimeoutStore
     {
         return _dbContext.Orders.FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     }
+
+    public Task AcquireOrderWorkflowLockAsync(
+        Guid orderId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({OrderWorkflowConcurrency.OrderLockKey(orderId)}, 0));",
+            cancellationToken);
 
     public Task<OrderExecutionRecord?> GetOrderExecutionRecordAsync(
         Guid sourceCommandId,

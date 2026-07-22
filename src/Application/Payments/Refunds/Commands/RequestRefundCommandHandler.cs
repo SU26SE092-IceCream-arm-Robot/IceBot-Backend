@@ -4,6 +4,7 @@ using Application.Payments.Abstractions;
 using Application.Payments.Refunds.Mapping;
 using Application.Payments.Refunds.Results;
 using Application.Shared.Wrappers;
+using Application.Shared.Idempotency;
 using Application.Tenants;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
@@ -35,30 +36,16 @@ public sealed class RequestRefundCommandHandler
         Guid? orgId = null;
         Guid? storeId = null;
 
+        if (!ScopedIdempotencyKey.TryNormalize(command.IdempotencyKey, out var idempotencyKey))
+        {
+            return ApiResult<RefundResult>.Fail(
+                $"Idempotency-Key is required and must be at most {ScopedIdempotencyKey.MaxClientKeyLength} characters.",
+                400);
+        }
+
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
-            var idempotencyKey = command.IdempotencyKey?.Trim();
-            if (!string.IsNullOrWhiteSpace(idempotencyKey))
-            {
-                var existing = await _paymentStore.GetRefundByIdempotencyKeyAsync(idempotencyKey, ct);
-                if (existing is not null)
-                {
-                    var existingOrder = existing.PaymentTransaction.Order;
-                    if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
-                        command.UserContext,
-                        existingOrder.OrganizationId,
-                        existingOrder.StoreId,
-                        existingOrder.KioskId))
-                    {
-                        return ApiResult<RefundResult>.Fail("Access denied.", 403);
-                    }
-
-                    return ApiResult<RefundResult>.Success(
-                        RefundResultMapper.ToResult(existing),
-                        "Refund request already exists.");
-                }
-            }
-
+            await _paymentStore.AcquireOrderWorkflowLockAsync(command.OrderId, ct);
             var order = await _paymentStore.GetOrderByIdAsync(command.OrderId, ct);
             if (order is null)
             {
@@ -86,10 +73,67 @@ public sealed class RequestRefundCommandHandler
                     409);
             }
 
-            var transaction = await _paymentStore.GetLatestPaidPaymentTransactionByOrderIdAsync(order.Id, ct);
+            var paidTransactions = (await _paymentStore.ListPaymentTransactionsByOrderIdAsync(order.Id, ct))
+                .Where(candidate =>
+                    candidate.Status == PaymentTransactionStatus.Paid &&
+                    candidate.SettlementDisposition != PaymentSettlementDisposition.DuplicateResolved)
+                .ToList();
+            var duplicatePayments = paidTransactions
+                .Where(candidate =>
+                    candidate.SettlementDisposition == PaymentSettlementDisposition.DuplicateRefundRequired)
+                .ToList();
+            PaymentTransaction? transaction;
+            if (command.PaymentTransactionId.HasValue)
+            {
+                transaction = paidTransactions.FirstOrDefault(candidate =>
+                    candidate.Id == command.PaymentTransactionId.Value);
+                if (transaction is null)
+                {
+                    return ApiResult<RefundResult>.Fail(
+                        "The selected paid transaction does not belong to this order.", 409);
+                }
+
+
+                if (duplicatePayments.Count > 0 &&
+                    transaction.SettlementDisposition != PaymentSettlementDisposition.DuplicateRefundRequired)
+                {
+                    return ApiResult<RefundResult>.Fail(
+                        "An unresolved duplicate payment must be selected before refunding the primary settlement.",
+                        409);
+                }
+            }
+            else
+            {
+                if (duplicatePayments.Count > 1)
+                {
+                    return ApiResult<RefundResult>.Fail(
+                        "PaymentTransactionId is required because this order has multiple duplicate payments awaiting resolution.",
+                        409);
+                }
+
+                transaction = duplicatePayments.SingleOrDefault() ?? paidTransactions
+                    .Where(candidate =>
+                        candidate.SettlementDisposition is PaymentSettlementDisposition.Primary or
+                            PaymentSettlementDisposition.Unassigned)
+                    .OrderByDescending(candidate =>
+                        candidate.SettlementDisposition == PaymentSettlementDisposition.Primary)
+                    .ThenBy(candidate => candidate.PaidAt ?? candidate.RequestedAt)
+                    .FirstOrDefault();
+            }
+
             if (transaction is null)
             {
                 return ApiResult<RefundResult>.Fail("No paid transaction found for this order.", 409);
+            }
+
+            await _paymentStore.AcquireRefundRequestLockAsync(transaction.Id, ct);
+            var scopedIdempotencyKey = ScopedIdempotencyKey.ForPaymentTransaction(transaction.Id, idempotencyKey);
+            var existingByIdempotencyKey = await _paymentStore.GetRefundByIdempotencyKeyAsync(scopedIdempotencyKey, ct);
+            if (existingByIdempotencyKey is not null)
+            {
+                return ApiResult<RefundResult>.Success(
+                    RefundResultMapper.ToResult(existingByIdempotencyKey),
+                    "Refund request already exists.");
             }
 
             var exists = await _paymentStore.RefundExistsForTransactionAsync(transaction.Id, ct);
@@ -155,7 +199,7 @@ public sealed class RequestRefundCommandHandler
                 PaymentTransactionId = transaction.Id,
                 RequestedByAccountId = command.UserContext.AccountId,
                 RefundNumber = refundNumber,
-                IdempotencyKey = idempotencyKey,
+                IdempotencyKey = scopedIdempotencyKey,
                 Amount = refundAmount,
                 Currency = transaction.Currency,
                 Reason = serializedReason,

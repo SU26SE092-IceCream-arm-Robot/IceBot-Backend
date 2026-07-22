@@ -1,13 +1,9 @@
 using Domain.Common;
-using Domain.Tenants.Entities;
-using Domain.Tenants.Enums;
-
+using Domain.Catalog.Enums;
 namespace Domain.Catalog.Entities;
 
-public partial class ProductOption : BusinessEntity, IOrganizationScoped
+public partial class ProductOption : BusinessEntity
 {
-    public Guid? OrganizationId { get; set; }
-
     public long OptionGroupId { get; set; }
 
     public Guid? TemplateProductOptionId { get; set; }
@@ -20,7 +16,7 @@ public partial class ProductOption : BusinessEntity, IOrganizationScoped
 
     public decimal PriceDelta { get; set; }
 
-    public string Currency { get; set; } = "VND";
+    public ProductOptionExecutionImpact ExecutionImpact { get; set; }
 
     public bool IsDefault { get; set; }
 
@@ -30,11 +26,8 @@ public partial class ProductOption : BusinessEntity, IOrganizationScoped
 
     public string? MetadataJson { get; set; }
 
-    public TenantScopeType ScopeType { get; set; } = TenantScopeType.Global;
-
-    public virtual Organization? Organization { get; set; }
-
-    public virtual ProductOption? TemplateProductOption { get; set; }
-
     public virtual OptionGroup OptionGroup { get; set; } = null!;
+
+    public virtual ICollection<ProductOptionIngredientRequirement> IngredientRequirements { get; set; } =
+        new List<ProductOptionIngredientRequirement>();
 }

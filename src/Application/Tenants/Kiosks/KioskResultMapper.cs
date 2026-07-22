@@ -16,6 +16,10 @@ internal static class KioskResultMapper
             Name = kiosk.Name,
             KioskType = kiosk.KioskType,
             Status = kiosk.Status.ToString(),
+            OperationalState = kiosk.OperationalState.ToString(),
+            OperationalStateReason = kiosk.OperationalStateReason,
+            OperationalStateChangedAt = kiosk.OperationalStateChangedAt,
+            OperationalStateChangedByAccountId = kiosk.OperationalStateChangedByAccountId,
             SerialNumber = kiosk.SerialNumber,
             TimeZone = kiosk.TimeZone,
             Address = kiosk.Address,
@@ -23,10 +27,6 @@ internal static class KioskResultMapper
             Longitude = kiosk.Longitude,
             InstalledAt = kiosk.InstalledAt,
             LastOnlineAt = kiosk.LastOnlineAt,
-            SupportsOfflineMode = kiosk.SupportsOfflineMode,
-            ConfigurationVersion = kiosk.ConfigurationVersion,
-            SettingsSchemaVersion = kiosk.SettingsSchemaVersion,
-            SettingsJson = kiosk.SettingsJson,
             CreatedAt = kiosk.CreatedAt,
             UpdatedAt = kiosk.UpdatedAt
         };

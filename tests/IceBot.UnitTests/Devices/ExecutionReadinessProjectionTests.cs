@@ -1,6 +1,7 @@
 using Domain.Common;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
+using Domain.Devices.ExecutionEndpoints;
+using Domain.Devices.Telemetry;
 using Domain.ProductionExecution.Enums;
 using Domain.Devices.ExecutionEndpoints.Projections;
 

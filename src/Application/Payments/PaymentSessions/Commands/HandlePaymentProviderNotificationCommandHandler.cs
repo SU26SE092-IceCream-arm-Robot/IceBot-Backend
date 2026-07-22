@@ -9,7 +9,10 @@ using Application.Shared.Wrappers;
 using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-using Application.EdgeIntegration.Commands;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Payments.PaymentSessions.Commands;
@@ -59,6 +62,10 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         {
             return ApiResult<PaymentNotificationResult>.Fail(ex.Message, ex.StatusCode);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             return ApiResult<PaymentNotificationResult>.Fail(ex.Message, 400);
@@ -81,31 +88,63 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         string orderPaymentStatus = "";
         bool canRetryPayment = false;
         bool requiresStaffSupport = false;
+        bool requiresMachineExecution = false;
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
-            if (!string.IsNullOrWhiteSpace(notification.ProviderEventId) &&
-                await _paymentStore.PaymentCallbackExistsAsync(notification.Provider, notification.ProviderEventId, ct))
+            if (!string.IsNullOrWhiteSpace(notification.ProviderEventId))
             {
-                var existingPayment = !string.IsNullOrWhiteSpace(notification.ProviderOrderCode)
-                    ? await _paymentStore.GetPaymentTransactionByProviderOrderCodeAsync(
-                        notification.Provider,
+                await _paymentStore.AcquirePaymentCallbackLockAsync(
+                    notification.Provider,
+                    notification.ProviderEventId,
+                    ct);
+            }
+
+            if (!string.IsNullOrWhiteSpace(notification.ProviderOrderCode))
+            {
+                await _paymentStore.AcquireProviderPaymentLockAsync(
+                    notification.Provider,
+                    notification.ProviderOrderCode,
+                    ct);
+            }
+
+            if (!string.IsNullOrWhiteSpace(notification.ProviderEventId))
+            {
+                var existingCallback = await _paymentStore.GetPaymentCallbackAsync(
+                    notification.Provider,
+                    notification.ProviderEventId,
+                    ct);
+                if (existingCallback is not null)
+                {
+                    var samePaymentIdentity = string.Equals(
+                        existingCallback.PaymentTransaction.ProviderOrderCode,
                         notification.ProviderOrderCode,
-                        ct)
-                    : null;
+                        StringComparison.Ordinal);
+                    var samePayload = string.Equals(
+                        existingCallback.PayloadJson,
+                        notification.RawPayloadJson,
+                        StringComparison.Ordinal);
+                    if (!samePaymentIdentity || !samePayload)
+                    {
+                        return ApiResult<PaymentNotificationResult>.Fail(
+                            "Provider event id was already used with a different payment or payload.", 409);
+                    }
 
-                if (existingPayment is null)
-                {
-                    return ApiResult<PaymentNotificationResult>.Fail("Duplicate webhook ignored, but payment transaction was not found.", 404);
+                    if (existingCallback.ProcessingStatus != PaymentCallbackProcessingStatus.Processed)
+                    {
+                        return ApiResult<PaymentNotificationResult>.Fail(
+                            existingCallback.LastError ?? "The existing payment callback was rejected.", 409);
+                    }
+
+                    var existingPayment = existingCallback.PaymentTransaction;
+                    return ApiResult<PaymentNotificationResult>.Success(new PaymentNotificationResult
+                    {
+                        PaymentTransactionId = existingPayment.Id,
+                        OrderId = existingPayment.OrderId,
+                        Status = existingPayment.Status,
+                        AlreadyProcessed = true
+                    });
                 }
-
-                return ApiResult<PaymentNotificationResult>.Success(new PaymentNotificationResult
-                {
-                    PaymentTransactionId = existingPayment.Id,
-                    OrderId = existingPayment.OrderId,
-                    Status = existingPayment.Status,
-                    AlreadyProcessed = true
-                });
             }
 
             PaymentTransaction? paymentTransaction = null;
@@ -123,6 +162,15 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 return ApiResult<PaymentNotificationResult>.Fail("Payment transaction not found.", 404);
             }
 
+            await _paymentStore.AcquireOrderWorkflowLockAsync(paymentTransaction.OrderId, ct);
+            await _paymentStore.ReloadOrderAsync(paymentTransaction.Order, ct);
+
+            var appliedSettlement = notification.IsPaid
+                ? await _paymentStore.GetAppliedPaymentSettlementByOrderIdAsync(paymentTransaction.OrderId, ct)
+                : null;
+            var paidByDifferentTransaction = appliedSettlement is not null &&
+                appliedSettlement.Id != paymentTransaction.Id;
+
             var callback = new PaymentCallback
             {
                 PaymentTransactionId = paymentTransaction.Id,
@@ -134,6 +182,15 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 ReceivedAt = DateTimeOffset.UtcNow
             };
 
+            var validationError = PaymentNotificationApplier.ValidateNotification(paymentTransaction, notification);
+            if (validationError is not null)
+            {
+                callback.MarkIgnored(validationError, DateTimeOffset.UtcNow);
+                await _paymentStore.AddPaymentCallbackAsync(callback, ct);
+                await _paymentStore.SaveChangesAsync(ct);
+                return ApiResult<PaymentNotificationResult>.Fail(validationError, 409);
+            }
+
             await _paymentStore.AddPaymentCallbackAsync(callback, ct);
 
             originalStatus = paymentTransaction.Order.Status;
@@ -142,6 +199,24 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
             if (!alreadyProcessed)
             {
                 PaymentNotificationApplier.ApplyNotification(paymentTransaction, notification);
+                if (notification.IsPaid && paymentTransaction.Status == PaymentTransactionStatus.Paid)
+                {
+                    var paidAt = notification.ProviderPaidAt ?? DateTimeOffset.UtcNow;
+                    var paidAmount = notification.PaidAmount ?? paymentTransaction.Amount;
+                    if (paidByDifferentTransaction)
+                    {
+                        appliedSettlement!.AssignPrimarySettlement();
+                        const string duplicateReason =
+                            "A second provider-confirmed payment was received for an already settled order. Manual refund review is required.";
+                        paymentTransaction.MarkDuplicateRefundRequired(duplicateReason);
+                        paymentTransaction.Order.MarkDuplicatePaymentRefundRequired(duplicateReason);
+                    }
+                    else
+                    {
+                        paymentTransaction.AssignPrimarySettlement();
+                        paymentTransaction.Order.MarkPaid(paidAmount, paidAt);
+                    }
+                }
 
                 newOrderStatus = paymentTransaction.Order.Status;
                 newTxStatus = paymentTransaction.Status;
@@ -154,8 +229,11 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 orderNumber = paymentTransaction.Order.OrderNumber;
                 provider = paymentTransaction.Provider;
                 orderPaymentStatus = paymentTransaction.Order.PaymentStatus.ToString();
+                requiresMachineExecution = paymentTransaction.Order.Status == OrderStatus.ReadyForFulfillment &&
+                    paymentTransaction.Order.OrderItems.Any(item =>
+                        item.FulfillmentType == Domain.Catalog.Enums.FulfillmentType.MachineProduced);
 
-                var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrder(paymentTransaction.Order);
+                var customerStatusInfo = Application.Orders.Support.OrderStatusProjector.ProjectFromOrder(paymentTransaction.Order);
                 customerStatus = customerStatusInfo.CustomerStatus;
                 customerStatusMessage = customerStatusInfo.CustomerStatusMessage;
                 canRetryPayment = customerStatusInfo.CanRetryPayment;
@@ -227,7 +305,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 }, cancellationToken);
             }
 
-            if (result.Data.Status == PaymentTransactionStatus.Paid)
+            if (result.Data.Status == PaymentTransactionStatus.Paid && requiresMachineExecution)
             {
                 var dispatchResult = await _dispatchOrderExecutionHandler.HandleAsync(
                     new DispatchOrderExecutionCommand

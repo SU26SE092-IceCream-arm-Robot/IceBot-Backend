@@ -37,6 +37,8 @@ internal static class MenuItemRequestValidator
         var product = await menus.GetProductByIdAsync(productId, cancellationToken);
         if (product is null) return "Product does not exist.";
         if (product.OrganizationId != organizationId) return "Product does not belong to the menu organization.";
+        if (!string.Equals(product.Currency, currency, StringComparison.OrdinalIgnoreCase))
+            return "Product currency must match the menu currency.";
 
         var variant = await menus.GetProductVariantByIdAsync(productVariantId, cancellationToken);
         if (variant is null) return "Product variant does not exist.";
@@ -47,7 +49,7 @@ internal static class MenuItemRequestValidator
             var recipe = await menus.GetRecipeByIdAsync(recipeId.Value, cancellationToken);
             if (recipe is null) return "Recipe does not exist.";
             if (recipe.ProductVariantId != variant.Id) return "Recipe does not belong to product variant.";
-            if (recipe.OrganizationId.HasValue && recipe.OrganizationId != organizationId)
+            if (recipe.OrganizationId != organizationId)
                 return "Recipe does not belong to the menu organization.";
         }
 

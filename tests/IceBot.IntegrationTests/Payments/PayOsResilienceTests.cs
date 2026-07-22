@@ -1,5 +1,8 @@
 using System.Diagnostics.Metrics;
 using System.Net;
+using System.Text;
+using System.Text.Json;
+using Application.Payments.Providers;
 using Infrastructure.Payments;
 using Infrastructure.Payments.Observability;
 using Infrastructure.Payments.Options;
@@ -10,6 +13,7 @@ using Microsoft.Extensions.Options;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using IceBot.IntegrationTests.Infrastructure;
+using Domain.Catalog.Enums;
 
 namespace IceBot.IntegrationTests.Payments;
 
@@ -95,11 +99,128 @@ public sealed class PayOsResilienceTests
 
         var gateway = CreateGateway(new CountingHandler(HttpStatusCode.ServiceUnavailable));
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => gateway.CreatePaymentSessionAsync(
-            new PaymentTransaction { Id = Guid.NewGuid(), Amount = 10_000 },
+        var exception = await Assert.ThrowsAsync<ProviderPaymentSessionCreationException>(() => gateway.CreatePaymentSessionAsync(
+            Payment(gateway),
             new Order { OrderNumber = "ORDER-1" }));
 
+        Assert.True(exception.OutcomeUnknown);
         Assert.Contains("transient", failureKinds);
+    }
+
+    [Fact]
+    public async Task GatewayRejectsSuccessfulResponseWithoutPaymentInstructions()
+    {
+        const string responseJson = """
+            {
+              "code": "00",
+              "data": {
+                "orderCode": 1234567890123,
+                "paymentLinkId": "link-1",
+                "status": "PENDING"
+              }
+            }
+            """;
+        var gateway = CreateGateway(new JsonResponseHandler(responseJson));
+
+        var exception = await Assert.ThrowsAsync<ProviderPaymentSessionCreationException>(() => gateway.CreatePaymentSessionAsync(
+            Payment(gateway),
+            new Order { OrderNumber = "ORDER-1" }));
+
+        Assert.Contains("invalid or incomplete payment session", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GatewayRejectsSuccessfulResponseWithDifferentProviderOrderCode()
+    {
+        const string responseJson = """
+            {
+              "code": "00",
+              "data": {
+                "orderCode": 9999999999999,
+                "paymentLinkId": "link-1",
+                "status": "PENDING",
+                "checkoutUrl": "https://pay.test/link-1"
+              }
+            }
+            """;
+        var gateway = CreateGateway(new JsonResponseHandler(responseJson));
+
+        var exception = await Assert.ThrowsAsync<ProviderPaymentSessionCreationException>(() => gateway.CreatePaymentSessionAsync(
+            Payment(gateway),
+            new Order { OrderNumber = "ORDER-1" }));
+
+        Assert.Contains("invalid or incomplete payment session", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task GatewayReadsExistingPaymentSessionByPersistedProviderOrderCode()
+    {
+        const string responseJson = """
+            {
+              "code": "00",
+              "data": {
+                "id": "link-1",
+                "orderCode": 1234567890123,
+                "amount": 10000,
+                "amountPaid": 0,
+                "status": "PENDING",
+                "checkoutUrl": "https://pay.test/link-1"
+              }
+            }
+            """;
+        var gateway = CreateGateway(new JsonResponseHandler(responseJson));
+
+        var session = await gateway.GetPaymentSessionAsync("1234567890123");
+
+        Assert.NotNull(session);
+        Assert.Equal("link-1", session.ProviderPaymentLinkId);
+        Assert.Equal(10_000, session.Amount);
+        Assert.Equal("https://pay.test/link-1", session.CheckoutUrl);
+    }
+
+    [Fact]
+    public async Task GatewayCapsProviderExpiryAtOrderPaymentDeadline()
+    {
+        const string responseJson = """
+            {
+              "code": "00",
+              "data": {
+                "orderCode": 1234567890123,
+                "paymentLinkId": "link-1",
+                "status": "PENDING",
+                "checkoutUrl": "https://pay.test/link-1"
+              }
+            }
+            """;
+        var handler = new CapturingJsonResponseHandler(responseJson);
+        var gateway = CreateGateway(handler);
+        var order = new Order { OrderNumber = "ORDER-DEADLINE" };
+        order.AddItem(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
+            "ITEM", "Item", "PRODUCT", "Product", "VARIANT", "Variant", null,
+            FulfillmentType.Packaged, 1, 10_000);
+        var placedAt = DateTimeOffset.UtcNow;
+        var deadline = placedAt.AddMinutes(5);
+        order.Place(placedAt, deadline);
+
+        var payment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(),
+            Amount = 10_000,
+            ProviderOrderCode = "1234567890123"
+        };
+        var session = await gateway.CreatePaymentSessionAsync(payment, order);
+
+        using var request = JsonDocument.Parse(handler.RequestJson!);
+        Assert.Equal(deadline.ToUnixTimeSeconds(), request.RootElement.GetProperty("expiredAt").GetInt64());
+        Assert.Equal(deadline, session.ExpiresAt);
+    }
+
+    private static PaymentTransaction Payment(PayOsPaymentGateway gateway)
+    {
+        var payment = new PaymentTransaction { Id = Guid.NewGuid(), Amount = 10_000 };
+        payment.ProviderOrderCode = gateway.CreateProviderOrderCode(payment.Id);
+        return payment;
     }
 
     private static PayOsPaymentGateway CreateGateway(HttpMessageHandler handler)
@@ -132,6 +253,33 @@ public sealed class PayOsResilienceTests
             {
                 Content = new StringContent("{\"code\":\"error\"}")
             });
+        }
+    }
+
+    private sealed class JsonResponseHandler(string responseJson) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+            });
+    }
+
+    private sealed class CapturingJsonResponseHandler(string responseJson) : HttpMessageHandler
+    {
+        public string? RequestJson { get; private set; }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            RequestJson = await request.Content!.ReadAsStringAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(responseJson, Encoding.UTF8, "application/json")
+            };
         }
     }
 }

@@ -27,9 +27,11 @@ public sealed class CancelPendingOrderCommandHandler
         var orderId = command.OrderId;
         var request = command.Request;
         OrderStatus fromStatus = OrderStatus.Draft;
+        OrderStatusChangedEvent? statusChangedEvent = null;
 
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {
+            await _orderStore.AcquireOrderWorkflowLockAsync(orderId, ct);
             var order = await _orderStore.GetOrderByIdAsync(orderId, ct);
             if (order is null)
             {
@@ -51,7 +53,7 @@ public sealed class CancelPendingOrderCommandHandler
             var reason = NormalizeOptional(request.Reason);
 
             order.Cancel(now, reason);
-            order.PaymentStatus = PaymentStatus.Cancelled;
+            order.MarkPaymentCancelled();
             order.UpdatedAt = now;
 
             var history = new OrderStatusHistory
@@ -65,28 +67,15 @@ public sealed class CancelPendingOrderCommandHandler
             };
             await _orderStore.AddOrderStatusHistoryAsync(history, ct);
 
-            return ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(order), "Order cancelled.");
+            await _orderStore.SaveChangesAsync(ct);
+            var orderResult = OrderResultMapper.ToResult(order);
+            statusChangedEvent = CreateStatusChangedEvent(order, orderResult, fromStatus);
+            return ApiResult<OrderResult>.Success(orderResult, "Order cancelled.");
         }, cancellationToken);
 
-        if (result.Succeeded && result.Data is not null)
+        if (result.Succeeded && statusChangedEvent is not null)
         {
-            await _publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
-            {
-                OrderId = result.Data.Id,
-                OrderNumber = result.Data.OrderNumber,
-                KioskId = result.Data.KioskId,
-                OrganizationId = result.Data.OrganizationId,
-                StoreId = result.Data.StoreId,
-                OldStatus = fromStatus.ToString(),
-                NewStatus = result.Data.Status.ToString(),
-                PaymentStatus = result.Data.PaymentStatus.ToString(),
-                CustomerStatus = result.Data.CustomerStatus,
-                CustomerStatusMessage = result.Data.CustomerStatusMessage,
-                CanRetryPayment = result.Data.CanRetryPayment,
-                RequiresStaffSupport = result.Data.RequiresStaffSupport,
-                UpdatedAt = result.Data.CancelledAt ?? DateTimeOffset.UtcNow,
-                Version = 1 // or best effort
-            }, cancellationToken);
+            await _publisher.PublishOrderStatusChangedAsync(statusChangedEvent, cancellationToken);
         }
 
         return result;
@@ -96,4 +85,25 @@ public sealed class CancelPendingOrderCommandHandler
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
+
+    private static OrderStatusChangedEvent CreateStatusChangedEvent(
+        Order order,
+        OrderResult result,
+        OrderStatus fromStatus) => new()
+    {
+        OrderId = order.Id,
+        OrderNumber = order.OrderNumber,
+        KioskId = order.KioskId,
+        OrganizationId = order.OrganizationId,
+        StoreId = order.StoreId,
+        OldStatus = fromStatus.ToString(),
+        NewStatus = result.Status.ToString(),
+        PaymentStatus = result.PaymentStatus.ToString(),
+        CustomerStatus = result.CustomerStatus,
+        CustomerStatusMessage = result.CustomerStatusMessage,
+        CanRetryPayment = result.CanRetryPayment,
+        RequiresStaffSupport = result.RequiresStaffSupport,
+        UpdatedAt = result.CancelledAt ?? DateTimeOffset.UtcNow,
+        Version = 1
+    };
 }

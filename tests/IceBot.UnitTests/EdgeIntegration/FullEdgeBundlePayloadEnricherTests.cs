@@ -1,6 +1,10 @@
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
 using System.Text.Json;
-using Application.EdgeIntegration.Services;
-using Application.RobotConfiguration.Abstractions;
+using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.EdgeIntegration.Dispatch.Services;
+using Application.EdgeIntegration.Reports.Services;
+using Application.RobotConfiguration.Artifacts.Abstractions;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using NSubstitute;
@@ -9,6 +13,26 @@ namespace IceBot.UnitTests.EdgeIntegration;
 
 public sealed class FullEdgeBundlePayloadEnricherTests
 {
+    [Fact]
+    public async Task InvalidDeploymentPayloadIsRejectedBeforeDelivery()
+    {
+        var storage = Substitute.For<IArtifactObjectStorage>();
+        var command = EdgeCommand.Create(
+            EdgeCommandType.DeployConfiguration,
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            "{invalid-json",
+            DateTimeOffset.UtcNow,
+            deploymentId: Guid.NewGuid(),
+            deploymentKind: DeploymentCommandTargetKind.FullEdgeConfiguration);
+
+        var exception = await Assert.ThrowsAsync<InvalidArtifactCommandPayloadException>(
+            () => new ArtifactCommandPayloadEnricher(storage).EnrichAsync(command));
+
+        Assert.Contains(command.Id.ToString(), exception.Message, StringComparison.Ordinal);
+        await storage.DidNotReceive().CreateReadUrlAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task FullEdgeDeploymentGetsBundleAndIndividualArtifactDownloadUrls()
     {

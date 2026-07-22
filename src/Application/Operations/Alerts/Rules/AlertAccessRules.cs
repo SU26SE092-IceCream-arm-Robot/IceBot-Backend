@@ -1,12 +1,15 @@
 using Application.Identity.Tokens.Claims;
+using Application.Tenants;
 
 namespace Application.Operations.Alerts.Rules;
 
 public static class AlertAccessRules
 {
-    public static bool CanAccess(CurrentUserContext user, Guid organizationId, Guid storeId, Guid kioskId) =>
-        user.IsSystemAdmin ||
-        user.AllowedOrganizationIds.Contains(organizationId) ||
-        user.AllowedStoreIds.Contains(storeId) ||
-        user.AllowedKioskIds.Contains(kioskId);
+    public static bool CanAccess(
+        IReadOnlyCollection<string> allowedRoles,
+        CurrentUserContext user,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId) =>
+        ScopeAccessRules.CanAccessScopedRow(allowedRoles, user, organizationId, storeId, kioskId);
 }

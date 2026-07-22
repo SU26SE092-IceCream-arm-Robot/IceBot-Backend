@@ -22,6 +22,7 @@ public sealed class ListOrganizationsQueryHandler
         var status = query.Status;
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrganizationsView, userContext);
 
         if (userContext.IsSystemAdmin)
         {
@@ -31,8 +32,8 @@ public sealed class ListOrganizationsQueryHandler
         }
         else
         {
-            var total = await _organizationStore.CountByIdsAsync(userContext.AllowedOrganizationIds, search, status, cancellationToken);
-            var list = await _organizationStore.ListByIdsAsync(userContext.AllowedOrganizationIds, search, status, pageNumber, pageSize, cancellationToken);
+            var total = await _organizationStore.CountByIdsAsync(scope.OrganizationIds, search, status, cancellationToken);
+            var list = await _organizationStore.ListByIdsAsync(scope.OrganizationIds, search, status, pageNumber, pageSize, cancellationToken);
             return PagedResult<OrganizationResult>.Success(list.Select(OrganizationResultMapper.ToResult), total, pageNumber, pageSize);
         }
     }

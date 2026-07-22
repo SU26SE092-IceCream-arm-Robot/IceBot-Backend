@@ -1,6 +1,9 @@
 using Application.Identity.CurrentAccount.Commands;
 using Application.Identity.CurrentAccount.Queries;
 using Application.Identity.CurrentAccount.Requests;
+using Application.Identity.NotificationDevices.Commands;
+using Application.Identity.NotificationDevices.Queries;
+using Application.Identity.NotificationDevices.Requests;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -19,17 +22,26 @@ public sealed class CurrentAccountController : ControllerBase
     private readonly GetCurrentAccountAccessQueryHandler _getCurrentAccountAccess;
     private readonly UpdateCurrentAccountProfileCommandHandler _updateProfile;
     private readonly ChangeCurrentAccountPasswordCommandHandler _changePassword;
+    private readonly RegisterCurrentAccountNotificationDeviceCommandHandler _registerNotificationDevice;
+    private readonly UnregisterCurrentAccountNotificationDeviceCommandHandler _unregisterNotificationDevice;
+    private readonly ListCurrentAccountNotificationDevicesQueryHandler _listNotificationDevices;
 
     public CurrentAccountController(
         GetCurrentAccountQueryHandler getCurrentAccount,
         GetCurrentAccountAccessQueryHandler getCurrentAccountAccess,
         UpdateCurrentAccountProfileCommandHandler updateProfile,
-        ChangeCurrentAccountPasswordCommandHandler changePassword)
+        ChangeCurrentAccountPasswordCommandHandler changePassword,
+        RegisterCurrentAccountNotificationDeviceCommandHandler registerNotificationDevice,
+        UnregisterCurrentAccountNotificationDeviceCommandHandler unregisterNotificationDevice,
+        ListCurrentAccountNotificationDevicesQueryHandler listNotificationDevices)
     {
         _getCurrentAccount = getCurrentAccount;
         _getCurrentAccountAccess = getCurrentAccountAccess;
         _updateProfile = updateProfile;
         _changePassword = changePassword;
+        _registerNotificationDevice = registerNotificationDevice;
+        _unregisterNotificationDevice = unregisterNotificationDevice;
+        _listNotificationDevices = listNotificationDevices;
     }
 
     [HttpGet]
@@ -88,6 +100,43 @@ public sealed class CurrentAccountController : ControllerBase
         var result = await _changePassword.HandleAsync(command, cancellationToken);
 
         return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("notification-devices")]
+    public async Task<IActionResult> ListNotificationDevices(CancellationToken cancellationToken)
+    {
+        var result = await _listNotificationDevices.HandleAsync(
+            new ListCurrentAccountNotificationDevicesQuery(GetCurrentAccountId()),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPut("notification-devices/{installationId:guid}")]
+    public async Task<IActionResult> RegisterNotificationDevice(
+        Guid installationId,
+        [FromBody] RegisterCurrentAccountNotificationDeviceRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _registerNotificationDevice.HandleAsync(
+            new RegisterCurrentAccountNotificationDeviceCommand
+            {
+                AccountId = GetCurrentAccountId(),
+                InstallationId = installationId,
+                Request = request
+            },
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("notification-devices/{installationId:guid}")]
+    public async Task<IActionResult> UnregisterNotificationDevice(
+        Guid installationId,
+        CancellationToken cancellationToken)
+    {
+        var result = await _unregisterNotificationDevice.HandleAsync(
+            new UnregisterCurrentAccountNotificationDeviceCommand(GetCurrentAccountId(), installationId),
+            cancellationToken);
+        return result.Succeeded ? NoContent() : StatusCode(result.StatusCode, result);
     }
 
     private Guid GetCurrentAccountId()

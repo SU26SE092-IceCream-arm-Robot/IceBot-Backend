@@ -30,7 +30,7 @@ public sealed class CreateKioskCommandHandler
             return ApiResult<KioskResult>.Fail("Store not found.", 404);
         }
 
-        if (!KioskAccessRules.CanManageStoreKiosks(userContext, store))
+        if (!KioskAccessRules.CanManageStoreKiosks(ScopeRoleSets.KiosksManage, userContext, store))
         {
             return ApiResult<KioskResult>.Fail("Access denied.", 403);
         }
@@ -67,9 +67,7 @@ public sealed class CreateKioskCommandHandler
             Address = request.Address?.Trim(),
             Latitude = request.Latitude,
             Longitude = request.Longitude,
-            SupportsOfflineMode = request.SupportsOfflineMode,
-            SettingsSchemaVersion = request.SettingsSchemaVersion,
-            SettingsJson = request.SettingsJson,
+            SettingsSchemaVersion = 1,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = userContext.AccountId
         };

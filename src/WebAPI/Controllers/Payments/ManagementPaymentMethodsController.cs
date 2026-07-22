@@ -34,6 +34,7 @@ public sealed class ManagementPaymentMethodsController : ControllerBase
     }
 
     [HttpPatch("{id:long}/status")]
+    [Authorize(Policy = "payment-methods.manage")]
     public async Task<IActionResult> SetStatus(long id, [FromBody] PaymentMethodStatusUpdateRequest request)
     {
         if (!ModelState.IsValid)

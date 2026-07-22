@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.Devices.Enums;
+using Domain.Devices.ExecutionEndpoints;
 
 namespace Domain.Devices.ExecutionEndpoints;
 

@@ -29,12 +29,37 @@ namespace Infrastructure.Identity.Persistence
                     cancellationToken);
         }
 
+        public async Task<Account?> GetByGoogleEmailAsync(
+            string googleEmail,
+            bool asNoTracking = true,
+            CancellationToken cancellationToken = default)
+        {
+            var matches = await BuildAccountQuery(asNoTracking)
+                .Where(account => account.GoogleEmail == googleEmail)
+                .Take(2)
+                .ToListAsync(cancellationToken);
+
+            return matches.Count == 1 ? matches[0] : null;
+        }
+
         public Task<Account?> GetByGoogleSubjectIdAsync(string googleSubjectId, bool asNoTracking = true, CancellationToken cancellationToken = default)
         {
             return BuildAccountQuery(asNoTracking)
                 .FirstOrDefaultAsync(
                     account => account.GoogleSubjectId == googleSubjectId,
                     cancellationToken);
+        }
+
+        public Task<bool> GoogleEmailExistsAsync(
+            string googleEmail,
+            Guid? excludedAccountId = null,
+            CancellationToken cancellationToken = default)
+        {
+            return _dbContext.Accounts.AnyAsync(
+                account => account.DeletedAt == null &&
+                           account.GoogleEmail == googleEmail &&
+                           (!excludedAccountId.HasValue || account.Id != excludedAccountId.Value),
+                cancellationToken);
         }
 
         public Task<Role?> GetRoleByCodeAsync(string code, CancellationToken cancellationToken = default)
@@ -86,7 +111,7 @@ namespace Infrastructure.Identity.Persistence
             CancellationToken cancellationToken = default)
         {
             return ApplyFilters(
-                    _dbContext.Accounts.AsNoTracking(),
+                    _dbContext.Accounts.WhereNotDeleted().AsNoTracking(),
                     search,
                     status,
                     isSystemAdmin,
@@ -98,21 +123,21 @@ namespace Infrastructure.Identity.Persistence
 
         public Task<bool> ExistsByEmailOrUserNameAsync(string email, string userName, CancellationToken cancellationToken = default)
         {
-            return _dbContext.Accounts
+            return _dbContext.Accounts.WhereNotDeleted()
                 .AsNoTracking()
                 .AnyAsync(account => account.Email == email || account.UserName == userName, cancellationToken);
         }
 
         public Task<bool> EmailExistsForOtherAccountAsync(Guid accountId, string email, CancellationToken cancellationToken = default)
         {
-            return _dbContext.Accounts
+            return _dbContext.Accounts.WhereNotDeleted()
                 .AsNoTracking()
                 .AnyAsync(account => account.Id != accountId && account.Email == email, cancellationToken);
         }
 
         public Task<bool> UserNameExistsAsync(string userName, CancellationToken cancellationToken = default)
         {
-            return _dbContext.Accounts
+            return _dbContext.Accounts.WhereNotDeleted()
                 .AsNoTracking()
                 .AnyAsync(account => account.UserName == userName, cancellationToken);
         }
@@ -129,7 +154,7 @@ namespace Infrastructure.Identity.Persistence
 
         private IQueryable<Account> BuildAccountQuery(bool asNoTracking)
         {
-            var query = _dbContext.Accounts
+            var query = _dbContext.Accounts.WhereNotDeleted()
                 .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Role)
                 .AsQueryable();

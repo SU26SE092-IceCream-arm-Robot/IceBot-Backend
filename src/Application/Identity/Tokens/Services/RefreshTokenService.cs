@@ -2,6 +2,7 @@ using Application.Identity.Abstractions;
 using Domain.Identity.Entities;
 using System.Security.Cryptography;
 using System.Text;
+using Domain.Identity.Enums;
 
 namespace Application.Identity.Tokens.Services
 {
@@ -19,10 +20,14 @@ namespace Application.Identity.Tokens.Services
 
         public async Task<RefreshTokenIssue> CreateAsync(Guid accountId, string? ipAddress, string? userAgent = null)
         {
-            var issue = CreateIssue(accountId, ipAddress, userAgent);
-            await _refreshTokens.AddAsync(issue.Entity);
-            await _refreshTokens.SaveChangesAsync();
-            return issue;
+            return await _refreshTokens.ExecuteInTransactionAsync(async () =>
+            {
+                await _refreshTokens.AcquireAccountSessionLockAsync(accountId);
+                var issue = CreateIssue(accountId, ipAddress, userAgent);
+                await _refreshTokens.AddAsync(issue.Entity);
+                await _refreshTokens.SaveChangesAsync();
+                return issue;
+            });
         }
 
         public async Task<(bool Ok, RefreshTokenIssue? NewToken, string? Error)> RotateAsync(
@@ -33,6 +38,13 @@ namespace Application.Identity.Tokens.Services
             return await _refreshTokens.ExecuteInTransactionAsync<(bool Ok, RefreshTokenIssue? NewToken, string? Error)>(async () =>
             {
                 var tokenHash = HashToken(token);
+                var observedToken = await _refreshTokens.GetByTokenHashAsync(tokenHash);
+                if (observedToken is null)
+                {
+                    return (false, null, "Invalid refresh token.");
+                }
+                await _refreshTokens.AcquireAccountSessionLockAsync(observedToken.AccountId);
+                await _refreshTokens.AcquireTokenLockAsync(tokenHash);
                 var oldToken = await _refreshTokens.GetByTokenHashAsync(tokenHash, asNoTracking: false);
                 if (oldToken is null)
                 {
@@ -64,6 +76,21 @@ namespace Application.Identity.Tokens.Services
                     return (false, null, "Refresh token is expired, used, or revoked.");
                 }
 
+                var accountStatus = await _refreshTokens.GetAccountStatusAsync(oldToken.AccountId);
+                if (accountStatus != AccountStatus.Active)
+                {
+                    var activeTokens = await _refreshTokens.ListActiveByAccountIdAsync(oldToken.AccountId);
+                    foreach (var activeToken in activeTokens)
+                    {
+                        activeToken.RevokedAt = DateTimeOffset.UtcNow;
+                        activeToken.RevokedByIp = ipAddress;
+                        activeToken.RevokedByUserAgent = userAgent;
+                        activeToken.RevokeReason = "Account is not active";
+                    }
+                    await _refreshTokens.SaveChangesAsync();
+                    return (false, null, "Account is not active.");
+                }
+
                 var newToken = CreateIssue(oldToken.AccountId, ipAddress, userAgent);
                 oldToken.RevokedAt = DateTimeOffset.UtcNow;
                 oldToken.RevokedByIp = ipAddress;
@@ -83,6 +110,10 @@ namespace Application.Identity.Tokens.Services
             return await _refreshTokens.ExecuteInTransactionAsync(async () =>
             {
                 var tokenHash = HashToken(token);
+                var observedToken = await _refreshTokens.GetByTokenHashAsync(tokenHash);
+                if (observedToken is null) return false;
+                await _refreshTokens.AcquireAccountSessionLockAsync(observedToken.AccountId);
+                await _refreshTokens.AcquireTokenLockAsync(tokenHash);
                 var refreshToken = await _refreshTokens.GetByTokenHashAsync(tokenHash, asNoTracking: false);
                 if (refreshToken is null)
                 {
@@ -106,6 +137,7 @@ namespace Application.Identity.Tokens.Services
         {
             return await _refreshTokens.ExecuteInTransactionAsync(async () =>
             {
+                await _refreshTokens.AcquireAccountSessionLockAsync(accountId);
                 var activeTokens = await _refreshTokens.ListActiveByAccountIdAsync(accountId);
                 foreach (var token in activeTokens)
                 {
