@@ -6,11 +6,31 @@ namespace Application.Orders.Management.Mapping;
 
 internal static class ExecutionAttemptResultMapper
 {
-    public static ExecutionAttemptResult ToResult(
+    public static ExecutionAttemptSummaryResult ToSummary(
         EdgeCommand command,
         OrderExecutionRecord? executionRecord)
     {
-        return new ExecutionAttemptResult
+        return new ExecutionAttemptSummaryResult
+        {
+            SourceCommandId = command.Id,
+            DispatchAttemptNo = command.DispatchAttemptNo!.Value,
+            CommandStatus = command.Status.ToString(),
+            CreatedAt = command.CreatedAt,
+            DeliveredAt = command.DeliveredAt,
+            RespondedAt = command.RespondedAt,
+            RejectionCode = command.RejectionCode,
+            RejectionMessage = command.RejectionMessage,
+            ExecutionStatus = executionRecord?.Status.ToString(),
+            ObservationStatus = executionRecord?.ObservationStatus.ToString(),
+            CustomerExecutionStatus = executionRecord?.CustomerExecutionStatus.ToString()
+        };
+    }
+
+    public static ExecutionAttemptDiagnosticsResult ToDiagnostics(
+        EdgeCommand command,
+        OrderExecutionRecord? executionRecord)
+    {
+        return new ExecutionAttemptDiagnosticsResult
         {
             SourceCommandId = command.Id,
             OrderId = command.OrderId!.Value,
@@ -45,6 +65,9 @@ internal static class ExecutionAttemptResultMapper
         {
             Id = record.Id,
             SourceProductionJobId = record.SourceProductionJobId,
+            OrderItemId = record.OrderItemId,
+            ProductionUnitNo = record.ProductionUnitNo,
+            ProductionUnitQuantity = record.ProductionUnitQuantity,
             WorkcellId = record.WorkcellId,
             ControllerId = record.ControllerId,
             ExecutionPlanChecksum = record.ExecutionPlanChecksum,

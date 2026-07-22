@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.Devices.Enums;
+using Domain.Devices.ExecutionEndpoints;
 using Domain.ProductionExecution.Enums;
 using Domain.Tenants.Entities;
 

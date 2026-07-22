@@ -1,9 +1,18 @@
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Programs.ReadModels;
+using Application.RobotConfiguration.Programs.Mapping;
+using Application.RobotConfiguration.Programs.Results;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Domain.RobotConfiguration.Programs;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Domain.RobotConfiguration.Entities;
+using Domain.RobotConfiguration.Artifacts;
 using Domain.Tenants.Enums;
-using Domain.RobotConfiguration.Manifests;
+using Domain.RobotConfiguration.Programs.Manifests;
 using IceBot.UnitTests.TestSupport;
 
 namespace IceBot.UnitTests.RobotConfiguration;
@@ -82,6 +91,21 @@ public sealed class RobotProgramManifestTests
         Assert.Equal(artifact.Checksum, item.RobotArtifact.Checksum);
     }
 
+    [Fact]
+    public void Publish_PreservesOptionConditionalExecution()
+    {
+        var organizationId = Guid.NewGuid();
+        var artifact = TestData.PublishedArtifact(organizationId, "TOPPING", "topping.lua", 'd');
+        var program = RobotProgram.CreateDraft("MAKE_TOPPING", "Make topping",
+            TenantScopeType.Organization, organizationId);
+        program.AddArtifact(artifact.Id, 10, requiredOptionCode: "extra_nuts");
+
+        program.Publish(DateTimeOffset.UtcNow, [Snapshot(artifact)]);
+
+        var item = Assert.Single(RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!).Artifacts);
+        Assert.Equal("EXTRA_NUTS", item.RequiredOptionCode);
+    }
+
     private static RobotArtifactManifestSnapshot Snapshot(RobotArtifact artifact) => new(
         artifact.Id,
         artifact.ArtifactCode,
@@ -92,5 +116,7 @@ public sealed class RobotProgramManifestTests
         artifact.StorageKey,
         artifact.RuntimeTargetCode,
         artifact.MachineModelCode,
-        artifact.ContentLengthBytes);
+        artifact.ContentLengthBytes,
+        artifact.TechnicalContractId,
+        artifact.TechnicalContractChecksum);
 }

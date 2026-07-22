@@ -27,7 +27,7 @@ public sealed class UpdateStoreCommandHandler
             return ApiResult<StoreResult>.Fail("Store not found.", 404);
         }
 
-        if (!StoreAccessRules.CanAccessStore(userContext, store))
+        if (!StoreAccessRules.CanAccessStore(ScopeRoleSets.StoresUpdate, userContext, store))
         {
             return ApiResult<StoreResult>.Fail("Access denied.", 403);
         }
@@ -47,20 +47,42 @@ public sealed class UpdateStoreCommandHandler
             return ApiResult<StoreResult>.Fail("Longitude must be between -180 and 180.", 400);
         }
 
+        var openingHoursError = StoreOpeningHoursContract.Validate(request.OpeningHours);
+        if (openingHoursError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(openingHoursError, 400);
+        }
+
+        var timeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim();
+        var timeZoneError = StoreSalesAvailabilityRules.ValidateTimeZone(timeZone);
+        if (timeZoneError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(timeZoneError, 400);
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var changesSalesScheduleClock =
+            !string.Equals(store.TimeZone, timeZone, StringComparison.OrdinalIgnoreCase) &&
+            (!string.IsNullOrWhiteSpace(store.OpeningHoursJson) || request.OpeningHours.Count > 0);
+        if (changesSalesScheduleClock && !store.IsSalesPausedAt(now))
+        {
+            return ApiResult<StoreResult>.Fail(
+                "Pause store sales before changing the time zone used by opening hours.", 409);
+        }
+
         store.Name = request.Name.Trim();
         store.StoreType = string.IsNullOrWhiteSpace(request.StoreType) ? "Retail" : request.StoreType.Trim();
         store.Address = request.Address?.Trim();
         store.City = request.City?.Trim();
         store.Province = request.Province?.Trim();
         store.Country = request.Country?.Trim();
-        store.TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim();
+        store.TimeZone = timeZone;
         store.Latitude = request.Latitude;
         store.Longitude = request.Longitude;
         store.PhoneNumber = request.PhoneNumber?.Trim();
         store.Email = request.Email?.Trim().ToLowerInvariant();
-        store.OpeningHoursSchemaVersion = request.OpeningHoursSchemaVersion;
-        store.OpeningHoursJson = request.OpeningHoursJson;
-        store.UpdatedAt = DateTimeOffset.UtcNow;
+        store.OpeningHoursJson = StoreOpeningHoursContract.Serialize(request.OpeningHours);
+        store.UpdatedAt = now;
         store.UpdatedByAccountId = userContext.AccountId;
 
         await _storeStore.SaveChangesAsync(cancellationToken);

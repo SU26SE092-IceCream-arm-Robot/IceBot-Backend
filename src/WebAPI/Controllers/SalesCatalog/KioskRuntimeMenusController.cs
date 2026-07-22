@@ -25,6 +25,14 @@ public sealed class KioskRuntimeMenusController : ControllerBase
     {
         var query = new GetKioskRuntimeMenuQuery(kioskId);
         var result = await _queryHandler.HandleAsync(query, cancellationToken);
+        if (result.Succeeded && result.Data is not null)
+        {
+            var etag = $"\"{result.Data.Revision}\"";
+            Response.Headers.ETag = etag;
+            if (Request.Headers.IfNoneMatch.Any(value =>
+                    string.Equals(value, etag, StringComparison.Ordinal)))
+                return StatusCode(StatusCodes.Status304NotModified);
+        }
         return StatusCode(result.StatusCode, result);
     }
 }

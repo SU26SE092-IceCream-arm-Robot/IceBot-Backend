@@ -2,12 +2,15 @@ using Application.Catalog;
 using Application.Dashboard.Queries;
 using Application.Devices;
 using Application.EdgeIntegration;
+using Application.EdgeIntegration.Dispatch;
+using Application.EdgeIntegration.Reports;
 using Application.Identity;
 using Application.Inventory;
 using Application.Operations;
 using Application.Orders;
 using Application.Payments;
 using Application.ProductionConfiguration;
+using Application.ProductionPackages;
 using Application.RobotConfiguration;
 using Application.SalesCatalog;
 using Application.Tenants;
@@ -22,11 +25,7 @@ namespace Application
         {
             services.AddCatalogModule();
             services.AddDevicesModule();
-            services.AddScoped<ListSyncDeadLettersQueryHandler>();
-            services.AddScoped<GetSyncDeadLetterQueryHandler>();
-            services.AddScoped<ResolveSyncDeadLetterCommandHandler>();
-            services.AddScoped<IgnoreSyncDeadLetterCommandHandler>();
-            services.AddScoped<RetrySyncDeadLetterCommandHandler>();
+            services.AddSyncModule();
             services.AddEdgeIntegrationModule();
             services.AddIdentityApplication();
             services.AddInventoryModule();
@@ -34,6 +33,7 @@ namespace Application
             services.AddOrderModule();
             services.AddPaymentModule();
             services.AddProductionConfigurationModule();
+            services.AddProductionPackagesModule();
             services.AddRobotConfigurationModule();
             services.AddSalesCatalogModule();
             services.AddTenantsApplication();

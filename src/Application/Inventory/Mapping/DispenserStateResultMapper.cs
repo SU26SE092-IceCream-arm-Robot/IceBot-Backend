@@ -1,5 +1,6 @@
 using Application.Inventory.Results;
 using Domain.Inventory.Entities;
+using Application.Inventory.Support;
 
 namespace Application.Inventory.Mapping;
 
@@ -23,7 +24,9 @@ internal static class DispenserStateResultMapper
             CapacityQuantity = state.CapacityQuantity,
             Unit = state.Unit,
             LastMeasuredAt = state.LastMeasuredAt,
-            LastRefilledAt = state.LastRefilledAt
+            LastRefilledAt = state.LastRefilledAt,
+            IsActive = state.IsActive,
+            LevelToQuantityProfile = DispenserLevelQuantityProfileContract.Deserialize(state.LevelToQuantityProfileJson)
         };
     }
 }

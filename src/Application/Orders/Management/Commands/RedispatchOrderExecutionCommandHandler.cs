@@ -1,9 +1,14 @@
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
-using Application.EdgeIntegration.Commands;
-using Application.EdgeIntegration.Results;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
+using Application.EdgeIntegration.CommandDelivery.Results;
+using Application.EdgeIntegration.Dispatch.Results;
+using Application.EdgeIntegration.Reports.Results;
 using Application.Orders.Abstractions;
-using Application.Shared.Utils;
+using Application.Orders.Support;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 
@@ -36,20 +41,13 @@ public sealed class RedispatchOrderExecutionCommandHandler
                 "Authenticated operator and redispatch reason of at most 500 characters are required.", 400);
         }
 
-        var order = await _orderStore.GetOrderByIdAsync(command.OrderId, cancellationToken);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, command.UserContext);
+        var order = await _orderStore.GetManagementOrderByIdAsync(
+            command.OrderId, command.UserContext.IsSystemAdmin,
+            scope.OrganizationIds, scope.StoreIds, scope.KioskIds, cancellationToken);
         if (order is null)
         {
             return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
-        }
-
-        if (!ScopeAccessRules.CanAccessScopedRow(
-                ScopeRoleSets.OrdersManage,
-                command.UserContext,
-                order.OrganizationId,
-                order.StoreId,
-                order.KioskId))
-        {
-            return ApiResult<OrderExecutionDispatchResult>.Fail("Access denied.", 403);
         }
 
         var previousStatus = order.Status;

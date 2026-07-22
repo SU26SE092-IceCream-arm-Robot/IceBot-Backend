@@ -7,7 +7,7 @@ Operational rules for coding agents working in this repository.
 - Architecture decisions: [ARCHITECTURE.md](ARCHITECTURE.md)
 - Domain context map: [docs/architecture/BOUNDARY_CONTEXTS.md](docs/architecture/BOUNDARY_CONTEXTS.md)
 - Dependency boundaries: [docs/architecture/DEPENDENCY_RULES.md](docs/architecture/DEPENDENCY_RULES.md)
-- RAG/docs routing map: [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md)
+- Documentation routing map: [docs/DOCUMENTATION_ROUTING_MAP.md](docs/DOCUMENTATION_ROUTING_MAP.md)
 - Documentation structure: [docs/process/DOCUMENTATION_RULES.md](docs/process/DOCUMENTATION_RULES.md)
 
 Do not duplicate long architecture explanations here. This file is for execution rules.
@@ -27,13 +27,14 @@ This is the main implementation repository for IceBot backend work.
 - Do not follow every link in every document.
 - If a linked file was already read in the current task, do not reopen it unless the user asks, the file may have changed, or a specific section is needed.
 - Prefer reading the smallest relevant set of docs, then inspect code.
-- When the right backend doc is unclear after direct retrieval or metadata/path filters, use [docs/RAG_CONTEXT_MAP.md](docs/RAG_CONTEXT_MAP.md) as a fallback router.
+- When the right backend doc is unclear after direct retrieval or metadata/path filters, use [docs/DOCUMENTATION_ROUTING_MAP.md](docs/DOCUMENTATION_ROUTING_MAP.md) as a fallback router.
 
 ## Working Workflow
 
 - Use current task context first; do not reread docs/code when the answer is already settled in context.
 - For concrete symbols/endpoints/handlers, use Code Intelligence before broad search.
 - For rules/flows/contracts, use docs/RAG only when current context is insufficient.
+- Before implementing a feature, define the complete vertical slice and its affected contracts so the work is not delivered as disconnected file-level patches.
 - Make the smallest scoped change, then verify with the narrowest relevant check.
 - After meaningful backend code/API/domain changes, run backend preflight as the final check.
 
@@ -55,7 +56,7 @@ This is the main implementation repository for IceBot backend work.
 - When the user asks to inspect or adjust an existing abstraction, preserve it and repair it first. Do not delete it just because it is currently unused or copied from another project.
 - Do not perform broad renames, namespace moves, or folder reshuffles unless requested.
 - Do not remove files, abstractions, or extension points unless the user explicitly asks for removal, or the file is proven obsolete and the removal is stated as part of the intended fix before editing.
-- Do not create EF Core migrations unless the user explicitly asks for migrations.
+- Do not create EF Core migrations unless the user explicitly asks for migrations. When asked, review and stabilize the complete model change before generating a migration; do not generate successive migrations while the same model change is still being repaired.
 - Do not use destructive git commands unless explicitly requested.
 - Work with existing uncommitted changes; do not revert user changes.
 
@@ -66,6 +67,10 @@ This is the main implementation repository for IceBot backend work.
 - Compare headings and content coverage before removing the original; report intentional omissions and replacement decisions first.
 - Write user-chosen architecture as Confirmed Decision. Keep agent proposals as Recommendation and unresolved choices as Open Design Choice.
 - Do not turn a recommended entity name, split, migration, or ownership boundary into a final architecture decision without explicit user approval.
+- Backend docs prioritize current implementation contracts and procedures needed to build, integrate, operate, or verify the system.
+- Preserve concise rationale, examples, future constraints, and implementation guidance when they are necessary to apply a contract correctly. Route extended discussion history, option comparisons, and rejected designs to the smallest owning Vault note; route standalone migration direction to `Vault/Evolution`.
+- Do not document a completed implementation step unless it changes a contract or creates an operation readers must perform.
+- When the user explicitly requests documentation cleanup, remove stale, duplicate, historical, or non-operational content after preserving the pre-cleanup version. Do not retain obsolete text merely to make the restructure lossless.
 
 ## Decision Traceability
 
@@ -96,6 +101,37 @@ This is the main implementation repository for IceBot backend work.
 - Update DI registrations when service contracts change.
 - Scan for stale identifiers before finishing; prefer `rg`.
 - Re-run build after code changes.
+
+## Vertical Slice Completion Gate
+
+Apply this gate before changing a workflow that crosses multiple modules,
+aggregate boundaries, persistence operations, or external dependencies.
+Use [Vertical Slice Review](docs/process/VERTICAL_SLICE_REVIEW.md) as the
+worksheet, invariant matrix, failure-scenario catalog, and evidence standard.
+
+1. Freeze the requested scope before editing. Record what is included, what is
+   excluded, and which public contracts or data models may change. Do not expand
+   the architecture during the final review pass.
+2. Define the complete vertical-slice invariants before implementation. Check at
+   least lifecycle/state transitions, concurrency, tenancy, idempotency,
+   transaction boundaries, external I/O, compensation/cleanup, and retry
+   behavior. Mark an item not applicable only with a concrete reason.
+3. Write the relevant failure scenarios before editing code. Include concurrent
+   requests, retries after partial success, stale state, external dependency
+   failure, and cleanup after database or object-storage failure when applicable.
+4. Implement the frozen slice in one coherent pass. Do not deliver a sequence of
+   disconnected patches that each handles only the latest observed symptom.
+5. After implementation, review the final diff independently against the frozen
+   scope, invariants, and failure scenarios. This review is a verification pass,
+   not permission to introduce new architecture or broaden the task.
+6. Call the slice complete only when every applicable invariant has code or
+   contract coverage and every material failure scenario has verification
+   evidence. Build success alone is not completion evidence. If any item remains
+   unverified, state it explicitly and do not report the slice as complete.
+
+For narrow, local changes, use the smallest applicable subset of this gate. Do
+not turn documentation-only work or isolated mechanical fixes into unnecessary
+process overhead.
 
 ## Verification
 

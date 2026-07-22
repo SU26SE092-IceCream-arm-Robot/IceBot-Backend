@@ -8,7 +8,7 @@ public sealed record InventoryChangedEvent
     public Guid? OrganizationId { get; init; }
     public Guid? StoreId { get; init; }
     public required string IngredientName { get; init; }
-    public required decimal EstimatedQuantity { get; init; }
+    public required decimal? EstimatedQuantity { get; init; }
     public required string Unit { get; init; }
     public required string Status { get; init; }
     public required DateTimeOffset UpdatedAt { get; init; }

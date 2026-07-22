@@ -1,8 +1,10 @@
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
 using System.Net;
 using System.Net.Sockets;
 using DotNet.Testcontainers.Builders;
 using IceBot.IntegrationTests.Infrastructure;
-using Infrastructure.RobotConfiguration.ObjectStorage;
+using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
 using Microsoft.Extensions.Options;
 
 namespace IceBot.IntegrationTests.RobotConfiguration;

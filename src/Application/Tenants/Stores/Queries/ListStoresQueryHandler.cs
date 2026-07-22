@@ -22,6 +22,7 @@ public sealed class ListStoresQueryHandler
         var organizationId = query.OrganizationId;
         var status = query.Status;
         var search = query.Search;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.StoresView, userContext);
 
         EntityStatus? parsedStatus = null;
         if (!string.IsNullOrWhiteSpace(status))
@@ -37,17 +38,17 @@ public sealed class ListStoresQueryHandler
         if (userContext.IsSystemAdmin)
         {
             var list = await _storeStore.ListAsync(organizationId, parsedStatus, search, cancellationToken);
-            return ApiResult<IReadOnlyList<StoreResult>>.Success(list.Select(StoreResultMapper.ToResult).ToList());
+            return ApiResult<IReadOnlyList<StoreResult>>.Success(list.Select(store => StoreResultMapper.ToResult(store)).ToList());
         }
 
         var accessibleStores = await _storeStore.ListAccessibleAsync(
-            userContext.AllowedOrganizationIds,
-            userContext.AllowedStoreIds,
+            scope.OrganizationIds,
+            scope.StoreIds,
             organizationId,
             parsedStatus,
             search,
             cancellationToken);
 
-        return ApiResult<IReadOnlyList<StoreResult>>.Success(accessibleStores.Select(StoreResultMapper.ToResult).ToList());
+        return ApiResult<IReadOnlyList<StoreResult>>.Success(accessibleStores.Select(store => StoreResultMapper.ToResult(store)).ToList());
     }
 }

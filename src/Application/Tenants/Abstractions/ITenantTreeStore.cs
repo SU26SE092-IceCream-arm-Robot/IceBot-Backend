@@ -25,4 +25,22 @@ public interface ITenantTreeStore
         IEnumerable<Guid> kioskIds,
         bool includeInactive,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Organization>> ListOrganizationsByIdsAsync(
+        IEnumerable<Guid> organizationIds,
+        bool includeInactive,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Store>> ListStoresForScopeAsync(
+        IEnumerable<Guid> organizationIds,
+        IEnumerable<Guid> storeIds,
+        bool includeInactive,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<Kiosk>> ListKiosksForScopeAsync(
+        IEnumerable<Guid> organizationIds,
+        IEnumerable<Guid> storeIds,
+        IEnumerable<Guid> kioskIds,
+        bool includeInactive,
+        CancellationToken cancellationToken = default);
 }

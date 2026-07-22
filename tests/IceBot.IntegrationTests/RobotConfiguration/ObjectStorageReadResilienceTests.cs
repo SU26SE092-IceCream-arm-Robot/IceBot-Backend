@@ -1,4 +1,6 @@
-using Infrastructure.RobotConfiguration.ObjectStorage;
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
+using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
 
 namespace IceBot.IntegrationTests.RobotConfiguration;
 

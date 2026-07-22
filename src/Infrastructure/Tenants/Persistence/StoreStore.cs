@@ -17,14 +17,14 @@ public sealed class StoreStore : IStoreStore
 
     public Task<bool> OrganizationExistsActiveAsync(Guid organizationId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Organizations
+        return _dbContext.Organizations.WhereNotDeleted()
             .AnyAsync(x => x.Id == organizationId && x.Status == EntityStatus.Active, cancellationToken);
     }
 
     public Task<bool> StoreCodeExistsAsync(Guid organizationId, string code, Guid? excludeStoreId = null, CancellationToken cancellationToken = default)
     {
         var normalizedCode = code.Trim().ToUpperInvariant();
-        var query = _dbContext.Stores.Where(x => x.OrganizationId == organizationId && x.Code.ToUpper() == normalizedCode);
+        var query = _dbContext.Stores.WhereNotDeleted().Where(x => x.OrganizationId == organizationId && x.Code.ToUpper() == normalizedCode);
         if (excludeStoreId.HasValue)
         {
             query = query.Where(x => x.Id != excludeStoreId.Value);
@@ -34,7 +34,7 @@ public sealed class StoreStore : IStoreStore
 
     public async Task<IReadOnlyList<Store>> ListAsync(Guid? organizationId, EntityStatus? status, string? search, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Stores.AsQueryable();
+        var query = _dbContext.Stores.WhereNotDeleted();
         if (organizationId.HasValue)
         {
             query = query.Where(x => x.OrganizationId == organizationId.Value);
@@ -45,7 +45,7 @@ public sealed class StoreStore : IStoreStore
 
     public async Task<IReadOnlyList<Store>> ListByOrganizationIdsAsync(IEnumerable<Guid> organizationIds, EntityStatus? status, string? search, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Stores.Where(x => organizationIds.Contains(x.OrganizationId));
+        var query = _dbContext.Stores.WhereNotDeleted().Where(x => organizationIds.Contains(x.OrganizationId));
         query = ApplyFilters(query, search, status);
         return await query.AsNoTracking().OrderBy(x => x.Code).ToListAsync(cancellationToken);
     }
@@ -66,7 +66,7 @@ public sealed class StoreStore : IStoreStore
             return Array.Empty<Store>();
         }
 
-        var query = _dbContext.Stores.Where(x =>
+        var query = _dbContext.Stores.WhereNotDeleted().Where(x =>
             scopedOrganizationIds.Contains(x.OrganizationId) ||
             scopedStoreIds.Contains(x.Id));
 
@@ -81,7 +81,17 @@ public sealed class StoreStore : IStoreStore
 
     public Task<Store?> GetByIdAsync(Guid storeId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Stores.FirstOrDefaultAsync(x => x.Id == storeId, cancellationToken);
+        return _dbContext.Stores.WhereNotDeleted().FirstOrDefaultAsync(x => x.Id == storeId, cancellationToken);
+    }
+
+    public Task<Store?> GetByOrganizationAndIdAsync(
+        Guid organizationId,
+        Guid storeId,
+        CancellationToken cancellationToken = default)
+    {
+        return _dbContext.Stores.WhereNotDeleted().FirstOrDefaultAsync(
+            x => x.OrganizationId == organizationId && x.Id == storeId,
+            cancellationToken);
     }
 
     public Task AddAsync(Store store, CancellationToken cancellationToken = default)

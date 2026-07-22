@@ -4,6 +4,7 @@ using Application.Operations.Alerts.Results;
 using Application.Shared.Wrappers;
 using Domain.Common.Enums;
 using Domain.Operations.Enums;
+using Application.Tenants;
 
 namespace Application.Operations.Alerts.Queries;
 
@@ -39,15 +40,15 @@ public sealed class ListAlertsQueryHandler
         }
 
         var user = query.UserContext;
-        var organizations = user.AllowedOrganizationIds.ToArray();
-        var stores = user.AllowedStoreIds.ToArray();
-        var kiosks = user.AllowedKioskIds.ToArray();
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AlertsView, user);
         var total = await _store.CountAsync(
             status, severity, query.OrganizationId, query.StoreId, query.KioskId, query.DeviceId,
-            query.From, query.To, user.IsSystemAdmin, organizations, stores, kiosks, cancellationToken);
+            query.From, query.To, user.IsSystemAdmin,
+            scope.OrganizationIds, scope.StoreIds, scope.KioskIds, cancellationToken);
         var alerts = await _store.ListAsync(
             status, severity, query.OrganizationId, query.StoreId, query.KioskId, query.DeviceId,
-            query.From, query.To, user.IsSystemAdmin, organizations, stores, kiosks,
+            query.From, query.To, user.IsSystemAdmin,
+            scope.OrganizationIds, scope.StoreIds, scope.KioskIds,
             pageNumber, pageSize, cancellationToken);
 
         return PagedResult<AlertResult>.Success(

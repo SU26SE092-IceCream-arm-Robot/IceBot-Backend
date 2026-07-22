@@ -17,15 +17,14 @@ internal static class InternalAccountResultMapper
             Status = account.Status.ToString(),
             LocalLoginEnabled = account.LocalLoginEnabled,
             GoogleLoginEnabled = account.GoogleLoginEnabled,
+            GoogleEmail = account.GoogleEmail,
             Invitation = invitation is null
                 ? null
                 : new InternalAccountInvitationResult
                 {
-                    InvitationToken = invitation.InvitationToken,
                     InvitationUrl = invitation.InvitationUrl,
                     ExpiresAt = invitation.ExpiresAt,
-                    EmailSentAt = invitation.EmailSentAt,
-                    EmailSent = invitation.EmailSent
+                    EmailSentAt = invitation.EmailSentAt
                 },
             Roles = account.AccountRoles.Select(accountRole => new InternalAccountRoleResult
             {

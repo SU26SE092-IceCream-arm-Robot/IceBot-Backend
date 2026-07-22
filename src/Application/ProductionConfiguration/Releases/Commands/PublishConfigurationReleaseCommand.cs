@@ -1,0 +1,10 @@
+using Application.Identity.Tokens.Claims;
+
+namespace Application.ProductionConfiguration.Releases.Commands;
+
+public sealed class PublishConfigurationReleaseCommand
+{
+    public required CurrentUserContext UserContext { get; init; }
+    public required Guid OrganizationId { get; init; }
+    public required Guid ReleaseId { get; init; }
+}

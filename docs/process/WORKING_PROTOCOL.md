@@ -78,6 +78,11 @@ During editing:
 - update DI and docs when contracts change;
 - do not add future-facing infrastructure without a current use case.
 
+For a workflow that crosses layers, modules, persistence operations, jobs, or
+external dependencies, follow [Vertical Slice Review](VERTICAL_SLICE_REVIEW.md).
+Freeze scope and define lifecycle, tenancy, idempotency, concurrency,
+transaction, I/O, retry, cleanup, and retention invariants before editing.
+
 ## Refactor Rules
 
 Build success does not prove design fit.
@@ -144,7 +149,7 @@ Links are routing hints, not mandatory recursive reads. If a linked file was alr
 
 Use:
 
-- [RAG Context Map](../RAG_CONTEXT_MAP.md) when the right backend doc is unclear.
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md) when the right backend doc is unclear.
 - [Documentation Rules](DOCUMENTATION_RULES.md) for RAG-friendly document structure.
 - [Architecture](../../ARCHITECTURE.md) for high-level architecture.
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md) for domain ownership.
@@ -211,11 +216,17 @@ A change is done when:
 - any skipped verification is stated explicitly;
 - remaining warnings or risks are reported.
 
+For a substantial vertical slice, completion additionally requires failure-path
+evidence for every applicable invariant and an independent review of the final
+diff against the frozen scope. Build success and happy-path coverage alone are
+not sufficient.
+
 ## Related Docs
 
 - [Documentation Rules](DOCUMENTATION_RULES.md)
-- [RAG Context Map](../RAG_CONTEXT_MAP.md)
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md)
 - [Architecture](../../ARCHITECTURE.md)
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](../architecture/DEPENDENCY_RULES.md)
 - [Naming Rules](NAMING_RULES.md)
+- [Vertical Slice Review](VERTICAL_SLICE_REVIEW.md)

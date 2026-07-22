@@ -1,4 +1,5 @@
 using Application.Orders.PlaceOrder.Commands;
+using Application.Orders.PlaceOrder.Services;
 using Application.Orders.PlaceOrder.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,6 +10,7 @@ public static class PlaceOrderModule
     public static IServiceCollection AddPlaceOrderModule(this IServiceCollection services)
     {
         services.AddScoped<PlaceOrderCommandHandler>();
+        services.AddScoped<PlaceOrderItemAppender>();
         services.AddScoped<GetOrderStatusQueryHandler>();
         services.AddScoped<CancelPendingOrderCommandHandler>();
         return services;

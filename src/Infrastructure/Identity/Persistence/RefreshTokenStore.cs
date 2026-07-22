@@ -3,6 +3,7 @@ using Domain.Identity.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
+using Domain.Identity.Enums;
 
 namespace Infrastructure.Identity.Persistence
 {
@@ -40,6 +41,28 @@ namespace Infrastructure.Identity.Persistence
             return _dbContext.RefreshTokens.AddAsync(refreshToken, cancellationToken).AsTask();
         }
 
+        public Task<AccountStatus?> GetAccountStatusAsync(
+            Guid accountId,
+            CancellationToken cancellationToken = default) =>
+            _dbContext.Accounts.AsNoTracking()
+                .Where(account => account.Id == accountId)
+                .Select(account => (AccountStatus?)account.Status)
+                .SingleOrDefaultAsync(cancellationToken);
+
+        public Task AcquireAccountSessionLockAsync(
+            Guid accountId,
+            CancellationToken cancellationToken = default) =>
+            _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-session:{accountId:D}"}, 0))",
+                cancellationToken);
+
+        public Task AcquireTokenLockAsync(
+            string tokenHash,
+            CancellationToken cancellationToken = default) =>
+            _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-refresh-token:{tokenHash}"}, 0))",
+                cancellationToken);
+
         public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
         {
             return _dbContext.SaveChangesAsync(cancellationToken);
@@ -49,6 +72,9 @@ namespace Infrastructure.Identity.Persistence
             Func<Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
+            if (_dbContext.Database.CurrentTransaction is not null)
+                return await operation();
+
             var strategy = _dbContext.Database.CreateExecutionStrategy();
             return await strategy.ExecuteAsync(async () =>
             {

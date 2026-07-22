@@ -1,3 +1,4 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 
 namespace Domain.Devices.ExecutionEndpoints;

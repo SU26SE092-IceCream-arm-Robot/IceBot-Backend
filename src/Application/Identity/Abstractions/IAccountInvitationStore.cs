@@ -16,4 +16,14 @@ public interface IAccountInvitationStore
     Task AddAsync(AccountInvitation invitation, CancellationToken cancellationToken = default);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    Task<T> ExecuteCreationTransactionAsync<T>(
+        Guid accountId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
+    Task<T> ExecuteAcceptanceTransactionAsync<T>(
+        string tokenHash,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
 }

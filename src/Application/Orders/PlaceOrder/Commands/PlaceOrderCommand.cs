@@ -5,4 +5,5 @@ namespace Application.Orders.PlaceOrder.Commands;
 public sealed class PlaceOrderCommand
 {
     public PlaceOrderRequest Request { get; init; } = null!;
+    public string? IdempotencyKey { get; init; }
 }

@@ -9,17 +9,16 @@ namespace Application.Identity.InternalAccounts.Results
         public string Status { get; set; } = string.Empty;
         public bool LocalLoginEnabled { get; set; }
         public bool GoogleLoginEnabled { get; set; }
+        public string? GoogleEmail { get; set; }
         public InternalAccountInvitationResult? Invitation { get; set; }
         public List<InternalAccountRoleResult> Roles { get; set; } = [];
     }
 
     public class InternalAccountInvitationResult
     {
-        public string InvitationToken { get; set; } = string.Empty;
-        public string? InvitationUrl { get; set; }
+        public string InvitationUrl { get; set; } = string.Empty;
         public DateTimeOffset ExpiresAt { get; set; }
         public DateTimeOffset? EmailSentAt { get; set; }
-        public bool EmailSent { get; set; }
     }
 
     public class InternalAccountRoleResult

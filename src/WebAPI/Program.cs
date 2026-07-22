@@ -38,7 +38,7 @@ try
     builder.AddIceBotObservability();
 
     builder.Services.AddIceBotCors(builder.Configuration, builder.Environment);
-    builder.Services.AddIceBotAuthentication(builder.Configuration);
+    builder.Services.AddIceBotAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddAuthorization(options => options.AddIceBotAuthorizationPolicies());
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
@@ -97,3 +97,5 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+public partial class Program;

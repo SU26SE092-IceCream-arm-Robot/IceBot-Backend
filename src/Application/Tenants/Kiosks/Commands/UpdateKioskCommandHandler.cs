@@ -27,7 +27,7 @@ public sealed class UpdateKioskCommandHandler
             return ApiResult<KioskResult>.Fail("Kiosk not found.", 404);
         }
 
-        if (!KioskAccessRules.CanAccessKiosk(userContext, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.KiosksManage, userContext, kiosk))
         {
             return ApiResult<KioskResult>.Fail("Access denied.", 403);
         }
@@ -54,9 +54,6 @@ public sealed class UpdateKioskCommandHandler
         kiosk.Address = request.Address?.Trim();
         kiosk.Latitude = request.Latitude;
         kiosk.Longitude = request.Longitude;
-        kiosk.SupportsOfflineMode = request.SupportsOfflineMode;
-        kiosk.SettingsSchemaVersion = request.SettingsSchemaVersion;
-        kiosk.SettingsJson = request.SettingsJson;
         kiosk.UpdatedAt = DateTimeOffset.UtcNow;
         kiosk.UpdatedByAccountId = userContext.AccountId;
 

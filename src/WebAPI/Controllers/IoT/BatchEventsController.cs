@@ -1,11 +1,15 @@
 using Domain.Devices.Telemetry;
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
-using Application.Devices.Commands;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
 using Application.Shared.Wrappers;
 using Asp.Versioning;
 using Domain.Common.Enums;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Configuration.Security;
 

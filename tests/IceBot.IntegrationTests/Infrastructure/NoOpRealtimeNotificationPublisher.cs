@@ -8,10 +8,17 @@ internal sealed class NoOpRealtimeNotificationPublisher : IRealtimeNotificationP
     public List<OrderExecutionObservationChangedEvent> OrderExecutionObservationEvents { get; } = [];
     public List<DeviceEventCreatedEvent> DeviceEventCreatedEvents { get; } = [];
     public List<KioskStatusChangedEvent> KioskStatusChangedEvents { get; } = [];
+    public List<KioskOperationalStateChangedEvent> KioskOperationalStateChangedEvents { get; } = [];
     public List<ExecutionReadinessChangedEvent> ExecutionReadinessChangedEvents { get; } = [];
     public List<AlertChangedEvent> AlertChangedEvents { get; } = [];
+    public List<OrderItemFulfillmentChangedEvent> OrderItemFulfillmentChangedEvents { get; } = [];
 
     public Task PublishOrderStatusChangedAsync(OrderStatusChangedEvent evt, CancellationToken ct = default) => Task.CompletedTask;
+    public Task PublishOrderItemFulfillmentChangedAsync(OrderItemFulfillmentChangedEvent evt, CancellationToken ct = default)
+    {
+        OrderItemFulfillmentChangedEvents.Add(evt);
+        return Task.CompletedTask;
+    }
     public Task PublishOrderExecutionObservationChangedAsync(OrderExecutionObservationChangedEvent evt, CancellationToken ct = default)
     {
         OrderExecutionObservationEvents.Add(evt);
@@ -21,6 +28,11 @@ internal sealed class NoOpRealtimeNotificationPublisher : IRealtimeNotificationP
     public Task PublishKioskStatusChangedAsync(KioskStatusChangedEvent evt, CancellationToken ct = default)
     {
         KioskStatusChangedEvents.Add(evt);
+        return Task.CompletedTask;
+    }
+    public Task PublishKioskOperationalStateChangedAsync(KioskOperationalStateChangedEvent evt, CancellationToken ct = default)
+    {
+        KioskOperationalStateChangedEvents.Add(evt);
         return Task.CompletedTask;
     }
     public Task PublishExecutionReadinessChangedAsync(ExecutionReadinessChangedEvent evt, CancellationToken ct = default)

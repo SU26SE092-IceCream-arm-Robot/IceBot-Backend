@@ -115,7 +115,7 @@ namespace Application.Identity.Authentication.Services
 
                 var email = NormalizeEmail(externalUser.Email);
                 var account = await _accounts.GetByGoogleSubjectIdAsync(externalUser.ExternalId, asNoTracking: false)
-                              ?? await _accounts.GetByEmailOrUserNameAsync(email, asNoTracking: false);
+                              ?? await _accounts.GetByGoogleEmailAsync(email, asNoTracking: false);
 
                 if (account is null)
                 {
@@ -130,10 +130,20 @@ namespace Application.Identity.Authentication.Services
                     return ApiResult<AuthenticatedAccountResult>.Fail("Google login is not enabled for this account.", 403);
                 }
 
+                if (!string.Equals(account.GoogleEmail, email, StringComparison.OrdinalIgnoreCase))
+                {
+                    return ApiResult<AuthenticatedAccountResult>.Fail("Google account email is not allowed for this account.", 403);
+                }
+
+                if (!string.IsNullOrWhiteSpace(account.GoogleSubjectId) &&
+                    !string.Equals(account.GoogleSubjectId, externalUser.ExternalId, StringComparison.Ordinal))
+                {
+                    return ApiResult<AuthenticatedAccountResult>.Fail("Google identity does not match the account binding.", 403);
+                }
+
                 if (string.IsNullOrWhiteSpace(account.GoogleSubjectId))
                 {
                     account.GoogleSubjectId = externalUser.ExternalId;
-                    account.GoogleEmail = email;
                 }
 
                 account.LastLoginAt = DateTimeOffset.UtcNow;

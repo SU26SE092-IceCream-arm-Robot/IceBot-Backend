@@ -123,12 +123,10 @@ Content-Type: application/json
   "kioskId": "{{sampleGuid}}",
   "items": [
     {
-      "productId": "{{sampleGuid}}",
-      "quantity": 1,
-      "price": 35000
+      "menuItemId": "{{sampleGuid}}",
+      "quantity": 1
     }
   ],
-  "paymentMethod": "PayOS",
   "notes": "No sprinkles please"
 }
 
@@ -138,9 +136,9 @@ Idempotency-Key: PaymentSession_Unique_Idempotency_Key
 Content-Type: application/json
 
 {
-  "paymentMethod": "PayOS",
-  "returnUrl": "http://localhost:3000/payment-success",
-  "cancelUrl": "http://localhost:3000/payment-cancelled"
+  "paymentMethodCode": "payos",
+  "expectedAmount": 35000,
+  "expectedCurrency": "VND"
 }
 
 ### Request Refund (Management Support Flow)
@@ -166,13 +164,13 @@ Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Refill Kiosk Dispenser
-POST {{baseUrl}}/management/inventory/dispenser-states/{{sampleGuid}}/refill
+POST {{baseUrl}}/management/kiosks/{{sampleGuid}}/inventory/dispenser-states/{{sampleGuid}}/refill
 Authorization: Bearer {{accessToken}}
 Content-Type: application/json
 
 {
-  "refillQuantity": 1000,
-  "batchNumber": "BATCH-001"
+  "quantity": 1000,
+  "reasonCode": "BATCH-001"
 }
 
 

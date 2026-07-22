@@ -80,6 +80,31 @@ public sealed class AlertStore : IAlertStore
             .Include(alert => alert.AcknowledgedByAccount)
             .FirstOrDefaultAsync(alert => alert.Id == alertId && alert.DeletedAt == null, cancellationToken);
 
+    public Task<Alert?> GetAccessibleByIdAsync(
+        Guid alertId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.Alerts
+            .Include(alert => alert.Kiosk)
+            .Include(alert => alert.Device)
+            .Include(alert => alert.AcknowledgedByAccount)
+            .Where(alert => alert.Id == alertId && alert.DeletedAt == null);
+
+        if (!isSystemAdmin)
+        {
+            query = query.Where(alert =>
+                allowedOrganizationIds.Contains(alert.Kiosk.OrganizationId) ||
+                allowedStoreIds.Contains(alert.Kiosk.StoreId) ||
+                allowedKioskIds.Contains(alert.KioskId));
+        }
+
+        return query.FirstOrDefaultAsync(cancellationToken);
+    }
+
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _dbContext.SaveChangesAsync(cancellationToken);
 

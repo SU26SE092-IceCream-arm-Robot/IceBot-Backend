@@ -17,7 +17,7 @@ public sealed class OrganizationStore : IOrganizationStore
 
     public Task<Organization?> GetByIdAsync(Guid id, bool asNoTracking = true, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Organizations.AsQueryable();
+        var query = _dbContext.Organizations.WhereNotDeleted();
         if (asNoTracking)
         {
             query = query.AsNoTracking();
@@ -27,7 +27,7 @@ public sealed class OrganizationStore : IOrganizationStore
 
     public Task<Organization?> GetByCodeAsync(string code, bool asNoTracking = true, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Organizations.AsQueryable();
+        var query = _dbContext.Organizations.WhereNotDeleted();
         if (asNoTracking)
         {
             query = query.AsNoTracking();
@@ -37,7 +37,7 @@ public sealed class OrganizationStore : IOrganizationStore
 
     public Task<List<Organization>> ListAsync(string? search, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
     {
-        var query = ApplyFilters(_dbContext.Organizations.AsQueryable(), search, status);
+        var query = ApplyFilters(_dbContext.Organizations.WhereNotDeleted(), search, status);
         return query.AsNoTracking()
             .OrderBy(x => x.Code)
             .Skip((pageNumber - 1) * pageSize)
@@ -47,7 +47,7 @@ public sealed class OrganizationStore : IOrganizationStore
 
     public Task<List<Organization>> ListByIdsAsync(IEnumerable<Guid> ids, string? search, string? status, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
     {
-        var query = _dbContext.Organizations.Where(x => ids.Contains(x.Id));
+        var query = _dbContext.Organizations.WhereNotDeleted().Where(x => ids.Contains(x.Id));
         query = ApplyFilters(query, search, status);
         return query.AsNoTracking()
             .OrderBy(x => x.Code)
@@ -58,17 +58,17 @@ public sealed class OrganizationStore : IOrganizationStore
 
     public Task<int> CountAsync(string? search, string? status, CancellationToken cancellationToken = default)
     {
-        return ApplyFilters(_dbContext.Organizations.AsNoTracking(), search, status).CountAsync(cancellationToken);
+        return ApplyFilters(_dbContext.Organizations.WhereNotDeleted().AsNoTracking(), search, status).CountAsync(cancellationToken);
     }
 
     public Task<int> CountByIdsAsync(IEnumerable<Guid> ids, string? search, string? status, CancellationToken cancellationToken = default)
     {
-        return ApplyFilters(_dbContext.Organizations.Where(x => ids.Contains(x.Id)).AsNoTracking(), search, status).CountAsync(cancellationToken);
+        return ApplyFilters(_dbContext.Organizations.WhereNotDeleted().Where(x => ids.Contains(x.Id)).AsNoTracking(), search, status).CountAsync(cancellationToken);
     }
 
     public Task<bool> ExistsByCodeAsync(string code, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Organizations.AnyAsync(x => x.Code == code, cancellationToken);
+        return _dbContext.Organizations.WhereNotDeleted().AnyAsync(x => x.Code == code, cancellationToken);
     }
 
     public Task AddAsync(Organization organization, CancellationToken cancellationToken = default)

@@ -45,7 +45,7 @@ public interface IMaintenanceTicketStore
 
     Task<bool> TicketNumberExistsAsync(string ticketNumber, CancellationToken cancellationToken = default);
 
-    Task<bool> ValidateKioskScopeAsync(Guid organizationId, Guid storeId, Guid kioskId, CancellationToken cancellationToken = default);
+    Task<MaintenanceKioskScope?> GetKioskScopeAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<bool> DeviceBelongsToKioskAsync(Guid deviceId, Guid kioskId, CancellationToken cancellationToken = default);
 
@@ -53,7 +53,23 @@ public interface IMaintenanceTicketStore
 
     Task<bool> DeviceEventBelongsToKioskAsync(Guid deviceEventId, Guid kioskId, CancellationToken cancellationToken = default);
 
+    Task<bool> CanAssignAccountAsync(
+        Guid accountId,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
+
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
+    Task<bool> TrySaveNewTicketAsync(CancellationToken cancellationToken = default);
+
     Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default);
+    Task AcquireKioskOperationalLockAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<bool> HasRunningExecutionAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task AddOperationalStateTransitionAsync(
+        Domain.Tenants.Entities.KioskOperationalStateTransition transition,
+        CancellationToken cancellationToken = default);
 }
+
+public sealed record MaintenanceKioskScope(Guid OrganizationId, Guid StoreId, Guid KioskId);

@@ -92,6 +92,7 @@ internal static class ProductRequestValidator
         IProductStore products,
         CreateProductRequest request,
         Guid? organizationId,
+        TenantScopeType scopeType,
         CancellationToken cancellationToken)
     {
         var validationError = await ValidateProductFieldsAsync(
@@ -101,7 +102,7 @@ internal static class ProductRequestValidator
             request.BasePrice,
             request.Currency,
             request.PreparationTimeSeconds,
-            request.ScopeType,
+            scopeType,
             organizationId,
             request.StoreId,
             request.KioskId,
@@ -121,7 +122,7 @@ internal static class ProductRequestValidator
                 variant.Code,
                 variant.Name,
                 variant.BasePrice,
-                variant.Currency,
+                request.Currency,
                 variant.PreparationTimeSeconds,
                 variant.FulfillmentType);
 

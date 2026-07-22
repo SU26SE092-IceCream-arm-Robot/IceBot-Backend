@@ -1,7 +1,11 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using Application.Devices.Abstractions;
+using Application.Devices.Catalog.Abstractions;
+using Application.Devices.ExecutionEndpoints.Abstractions;
+using Application.Devices.Telemetry.Abstractions;
+using Application.Devices.Connectivity.Abstractions;
+using Application.Devices.Credentials.Abstractions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MQTTnet;
@@ -90,7 +94,15 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
         CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
-        ThrowIfError(await ExecuteCommandAsync(new { command = "disableClient", username }, cancellationToken));
+        var error = await ExecuteCommandAsync(new { command = "disableClient", username }, cancellationToken);
+        if (error is null ||
+            error.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        ThrowIfError(error);
     }
 
     private async Task<string?> ExecuteCommandAsync(object command, CancellationToken cancellationToken)

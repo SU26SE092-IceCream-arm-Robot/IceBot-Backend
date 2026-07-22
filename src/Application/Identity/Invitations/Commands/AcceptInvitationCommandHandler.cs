@@ -37,84 +37,90 @@ public sealed class AcceptInvitationCommandHandler
         }
 
         var tokenHash = AccountInvitationTokenHelper.HashToken(request.Token.Trim());
-        var invitation = await _invitationStore.GetByTokenHashAsync(tokenHash, asNoTracking: false, cancellationToken);
-
-        if (invitation is null)
-        {
-            return ApiResult<AcceptInvitationResult>.Fail("Invitation token is invalid.", 400);
-        }
-
-        if (invitation.AcceptedAt is not null)
-        {
-            return ApiResult<AcceptInvitationResult>.Fail("Invitation already accepted.", 400);
-        }
-
-        if (invitation.RevokedAt is not null)
-        {
-            return ApiResult<AcceptInvitationResult>.Fail("Invitation has been revoked. Please request a new invitation.", 400);
-        }
-
-        if (invitation.ExpiresAt <= DateTimeOffset.UtcNow)
-        {
-            return ApiResult<AcceptInvitationResult>.Fail("Invitation has expired. Please request a new invitation.", 400);
-        }
-
-        var account = invitation.Account;
-        if (account is null)
-        {
-            return ApiResult<AcceptInvitationResult>.Fail("Account not found.", 404);
-        }
-
-        if (account.Status == AccountStatus.Disabled || account.Status == AccountStatus.Suspended)
-        {
-            return ApiResult<AcceptInvitationResult>.Fail("Account is disabled or suspended.", 403);
-        }
-
-        if (account.Status != AccountStatus.Invited)
-        {
-            invitation.RevokedAt = DateTimeOffset.UtcNow;
-            await _invitationStore.SaveChangesAsync(cancellationToken);
-
-            return ApiResult<AcceptInvitationResult>.Fail("Invitation token is no longer valid for this account.", 400);
-        }
-
-        if (account.LocalLoginEnabled)
-        {
-            if (account.Password is null && string.IsNullOrWhiteSpace(request.NewPassword))
+        return await _invitationStore.ExecuteAcceptanceTransactionAsync(
+            tokenHash,
+            async transactionToken =>
             {
-                return ApiResult<AcceptInvitationResult>.Fail("New password is required for local login.", 400);
-            }
+                var invitation = await _invitationStore.GetByTokenHashAsync(
+                    tokenHash, asNoTracking: false, transactionToken);
 
-            if (!string.IsNullOrWhiteSpace(request.NewPassword))
-            {
-                account.Password = HashedPassword.From(_passwordHasher.HashPassword(request.NewPassword));
-            }
-        }
+                if (invitation is null)
+                {
+                    return ApiResult<AcceptInvitationResult>.Fail("Invitation token is invalid.", 400);
+                }
 
-        account.Status = AccountStatus.Active;
-        if (invitation.EmailSentAt is not null)
-        {
-            account.EmailConfirmed = true;
-            account.EmailConfirmedAt = DateTimeOffset.UtcNow;
-        }
+                if (invitation.AcceptedAt is not null)
+                {
+                    return ApiResult<AcceptInvitationResult>.Fail("Invitation already accepted.", 400);
+                }
 
-        account.UpdatedAt = DateTimeOffset.UtcNow;
-        account.UpdatedByAccountId = account.Id;
+                if (invitation.RevokedAt is not null)
+                {
+                    return ApiResult<AcceptInvitationResult>.Fail("Invitation has been revoked. Please request a new invitation.", 400);
+                }
 
-        invitation.AcceptedAt = DateTimeOffset.UtcNow;
-        invitation.AcceptedByIp = ipAddress;
-        invitation.AcceptedByUserAgent = userAgent;
+                if (invitation.ExpiresAt <= DateTimeOffset.UtcNow)
+                {
+                    return ApiResult<AcceptInvitationResult>.Fail("Invitation has expired. Please request a new invitation.", 400);
+                }
 
-        await _invitationStore.SaveChangesAsync(cancellationToken);
+                var account = invitation.Account;
+                if (account is null)
+                {
+                    return ApiResult<AcceptInvitationResult>.Fail("Account not found.", 404);
+                }
 
-        // Revoke any existing sessions/refresh tokens for security
-        await _refreshTokens.RevokeAllForAccountAsync(account.Id, "Invitation accepted", ipAddress, userAgent);
+                if (account.Status == AccountStatus.Disabled || account.Status == AccountStatus.Suspended)
+                {
+                    return ApiResult<AcceptInvitationResult>.Fail("Account is disabled or suspended.", 403);
+                }
 
-        return ApiResult<AcceptInvitationResult>.Success(new AcceptInvitationResult
-        {
-            Accepted = true,
-            LocalLoginEnabled = account.LocalLoginEnabled,
-            GoogleLoginEnabled = account.GoogleLoginEnabled
-        }, "Invitation accepted and account activated.");
+                if (account.Status != AccountStatus.Invited)
+                {
+                    invitation.RevokedAt = DateTimeOffset.UtcNow;
+                    await _invitationStore.SaveChangesAsync(transactionToken);
+
+                    return ApiResult<AcceptInvitationResult>.Fail("Invitation token is no longer valid for this account.", 400);
+                }
+
+                if (account.LocalLoginEnabled)
+                {
+                    if (account.Password is null && string.IsNullOrWhiteSpace(request.NewPassword))
+                    {
+                        return ApiResult<AcceptInvitationResult>.Fail("New password is required for local login.", 400);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(request.NewPassword))
+                    {
+                        account.Password = HashedPassword.From(_passwordHasher.HashPassword(request.NewPassword));
+                    }
+                }
+
+                account.Status = AccountStatus.Active;
+                if (invitation.EmailSentAt is not null)
+                {
+                    account.EmailConfirmed = true;
+                    account.EmailConfirmedAt = DateTimeOffset.UtcNow;
+                }
+
+                account.UpdatedAt = DateTimeOffset.UtcNow;
+                account.UpdatedByAccountId = account.Id;
+
+                invitation.AcceptedAt = DateTimeOffset.UtcNow;
+                invitation.AcceptedByIp = ipAddress;
+                invitation.AcceptedByUserAgent = userAgent;
+
+                await _invitationStore.SaveChangesAsync(transactionToken);
+
+                // Revoke any existing sessions/refresh tokens for security
+                await _refreshTokens.RevokeAllForAccountAsync(account.Id, "Invitation accepted", ipAddress, userAgent);
+
+                return ApiResult<AcceptInvitationResult>.Success(new AcceptInvitationResult
+                {
+                    LocalLoginEnabled = account.LocalLoginEnabled,
+                    GoogleLoginEnabled = account.GoogleLoginEnabled
+                }, "Invitation accepted and account activated.");
+            },
+            cancellationToken);
     }
 }

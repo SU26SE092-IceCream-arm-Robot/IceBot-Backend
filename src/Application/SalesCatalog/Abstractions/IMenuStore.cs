@@ -1,12 +1,15 @@
 using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
+using Application.SalesCatalog.ReadModels;
+using Domain.Devices.Connectivity;
 
 namespace Application.SalesCatalog.Abstractions;
 
 public interface IMenuStore
 {
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<KioskConnectivityProjection?> GetKioskConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
     Task<int> CountMenusAsync(
         string? search,
@@ -39,10 +42,11 @@ public interface IMenuStore
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
-    Task<bool> HasActiveProductionRouteAsync(
+    Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default);
 
     Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default);
@@ -58,6 +62,19 @@ public interface IMenuStore
     Task<ProductVariant?> GetProductVariantByIdAsync(Guid productVariantId, CancellationToken cancellationToken = default);
 
     Task<Recipe?> GetRecipeByIdAsync(Guid recipeId, CancellationToken cancellationToken = default);
+
+    Task<List<ProductOption>> ListProductOptionsAsync(
+        Guid productId,
+        IReadOnlyCollection<Guid> optionIds,
+        CancellationToken cancellationToken = default);
+
+    Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default);
+
+    Task<List<MenuItemOptionGroupReadModel>> ListMenuItemOptionGroupsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default);
 
     Task<bool> MenuCodeExistsAsync(
         Guid? organizationId,
@@ -82,6 +99,10 @@ public interface IMenuStore
     Task AddMenuAsync(Menu menu, CancellationToken cancellationToken = default);
 
     Task AddMenuItemAsync(MenuItem menuItem, CancellationToken cancellationToken = default);
+
+    void ReplaceMenuItemProductOptions(
+        MenuItem menuItem,
+        IReadOnlyCollection<MenuItemProductOption> replacements);
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

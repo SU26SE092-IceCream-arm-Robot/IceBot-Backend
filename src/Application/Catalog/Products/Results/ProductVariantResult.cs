@@ -34,8 +34,6 @@ public sealed class ProductVariantResult
 
     public string? ImageUrl { get; set; }
 
-    public string? MetadataJson { get; set; }
-
     public DateTimeOffset CreatedAt { get; set; }
 
     public DateTimeOffset? UpdatedAt { get; set; }

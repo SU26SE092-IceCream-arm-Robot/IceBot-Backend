@@ -1,8 +1,15 @@
+using Application.RobotConfiguration.Programs.ReadModels;
+using Application.RobotConfiguration.Programs.Mapping;
+using Application.RobotConfiguration.Programs.Results;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using System.ComponentModel.DataAnnotations;
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Artifacts.Queries;
 using Asp.Versioning;
-using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.Artifacts;
 using Domain.Tenants.Enums;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -90,7 +97,6 @@ public sealed class ManagementRobotProgramsController : ControllerBase
             StoreId = request.StoreId,
             KioskId = request.KioskId,
             DeviceId = request.DeviceId,
-            ScopeType = request.ScopeType,
             Code = request.Code,
             Name = request.Name,
             Description = request.Description
@@ -134,7 +140,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
             OrganizationId = organizationId,
             ProgramId = programId,
             Artifacts = request.Artifacts.Select(item => new RobotProgramArtifactInput(
-                item.RobotArtifactId, item.RunOrder, 1, item.ParametersJson)).ToArray()
+                item.RobotArtifactId, item.RunOrder, 1, item.ParametersJson, item.RequiredOptionCode)).ToArray()
         };
         var result = await _replaceArtifactsHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -189,9 +195,6 @@ public sealed class CreateRobotProgramRequest
     [Required, StringLength(200)]
     public string Name { get; init; } = string.Empty;
 
-    [EnumDataType(typeof(TenantScopeType))]
-    public TenantScopeType ScopeType { get; init; } = TenantScopeType.Organization;
-
     public Guid? StoreId { get; init; }
     public Guid? KioskId { get; init; }
     public Guid? DeviceId { get; init; }
@@ -226,4 +229,7 @@ public sealed class RobotProgramArtifactRequest
     public int RunOrder { get; init; }
 
     public string? ParametersJson { get; init; }
+
+    [StringLength(100)]
+    public string? RequiredOptionCode { get; init; }
 }

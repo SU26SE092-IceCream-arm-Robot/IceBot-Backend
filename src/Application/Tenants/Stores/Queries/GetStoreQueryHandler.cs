@@ -23,7 +23,7 @@ public sealed class GetStoreQueryHandler
             return ApiResult<StoreResult>.Fail("Store not found.", 404);
         }
 
-        if (!StoreAccessRules.CanAccessStore(query.UserContext, store))
+        if (!StoreAccessRules.CanAccessStore(ScopeRoleSets.StoresView, query.UserContext, store))
         {
             return ApiResult<StoreResult>.Fail("Access denied.", 403);
         }

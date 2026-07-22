@@ -1,5 +1,12 @@
-using Application.Devices.Commands;
-using Application.Devices.Queries;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
+using Application.Devices.Catalog.Queries;
+using Application.Devices.ExecutionEndpoints.Queries;
+using Application.Devices.Telemetry.Queries;
+using Application.Devices.Connectivity.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Devices;
@@ -15,11 +22,7 @@ public static class DevicesModule
         services.AddScoped<IngestDeviceEventCommandHandler>();
         services.AddScoped<IngestLocalOperationLogCommandHandler>();
         services.AddScoped<IngestBatchEventsCommandHandler>();
-        services.AddScoped<IngestProductionEventCommandHandler>();
-        services.AddScoped<IngestProductionEventsBatchCommandHandler>();
         services.AddScoped<IngestExecutionReadinessCommandHandler>();
-        services.AddScoped<IngestEdgeStateSummariesCommandHandler>();
-        services.AddScoped<GetProductionEventCheckpointQueryHandler>();
         services.AddScoped<ReconcileKioskConnectivityCommandHandler>();
 
         services.AddScoped<ListDevicesQueryHandler>();
@@ -28,6 +31,17 @@ public static class DevicesModule
         services.AddScoped<UpdateDeviceCommandHandler>();
         services.AddScoped<SetDeviceStatusCommandHandler>();
         services.AddScoped<RetireDeviceCommandHandler>();
+        services.AddScoped<ReplaceDeviceCommandHandler>();
+        services.AddScoped<ListDeviceTypesQueryHandler>();
+        services.AddScoped<GetDeviceTypeQueryHandler>();
+        services.AddScoped<ListDeviceModelsQueryHandler>();
+        services.AddScoped<GetDeviceModelQueryHandler>();
+        services.AddScoped<CreateDeviceTypeCommandHandler>();
+        services.AddScoped<UpdateDeviceTypeCommandHandler>();
+        services.AddScoped<SetDeviceTypeStatusCommandHandler>();
+        services.AddScoped<CreateDeviceModelCommandHandler>();
+        services.AddScoped<UpdateDeviceModelCommandHandler>();
+        services.AddScoped<RetireDeviceModelCommandHandler>();
         services.AddScoped<ListExecutionEndpointsQueryHandler>();
         services.AddScoped<GetExecutionEndpointQueryHandler>();
         services.AddScoped<CreateExecutionEndpointCommandHandler>();
@@ -40,6 +54,7 @@ public static class DevicesModule
         services.AddScoped<ProvisionMqttEndpointCredentialCommandHandler>();
         services.AddScoped<RotateMqttEndpointCredentialCommandHandler>();
         services.AddScoped<RevokeMqttEndpointCredentialCommandHandler>();
+        services.AddScoped<ReconcileStaleMqttEndpointCredentialCommandHandler>();
 
         return services;
     }

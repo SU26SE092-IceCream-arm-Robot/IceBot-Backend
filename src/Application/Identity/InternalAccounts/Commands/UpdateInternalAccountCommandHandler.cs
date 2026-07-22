@@ -42,7 +42,6 @@ public sealed class UpdateInternalAccountCommandHandler
         account.PhoneNumber = request.PhoneNumber?.Trim() ?? account.PhoneNumber;
         account.Address = request.Address?.Trim() ?? account.Address;
         account.Gender = string.IsNullOrWhiteSpace(request.Gender) ? account.Gender : request.Gender.Trim();
-        account.Status = request.Status ?? account.Status;
 
         if (request.LocalLoginEnabled.HasValue)
         {
@@ -54,9 +53,13 @@ public sealed class UpdateInternalAccountCommandHandler
             account.LocalLoginEnabled = request.LocalLoginEnabled.Value;
         }
 
+        var googleEmail = !string.IsNullOrWhiteSpace(request.GoogleEmail)
+            ? InternalAccountNormalizer.NormalizeEmail(request.GoogleEmail)
+            : account.GoogleEmail;
+
         if (request.GoogleLoginEnabled.HasValue)
         {
-            if (request.GoogleLoginEnabled.Value && string.IsNullOrWhiteSpace(request.GoogleEmail ?? account.GoogleEmail))
+            if (request.GoogleLoginEnabled.Value && string.IsNullOrWhiteSpace(googleEmail))
             {
                 return ApiResult<InternalAccountResult>.Fail("Google email is required before enabling Google login.");
             }
@@ -64,9 +67,16 @@ public sealed class UpdateInternalAccountCommandHandler
             account.GoogleLoginEnabled = request.GoogleLoginEnabled.Value;
         }
 
-        if (!string.IsNullOrWhiteSpace(request.GoogleEmail))
+        if (!string.IsNullOrWhiteSpace(googleEmail) &&
+            !string.Equals(account.GoogleEmail, googleEmail, StringComparison.Ordinal))
         {
-            account.GoogleEmail = InternalAccountNormalizer.NormalizeEmail(request.GoogleEmail);
+            if (await _accounts.GoogleEmailExistsAsync(googleEmail, accountId, cancellationToken))
+            {
+                return ApiResult<InternalAccountResult>.Fail("Google email already belongs to another account.", 409);
+            }
+
+            account.GoogleEmail = googleEmail;
+            account.GoogleSubjectId = null;
         }
 
         account.UpdatedAt = DateTimeOffset.UtcNow;

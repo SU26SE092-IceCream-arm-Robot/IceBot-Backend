@@ -4,6 +4,11 @@ using Domain.Operations.Entities;
 using Domain.Operations.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
+using Application.Tenants.Kiosks.Rules;
+using Domain.ProductionExecution.Enums;
+using Domain.Sync.Enums;
+using Domain.Tenants.Entities;
 
 namespace Infrastructure.Operations.Persistence;
 
@@ -186,19 +191,22 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
         return _dbContext.MaintenanceTickets.AnyAsync(t => t.TicketNumber == ticketNumber, cancellationToken);
     }
 
-    public Task<bool> ValidateKioskScopeAsync(Guid organizationId, Guid storeId, Guid kioskId, CancellationToken cancellationToken = default)
+    public Task<MaintenanceKioskScope?> GetKioskScopeAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks.AnyAsync(k => k.Id == kioskId && k.StoreId == storeId && k.OrganizationId == organizationId, cancellationToken);
+        return _dbContext.Kiosks.AsNoTracking()
+            .Where(kiosk => kiosk.Id == kioskId)
+            .Select(kiosk => new MaintenanceKioskScope(kiosk.OrganizationId, kiosk.StoreId, kiosk.Id))
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public Task<bool> DeviceBelongsToKioskAsync(Guid deviceId, Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Devices.AnyAsync(d => d.Id == deviceId && d.KioskId == kioskId, cancellationToken);
+        return _dbContext.Devices.WhereNotDeleted().AnyAsync(d => d.Id == deviceId && d.KioskId == kioskId, cancellationToken);
     }
 
     public Task<bool> OrderBelongsToScopeAsync(Guid orderId, Guid organizationId, Guid storeId, Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders.AnyAsync(o => o.Id == orderId && o.OrganizationId == organizationId && o.StoreId == storeId && o.KioskId == kioskId, cancellationToken);
+        return _dbContext.Orders.WhereNotDeleted().AnyAsync(o => o.Id == orderId && o.OrganizationId == organizationId && o.StoreId == storeId && o.KioskId == kioskId, cancellationToken);
     }
 
     public Task<bool> DeviceEventBelongsToKioskAsync(Guid deviceEventId, Guid kioskId, CancellationToken cancellationToken = default)
@@ -206,9 +214,50 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
         return _dbContext.DeviceEvents.AnyAsync(de => de.Id == deviceEventId && de.KioskId == kioskId, cancellationToken);
     }
 
+    public Task<bool> CanAssignAccountAsync(
+        Guid accountId,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default)
+    {
+        if (accountId == Guid.Empty)
+        {
+            return Task.FromResult(false);
+        }
+
+        return _dbContext.AccountRoles.AsNoTracking().AnyAsync(accountRole =>
+            accountRole.AccountId == accountId &&
+            accountRole.IsActive &&
+            accountRole.Account.DeletedAt == null &&
+            accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+            (accountRole.Role.Code == "Technician" ||
+             accountRole.Role.Code == "Manager" ||
+             accountRole.Role.Code == "OrgAdmin") &&
+            (accountRole.KioskId == kioskId ||
+             accountRole.StoreId == storeId ||
+             accountRole.OrganizationId == organizationId),
+            cancellationToken);
+    }
+
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<bool> TrySaveNewTicketAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _dbContext.SaveChangesAsync(cancellationToken);
+            return true;
+        }
+        catch (DbUpdateException ex) when (ex.InnerException is PostgresException
+               { SqlState: PostgresErrorCodes.UniqueViolation,
+                 ConstraintName: "IX_MaintenanceTickets_TicketNumber" })
+        {
+            return false;
+        }
     }
 
     public async Task<T> ExecuteInTransactionAsync<T>(Func<CancellationToken, Task<T>> action, CancellationToken cancellationToken = default)
@@ -227,4 +276,30 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
             throw;
         }
     }
+
+    public Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({KioskOperationalConcurrency.LockKey(kioskId)}, 0));",
+            cancellationToken);
+
+    public Task<bool> HasRunningExecutionAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.EdgeCommands.AnyAsync(command =>
+            command.KioskId == kioskId &&
+            command.CommandType == EdgeCommandType.ExecuteOrder &&
+            command.Status == EdgeCommandStatus.Accepted &&
+            !_dbContext.OrderExecutionRecords.Any(record =>
+                record.SourceCommandId == command.Id &&
+                (record.Status == ProductionExecutionStatus.Completed ||
+                 record.Status == ProductionExecutionStatus.Failed ||
+                 record.Status == ProductionExecutionStatus.RequiresManualIntervention)),
+            cancellationToken);
+
+    public Task AddOperationalStateTransitionAsync(
+        KioskOperationalStateTransition transition,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskOperationalStateTransitions.AddAsync(transition, cancellationToken).AsTask();
 }

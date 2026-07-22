@@ -3,6 +3,7 @@ using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
 using Application.Catalog.Products.Rules;
 using Application.Catalog.Products.Support;
+using Application.Shared.Ownership;
 using Application.Shared.Wrappers;
 
 namespace Application.Catalog.Products.Commands;
@@ -10,10 +11,14 @@ namespace Application.Catalog.Products.Commands;
 public sealed class AddProductVariantCommandHandler
 {
     private readonly IProductStore _products;
+    private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
 
-    public AddProductVariantCommandHandler(IProductStore products)
+    public AddProductVariantCommandHandler(
+        IProductStore products,
+        ITechnicalResourceMutationPolicy technicalOwnership)
     {
         _products = products;
+        _technicalOwnership = technicalOwnership;
     }
 
     public async Task<ApiResult<ProductVariantResult>> HandleAsync(
@@ -36,10 +41,15 @@ public sealed class AddProductVariantCommandHandler
             return accessError;
         }
 
+        var ownershipError = await _technicalOwnership.ValidateDefinitionMutationAsync(
+            TechnicalResourceKind.Product, product.Id, cancellationToken);
+        if (ownershipError is not null) return ApiResult<ProductVariantResult>.Fail(ownershipError, 409);
+
         var validationError = await ProductVariantRequestValidator.ValidateVariantFieldsAsync(
             _products,
             productId,
             request,
+            product.Currency,
             null,
             cancellationToken);
 
@@ -48,7 +58,8 @@ public sealed class AddProductVariantCommandHandler
             return ApiResult<ProductVariantResult>.Fail(validationError);
         }
 
-        var variant = ProductVariantFactory.CreateVariant(request, product.Id, DateTimeOffset.UtcNow, createdByAccountId);
+        var variant = ProductVariantFactory.CreateVariant(
+            request, product.Id, product.Currency, DateTimeOffset.UtcNow, createdByAccountId);
         await _products.AddProductVariantAsync(variant, cancellationToken);
         await _products.SaveChangesAsync(cancellationToken);
 

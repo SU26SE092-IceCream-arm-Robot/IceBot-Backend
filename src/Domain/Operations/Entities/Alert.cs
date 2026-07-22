@@ -1,6 +1,7 @@
+using Domain.Devices.Telemetry;
 using Domain.Common;
 using Domain.Common.Enums;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Identity.Entities;
 using Domain.Operations.Enums;
 using Domain.Tenants.Entities;
@@ -127,6 +128,80 @@ public partial class Alert : SyncAggregateEntity
         Version++;
     }
 
+    public static Alert RaiseFromInventoryState(
+        Guid kioskId,
+        Guid deviceId,
+        Guid dispenserStateId,
+        string alertCode,
+        SeverityLevel severity,
+        string title,
+        string? message,
+        DateTimeOffset raisedAt,
+        Guid originNodeId)
+    {
+        if (kioskId == Guid.Empty || deviceId == Guid.Empty || dispenserStateId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(alertCode) || string.IsNullOrWhiteSpace(title))
+        {
+            throw new DomainRuleException("Inventory alert identity, code, and title are required.");
+        }
+
+        return new Alert
+        {
+            KioskId = kioskId,
+            DeviceId = deviceId,
+            AlertCode = alertCode.Trim(),
+            CorrelationKey = NormalizeCorrelationKey(alertCode),
+            Severity = severity,
+            Title = title.Trim(),
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
+            Status = AlertStatus.Open,
+            SourceType = "InventoryDispenserState",
+            SourceId = dispenserStateId,
+            RaisedAt = raisedAt,
+            LastOccurredAt = raisedAt,
+            OccurrenceCount = 1,
+            OriginNodeId = originNodeId,
+            Version = 1,
+            SyncedAt = raisedAt
+        };
+    }
+
+    public static Alert RaiseFromExecutionEndpoint(
+        Guid kioskId,
+        Guid executionEndpointId,
+        string alertCode,
+        SeverityLevel severity,
+        string title,
+        string? message,
+        DateTimeOffset raisedAt)
+    {
+        if (kioskId == Guid.Empty || executionEndpointId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(alertCode) || string.IsNullOrWhiteSpace(title))
+        {
+            throw new DomainRuleException("Execution-endpoint alert identity, code, and title are required.");
+        }
+
+        return new Alert
+        {
+            KioskId = kioskId,
+            DeviceId = null,
+            AlertCode = alertCode.Trim(),
+            CorrelationKey = NormalizeCorrelationKey(alertCode),
+            Severity = severity,
+            Title = title.Trim(),
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
+            Status = AlertStatus.Open,
+            SourceType = "ExecutionEndpointMqttCredential",
+            SourceId = executionEndpointId,
+            RaisedAt = raisedAt,
+            LastOccurredAt = raisedAt,
+            OccurrenceCount = 1,
+            OriginNodeId = executionEndpointId,
+            Version = 1,
+            SyncedAt = raisedAt
+        };
+    }
+
     public void Acknowledge(Guid acknowledgedByAccountId, DateTimeOffset acknowledgedAt)
     {
         if (Status is AlertStatus.Resolved or AlertStatus.Suppressed)
@@ -142,6 +217,8 @@ public partial class Alert : SyncAggregateEntity
         AcknowledgedByAccountId = acknowledgedByAccountId;
         AcknowledgedAt = acknowledgedAt;
         Status = AlertStatus.Acknowledged;
+        SyncedAt = acknowledgedAt;
+        Version++;
     }
 
     public void Resolve(DateTimeOffset resolvedAt, string? resolutionNotes = null)
@@ -159,6 +236,8 @@ public partial class Alert : SyncAggregateEntity
         ResolvedAt = resolvedAt;
         ResolutionNotes = resolutionNotes;
         Status = AlertStatus.Resolved;
+        SyncedAt = resolvedAt;
+        Version++;
     }
 
     public void Suppress(DateTimeOffset suppressedAt, string reason)
@@ -171,5 +250,7 @@ public partial class Alert : SyncAggregateEntity
         ResolvedAt = suppressedAt;
         ResolutionNotes = reason.Trim();
         Status = AlertStatus.Suppressed;
+        SyncedAt = suppressedAt;
+        Version++;
     }
 }

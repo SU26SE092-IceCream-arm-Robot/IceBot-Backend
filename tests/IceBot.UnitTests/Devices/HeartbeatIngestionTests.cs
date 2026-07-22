@@ -1,8 +1,18 @@
 using Application.Abstractions.Realtime;
-using Application.Devices;
-using Application.Devices.Abstractions;
-using Application.Devices.Commands;
-using Domain.Devices.Enums;
+using Application.Devices.Telemetry;
+using Application.Devices.Catalog.Abstractions;
+using Application.Devices.ExecutionEndpoints.Abstractions;
+using Application.Devices.Telemetry.Abstractions;
+using Application.Devices.Connectivity.Abstractions;
+using Application.Devices.Credentials.Abstractions;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
+using Domain.Devices.Catalog;
+using Domain.Devices.ExecutionEndpoints;
+using Domain.Devices.Telemetry;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 

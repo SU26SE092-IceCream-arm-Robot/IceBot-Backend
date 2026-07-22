@@ -1,5 +1,6 @@
 using Domain.Catalog.Entities;
 using Domain.Common;
+using Domain.Catalog.Enums;
 using Domain.Orders.Enums;
 using Domain.SalesCatalog.Entities;
 
@@ -35,6 +36,8 @@ public partial class OrderItem : BusinessEntity
 
     public int Quantity { get; set; } = 1;
 
+    public FulfillmentType FulfillmentType { get; private set; } = FulfillmentType.Packaged;
+
     public decimal UnitPrice { get; set; }
 
     public decimal DiscountAmount { get; set; }
@@ -43,11 +46,7 @@ public partial class OrderItem : BusinessEntity
 
     public OrderItemStatus Status { get; set; } = OrderItemStatus.Pending;
 
-    public int OptionsSchemaVersion { get; set; } = 1;
-
-    public string? OptionsJson { get; set; }
-
-    public int RecipeSnapshotSchemaVersion { get; set; } = 1;
+    public int RecipeSnapshotSchemaVersion { get; set; } = 2;
 
     public string? RecipeSnapshotJson { get; set; }
 
@@ -61,7 +60,7 @@ public partial class OrderItem : BusinessEntity
 
     public virtual Recipe? Recipe { get; set; }
 
-    public virtual ICollection<ProductOption> ProductOptions { get; set; } = new List<ProductOption>();
+    public virtual ICollection<OrderItemOption> Options { get; set; } = new List<OrderItemOption>();
 
     public static OrderItem Create(
         Guid menuItemId,
@@ -75,11 +74,11 @@ public partial class OrderItem : BusinessEntity
         string productVariantCodeSnapshot,
         string productVariantNameSnapshot,
         int? recipeVersionSnapshot,
+        FulfillmentType fulfillmentType,
         int quantity,
         decimal unitPrice,
         decimal discountAmount = 0,
         string? clientLineId = null,
-        string? optionsJson = null,
         string? recipeSnapshotJson = null)
     {
         if (menuItemId == Guid.Empty)
@@ -95,6 +94,11 @@ public partial class OrderItem : BusinessEntity
         if (productVariantId == Guid.Empty)
         {
             throw new DomainRuleException("Product variant is required for an order item.");
+        }
+
+        if (!Enum.IsDefined(fulfillmentType))
+        {
+            throw new DomainRuleException("Order item fulfillment type is invalid.");
         }
 
         if (string.IsNullOrWhiteSpace(productCodeSnapshot))
@@ -155,11 +159,11 @@ public partial class OrderItem : BusinessEntity
             ProductVariantCodeSnapshot = productVariantCodeSnapshot.Trim(),
             ProductVariantNameSnapshot = productVariantNameSnapshot.Trim(),
             RecipeVersionSnapshot = recipeVersionSnapshot,
+            FulfillmentType = fulfillmentType,
             ClientLineId = string.IsNullOrWhiteSpace(clientLineId) ? null : clientLineId.Trim(),
             Quantity = quantity,
             UnitPrice = unitPrice,
             DiscountAmount = discountAmount,
-            OptionsJson = optionsJson,
             RecipeSnapshotJson = recipeSnapshotJson
         };
 
@@ -197,22 +201,122 @@ public partial class OrderItem : BusinessEntity
 
     public void MarkPreparing()
     {
-        if (Status is OrderItemStatus.Cancelled or OrderItemStatus.Failed)
+        RejectGenericPackagedTransition();
+
+        if (Status != OrderItemStatus.Accepted)
         {
-            throw new DomainRuleException("Cannot prepare a cancelled or failed order item.");
+            throw new DomainRuleException("Only an accepted order item can be prepared.");
         }
 
         Status = OrderItemStatus.Preparing;
     }
 
+    public void MarkAccepted()
+    {
+        RejectGenericPackagedTransition();
+
+        if (Status != OrderItemStatus.Pending)
+        {
+            throw new DomainRuleException("Only a pending order item can be accepted.");
+        }
+
+        Status = OrderItemStatus.Accepted;
+    }
+
     public void MarkCompleted()
     {
-        if (Status == OrderItemStatus.Cancelled)
+        RejectGenericPackagedTransition();
+
+        if (Status is not (OrderItemStatus.Accepted or OrderItemStatus.Preparing))
         {
-            throw new DomainRuleException("Cannot complete a cancelled order item.");
+            throw new DomainRuleException("Only an accepted or preparing order item can be completed.");
         }
 
         Status = OrderItemStatus.Completed;
+    }
+
+    public void MarkFailed()
+    {
+        RejectGenericPackagedTransition();
+
+        if (Status is not (OrderItemStatus.Pending or OrderItemStatus.Accepted or OrderItemStatus.Preparing))
+        {
+            throw new DomainRuleException("Only a pending, accepted, or preparing order item can fail.");
+        }
+
+        Status = OrderItemStatus.Failed;
+    }
+
+    public void MarkRemakePreparing()
+    {
+        RejectGenericPackagedTransition();
+        if (Status != OrderItemStatus.Failed)
+            throw new DomainRuleException("Only a failed machine-produced order item can begin remake production.");
+        Status = OrderItemStatus.Preparing;
+    }
+
+    public void MarkRemakeCompleted()
+    {
+        RejectGenericPackagedTransition();
+        if (Status is not (OrderItemStatus.Failed or OrderItemStatus.Preparing))
+            throw new DomainRuleException("Only a failed or remake-preparing order item can complete a remake.");
+        Status = OrderItemStatus.Completed;
+    }
+
+    public bool FulfillPackaged()
+    {
+        if (FulfillmentType != FulfillmentType.Packaged)
+        {
+            throw new DomainRuleException("Packaged fulfillment applies only to packaged order items.");
+        }
+
+        if (Status == OrderItemStatus.Completed)
+        {
+            return false;
+        }
+
+        if (Status != OrderItemStatus.Pending)
+        {
+            throw new DomainRuleException("Only a pending packaged order item can be fulfilled.");
+        }
+
+        Status = OrderItemStatus.Completed;
+        return true;
+    }
+
+    public bool FailPackaged(string reason)
+    {
+        if (FulfillmentType != FulfillmentType.Packaged)
+        {
+            throw new DomainRuleException("Packaged fulfillment applies only to packaged order items.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new DomainRuleException("A reason is required when packaged fulfillment fails.");
+        }
+
+        if (Status == OrderItemStatus.Failed)
+        {
+            return false;
+        }
+
+        if (Status != OrderItemStatus.Pending)
+        {
+            throw new DomainRuleException("Only a pending packaged order item can fail fulfillment.");
+        }
+
+        Status = OrderItemStatus.Failed;
+        return true;
+    }
+
+    private void RejectGenericPackagedTransition()
+    {
+        if (FulfillmentType == FulfillmentType.Packaged)
+        {
+            throw new DomainRuleException(
+                "Packaged order items must use the packaged fulfillment transition.");
+        }
     }
 
     public void Cancel()

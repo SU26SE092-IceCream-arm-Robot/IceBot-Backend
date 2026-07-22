@@ -1,15 +1,35 @@
 using Application.Abstractions.Realtime;
-using Application.Devices;
-using Application.Devices.Abstractions;
-using Application.Devices.Commands;
+using Application.Devices.Telemetry;
+using Application.Devices.Catalog.Abstractions;
+using Application.Devices.ExecutionEndpoints.Abstractions;
+using Application.Devices.Telemetry.Abstractions;
+using Application.Devices.Credentials.Abstractions;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
+using Application.Operations.Alerts.Notifications;
 using Domain.Common.Enums;
 using Microsoft.Extensions.Options;
 using NSubstitute;
+using Application.Devices.Telemetry.Rules;
 
 namespace IceBot.UnitTests.Devices;
 
 public sealed class DeviceEventIngestionTests
 {
+    [Fact]
+    public void HistoricalEvent_IsNotEligibleForAlertAutomation()
+    {
+        var receivedAt = DateTimeOffset.UtcNow;
+
+        Assert.False(DeviceEventAutomationRules.IsEligibleForAlertAutomation(
+            receivedAt.AddHours(-2), receivedAt, 30));
+        Assert.True(DeviceEventAutomationRules.IsEligibleForAlertAutomation(
+            receivedAt.AddMinutes(-29), receivedAt, 30));
+    }
+
     [Fact]
     public async Task HandleAsync_RejectsInformationalEvidenceBeforeStoreAccess()
     {
@@ -18,6 +38,7 @@ public sealed class DeviceEventIngestionTests
             store,
             Substitute.For<IAlertIngestionStore>(),
             Substitute.For<IRealtimeNotificationPublisher>(),
+            Substitute.For<ICriticalOperationalAlertNotifier>(),
             Options.Create(new EdgeTelemetryIngestionOptions()));
 
         var result = await handler.HandleAsync(new IngestDeviceEventCommand

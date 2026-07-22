@@ -9,6 +9,10 @@ public sealed class KioskResult
     public string Name { get; set; } = null!;
     public string KioskType { get; set; } = null!;
     public string Status { get; set; } = null!;
+    public string OperationalState { get; set; } = null!;
+    public string? OperationalStateReason { get; set; }
+    public DateTimeOffset? OperationalStateChangedAt { get; set; }
+    public Guid? OperationalStateChangedByAccountId { get; set; }
     public string? SerialNumber { get; set; }
     public string TimeZone { get; set; } = null!;
     public string? Address { get; set; }
@@ -16,10 +20,6 @@ public sealed class KioskResult
     public decimal? Longitude { get; set; }
     public DateTimeOffset? InstalledAt { get; set; }
     public DateTimeOffset? LastOnlineAt { get; set; }
-    public bool SupportsOfflineMode { get; set; }
-    public long ConfigurationVersion { get; set; }
-    public int SettingsSchemaVersion { get; set; }
-    public string? SettingsJson { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
 }

@@ -1,6 +1,6 @@
 using Domain.Catalog.Entities;
 using Domain.Common;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Inventory.Enums;
 using Domain.Tenants.Entities;
 
@@ -36,6 +36,8 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     public string? SensorPayloadJson { get; set; }
 
+    public bool IsActive { get; set; } = true;
+
     public virtual Device Device { get; set; } = null!;
 
     public virtual Kiosk? Kiosk { get; set; }
@@ -44,6 +46,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     public void ConfigureContainer(decimal? capacityQuantity, string unit, string? levelToQuantityProfileJson = null)
     {
+        EnsureActive();
         if (capacityQuantity.HasValue && capacityQuantity.Value <= 0)
         {
             throw new DomainRuleException("Dispenser capacity must be greater than zero when provided.");
@@ -52,6 +55,11 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         if (string.IsNullOrWhiteSpace(unit))
         {
             throw new DomainRuleException("Dispenser unit is required.");
+        }
+
+        if (capacityQuantity.HasValue && EstimatedQuantity.HasValue && EstimatedQuantity.Value > capacityQuantity.Value)
+        {
+            throw new DomainRuleException("Dispenser capacity cannot be lower than its current estimated quantity.");
         }
 
         CapacityQuantity = capacityQuantity;
@@ -65,6 +73,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         string? sensorPayloadJson = null,
         decimal? estimatedQuantity = null)
     {
+        EnsureActive();
         if (estimatedQuantity.HasValue && estimatedQuantity.Value < 0)
         {
             throw new DomainRuleException("Estimated quantity cannot be negative.");
@@ -88,11 +97,13 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         Guid? sourceEventId = null,
         IngredientLevelStatus? reportedLevelAfter = IngredientLevelStatus.Full)
     {
+        EnsureActive();
         if (quantity <= 0)
         {
             throw new DomainRuleException("Refill quantity must be greater than zero.");
         }
 
+        var previousEstimate = EstimatedQuantity;
         if (EstimatedQuantity.HasValue)
         {
             var newEstimatedQuantity = EstimatedQuantity.Value + quantity;
@@ -113,7 +124,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         LastRefilledAt = occurredAt;
         LastMeasuredAt = occurredAt;
 
-        return AddMovement("REFILL", quantity, occurredAt, reasonCode, sourceEventId: sourceEventId);
+        return AddMovement("REFILL", quantity, previousEstimate, occurredAt, reasonCode, sourceEventId: sourceEventId);
     }
 
     public StockMovement Consume(
@@ -124,19 +135,61 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         Guid? sourceEventId = null,
         IngredientLevelStatus? reportedLevelAfter = null)
     {
+        return ConsumeWithEvidence(
+            quantity,
+            occurredAt,
+            reportedBalanceAfter: null,
+            referenceType,
+            referenceId,
+            sourceEventId,
+            reportedLevelAfter);
+    }
+
+    public StockMovement ConsumeWithEvidence(
+        decimal quantity,
+        DateTimeOffset occurredAt,
+        decimal? reportedBalanceAfter,
+        string? referenceType = null,
+        Guid? referenceId = null,
+        Guid? sourceEventId = null,
+        IngredientLevelStatus? reportedLevelAfter = null)
+    {
+        EnsureActive();
         if (quantity <= 0)
         {
             throw new DomainRuleException("Consumed quantity must be greater than zero.");
         }
 
-        if (EstimatedQuantity.HasValue)
+        var previousEstimate = EstimatedQuantity;
+        if (previousEstimate.HasValue)
         {
-            if (EstimatedQuantity.Value < quantity)
+            if (previousEstimate.Value < quantity)
             {
                 throw new DomainRuleException("Not enough estimated ingredient quantity in dispenser.");
             }
 
-            EstimatedQuantity -= quantity;
+            var expectedBalanceAfter = previousEstimate.Value - quantity;
+            if (reportedBalanceAfter.HasValue && reportedBalanceAfter.Value != expectedBalanceAfter)
+            {
+                throw new DomainRuleException(
+                    "Reported stock balance does not match the dispenser estimate after consumption.");
+            }
+
+            EstimatedQuantity = expectedBalanceAfter;
+        }
+        else if (reportedBalanceAfter.HasValue)
+        {
+            if (reportedBalanceAfter.Value < 0)
+            {
+                throw new DomainRuleException("Reported stock balance cannot be negative.");
+            }
+
+            if (CapacityQuantity.HasValue && reportedBalanceAfter.Value > CapacityQuantity.Value)
+            {
+                throw new DomainRuleException("Reported stock balance exceeds dispenser capacity.");
+            }
+
+            EstimatedQuantity = reportedBalanceAfter.Value;
         }
 
         if (reportedLevelAfter.HasValue)
@@ -146,7 +199,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
         LastMeasuredAt = occurredAt;
 
-        return AddMovement("CONSUME", -quantity, occurredAt, null, referenceType, referenceId, sourceEventId);
+        return AddMovement("CONSUME", -quantity, previousEstimate, occurredAt, null, referenceType, referenceId, sourceEventId);
     }
 
     public StockMovement AdjustEstimate(
@@ -156,6 +209,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         Guid? sourceEventId = null,
         IngredientLevelStatus? reportedLevelAfter = null)
     {
+        EnsureActive();
         if (estimatedQuantity < 0)
         {
             throw new DomainRuleException("Estimated quantity cannot be negative.");
@@ -177,7 +231,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             CurrentLevelStatus = reportedLevelAfter.Value;
         }
 
-        return AddMovement("ADJUST_ESTIMATE", delta, occurredAt, reasonCode, sourceEventId: sourceEventId, isEstimated: true);
+        return AddMovement("ADJUST_ESTIMATE", delta, previousEstimate, occurredAt, reasonCode, sourceEventId: sourceEventId, isEstimated: true);
     }
 
     public bool IsLow()
@@ -190,9 +244,35 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         return CurrentLevelStatus == IngredientLevelStatus.Full;
     }
 
+    public void Retire(Guid? actorId, DateTimeOffset now)
+    {
+        if (!IsActive) return;
+        IsActive = false;
+        UpdatedAt = now;
+        UpdatedByAccountId = actorId;
+    }
+
+    public void Reactivate(Guid? actorId, DateTimeOffset now)
+    {
+        if (IsActive) return;
+        IsActive = true;
+        UpdatedAt = now;
+        UpdatedByAccountId = actorId;
+    }
+
+    private void EnsureActive()
+    {
+        if (!IsActive)
+        {
+            throw new DomainRuleException("Retired dispenser state cannot accept inventory updates.");
+        }
+
+    }
+
     private StockMovement AddMovement(
         string movementType,
         decimal quantity,
+        decimal? balanceBefore,
         DateTimeOffset occurredAt,
         string? reasonCode = null,
         string? referenceType = null,
@@ -209,6 +289,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             IngredientId,
             movementType,
             quantity,
+            balanceBefore,
             EstimatedQuantity,
             Unit,
             occurredAt,

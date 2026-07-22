@@ -29,6 +29,7 @@ public sealed class GetRoleScopeOptionsQueryHandler
         }
 
         var userContext = query.UserContext;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.RoleScopeOptionsView, userContext);
         if (!CanRequestRoleScopeOptions(userContext, query.UserRoles, roleCode))
         {
             return ApiResult<RoleScopeOptionsResult>.Fail(
@@ -49,46 +50,33 @@ public sealed class GetRoleScopeOptionsQueryHandler
         else
         {
             var scopedStores = await _tenantTreeStore.ListStoresByIdsAsync(
-                userContext.AllowedStoreIds,
+                scope.StoreIds,
                 includeInactive: false,
                 cancellationToken);
 
             var scopedKiosks = await _tenantTreeStore.ListKiosksByIdsAsync(
-                userContext.AllowedKioskIds,
+                scope.KioskIds,
                 includeInactive: false,
                 cancellationToken);
 
-            organizations = await _tenantTreeStore.ListOrganizationsAsync(includeInactive: false, cancellationToken);
-            stores = await _tenantTreeStore.ListStoresAsync(includeInactive: false, cancellationToken);
-            kiosks = await _tenantTreeStore.ListKiosksAsync(includeInactive: false, cancellationToken);
-
-            var allowedOrganizationIds = userContext.AllowedOrganizationIds
+            var allowedOrganizationIds = scope.OrganizationIds
                 .Concat(scopedStores.Select(store => store.OrganizationId))
                 .Concat(scopedKiosks.Select(kiosk => kiosk.OrganizationId))
                 .ToHashSet();
 
-            var allowedStoreIds = userContext.AllowedStoreIds
+            var allowedStoreIds = scope.StoreIds
                 .Concat(scopedKiosks.Select(kiosk => kiosk.StoreId))
                 .ToHashSet();
 
-            var allowedKioskIds = userContext.AllowedKioskIds.ToHashSet();
+            var allowedKioskIds = scope.KioskIds.ToHashSet();
 
-            organizations = organizations
-                .Where(organization => allowedOrganizationIds.Contains(organization.Id))
-                .ToList();
-
-            stores = stores
-                .Where(store =>
-                    userContext.AllowedOrganizationIds.Contains(store.OrganizationId) ||
-                    allowedStoreIds.Contains(store.Id))
-                .ToList();
-
-            kiosks = kiosks
-                .Where(kiosk =>
-                    userContext.AllowedOrganizationIds.Contains(kiosk.OrganizationId) ||
-                    userContext.AllowedStoreIds.Contains(kiosk.StoreId) ||
-                    allowedKioskIds.Contains(kiosk.Id))
-                .ToList();
+            organizations = await _tenantTreeStore.ListOrganizationsByIdsAsync(
+                allowedOrganizationIds, includeInactive: false, cancellationToken);
+            stores = await _tenantTreeStore.ListStoresForScopeAsync(
+                scope.OrganizationIds, allowedStoreIds, includeInactive: false, cancellationToken);
+            kiosks = await _tenantTreeStore.ListKiosksForScopeAsync(
+                scope.OrganizationIds, scope.StoreIds, allowedKioskIds,
+                includeInactive: false, cancellationToken);
         }
 
         var result = RoleScopeOptionsResultMapper.ToResult(
