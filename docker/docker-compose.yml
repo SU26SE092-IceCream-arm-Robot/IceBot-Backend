@@ -52,6 +52,8 @@ services:
     networks:
       - default # Giữ lại mạng mặc định để API kết nối được với postgres và minio
       - icebot_network # Nối thêm vào mạng chung để API nhìn thấy Aspire Dashboard
+    volumes:
+      - icebot_keyring:/app/keys
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
@@ -70,6 +72,8 @@ services:
       Observability__Serilog__OtlpSinkEnabled: "true"
       Observability__OpenTelemetry__OtlpEndpoint: "http://IceBot-tools-aspire-dashboard:18889"
 
+      PublicOrderAccess__KeyRingDirectory: ${PUBLIC_ORDER_ACCESS_KEY_RING_DIR}
+
       # --- CẤU HÌNH PAYOS TỪ CLASS C# ---
       PayOS__ClientId: ${PAYOS_CLIENT_ID}
       PayOS__ApiKey: ${PAYOS_API_KEY}
@@ -84,6 +88,7 @@ services:
 volumes:
   icebot_postgres_data:
   icebot_minio_data:
+  icebot_keyring:
 
 # --- KHAI BÁO MẠNG DÙNG CHUNG ---
 networks:
