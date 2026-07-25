@@ -204,7 +204,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 
 ## Related Docs
 
-- [Business Flows](../../../Docs/BUSINESS_FLOWS.md)
+- [Product Overview](../../../IceBot-Product/product/OVERVIEW.md)
 - [API Surface Rules](API_SURFACE_RULES.md)
 - [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
 - [Dependency Rules](../architecture/DEPENDENCY_RULES.md)

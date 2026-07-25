@@ -18,7 +18,7 @@ This is the main implementation repository for IceBot backend work.
 
 - Use this file as the primary operational guide for backend/API/domain/database/auth/payment/order/sync tasks.
 - Use `../IceBot-Tools` only as auxiliary tooling: RAG, MCP, code intelligence, docs checks, diagnostics, and local scripts.
-- Use `../Docs` for shared project/business docs when the task needs cross-repo project context.
+- Use `../IceBot-Product` for shared product/business docs and frontend implementation contracts when the task needs cross-repo context.
 - The workspace root `AGENTS.md` is only a router/fallback and does not override this file for backend work.
 
 ## Documentation Reading
@@ -166,6 +166,15 @@ If a required tool is unavailable, report exactly what could not be verified.
 ## Ambiguity
 
 Make reasonable assumptions when they are low risk and consistent with the existing codebase. Ask for clarification only when the choice would change public contracts, data model ownership, migrations, or workflow semantics.
+
+## Request Triage
+
+When a request prescribes a new API, field, entity, event, or file transport,
+do not treat that technical shape as the requirement. First use
+`../IceBot-Product/delivery/playbooks/REQUEST_TRIAGE.md` to
+identify the operating goal, actor, scope, current flow, and any real contract
+gap. Explain why the existing boundary does or does not satisfy the goal before
+proposing implementation.
 
 ## Technical Challenge And Decision Ownership
 

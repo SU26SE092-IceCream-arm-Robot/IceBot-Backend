@@ -20,6 +20,7 @@ Use [Documentation Routing Map](DOCUMENTATION_ROUTING_MAP.md) only when the righ
 
 | Need | Start With |
 | --- | --- |
+| Module documentation ownership and verification entry points | [Documentation Coverage Matrix](DOCUMENTATION_COVERAGE.md) |
 | Route/API ownership | [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Internal management route catalog | [Management API Surface](api/MANAGEMENT_API_SURFACE.md) |
 | Role policy and scoped RBAC | [Authorization Rules](api/AUTHORIZATION_RULES.md) |
