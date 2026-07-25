@@ -29,6 +29,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Observability, Serilog, OpenTelemetry, Aspire Dashboard, debug body logging, OTLP | [Observability](operations/OBSERVABILITY.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | Manual backend critical rule checks before handoff | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) | [Working Protocol](process/WORKING_PROTOCOL.md) |
 | How backend docs should be structured for RAG/search | [Documentation Rules](process/DOCUMENTATION_RULES.md) | this file |
+| Which module owns a topic, its primary contract/flow, and its verification entry point | [Documentation Coverage Matrix](DOCUMENTATION_COVERAGE.md) | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md), [System Flows](flows/SYSTEM_FLOWS.md) |
 | Domain ownership, entity belongs to which bounded context | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) | [Dependency Rules](architecture/DEPENDENCY_RULES.md) |
 | Layer dependency, repository, DbContext, application/domain/infrastructure boundary | [Dependency Rules](architecture/DEPENDENCY_RULES.md) | [Architecture](../ARCHITECTURE.md) |
 | Route prefixes, API surface, missing API surface, tablet vs management vs auth vs IoT API, GraphQL vs REST | [API Surface Rules](api/API_SURFACE_RULES.md) | [Management API Surface](api/MANAGEMENT_API_SURFACE.md), [Naming Rules](process/NAMING_RULES.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |

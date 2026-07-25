@@ -8,6 +8,51 @@ This document owns Fairino export, authoring-bundle import, template/artifact li
 
 The shared source of truth, boundary, and full lifecycle index are in [Robot Lua Artifact Flow](ROBOT_LUA_ARTIFACT_FLOW.md). Release, deployment, download, and activation rules are in [Robot Lua Deployment And Activation Flow](ROBOT_LUA_DEPLOYMENT_AND_ACTIVATION_FLOW.md).
 
+## Primary FE Integration Journey
+
+The normal FE path is one guided authoring workspace. It must not construct a
+RobotProgram by calling artifact, technical-contract, and program CRUD routes
+one by one after a normal Fairino export.
+
+```text
+POST import bundle
+-> GET workspace
+-> POST validate
+-> GET workspace
+-> POST apply (materialize Draft resources)
+-> GET workspace
+-> POST composition preview
+-> POST composition confirm
+-> POST publish (publish imported resources)
+-> POST release draft
+-> GET workspace
+-> use normal release publication/deployment workflow
+```
+
+After every mutation, read `GET .../robot-authoring-imports/{importId}/workspace`.
+It is the convergence read model for import status, validation, package
+ownership context, release status, deployment preview, blockers, and currently
+allowed actions. The client must use returned actions/blockers as guidance but
+must still call the typed command route for the action; an action code is not a
+generic mutation endpoint and does not grant permission.
+
+| Workspace action | Typed command to call | When it is the normal next step |
+| --- | --- | --- |
+| `ValidateImport` | `POST .../{importId}/validate` | A bundle was staged. |
+| `ApplyImport` | `POST .../{importId}/apply` | Validation succeeds. This materializes Draft contracts, artifacts, and program. |
+| `PreviewSemanticComposition` | `POST .../{importId}/composition-preview` | Draft resources need a Recipe/production-option compatibility check. |
+| `PublishImportResources` | `POST .../{importId}/publish` | Composition has been confirmed and technical resources were reviewed. |
+| `CreateConfigurationReleaseDraft` | `POST .../{importId}/release-draft` | Imported resources are published. |
+| `PublishConfigurationRelease` | Configuration release publish route | The linked release is Draft and has passed release checks. |
+| `ConfirmDeployment` | Configuration deployment route | The published release has an eligible endpoint. |
+
+`robot-artifacts`, `robot-artifact-technical-contracts`, and `robot-programs`
+are advanced technical-authoring resources. Use them to inspect, repair, clone,
+or deliberately build a graph without a normal import. They are not the normal
+bundle-import sequence.
+
+The shared product/UI journey is [Robot Authoring Workspace Journey](../../../IceBot-Product/product/journeys/ROBOT_AUTHORING_WORKSPACE.md).
+
 ## Step And API Lookup
 
 | Step | Actor | API / operation | Effect |

@@ -60,6 +60,25 @@ The actual content owned by the doc.
 - Other related doc name and path
 ```
 
+For a contract, flow, or operational procedure that will be maintained across
+multiple releases, include a short metadata table after `Search Keywords`:
+
+```text
+## Metadata
+
+| Field | Value |
+| --- | --- |
+| Status | Current contract | Partial implementation | Proposal |
+| Owner | Owning bounded context or operational module |
+| Verification | Code path, contract test, smoke test, or manual check |
+```
+
+Do not claim that a document is fully implemented or verified unless the
+listed evidence exists. Use `Partial implementation` when the document
+describes a current boundary whose remaining behavior is intentionally
+excluded. The [Documentation Coverage Matrix](../DOCUMENTATION_COVERAGE.md)
+is the cross-module index; do not duplicate that matrix in every document.
+
 `Search Keywords` should be near the top, but not inside the opening paragraph. This keeps overview chunks narrow while still giving RAG a clean keyword chunk.
 
 ## Search Keyword Rules
@@ -127,6 +146,11 @@ When backend behavior changes:
 2. Remove superseded behavior from backend docs.
 3. Keep locally necessary rationale with the contract; record broader decision history and trade-offs in Vault when worth preserving.
 4. Check headings, links, duplicated rules, stale future language, and `git diff --check`.
+
+When a code module gains a public contract, operational procedure, or
+integration test family, update the matching row in the
+[Documentation Coverage Matrix](../DOCUMENTATION_COVERAGE.md). The matrix is
+an ownership and discovery index, not a replacement for the owning contract.
 
 For a documentation cleanup or restructure, preserve the current uncommitted version before editing and compare content coverage afterward. Intentional removals are allowed when the user explicitly requests cleanup, condensation, or deletion; report what was removed or moved.
 

@@ -163,6 +163,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "payment-methods.manage",
+            Description = "Manage the global payment-method catalog status.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "roles.view",
             Description = "View roles catalog and static permission matrix.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
