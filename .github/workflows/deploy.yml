@@ -1,33 +1,57 @@
-name: Deploy Backend to VPS
+name: CI/CD Pipeline - Backend
 
-# Pipeline này sẽ được kích hoạt tự động khi có code đẩy vào (hoặc merge PR) nhánh main
 on:
+  # 1. Chạy CI khi có PR mở ra hoặc cập nhật hướng vào nhánh main
+  pull_request:
+    branches:
+      - main
+  # 2. Chạy CD khi code chính thức được merge vào nhánh main
   push:
     branches:
       - main
 
 jobs:
-  deploy:
-    name: SSH to VPS and Deploy
+  # ==========================================
+  # JOB 1: CHECK & BUILD (CI - Chạy cho cả PR và Push)
+  # ==========================================
+  build-and-test:
+    name: Build & Verify Code
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x' # Nhớ đổi đúng phiên bản .NET dự án bạn đang dùng (8.0 hay 9.0)
+
+      - name: Restore Dependencies
+        run: dotnet restore
+
+      - name: Build Solution
+        run: dotnet build --no-restore --configuration Release
+
+  # ==========================================
+  # JOB 2: DEPLOY TO VPS (CD - CHỈ CHẠY KHI MERGE VÀO MAIN)
+  # ==========================================
+  deploy:
+    name: SSH to VPS and Deploy
+    runs-on: ubuntu-latest
+    # BẮT BUỘC: Job build ở trên phải thành công VÀ phải là sự kiện Push vào main thì mới Deploy
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
       - name: Execute Deploy Script via SSH
-        # Sử dụng action có sẵn để SSH vào server
         uses: appleboy/ssh-action@v1.0.3
         with:
-          # Các thông tin nhạy cảm được gọi từ GitHub Secrets
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
-          # Kịch bản chạy trên VPS sau khi SSH thành công
           script: |
-            # LƯU Ý: Nhớ đổi đường dẫn dưới đây thành đường dẫn thật trên VPS của bạn
             cd /opt/apps/IceBot-Backend
-
-            # Cấp quyền thực thi cho file deploy (đề phòng bị mất quyền)
             chmod +x ./docker/deploy.sh
-
-            # Chạy file deploy
             ./docker/deploy.sh
