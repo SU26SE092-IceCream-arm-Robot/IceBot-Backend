@@ -101,7 +101,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("organizations/{organizationId:guid}/robot-artifacts/bulk")]
+    [HttpPost("organizations/{organizationId:guid}/robot-artifacts")]
     [Authorize(Policy = "artifact.upload")]
     [Consumes("multipart/form-data")]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600)]
@@ -201,7 +201,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/publish-bulk")]
+    [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/publish")]
     [Authorize(Policy = "artifact.upload")]
     public async Task<IActionResult> BulkPublishRobotArtifacts(
         Guid organizationId,

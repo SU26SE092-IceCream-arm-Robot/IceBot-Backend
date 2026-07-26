@@ -232,10 +232,10 @@ Recipe evidence is variant-qualified, and release evidence must point to the exa
 Technical-contract authoring:
 
 ```text
-GET/POST /api/v1/management/robot-artifact-technical-contracts
-GET/PUT/DELETE /api/v1/management/robot-artifact-technical-contracts/{id}
-POST     /api/v1/management/robot-artifact-technical-contracts/{id}/validation-preview
-PATCH    /api/v1/management/robot-artifact-technical-contracts/{id}/publish|retire
+GET/POST /api/v1/management/robot-artifact-template-contracts
+GET/PUT/DELETE /api/v1/management/robot-artifact-template-contracts/{id}
+POST     /api/v1/management/robot-artifact-template-contracts/{id}/validation-preview
+PATCH    /api/v1/management/robot-artifact-template-contracts/{id}/publish|retire
 GET/POST /api/v1/management/organizations/{organizationId}/robot-artifact-technical-contracts
 GET/PUT/DELETE /api/v1/management/organizations/{organizationId}/robot-artifact-technical-contracts/{id}
 POST     /api/v1/management/organizations/{organizationId}/robot-artifact-technical-contracts/import-sidecars

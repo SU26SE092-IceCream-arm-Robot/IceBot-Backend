@@ -11,21 +11,7 @@ namespace Infrastructure.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(
-                """
-                DO $$
-                BEGIN
-                    IF EXISTS (
-                        SELECT 1
-                        FROM "PaymentTransactions"
-                        WHERE "ProviderOrderCode" IS NOT NULL
-                        GROUP BY "Provider", "ProviderOrderCode"
-                        HAVING COUNT(*) > 1
-                    ) THEN
-                        RAISE EXCEPTION 'Cannot enforce provider payment identity: duplicate Provider and ProviderOrderCode values exist.';
-                    END IF;
-                END $$;
-                """);
+            CompleteLocalOperationalWorkflowsManualSteps.EnsureUniqueProviderPaymentIdentity(migrationBuilder);
 
             migrationBuilder.DropIndex(
                 name: "IX_PaymentTransactions_ProviderOrderCode",

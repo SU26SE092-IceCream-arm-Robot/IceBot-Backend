@@ -73,12 +73,15 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("{importId:guid}/apply")]
+    [HttpPost("{importId:guid}/materialize")]
     [Authorize(Policy = "artifact.upload")]
     [Authorize(Policy = "program.manage")]
-    public async Task<IActionResult> Apply(Guid organizationId, Guid importId, CancellationToken cancellationToken)
+    public async Task<IActionResult> Materialize(
+        Guid organizationId,
+        Guid importId,
+        CancellationToken cancellationToken)
     {
-        var result = await handlers.ApplyAsync(new ApplyRobotAuthoringImportCommand(
+        var result = await handlers.MaterializeAsync(new MaterializeRobotAuthoringImportCommand(
             User.GetUserContext(), organizationId, importId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -92,17 +95,20 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("{importId:guid}/publish")]
+    [HttpPost("{importId:guid}/publish-resources")]
     [Authorize(Policy = "artifact.upload")]
     [Authorize(Policy = "program.manage")]
-    public async Task<IActionResult> Publish(Guid organizationId, Guid importId, CancellationToken cancellationToken)
+    public async Task<IActionResult> PublishResources(
+        Guid organizationId,
+        Guid importId,
+        CancellationToken cancellationToken)
     {
         var result = await handlers.PublishAsync(new PublishRobotAuthoringImportCommand(
             User.GetUserContext(), organizationId, importId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("{importId:guid}/release-draft")]
+    [HttpPost("{importId:guid}/create-release-draft")]
     [Authorize(Policy = "release.publish")]
     public async Task<IActionResult> CreateReleaseDraft(
         Guid organizationId,
@@ -122,7 +128,7 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("{importId:guid}/composition-preview")]
+    [HttpPost("{importId:guid}/preview-composition")]
     [Authorize(Policy = "artifact.upload")]
     [Authorize(Policy = "program.manage")]
     public async Task<IActionResult> PreviewComposition(Guid organizationId, Guid importId,
@@ -134,7 +140,7 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("{importId:guid}/composition-confirm")]
+    [HttpPost("{importId:guid}/confirm-composition")]
     [Authorize(Policy = "artifact.upload")]
     [Authorize(Policy = "program.manage")]
     public async Task<IActionResult> ConfirmComposition(Guid organizationId, Guid importId,

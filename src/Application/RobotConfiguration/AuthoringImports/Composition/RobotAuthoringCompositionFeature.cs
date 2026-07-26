@@ -139,7 +139,7 @@ public sealed class RobotAuthoringCompositionHandlers(
         var importSession = await importStore.GetAsync(organizationId, importId, false, cancellationToken);
         if (importSession is null) return (null, ("Robot authoring import not found.", 404));
         if (importSession.Status != RobotAuthoringImportStatus.Applied || !importSession.AppliedRobotProgramId.HasValue)
-            return (null, ("Import must be applied before composition preview.", 409));
+            return (null, ("Import must be materialized before composition preview.", 409));
 
         var recipe = await compositionStore.GetRecipeAsync(organizationId, recipeId, cancellationToken);
         if (recipe is null) return (null, ("Published or active recipe was not found in the organization scope.", 404));

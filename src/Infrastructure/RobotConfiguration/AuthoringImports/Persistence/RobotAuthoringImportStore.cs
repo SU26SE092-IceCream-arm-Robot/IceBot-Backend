@@ -117,7 +117,7 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
         }
     }
 
-    public async Task LockApplyResourceIdentitiesAsync(
+    public async Task LockMaterializationResourceIdentitiesAsync(
         Guid organizationId,
         Guid? storeId,
         Guid? kioskId,
@@ -170,7 +170,7 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
         }
     }
 
-    public async Task PrepareApplyAsync(IReadOnlyCollection<RobotArtifactTechnicalContract> contracts,
+    public async Task PrepareMaterializationAsync(IReadOnlyCollection<RobotArtifactTechnicalContract> contracts,
         IReadOnlyCollection<RobotArtifact> artifacts, RobotProgram? program, CancellationToken cancellationToken)
     {
         if (_mutationTransaction is null)

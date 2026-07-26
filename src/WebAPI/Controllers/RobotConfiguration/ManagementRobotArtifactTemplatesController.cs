@@ -60,7 +60,7 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("robot-artifact-templates/bulk")]
+    [HttpPost("robot-artifact-templates")]
     [Authorize(Policy = "artifact-template.manage")]
     [Consumes("multipart/form-data")]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600)]

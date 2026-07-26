@@ -1,3 +1,5 @@
+using System.Text.Json;
+using Application.RobotConfiguration.AuthoringImports;
 using Domain.Common;
 using Domain.RobotConfiguration.AuthoringImports;
 
@@ -5,6 +7,48 @@ namespace IceBot.UnitTests.RobotConfiguration;
 
 public sealed class RobotAuthoringImportLifecycleTests
 {
+    [Fact]
+    public void ValidatedImport_AdvertisesMaterializeAction()
+    {
+        var importSession = CreateImport();
+        var validation = new RobotAuthoringImportValidationReport(true, [], [], 0, 1, 0, 1);
+        importSession.MarkValidated(
+            JsonSerializer.Serialize(validation),
+            DateTimeOffset.UtcNow,
+            Guid.NewGuid());
+
+        var result = RobotAuthoringImportResult.From(importSession);
+
+        Assert.Equal("Validated", result.Status);
+        Assert.True(result.Validation?.CanMaterialize);
+        Assert.Contains("MaterializeImport", result.NextActions);
+        Assert.DoesNotContain("ApplyImport", result.NextActions);
+    }
+
+    [Fact]
+    public void MaterializedAndPublishedImport_UsePublicLifecycleNames()
+    {
+        var importSession = CreateImport();
+        var now = DateTimeOffset.UtcNow;
+        var programId = Guid.NewGuid();
+        importSession.MarkValidated(
+            JsonSerializer.Serialize(new RobotAuthoringImportValidationReport(true, [], [], 0, 1, 0, 1)),
+            now,
+            Guid.NewGuid());
+        importSession.MarkApplied(programId, now, Guid.NewGuid());
+
+        var materialized = RobotAuthoringImportResult.From(importSession);
+
+        Assert.Equal("Materialized", materialized.Status);
+        Assert.Equal(programId, materialized.MaterializedRobotProgramId);
+        Assert.Equal(now, materialized.MaterializedAt);
+
+        importSession.MarkPublished(now.AddMinutes(1), Guid.NewGuid());
+        var published = RobotAuthoringImportResult.From(importSession);
+
+        Assert.Equal("ResourcesPublished", published.Status);
+    }
+
     [Fact]
     public void ReleaseLinkRequiresPublishedImportResources()
     {

@@ -48,7 +48,7 @@ public sealed class RobotAuthoringWorkspaceRulesTests
         Guid? kioskId,
         IReadOnlyCollection<string> nextActions) => new(
         Guid.NewGuid(), Guid.NewGuid(), null, kioskId, null, Guid.NewGuid(), new string('a', 64), 1,
-        "Applied", "MAKE_PRODUCT", "Make product", "FAIRINO_LUA_V1", "FR5", null,
+        "Materialized", "MAKE_PRODUCT", "Make product", "FAIRINO_LUA_V1", "FR5", null,
         Guid.NewGuid(), linkedReleaseId, Guid.NewGuid(), [], null, [], nextActions,
         DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
         null, null);
