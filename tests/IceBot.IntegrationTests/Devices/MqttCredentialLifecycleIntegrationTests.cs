@@ -268,6 +268,12 @@ public sealed class MqttCredentialLifecycleIntegrationTests(IntegrationTestFixtu
         public string GetSubscribeTopic(Guid endpointId) =>
             $"icebot/execution-endpoints/{endpointId:D}/commands/available";
 
+        public string GetUplinkPublishTopicPattern(Guid endpointId) =>
+            $"icebot/execution-endpoints/{endpointId:D}/uplink/{{messageType}}";
+
+        public string GetUplinkResultTopic(Guid endpointId) =>
+            $"icebot/execution-endpoints/{endpointId:D}/uplink/results";
+
         public async Task ProvisionOrReplaceAsync(
             Guid endpointId,
             string username,

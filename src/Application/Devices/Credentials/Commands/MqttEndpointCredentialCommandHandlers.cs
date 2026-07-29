@@ -167,6 +167,8 @@ internal static class MqttEndpointCredentialWorkflow
                 Password = prepared.Password,
                 ClientId = prepared.Username,
                 SubscribeTopic = provisioner.GetSubscribeTopic(endpointId),
+                UplinkPublishTopicPattern = provisioner.GetUplinkPublishTopicPattern(endpointId),
+                UplinkResultTopic = provisioner.GetUplinkResultTopic(endpointId),
                 CredentialVersion = prepared.CredentialVersion,
                 Status = credential.Status.ToString()
             }, rotate

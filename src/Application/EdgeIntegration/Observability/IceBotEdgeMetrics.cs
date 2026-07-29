@@ -9,6 +9,10 @@ public static class IceBotEdgeMetrics
 
     private static readonly Counter<long> MqttWakeUpPublishAttempts = Meter.CreateCounter<long>(
         "icebot.mqtt.wakeup.publish.attempts", "{attempt}", "MQTT command wake-up publish attempts.");
+    private static readonly Counter<long> MqttUplinkMessages = Meter.CreateCounter<long>(
+        "icebot.mqtt.uplink.messages", "{message}", "MQTT Edge uplink processing outcomes.");
+    private static readonly Histogram<double> MqttUplinkProcessingLatency = Meter.CreateHistogram<double>(
+        "icebot.mqtt.uplink.processing.latency", "s", "MQTT Edge uplink application processing latency.");
     private static readonly Histogram<double> CommandPullLatency = Meter.CreateHistogram<double>(
         "icebot.edge.command.pull.latency", "s", "Time from durable command creation until command pull delivery.");
     private static readonly Histogram<double> CommandAckLatency = Meter.CreateHistogram<double>(
@@ -36,6 +40,16 @@ public static class IceBotEdgeMetrics
         MqttWakeUpPublishAttempts.Add(1,
             new KeyValuePair<string, object?>("outcome", outcome),
             new KeyValuePair<string, object?>("command.type", commandType));
+
+    public static void RecordMqttUplink(string outcome, string messageType, TimeSpan processingTime)
+    {
+        MqttUplinkMessages.Add(1,
+            new KeyValuePair<string, object?>("outcome", outcome),
+            new KeyValuePair<string, object?>("message.type", messageType));
+        MqttUplinkProcessingLatency.Record(
+            NonNegativeSeconds(processingTime),
+            new KeyValuePair<string, object?>("message.type", messageType));
+    }
 
     public static void RecordCommandPull(TimeSpan latency, string commandType) =>
         CommandPullLatency.Record(NonNegativeSeconds(latency),

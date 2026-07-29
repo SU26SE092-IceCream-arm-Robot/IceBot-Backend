@@ -5,6 +5,7 @@ using Application.EdgeIntegration.Timeouts.Commands;
 using Application.EdgeIntegration.CommandDelivery.Services;
 using Application.EdgeIntegration.Dispatch.Services;
 using Application.EdgeIntegration.Reports.Services;
+using Application.EdgeIntegration.Uplink;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.EdgeIntegration;
@@ -20,6 +21,7 @@ public static class EdgeIntegrationModule
         services.AddScoped<EscalateInitialDispatchFailureCommandHandler>();
         services.AddScoped<ReconcileOrderExecutionTimeoutCommandHandler>();
         services.AddScoped<ArtifactCommandPayloadEnricher>();
+        services.AddScoped<IEdgeUplinkMessageDispatcher, EdgeUplinkMessageDispatcher>();
 
         return services;
     }

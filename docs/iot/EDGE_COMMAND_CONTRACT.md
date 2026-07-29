@@ -234,6 +234,18 @@ Redispatch is an explicit management operation, not an Edge-side automatic retry
 
 ### Execution Reports
 
+Primary MQTT topic:
+
+```text
+icebot/execution-endpoints/{endpointId}/uplink/execution-report
+```
+
+The MQTT `payload` is the request below plus `commandId`. Cloud returns the
+application result on the endpoint `uplink/results` topic. Edge retains the
+report in its local outbox until that result is received.
+
+HTTPS recovery fallback:
+
 ```http
 POST /api/v1/iot/execution-endpoints/{endpointId}/commands/{commandId}/reports
 ```
@@ -259,6 +271,7 @@ Request:
   "stockMovements": [
     {
       "sourceEventId": "uuid",
+      "orderItemId": "uuid",
       "ingredientDispenserStateId": "uuid",
       "quantityConsumed": 12.5,
       "balanceAfter": 87.5,
@@ -310,6 +323,9 @@ Production execution `status` values:
 
 Rules:
 
+- MQTT and HTTPS invoke the same execution-report handler. Retrying through
+  another transport reuses `sourceEventId`, `sequenceNumber`, `commandId`, and
+  every stock-movement source event ID.
 - Command ack is dispatch-only. Execution reports are the current V1 boundary for deployment and production status after a command has been accepted.
 - The endpoint deduplicates by `(sourceExecutorId, sourceEventId)` using `SyncEventInbox`. A retry is a duplicate only when command identity and the complete normalized report payload match; reusing the event id for another command or payload returns `409 Conflict`.
 - Production reports must repeat the `SourceConfigurationReleaseId` and `ReleaseChecksum` from the accepted execute-order command. Low-cost reports must also repeat the command's `ActiveSetVersion` and `ActiveSetChecksum`; Full Edge reports omit both. Cloud compares this provenance against the immutable command payload before creating execution or stock projections.
