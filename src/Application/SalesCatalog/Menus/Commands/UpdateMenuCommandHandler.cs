@@ -4,21 +4,34 @@ using Application.SalesCatalog.Menus.Results;
 using Application.SalesCatalog.Menus.Rules;
 using Application.SalesCatalog.Menus.Support;
 using Application.Shared.Wrappers;
+using Application.Shared.Concurrency;
 
 namespace Application.SalesCatalog.Menus.Commands;
 
 public sealed class UpdateMenuCommandHandler
 {
     private readonly IMenuStore _menus;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
-    public UpdateMenuCommandHandler(IMenuStore menus)
+    public UpdateMenuCommandHandler(
+        IMenuStore menus,
+        ITechnicalResourceMutationCoordinator mutations)
     {
         _menus = menus;
+        _mutations = mutations;
     }
 
     public async Task<ApiResult<MenuResult>> HandleAsync(
         UpdateMenuCommand command,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default) =>
+        await _mutations.ExecuteAsync(
+            [TechnicalResourceMutationIdentity.Menu(command.MenuId)],
+            ct => HandleLockedAsync(command, ct),
+            cancellationToken);
+
+    private async Task<ApiResult<MenuResult>> HandleLockedAsync(
+        UpdateMenuCommand command,
+        CancellationToken cancellationToken)
     {
         var menuId = command.MenuId;
         var request = command.Request;
@@ -42,6 +55,17 @@ public sealed class UpdateMenuCommandHandler
         var newEffectiveFrom = request.EffectiveFrom ?? menu.EffectiveFrom;
         var newEffectiveTo = request.EffectiveTo ?? menu.EffectiveTo;
 
+        if (!string.Equals(
+                MenuNormalizer.NormalizeCode(newCurrency),
+                menu.Currency,
+                StringComparison.Ordinal) &&
+            menu.MenuItems.Count != 0)
+        {
+            return ApiResult<MenuResult>.Fail(
+                "Menu currency cannot change while the menu contains items.",
+                409);
+        }
+
         var validationError = await MenuRequestValidator.ValidateMenuFieldsAsync(
             _menus,
             newCode,
@@ -64,15 +88,10 @@ public sealed class UpdateMenuCommandHandler
         menu.Code = newCode;
         menu.Name = newName.Trim();
         menu.Description = request.Description is null ? menu.Description : MenuNormalizer.TrimToNull(request.Description);
-        menu.Status = request.Status ?? menu.Status;
         menu.Currency = MenuNormalizer.NormalizeCode(newCurrency);
         menu.EffectiveFrom = newEffectiveFrom;
         menu.EffectiveTo = newEffectiveTo;
         menu.DisplayOrder = request.DisplayOrder ?? menu.DisplayOrder;
-        menu.MetadataSchemaVersion = request.MetadataSchemaVersion.HasValue
-            ? Math.Max(request.MetadataSchemaVersion.Value, 1)
-            : menu.MetadataSchemaVersion;
-        menu.MetadataJson = request.MetadataJson is null ? menu.MetadataJson : MenuNormalizer.TrimToNull(request.MetadataJson);
         menu.UpdatedAt = DateTimeOffset.UtcNow;
         menu.UpdatedByAccountId = updatedByAccountId;
 

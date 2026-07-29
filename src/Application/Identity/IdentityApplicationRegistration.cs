@@ -3,6 +3,8 @@ using Application.Identity.Authentication.Commands;
 using Application.Identity.Authentication.Services;
 using Application.Identity.CurrentAccount.Commands;
 using Application.Identity.CurrentAccount.Queries;
+using Application.Identity.NotificationDevices.Commands;
+using Application.Identity.NotificationDevices.Queries;
 using Application.Identity.InternalAccounts.Commands;
 using Application.Identity.InternalAccounts.Queries;
 using Application.Identity.Invitations.Commands;
@@ -31,6 +33,9 @@ public static class IdentityApplicationRegistration
         services.AddScoped<GetCurrentAccountQueryHandler>();
         services.AddScoped<UpdateCurrentAccountProfileCommandHandler>();
         services.AddScoped<ChangeCurrentAccountPasswordCommandHandler>();
+        services.AddScoped<RegisterCurrentAccountNotificationDeviceCommandHandler>();
+        services.AddScoped<UnregisterCurrentAccountNotificationDeviceCommandHandler>();
+        services.AddScoped<ListCurrentAccountNotificationDevicesQueryHandler>();
 
         services.AddScoped<ListInternalAccountsQueryHandler>();
         services.AddScoped<GetInternalAccountQueryHandler>();

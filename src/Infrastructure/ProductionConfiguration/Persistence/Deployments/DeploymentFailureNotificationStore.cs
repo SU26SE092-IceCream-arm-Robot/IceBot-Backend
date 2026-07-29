@@ -1,0 +1,78 @@
+using Application.ProductionConfiguration.Deployments.Notifications;
+using Domain.ProductionConfiguration.Enums;
+using Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
+
+namespace Infrastructure.ProductionConfiguration.Persistence.Deployments;
+
+public sealed class DeploymentFailureNotificationStore(IceBotDbContext db) : IDeploymentFailureNotificationStore
+{
+    public async Task<IReadOnlyList<Guid>> ListPendingIdsAsync(int batchSize,
+        CancellationToken cancellationToken = default)
+    {
+        var limit = Math.Clamp(batchSize, 1, 500);
+        return await FullEdgeCandidates()
+            .Select(x => new { x.Id, FailedAt = x.CloudReceivedAt ?? x.RequestedAt })
+            .Concat(ControllerCandidates()
+                .Select(x => new { x.Id, FailedAt = x.CloudReceivedAt ?? x.RequestedAt }))
+            .OrderBy(x => x.FailedAt)
+            .ThenBy(x => x.Id)
+            .Select(x => x.Id)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task<DeploymentFailureNotificationCandidate?> GetCandidateAsync(Guid deploymentId,
+        CancellationToken cancellationToken = default)
+    {
+        var fullEdge = await FullEdgeCandidates().Where(x => x.Id == deploymentId)
+            .Select(x => new DeploymentFailureNotificationCandidate(
+                x.Id, x.OrganizationId, x.KioskExecutionEndpoint.Kiosk.StoreId, x.KioskId,
+                "FullEdge", x.FailureCode!, x.CloudReceivedAt ?? x.RequestedAt))
+            .SingleOrDefaultAsync(cancellationToken);
+        if (fullEdge is not null) return fullEdge;
+        return await ControllerCandidates().Where(x => x.Id == deploymentId)
+            .Select(x => new DeploymentFailureNotificationCandidate(
+                x.Id, x.OrganizationId, x.KioskExecutionEndpoint.Kiosk.StoreId, x.KioskId,
+                "LowCostController", x.FailureCode!, x.CloudReceivedAt ?? x.RequestedAt))
+            .SingleOrDefaultAsync(cancellationToken);
+    }
+
+    private IQueryable<Domain.ProductionConfiguration.Entities.KioskConfigurationDeployment> FullEdgeCandidates() =>
+        db.KioskConfigurationDeployments.AsNoTracking().Where(x =>
+            x.Status == KioskConfigurationDeploymentStatus.Failed && x.FailureCode != null &&
+            !db.NotificationDeliveries.Any(delivery =>
+                delivery.NotificationType == "deployment_failed" && delivery.SubjectId == x.Id) &&
+            db.AccountRoles.Any(accountRole =>
+                accountRole.IsActive &&
+                accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+                accountRole.Account.DeletedAt == null &&
+                accountRole.Account.NotificationDevices.Any(device =>
+                    device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+                ((accountRole.Role.Code == "Technician" &&
+                  (accountRole.KioskId == x.KioskId ||
+                   accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId)) ||
+                 (accountRole.Role.Code == "Manager" &&
+                  (accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId ||
+                   accountRole.OrganizationId == x.OrganizationId)) ||
+                 (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))));
+
+    private IQueryable<Domain.ProductionConfiguration.Entities.ControllerArtifactSetDeployment> ControllerCandidates() =>
+        db.ControllerArtifactSetDeployments.AsNoTracking().Where(x =>
+            x.Status == ControllerArtifactSetDeploymentStatus.Failed && x.FailureCode != null &&
+            !db.NotificationDeliveries.Any(delivery =>
+                delivery.NotificationType == "deployment_failed" && delivery.SubjectId == x.Id) &&
+            db.AccountRoles.Any(accountRole =>
+                accountRole.IsActive &&
+                accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+                accountRole.Account.DeletedAt == null &&
+                accountRole.Account.NotificationDevices.Any(device =>
+                    device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+                ((accountRole.Role.Code == "Technician" &&
+                  (accountRole.KioskId == x.KioskId ||
+                   accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId)) ||
+                 (accountRole.Role.Code == "Manager" &&
+                  (accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId ||
+                   accountRole.OrganizationId == x.OrganizationId)) ||
+                 (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))));
+}

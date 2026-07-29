@@ -1,6 +1,11 @@
 using Application.EdgeIntegration;
+using Application.EdgeIntegration.Dispatch;
+using Application.EdgeIntegration.Reports;
 using Application.EdgeIntegration.Abstractions;
-using Application.EdgeIntegration.Commands;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -51,20 +56,38 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
 
             foreach (var orderId in orderIds)
             {
-                using var itemScope = _scopeFactory.CreateScope();
-                var handler = itemScope.ServiceProvider.GetRequiredService<DispatchOrderExecutionCommandHandler>();
-                var result = await handler.HandleAsync(new DispatchOrderExecutionCommand
+                try
                 {
-                    OrderId = orderId,
-                    DispatchAttemptNo = 1
-                }, cancellationToken);
+                    using var itemScope = _scopeFactory.CreateScope();
+                    var handler = itemScope.ServiceProvider.GetRequiredService<DispatchOrderExecutionCommandHandler>();
+                    var result = await handler.HandleAsync(new DispatchOrderExecutionCommand
+                    {
+                        OrderId = orderId,
+                        DispatchAttemptNo = 1
+                    }, cancellationToken);
 
-                if (!result.Succeeded)
+                    if (!result.Succeeded)
+                    {
+                        _logger.LogWarning(
+                            "Order execution dispatch reconciliation deferred order {OrderId}: {Message}",
+                            orderId,
+                            result.Message);
+
+                        await TryEscalateAsync(
+                            orderId,
+                            result.Message ?? "Initial dispatch was deferred.",
+                            cancellationToken);
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
-                    _logger.LogWarning(
-                        "Order execution dispatch reconciliation deferred order {OrderId}: {Message}",
-                        orderId,
-                        result.Message);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex,
+                        "Order execution dispatch reconciliation failed for order {OrderId}.", orderId);
+                    await TryEscalateAsync(orderId, ex.Message, cancellationToken);
                 }
             }
         }
@@ -74,6 +97,35 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Order execution dispatch reconciliation failed.");
+        }
+    }
+
+    private async Task TryEscalateAsync(
+        Guid orderId,
+        string failureReason,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var handler = scope.ServiceProvider
+                .GetRequiredService<EscalateInitialDispatchFailureCommandHandler>();
+            var result = await handler.HandleAsync(orderId, failureReason, cancellationToken);
+            if (!result.Succeeded)
+            {
+                _logger.LogError(
+                    "Initial dispatch escalation failed for order {OrderId}: {Message}",
+                    orderId,
+                    result.Message);
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Initial dispatch escalation failed for order {OrderId}.", orderId);
         }
     }
 }

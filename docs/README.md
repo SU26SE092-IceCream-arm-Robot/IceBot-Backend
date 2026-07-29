@@ -2,7 +2,7 @@
 
 This folder contains backend source-of-truth documentation.
 
-Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. For direct work, start from the matching folder below.
+Use [Documentation Routing Map](DOCUMENTATION_ROUTING_MAP.md) only when the right doc is unclear. For direct work, start from the matching folder below.
 
 ## Folder Map
 
@@ -20,7 +20,9 @@ Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. Fo
 
 | Need | Start With |
 | --- | --- |
+| Module documentation ownership and verification entry points | [Documentation Coverage Matrix](DOCUMENTATION_COVERAGE.md) |
 | Route/API ownership | [API Surface Rules](api/API_SURFACE_RULES.md) |
+| Internal management route catalog | [Management API Surface](api/MANAGEMENT_API_SURFACE.md) |
 | Role policy and scoped RBAC | [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Internal account onboarding | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
 | Domain ownership | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
@@ -28,9 +30,10 @@ Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. Fo
 | Tenant scope | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md) |
 | EF/data modeling rules | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
 | System flow index | [System Flows](flows/SYSTEM_FLOWS.md) |
-| Version direction / future roadmap | [System Overview Flow](flows/SYSTEM_OVERVIEW_FLOW.md) |
 | Checkout/payment/edge execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) |
 | Fairino Lua artifact/program deployment | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md) |
+| Production Package installation | [Production Package Installation Flow](flows/PRODUCTION_PACKAGE_INSTALLATION_FLOW.md) |
+| Production Package upgrade | [Production Package Upgrade Flow](flows/PRODUCTION_PACKAGE_UPGRADE_FLOW.md) |
 | Tablet/edge/cloud contract | [IoT Contract](iot/IOT_CONTRACT.md) |
 | Naming conventions | [Naming Rules](process/NAMING_RULES.md) |
 | Deployment/runtime configuration | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
@@ -41,4 +44,4 @@ Use [RAG Context Map](RAG_CONTEXT_MAP.md) only when the right doc is unclear. Fo
 ## Related
 
 - [Architecture](../ARCHITECTURE.md)
-- [RAG Context Map](RAG_CONTEXT_MAP.md)
+- [Documentation Routing Map](DOCUMENTATION_ROUTING_MAP.md)

@@ -8,9 +8,15 @@ public interface IPaymentGateway
 {
     string ProviderCode { get; }
 
+    string CreateProviderOrderCode(Guid paymentTransactionId);
+
     Task<ProviderPaymentSession> CreatePaymentSessionAsync(
         PaymentTransaction paymentTransaction,
         Order order,
+        CancellationToken cancellationToken = default);
+
+    Task<ProviderPaymentSession?> GetPaymentSessionAsync(
+        string providerOrderCode,
         CancellationToken cancellationToken = default);
 
     Task<ProviderPaymentNotification> ParseAndVerifyNotificationAsync(

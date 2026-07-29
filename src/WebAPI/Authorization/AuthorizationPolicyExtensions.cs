@@ -10,7 +10,12 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("accounts.read", "SystemAdmin", "OrgAdmin", "Manager");
 
         options.AddScopedRolePolicy("payments.manage", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("payment-methods.manage", "SystemAdmin");
         options.AddScopedRolePolicy("products.manage", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("product-categories.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("product-categories.manage", "SystemAdmin");
+        options.AddScopedRolePolicy("ingredients.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("ingredients.manage", "SystemAdmin");
         options.AddScopedRolePolicy("product-templates.read", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("product-templates.manage", "SystemAdmin");
         options.AddScopedRolePolicy("menus.manage", "SystemAdmin", "Manager");
@@ -30,6 +35,7 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("tenant-tree.view", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
         options.AddScopedRolePolicy("roles.view", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("role-scope-options.view", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("dashboard.view", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
 
         options.AddScopedRolePolicy("orders.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff");
         options.AddScopedRolePolicy("orders.manage", "SystemAdmin", "OrgAdmin", "Manager", "Staff");
@@ -37,6 +43,7 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("inventory.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("inventory.manage", "SystemAdmin", "Manager", "Staff", "Technician");
+        options.AddScopedRolePolicy("inventory.configure", "SystemAdmin", "Manager", "Technician");
 
         options.AddScopedRolePolicy("maintenance.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("maintenance.create", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
@@ -47,9 +54,13 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("alerts.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
 
         options.AddScopedRolePolicy("operations.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
+        options.AddScopedRolePolicy("operations.diagnostics", "SystemAdmin", "Technician");
+        options.AddScopedRolePolicy("notifications.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
 
         options.AddScopedRolePolicy("devices.view", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
         options.AddScopedRolePolicy("devices.manage", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
+        options.AddScopedRolePolicy("device-catalog.read", "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician");
+        options.AddScopedRolePolicy("device-catalog.manage", "SystemAdmin");
 
         options.AddScopedRolePolicy("artifact.read", "SystemAdmin", "OrgAdmin");
         options.AddScopedRolePolicy("artifact.upload", "SystemAdmin", "OrgAdmin");
@@ -62,6 +73,10 @@ public static class AuthorizationPolicyExtensions
         options.AddScopedRolePolicy("deployment.read", "SystemAdmin", "OrgAdmin", "Manager", "Technician");
         options.AddScopedRolePolicy("release.deploy", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("release.rollback", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("package.read", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("package.manage", "SystemAdmin");
+        options.AddScopedRolePolicy("package.install", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("package.fork", "SystemAdmin", "OrgAdmin");
 
         return options;
     }

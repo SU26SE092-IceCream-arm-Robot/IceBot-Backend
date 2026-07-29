@@ -3,43 +3,46 @@ using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Observability;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MQTTnet;
-using MQTTnet.Protocol;
+using Polly;
+using Polly.Retry;
 
 namespace Infrastructure.EdgeIntegration.Mqtt;
 
-public sealed class MqttEdgeCommandWakeUpPublisher : IEdgeCommandWakeUpPublisher, IAsyncDisposable
+public sealed class MqttEdgeCommandWakeUpPublisher : IEdgeCommandWakeUpPublisher
 {
     private readonly EdgeCommandMqttOptions _options;
     private readonly ILogger<MqttEdgeCommandWakeUpPublisher> _logger;
-    private readonly IMqttClient _client;
-    private readonly MqttClientOptions _clientOptions;
-    private readonly SemaphoreSlim _connectionLock = new(1, 1);
+    private readonly IMqttEdgeCommandTransport _transport;
+    private readonly ResiliencePipeline _publishPipeline;
 
     public MqttEdgeCommandWakeUpPublisher(
         IOptions<EdgeCommandMqttOptions> options,
+        IMqttEdgeCommandTransport transport,
         ILogger<MqttEdgeCommandWakeUpPublisher> logger)
     {
         _options = options.Value;
+        _transport = transport;
         _logger = logger;
-
-        var factory = new MqttClientFactory();
-        _client = factory.CreateMqttClient();
-        var builder = new MqttClientOptionsBuilder()
-            .WithClientId(_options.ClientId)
-            .WithTcpServer(_options.Host, _options.Port);
-
-        if (!string.IsNullOrWhiteSpace(_options.Username))
-        {
-            builder.WithCredentials(_options.Username, _options.Password);
-        }
-
-        if (_options.UseTls)
-        {
-            builder.WithTlsOptions(tls => tls.UseTls());
-        }
-
-        _clientOptions = builder.Build();
+        _publishPipeline = new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
+            {
+                ShouldHandle = new PredicateBuilder().Handle<Exception>(exception =>
+                    exception is not OperationCanceledException),
+                MaxRetryAttempts = _options.PublishRetryCount,
+                Delay = TimeSpan.FromMilliseconds(_options.PublishRetryDelayMilliseconds),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true,
+                OnRetry = args =>
+                {
+                    _logger.LogWarning(
+                        args.Outcome.Exception,
+                        "Retrying MQTT command wake-up publish after transient failure. Attempt={AttemptNumber}.",
+                        args.AttemptNumber + 1);
+                    return ValueTask.CompletedTask;
+                }
+            })
+            .AddTimeout(TimeSpan.FromSeconds(_options.PublishTimeoutSeconds))
+            .Build();
     }
 
     public async Task<bool> TryPublishAsync(
@@ -54,26 +57,9 @@ public sealed class MqttEdgeCommandWakeUpPublisher : IEdgeCommandWakeUpPublisher
 
         try
         {
-            await EnsureConnectedAsync(cancellationToken);
-            var topicPrefix = _options.TopicPrefix.Trim().Trim('/');
-            var topic = $"{topicPrefix}/execution-endpoints/{notification.TargetExecutionEndpointId:D}/commands/available";
-            var payload = JsonSerializer.Serialize(new
-            {
-                Type = "CommandAvailable",
-                notification.CommandId,
-                CommandType = notification.CommandType.ToString(),
-                notification.TargetExecutionEndpointId,
-                notification.NotifiedAt,
-                Version = 1
-            });
-            var message = new MqttApplicationMessageBuilder()
-                .WithTopic(topic)
-                .WithPayload(payload)
-                .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
-                .WithRetainFlag(false)
-                .Build();
-
-            await _client.PublishAsync(message, cancellationToken);
+            await _publishPipeline.ExecuteAsync(
+                async resilienceToken => await PublishOnceAsync(notification, resilienceToken),
+                cancellationToken);
             IceBotEdgeMetrics.RecordMqttWakeUp("succeeded", notification.CommandType.ToString());
             return true;
         }
@@ -89,39 +75,21 @@ public sealed class MqttEdgeCommandWakeUpPublisher : IEdgeCommandWakeUpPublisher
         }
     }
 
-    private async Task EnsureConnectedAsync(CancellationToken cancellationToken)
+    private async ValueTask PublishOnceAsync(
+        EdgeCommandWakeUp notification,
+        CancellationToken cancellationToken)
     {
-        if (_client.IsConnected)
+        var topicPrefix = _options.TopicPrefix.Trim().Trim('/');
+        var topic = $"{topicPrefix}/execution-endpoints/{notification.TargetExecutionEndpointId:D}/commands/available";
+        var payload = JsonSerializer.Serialize(new
         {
-            return;
-        }
-
-        await _connectionLock.WaitAsync(cancellationToken);
-        try
-        {
-            if (_client.IsConnected)
-            {
-                return;
-            }
-
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(_options.ConnectTimeoutSeconds));
-            await _client.ConnectAsync(_clientOptions, timeout.Token);
-        }
-        finally
-        {
-            _connectionLock.Release();
-        }
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_client.IsConnected)
-        {
-            await _client.DisconnectAsync();
-        }
-
-        _client.Dispose();
-        _connectionLock.Dispose();
+            Type = "CommandAvailable",
+            notification.CommandId,
+            CommandType = notification.CommandType.ToString(),
+            notification.TargetExecutionEndpointId,
+            notification.NotifiedAt,
+            Version = 1
+        });
+        await _transport.PublishAsync(topic, payload, cancellationToken);
     }
 }

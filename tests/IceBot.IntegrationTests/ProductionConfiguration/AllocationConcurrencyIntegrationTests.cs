@@ -1,13 +1,14 @@
 using Domain.Devices.ExecutionEndpoints;
 using System.Reflection;
 using Domain.Common.Enums;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
+using Domain.Devices.Telemetry;
 using Domain.ProductionConfiguration.Entities;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using IceBot.IntegrationTests.Infrastructure;
-using Infrastructure.ProductionConfiguration.Persistence;
+using Infrastructure.ProductionConfiguration.Persistence.Deployments;
+using Infrastructure.ProductionConfiguration.Persistence.Releases;
 using Microsoft.EntityFrameworkCore;
 
 namespace IceBot.IntegrationTests.ProductionConfiguration;
@@ -56,7 +57,7 @@ public sealed class AllocationConcurrencyIntegrationTests
     private async Task<ConfigurationRelease> CreateNextReleaseAsync(Guid organizationId)
     {
         await using var dbContext = _fixture.CreateDbContext();
-        var store = new ProductionConfigurationStore(dbContext);
+        var store = new ConfigurationReleaseStore(dbContext);
         return await store.CreateNextReleaseAsync(
             organizationId,
             number => ConfigurationRelease.CreateDraft(organizationId, number));
@@ -65,7 +66,7 @@ public sealed class AllocationConcurrencyIntegrationTests
     private async Task<int> CreateFailedDeploymentAttemptAsync(FullEdgeGraph graph)
     {
         await using var dbContext = _fixture.CreateDbContext();
-        var store = new ProductionConfigurationStore(dbContext);
+        var store = new ConfigurationDeploymentStore(dbContext);
         return await store.ExecuteDeploymentCreationAsync(
             graph.KioskId,
             async cancellationToken =>

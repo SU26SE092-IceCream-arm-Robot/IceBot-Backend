@@ -44,7 +44,6 @@ public sealed class CreateOrganizationCommandHandler
             PhoneNumber = request.PhoneNumber?.Trim(),
             Address = request.Address?.Trim(),
             Status = EntityStatus.Active,
-            MetadataJson = request.MetadataJson,
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = userContext.AccountId
         };

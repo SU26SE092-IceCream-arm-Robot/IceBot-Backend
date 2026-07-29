@@ -5,18 +5,17 @@ namespace Application.Tenants.Kiosks;
 
 internal static class KioskAccessRules
 {
-    public static bool CanAccessKiosk(CurrentUserContext userContext, Kiosk kiosk)
-    {
-        return userContext.IsSystemAdmin
-            || userContext.AllowedOrganizationIds.Contains(kiosk.OrganizationId)
-            || userContext.AllowedStoreIds.Contains(kiosk.StoreId)
-            || userContext.AllowedKioskIds.Contains(kiosk.Id);
-    }
+    public static bool CanAccessKiosk(
+        IReadOnlyCollection<string> allowedRoles,
+        CurrentUserContext userContext,
+        Kiosk kiosk) =>
+        ScopeAccessRules.CanAccessScopedRow(
+            allowedRoles, userContext, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id);
 
-    public static bool CanManageStoreKiosks(CurrentUserContext userContext, Store store)
-    {
-        return userContext.IsSystemAdmin
-            || userContext.AllowedOrganizationIds.Contains(store.OrganizationId)
-            || userContext.AllowedStoreIds.Contains(store.Id);
-    }
+    public static bool CanManageStoreKiosks(
+        IReadOnlyCollection<string> allowedRoles,
+        CurrentUserContext userContext,
+        Store store) =>
+        ScopeAccessRules.CanAccessScopedRow(
+            allowedRoles, userContext, store.OrganizationId, store.Id, null);
 }

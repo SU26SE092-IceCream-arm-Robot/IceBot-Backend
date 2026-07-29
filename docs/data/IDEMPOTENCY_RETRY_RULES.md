@@ -141,6 +141,8 @@ Recommended unique constraint:
 
 Reason: payment providers commonly send duplicate webhooks.
 
+Use a provider-guaranteed event id when one is present. If the provider does not supply one, persist a deterministic SHA-256 fingerprint of the raw signed payload as the deduplication key. Do not substitute an order code, payment-link id, or transaction reference because those can identify multiple legitimate state changes.
+
 ### Refund
 
 Current phase uses manual cash refund. Treat auto provider refund and payout as future integration work unless explicitly requested.
@@ -168,6 +170,16 @@ Reason: duplicate refund is a high-risk financial bug.
 
 `EdgeCommand.Id` is the dispatch identity. A delivery retry keeps the same command id; a new approved execution retry creates a new command id and dispatch attempt number.
 
+Cloud allocates delivery-attempt numbers inside a transaction serialized by the
+target execution endpoint. Command ACK, execution report, and timeout reconciliation
+serialize by `EdgeCommand.Id`; any of those paths that changes an order also acquires
+the shared `OrderId` workflow lock. Manual/Packaged fulfillment and initial dispatch
+use that same order lock. This lock ordering prevents duplicate provisional execution
+records and lost mixed-order aggregation updates across backend instances.
+Payment-session creation, signed payment application, payment reconciliation, and
+order cancellation/refund-required decisions use the same order lock, so a payment
+cannot be applied from a stale pre-cancellation order snapshot.
+
 Recommended constraints:
 
 - `EdgeCommand.OrderId + DispatchAttemptNo`
@@ -175,6 +187,31 @@ Recommended constraints:
 - executor report identity scoped to its stable runtime/controller identity before Cloud projections are updated
 
 Reason: delivery retry must not rerun physical work, and Cloud projections must not accept duplicated executor evidence.
+
+### Production Package Upgrade
+
+Upgrade execute uses `OrganizationId + IdempotencyKey`. The same key is valid
+only for the same source installation, target package version, selected Product
+source keys, and `PreviewChecksum`. A different payload returns conflict.
+
+Only one active Upgrade may own a source installation. Its successor installation
+uses a deterministic internal idempotency key and a persisted materialization
+identity suffix, so retry cannot create different staging Product or RobotProgram
+identities.
+
+The Upgrade persists `TargetInstallationId` immediately after successor
+materialization and before preparation evidence is finalized. A Failed Upgrade
+may resume only with the original payload and reuses that installation. A
+terminal retry returns the existing result even after the source installation
+has been superseded; it does not rebuild preview from current state.
+
+Rollback uses one deterministic idempotency key per Upgrade, execution endpoint,
+and rollback attempt number. Successful endpoint requests are persisted
+individually. Retrying a partially requested rollback sends only missing
+endpoint requests, then waits for every resulting deployment to become Active
+before restoring Cloud menu and Catalog bindings. An observed Failed deployment
+permits the next audited attempt; unknown or non-terminal observation does not.
+Each endpoint is limited to three attempts.
 
 ### DeviceEvent
 
@@ -290,7 +327,9 @@ Retry is recommended for:
 - `SyncEventInbox`: retry event processing.
 - `PaymentTransaction`: retry provider calls with the same provider idempotency key.
 - `PaymentCallback`: retry internal callback processing.
-- `Refund`: retry provider refund with the same idempotency key.
+- `Refund`: the current manual workflow retries only the backend command with the
+  same idempotency key. It does not call or retry a provider refund. Provider
+  refund retry requires a separately approved provider contract and workflow.
 - `EdgeCommand`: retry delivery using the same command id while it remains unexpired.
 - `DeviceEvent` and `OperationLog`: retry publish/sync, not the original physical action.
 
@@ -330,6 +369,31 @@ Notes:
 - Configuration release numbers are allocated inside a database transaction protected by a PostgreSQL transaction-scoped advisory lock derived from `OrganizationId`. This preserves `MAX + 1` numbering per organization without serializing unrelated organizations.
 - The unique `OrganizationId + ReleaseNumber` index remains the final integrity boundary.
 - `RobotArtifactOrphanCleanupJob` uses a PostgreSQL session advisory lock. At most one backend instance scans/deletes orphans per run; another instance skips when the lock is held. A crashed instance releases the lock when its database connection closes.
+
+## External Dependency Resilience
+
+HTTP integrations use `Microsoft.Extensions.Http.Resilience`, which integrates Polly resilience pipelines with `IHttpClientFactory`. Do not construct ad hoc Polly pipelines inside handlers or gateways when the operation is HTTP-based.
+
+- Configure resilience per named or typed dependency client, not as one global backend policy.
+- Use timeout, circuit breaker, telemetry, and transient-response handling at the HTTP adapter boundary.
+- Retry only when the operation is proven idempotent through a provider idempotency key or equivalent durable identity.
+- Unsafe HTTP methods (`POST`, `PUT`, `PATCH`, `DELETE`, `CONNECT`) are not retried by default.
+- Validation/authentication failures and ordinary `4xx` responses are not transient failures.
+- Non-HTTP boundaries such as MQTT operations or custom background processing may use Polly `ResiliencePipeline` directly when their retry semantics are explicit.
+
+PayOS is the first adopted HTTP resilience boundary. Its typed client uses the standard resilience handler with per-attempt and total timeouts, while retry remains disabled for payment-creation `POST` requests. A future retry policy requires an explicitly verified PayOS idempotency guarantee; deterministic local order-code generation alone is not assumed to prove provider-side idempotency.
+
+MQTT command wake-up uses a direct Polly pipeline because it is not an HTTP operation. It permits one short retry with exponential backoff and jitter. Duplicate wake-up messages are safe because they contain the same committed `EdgeCommand.Id`, use QoS 1, and only tell Edge to pull; command pull and Edge-side command deduplication remain authoritative. Exhausted retries do not roll back the committed command.
+
+SMTP delivery has one operation timeout covering connect, authenticate, send, and disconnect. It does not retry because a timeout can occur after the SMTP server accepted the message. Safe retry requires a durable email outbox and a delivery identity before another attempt is allowed.
+
+Robot artifact object storage retries only transport failures for read-only/control-plane operations: object stat/existence checks, bucket existence checks, and presigned read URL generation. Upload stream, server-side copy, delete, and list/orphan scan are not automatically retried. Retrying upload requires a rewindable stream or staged file together with an immutable object key.
+
+Firebase token verification does not retry invalid, expired, or revoked tokens. It retries only explicit SDK service failures (`Unavailable`, `Internal`, `Unknown`, or `DeadlineExceeded`) and transport/operation-timeout failures. Invalid tokens remain authentication failures, not provider-unavailability failures.
+
+Resilience configuration is owned by each dependency boundary. Do not create one global timeout/retry/circuit-breaker section because payment creation, token verification, SMTP delivery, object storage, and MQTT have different idempotency and failure semantics. Configurable ranges are validated during application startup.
+
+Mosquitto dynamic-security credential commands also use a direct Polly pipeline for transport failures. Provisioning operations are designed as idempotent upserts: a repeated `createClient` enters the existing-client update path, password replacement is deterministic, role assignment tolerates an already-assigned result, and disable is repeatable. Broker business-error responses are not retried; only an exception or command timeout triggers the single short retry.
 
 ## Do Not Soft Delete Event Tables
 

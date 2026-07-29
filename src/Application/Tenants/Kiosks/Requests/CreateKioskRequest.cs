@@ -27,9 +27,4 @@ public sealed class CreateKioskRequest
     [Range(-180.0, 180.0)]
     public decimal? Longitude { get; set; }
 
-    public bool SupportsOfflineMode { get; set; } = true;
-
-    public int SettingsSchemaVersion { get; set; } = 1;
-
-    public string? SettingsJson { get; set; }
 }

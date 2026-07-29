@@ -22,8 +22,6 @@ internal static class MenuResultMapper
             EffectiveFrom = menu.EffectiveFrom,
             EffectiveTo = menu.EffectiveTo,
             DisplayOrder = menu.DisplayOrder,
-            MetadataSchemaVersion = menu.MetadataSchemaVersion,
-            MetadataJson = menu.MetadataJson,
             CreatedAt = menu.CreatedAt,
             UpdatedAt = menu.UpdatedAt,
             Items = menu.MenuItems
@@ -55,10 +53,9 @@ internal static class MenuResultMapper
             ImageUrl = item.ImageUrl,
             EffectiveFrom = item.EffectiveFrom,
             EffectiveTo = item.EffectiveTo,
-            MetadataSchemaVersion = item.MetadataSchemaVersion,
-            MetadataJson = item.MetadataJson,
             CreatedAt = item.CreatedAt,
-            UpdatedAt = item.UpdatedAt
+            UpdatedAt = item.UpdatedAt,
+            ProductOptionIds = item.ProductOptions.Select(option => option.ProductOptionId).ToList()
         };
     }
 }

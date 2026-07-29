@@ -8,7 +8,17 @@ This document defines how backend docs should be written so humans and RAG tools
 
 ## Purpose
 
-Keep docs small, routed, and searchable.
+Keep backend docs small, current, routed, and searchable.
+
+Backend docs are operational source of truth. They prioritize information needed to implement, integrate, operate, or verify the behavior that runs now:
+
+- current contracts, invariants, routes, payloads, states, and ownership boundaries
+- commands and procedures a developer or operator must execute
+- current failure, retry, security, and verification behavior
+
+Keep concise rationale, examples, future constraints, and implementation guidance when readers need them to apply the contract correctly or avoid a known unsafe interpretation. Move extended discussion history, option comparison, rejected alternatives, and standalone decision records to the smallest owning `Vault/Decisions`, `Vault/Discussions`, or `Vault/Evolution` note. Backend docs may link to that note, but must remain understandable without reading Vault.
+
+Do not document implementation work merely because it was performed. Add documentation only when readers need the resulting contract or procedure.
 
 Each doc should answer one ownership question:
 
@@ -19,7 +29,14 @@ Each doc should answer one ownership question:
 
 Do not duplicate full explanations across docs. Link to the owning doc instead.
 
-Use [RAG Context Map](../RAG_CONTEXT_MAP.md) only when the right backend doc is unclear after direct retrieval, metadata filters, or path filters.
+Active backend documents must remain at or below 500 lines. When a document
+approaches that limit, split it by ownership and retain a short index in the
+original owner. A level-two or level-three section must remain at or below 120
+lines so retrieval does not receive one oversized mixed-ownership chunk. Files
+prefixed `HISTORICAL_`, `DEPRECATED_`, or `PROPOSAL_` belong in Vault rather
+than `IceBot-Backend/docs`.
+
+Use [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md) only when the right backend doc is unclear after direct retrieval, metadata filters, or path filters.
 
 ## Standard Shape
 
@@ -42,6 +59,25 @@ The actual content owned by the doc.
 
 - Other related doc name and path
 ```
+
+For a contract, flow, or operational procedure that will be maintained across
+multiple releases, include a short metadata table after `Search Keywords`:
+
+```text
+## Metadata
+
+| Field | Value |
+| --- | --- |
+| Status | Current contract | Partial implementation | Proposal |
+| Owner | Owning bounded context or operational module |
+| Verification | Code path, contract test, smoke test, or manual check |
+```
+
+Do not claim that a document is fully implemented or verified unless the
+listed evidence exists. Use `Partial implementation` when the document
+describes a current boundary whose remaining behavior is intentionally
+excluded. The [Documentation Coverage Matrix](../DOCUMENTATION_COVERAGE.md)
+is the cross-module index; do not duplicate that matrix in every document.
 
 `Search Keywords` should be near the top, but not inside the opening paragraph. This keeps overview chunks narrow while still giving RAG a clean keyword chunk.
 
@@ -97,7 +133,26 @@ Do not copy full route maps, entity lists, or rules from the linked doc unless t
 - Use precise section headings.
 - Prefer tables for lookup data.
 - Prefer specific lookup sections and metadata-friendly terms over generic overview prose.
-- Keep rejected/future ideas out of source-of-truth docs unless clearly marked.
+- Keep extended decision history, rejected alternatives, and unrelated proposals out of backend source-of-truth docs.
+- Describe the current rule directly. Keep “because”, examples, and future constraints when removing them would make the rule ambiguous or easier to misuse.
+- Remove stale behavior when the implementation changes; do not preserve it as history in the contract document.
+- Avoid duplicating the same section or rule. Keep one owner and link to it.
+
+## Change Workflow
+
+When backend behavior changes:
+
+1. Update only the owning contract or procedure.
+2. Remove superseded behavior from backend docs.
+3. Keep locally necessary rationale with the contract; record broader decision history and trade-offs in Vault when worth preserving.
+4. Check headings, links, duplicated rules, stale future language, and `git diff --check`.
+
+When a code module gains a public contract, operational procedure, or
+integration test family, update the matching row in the
+[Documentation Coverage Matrix](../DOCUMENTATION_COVERAGE.md). The matrix is
+an ownership and discovery index, not a replacement for the owning contract.
+
+For a documentation cleanup or restructure, preserve the current uncommitted version before editing and compare content coverage afterward. Intentional removals are allowed when the user explicitly requests cleanup, condensation, or deletion; report what was removed or moved.
 
 ## Retrieval Priority
 
@@ -105,13 +160,13 @@ RAG should use a lazy retrieval path:
 
 1. Search specific source-of-truth docs with direct query terms and metadata filters.
 2. Narrow by path, source type, document type, or lookup section when the query is ambiguous.
-3. Use [RAG Context Map](../RAG_CONTEXT_MAP.md) as a fallback router when the correct doc family is still unclear.
+3. Use [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md) as a fallback router when the correct doc family is still unclear.
 4. Use reranking selectively for hard queries, not as a mandatory fix for weak docs or broad queries.
 
 ## Related Docs
 
 - [Working Protocol](WORKING_PROTOCOL.md)
-- [RAG Context Map](../RAG_CONTEXT_MAP.md)
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md)
 - [API Surface Rules](../api/API_SURFACE_RULES.md)
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
 - [Naming Rules](NAMING_RULES.md)

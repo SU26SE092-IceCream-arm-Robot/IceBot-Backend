@@ -1,3 +1,6 @@
+using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.ValueObjects;
@@ -10,7 +13,7 @@ namespace Domain.ProductionConfiguration.Manifests;
 
 public static class ConfigurationReleaseManifestBuilder
 {
-    public static ConfigurationReleaseManifest Create(
+    public static ConfigurationReleaseManifest CreateContent(
         ConfigurationRelease release,
         IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
@@ -25,6 +28,10 @@ public static class ConfigurationReleaseManifestBuilder
                 route.Priority,
                 route.ProductVariantId,
                 route.RecipeId,
+                route.ProductionDefinitionSchemaVersion,
+                route.ProductionDefinitionChecksum,
+                ProductionDefinition = CanonicalizeOptionalJson(route.ProductionDefinitionJson, "production definition"),
+                SupportedOptionCodes = route.GetSupportedOptionCodes(),
                 RequiredCapabilities = CanonicalizeOptionalJson(route.RequiredCapabilitiesJson, "execution route required capabilities"),
                 RobotBindings = route.RobotBindings
                     .OrderBy(binding => binding.BindingOrder)
@@ -71,13 +78,18 @@ public static class ConfigurationReleaseManifestBuilder
                     artifact.RunOrder,
                     Parameters = CanonicalizeOptionalJson(artifact.ParametersJson, "robot program artifact parameters"),
                     artifact.ParametersSchemaVersion,
+                    artifact.RequiredOptionCode,
                     RobotArtifact = new
                     {
                         Id = artifact.RobotArtifactId,
                         artifact.Checksum,
                         artifact.StorageKey,
                         artifact.RuntimeTargetCode,
-                        artifact.MachineModelCode
+                        artifact.MachineModelCode,
+                        artifact.ContentLengthBytes,
+                        artifact.TechnicalContractId,
+                        artifact.TechnicalContractChecksum,
+                        BundleEntryName = $"artifacts/{artifact.RobotArtifactId:D}.lua"
                     }
                 };
             })
@@ -99,6 +111,7 @@ public static class ConfigurationReleaseManifestBuilder
                 program.Code,
                 ProgramManifestSchemaVersion = program.ManifestSchemaVersion,
                 ProgramManifestChecksum = program.ManifestChecksum,
+                program.RestartPolicy,
                 Artifacts = artifacts
             }
         };

@@ -68,6 +68,11 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsAllergen")
                         .HasColumnType("boolean");
 
@@ -153,6 +158,9 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("SelectionType")
                         .HasColumnType("integer");
 
@@ -164,7 +172,7 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Code")
+                    b.HasIndex("ProductId", "Code")
                         .IsUnique();
 
                     b.ToTable("OptionGroups", (string)null);
@@ -314,9 +322,6 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<long?>("ParentCategoryId")
-                        .HasColumnType("bigint");
-
                     b.Property<string>("ProductType")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -332,8 +337,6 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("Code")
                         .IsUnique();
-
-                    b.HasIndex("ParentCategoryId");
 
                     b.ToTable("ProductCategories", (string)null);
                 });
@@ -354,11 +357,6 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("CreatedByAccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -370,6 +368,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.Property<int>("DisplayOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ExecutionImpact")
                         .HasColumnType("integer");
 
                     b.Property<bool>("IsAvailable")
@@ -390,15 +391,9 @@ namespace Infrastructure.Migrations
                     b.Property<long>("OptionGroupId")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid?>("OrganizationId")
-                        .HasColumnType("uuid");
-
                     b.Property<decimal>("PriceDelta")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
-
-                    b.Property<int>("ScopeType")
-                        .HasColumnType("integer");
 
                     b.Property<Guid?>("TemplateProductOptionId")
                         .HasColumnType("uuid");
@@ -411,17 +406,69 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("OptionGroupId");
+                    b.HasIndex("OptionGroupId")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\" = TRUE AND \"DeletedAt\" IS NULL");
 
-                    b.HasIndex("OrganizationId");
-
-                    b.HasIndex("TemplateProductOptionId");
-
-                    b.HasIndex("OrganizationId", "OptionGroupId", "Code")
+                    b.HasIndex("OptionGroupId", "Code")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("ProductOptions", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Catalog.Entities.ProductOptionIngredientRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("RequiredWorkcellCapabilityCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngredientId");
+
+                    b.HasIndex("ProductOptionId", "IngredientId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductOptionIngredientRequirements", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
@@ -618,6 +665,10 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
+                    b.HasIndex(new[] { "ProductVariantId" }, "IX_Recipes_ProductVariantId_Default")
+                        .IsUnique()
+                        .HasFilter("\"IsDefault\" = TRUE AND \"Status\" <> 4 AND \"DeletedAt\" IS NULL");
+
                     b.ToTable("Recipes", (string)null);
                 });
 
@@ -680,7 +731,7 @@ namespace Infrastructure.Migrations
                     b.ToTable("RecipeItems", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Devices.Entities.Device", b =>
+            modelBuilder.Entity("Domain.Devices.Catalog.Device", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -767,7 +818,7 @@ namespace Infrastructure.Migrations
                     b.ToTable("Devices", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Devices.Entities.DeviceModel", b =>
+            modelBuilder.Entity("Domain.Devices.Catalog.DeviceModel", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -835,7 +886,7 @@ namespace Infrastructure.Migrations
                     b.ToTable("DeviceModels", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Devices.Entities.DeviceType", b =>
+            modelBuilder.Entity("Domain.Devices.Catalog.DeviceType", b =>
                 {
                     b.Property<long>("Id")
                         .ValueGeneratedOnAdd()
@@ -889,6 +940,39 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("DeviceTypes", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Devices.Connectivity.KioskConnectivityProjection", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long?>("LastHeartbeatSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("LastObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("LastTransitionedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KioskId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "LastObservedAt");
+
+                    b.ToTable("KioskConnectivityProjections", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointCredentialBinding", b =>
@@ -1613,70 +1697,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("Accounts", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.Identity.Entities.AccountDevice", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("AppVersion")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedByAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("DeletedByAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DeviceName")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("DeviceTokenHash")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsTrusted")
-                        .HasColumnType("boolean");
-
-                    b.Property<DateTimeOffset?>("LastSeenAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Platform")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("PushToken")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset?>("RevokedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedByAccountId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AccountId", "DeviceTokenHash");
-
-                    b.ToTable("AccountDevices", (string)null);
-                });
-
             modelBuilder.Entity("Domain.Identity.Entities.AccountInvitation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1729,6 +1749,80 @@ namespace Infrastructure.Migrations
                     b.HasIndex("AccountId", "InvitedAt");
 
                     b.ToTable("AccountInvitations", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Identity.Entities.AccountNotificationDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeviceName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("InvalidatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InvalidationReason")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Platform")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PushToken")
+                        .HasMaxLength(4096)
+                        .HasColumnType("character varying(4096)");
+
+                    b.Property<string>("PushTokenHash")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PushTokenHash")
+                        .IsUnique()
+                        .HasFilter("\"PushTokenHash\" IS NOT NULL AND \"InvalidatedAt\" IS NULL");
+
+                    b.HasIndex("AccountId", "InstallationId")
+                        .IsUnique();
+
+                    b.HasIndex("AccountId", "InvalidatedAt");
+
+                    b.ToTable("AccountNotificationDevices", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Identity.Entities.AccountRole", b =>
@@ -1831,9 +1925,6 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("AccountDeviceId")
-                        .HasColumnType("uuid");
-
                     b.Property<Guid>("AccountId")
                         .HasColumnType("uuid");
 
@@ -1881,8 +1972,6 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("AccountDeviceId");
 
                     b.HasIndex("AccountId");
 
@@ -1990,6 +2079,11 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("IngredientId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<Guid?>("KioskId")
                         .HasColumnType("uuid");
 
@@ -2038,11 +2132,171 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("DeviceId", "ContainerCode")
                         .IsUnique()
-                        .HasFilter("\"DeletedAt\" IS NULL");
+                        .HasFilter("\"IsActive\" = TRUE AND \"DeletedAt\" IS NULL");
 
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.ToTable("IngredientDispenserStates", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyChangeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("AfterCapacityQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool?>("AfterIsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AfterUnit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal?>("BeforeCapacityQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<bool?>("BeforeIsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BeforeUnit")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<int>("ChangeType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContainerCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DispenserStateId", "CreatedAt");
+
+                    b.HasIndex("KioskId", "CreatedAt");
+
+                    b.ToTable("InventoryTopologyChangeRecords", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyRebindRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("EstimateDisposition")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("PreviousEstimatedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ReplacementContainerCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("ReplacementDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReplacementDispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ReplacementIngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReplacementUnit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("SourceContainerCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid>("SourceDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceDispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceIngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceUnit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<decimal>("TransferredQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReplacementDispenserStateId")
+                        .IsUnique();
+
+                    b.HasIndex("SourceDispenserStateId")
+                        .IsUnique();
+
+                    b.HasIndex("KioskId", "CreatedAt");
+
+                    b.ToTable("InventoryTopologyRebindRecords", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Inventory.Entities.StockMovement", b =>
@@ -2051,6 +2305,10 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<decimal?>("BalanceAfter")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal?>("BalanceBefore")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
 
@@ -2180,6 +2438,11 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("CorrelationKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2198,9 +2461,15 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("KioskId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset>("LastOccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Message")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<int>("OccurrenceCount")
+                        .HasColumnType("integer");
 
                     b.Property<Guid>("OriginNodeId")
                         .HasColumnType("uuid");
@@ -2255,12 +2524,17 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("KioskId", "Status", "RaisedAt");
 
+                    b.HasIndex("KioskId", "DeviceId", "CorrelationKey", "Status", "LastOccurredAt");
+
                     b.ToTable("Alerts", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Operations.Entities.MaintenanceTicket", b =>
                 {
                     b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AlertId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("AssignedAt")
@@ -2311,6 +2585,11 @@ namespace Infrastructure.Migrations
 
                     b.Property<Guid>("KioskId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("OperationalImpact")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<Guid?>("OrderId")
                         .HasColumnType("uuid");
@@ -2367,6 +2646,10 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AlertId")
+                        .IsUnique()
+                        .HasFilter("\"AlertId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
                     b.HasIndex("AssignedToAccountId");
 
                     b.HasIndex("CreatedByAccountId");
@@ -2392,6 +2675,110 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "Status", "ReportedAt");
 
                     b.ToTable("MaintenanceTickets", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Operations.Entities.NotificationDelivery", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DataJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeliveryKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastErrorCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("LastErrorMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("MaxAttempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("NextAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NotificationType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ProcessingStartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RecipientAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeliveryKey")
+                        .IsUnique();
+
+                    b.HasIndex("RecipientAccountId");
+
+                    b.HasIndex("KioskId", "OrganizationId");
+
+                    b.HasIndex("NotificationType", "SubjectId");
+
+                    b.HasIndex("StoreId", "OrganizationId");
+
+                    b.HasIndex("OrganizationId", "Status", "NextAttemptAt");
+
+                    b.ToTable("NotificationDeliveries", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Operations.Entities.OperationLog", b =>
@@ -2568,6 +2955,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("PaidAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset>("PaymentDeadlineAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<int>("PaymentStatus")
                         .HasColumnType("integer");
 
@@ -2581,6 +2971,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("StatusBeforeDuplicatePaymentIntervention")
                         .HasColumnType("integer");
 
                     b.Property<Guid?>("StoreId")
@@ -2651,6 +3044,9 @@ namespace Infrastructure.Migrations
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
 
+                    b.Property<int>("FulfillmentType")
+                        .HasColumnType("integer");
+
                     b.Property<string>("MenuItemCodeSnapshot")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -2663,13 +3059,6 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
-
-                    b.Property<string>("OptionsJson")
-                        .HasMaxLength(500)
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("OptionsSchemaVersion")
-                        .HasColumnType("integer");
 
                     b.Property<Guid>("OrderId")
                         .HasColumnType("uuid");
@@ -2750,6 +3139,184 @@ namespace Infrastructure.Migrations
                     b.ToTable("OrderItems", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ExecutionImpact")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("OptionGroupCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("OptionGroupId")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("TotalPriceDelta")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("UnitPriceDelta")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemId", "OptionGroupId");
+
+                    b.HasIndex("OrderItemId", "ProductOptionId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("OrderItemOptions", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemOptionIngredientRequirement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IngredientCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IngredientNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("OrderItemOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("QuantityPerOption")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("RequiredWorkcellCapabilityCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemOptionId", "IngredientId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("OrderItemOptionIngredientRequirements", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ChangedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("SourceEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourcePayloadHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedByAccountId");
+
+                    b.HasIndex("OrderItemId", "ChangedAt");
+
+                    b.HasIndex("OrderItemId", "SourceEventId")
+                        .IsUnique()
+                        .HasFilter("\"SourceEventId\" IS NOT NULL");
+
+                    b.ToTable("OrderItemStatusHistories", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Orders.Entities.OrderStatusHistory", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2799,6 +3366,185 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OrderId", "ChangedAt");
 
                     b.ToTable("OrderStatusHistories", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Orders.Incidents.ProductionIncident", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ErrorCodeSnapshot")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ErrorMessageSnapshot")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("InspectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("InspectedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("InspectionOutcome")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OpenedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OrderNumberSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("PhysicalOutputState")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProductNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ProductVariantNameSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("ProductionUnitNo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProductionUnitQuantity")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("RelatedEdgeCommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RelatedRefundId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("Resolution")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResolutionNotes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ResolutionRequestFingerprint")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("ResolutionRequestId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ResolvedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceCommandId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceProductionJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Trigger")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrderItemId");
+
+                    b.HasIndex("ResolutionRequestId")
+                        .IsUnique()
+                        .HasFilter("\"ResolutionRequestId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("SourceCommandId", "SourceProductionJobId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("OrderId", "OrderItemId", "ProductionUnitNo");
+
+                    b.HasIndex("OrganizationId", "StoreId", "KioskId", "Status", "CreatedAt");
+
+                    b.ToTable("ProductionIncidents", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Orders.Incidents.ProductionIncidentHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("ActorAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProductionIncidentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid?>("RelatedEntityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductionIncidentId", "OccurredAt");
+
+                    b.ToTable("ProductionIncidentHistories", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Payments.Entities.PaymentCallback", b =>
@@ -2892,13 +3638,6 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
-
-                    b.Property<string>("ConfigJson")
-                        .HasMaxLength(500)
-                        .HasColumnType("jsonb");
-
-                    b.Property<int>("ConfigSchemaVersion")
-                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -3081,6 +3820,9 @@ namespace Infrastructure.Migrations
                     b.Property<int>("RetryCount")
                         .HasColumnType("integer");
 
+                    b.Property<int>("SettlementDisposition")
+                        .HasColumnType("integer");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -3105,14 +3847,19 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("PaymentMethodId");
 
-                    b.HasIndex("ProviderOrderCode")
-                        .HasFilter("\"ProviderOrderCode\" IS NOT NULL");
-
                     b.HasIndex("ProviderTransactionId")
                         .HasFilter("\"ProviderTransactionId\" IS NOT NULL");
 
                     b.HasIndex("TransactionNumber")
                         .IsUnique();
+
+                    b.HasIndex("Provider", "ProviderOrderCode")
+                        .IsUnique()
+                        .HasFilter("\"ProviderOrderCode\" IS NOT NULL");
+
+                    b.HasIndex(new[] { "OrderId" }, "IX_PaymentTransactions_OrderId_PrimarySettlement")
+                        .IsUnique()
+                        .HasFilter("\"SettlementDisposition\" = 1");
 
                     b.ToTable("PaymentTransactions", (string)null);
                 });
@@ -3373,6 +4120,17 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("RequestedByAccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("RiskAcknowledgedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RiskAcknowledgedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RiskLevel")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<Guid>("SourceConfigurationReleaseId")
                         .HasColumnType("uuid");
 
@@ -3385,7 +4143,21 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("UpdatedByAccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ValidationReportChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("WarningCodesJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("RequestedByAccountId");
+
+                    b.HasIndex("RiskAcknowledgedByAccountId");
 
                     b.HasIndex("ControllerId", "ActiveSetVersion")
                         .IsUnique();
@@ -3447,6 +4219,10 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("ParametersSchemaVersion")
                         .HasColumnType("integer");
+
+                    b.Property<string>("RequiredOptionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<Guid>("RobotArtifactId")
                         .HasColumnType("uuid");
@@ -3512,6 +4288,17 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("ProductVariantId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ProductionDefinitionChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ProductionDefinitionJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int?>("ProductionDefinitionSchemaVersion")
+                        .HasColumnType("integer");
+
                     b.Property<Guid>("RecipeId")
                         .HasColumnType("uuid");
 
@@ -3524,6 +4311,13 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("SupportedOptionCodesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10000)
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -3533,6 +4327,9 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("ProductionDefinitionChecksum")
+                        .HasFilter("\"ProductionDefinitionChecksum\" IS NOT NULL");
 
                     b.HasIndex("RecipeId");
 
@@ -3661,6 +4458,17 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("RequestedByAccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("RiskAcknowledgedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RiskAcknowledgedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RiskLevel")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -3670,6 +4478,16 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("UpdatedByAccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ValidationReportChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("WarningCodesJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
                     b.HasKey("Id");
 
                     b.HasIndex("KioskId")
@@ -3677,6 +4495,8 @@ namespace Infrastructure.Migrations
                         .HasFilter("\"Status\" IN (1, 2)");
 
                     b.HasIndex("RequestedByAccountId");
+
+                    b.HasIndex("RiskAcknowledgedByAccountId");
 
                     b.HasIndex("ConfigurationReleaseId", "OrganizationId");
 
@@ -3837,7 +4657,16 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset>("LastExecutorReportedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("OrderItemId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("PhysicalOutputState")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProductionUnitNo")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProductionUnitQuantity")
                         .HasColumnType("integer");
 
                     b.Property<Guid>("SourceCommandId")
@@ -3863,6 +4692,8 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OrderItemId");
+
                     b.HasIndex("SourceCommandId", "KioskExecutionEndpointId");
 
                     b.HasIndex("SourceCommandId", "SourceProductionJobId")
@@ -3873,10 +4704,1470 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("KioskExecutionEndpointId", "Status", "LastExecutorReportedAt");
 
+                    b.HasIndex("SourceCommandId", "OrderItemId", "ProductionUnitNo")
+                        .IsUnique();
+
                     b.ToTable("ProductionExecutionRecords", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotArtifact", b =>
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionComposition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("GeneratedRobotProgramId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("InputChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("InputJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("InputSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MachineModelCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReportJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("RuntimeTargetCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TargetExecutionEndpointId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GeneratedRobotProgramId");
+
+                    b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("RecipeId");
+
+                    b.HasIndex("TargetExecutionEndpointId");
+
+                    b.HasIndex("InstallationId", "InputChecksum")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("OrganizationId", "ProductVariantId", "Status");
+
+                    b.ToTable("ProductionCompositions", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackages", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageArtifactDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ArtifactChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PackageVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RobotArtifactTemplateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TechnicalContractChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("TechnicalContractId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RobotArtifactTemplateId");
+
+                    b.HasIndex("TechnicalContractId");
+
+                    b.HasIndex("PackageVersionId", "SourceKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageArtifactDefinitions", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageInstallation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DraftConfigurationReleaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MaterializationIdentitySuffix")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("OwnershipMode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PackageManifestChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("PackageVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SelectedProductSourceKeysJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DraftConfigurationReleaseId");
+
+                    b.HasIndex("PackageVersionId");
+
+                    b.HasIndex("KioskId", "OrganizationId");
+
+                    b.HasIndex("OrganizationId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("StoreId", "OrganizationId");
+
+                    b.HasIndex("OrganizationId", "Status", "StartedAt");
+
+                    b.ToTable("ProductionPackageInstallations", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductionPackageInstallations_KioskRequiresStore", "\"KioskId\" IS NULL OR \"StoreId\" IS NOT NULL");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageMaterialization", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ResourceKind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("TargetChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("TargetKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResourceKind", "TargetKey")
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("InstallationId", "ResourceKind", "SourceKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageMaterializations", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageProductDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PackageVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductSnapshotChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ProductSnapshotJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("SourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("SourceProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceProductId");
+
+                    b.HasIndex("PackageVersionId", "SourceKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageProductDefinitions", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageProgramBlueprint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BlueprintCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MachineModelCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("PackageVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RuntimeTargetCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageVersionId", "BlueprintCode")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageProgramBlueprints", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageProgramSlot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AllowMultiple")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ArtifactSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Phase")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("ProgramBlueprintId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequiredEffectCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SlotCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SortHint")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProgramBlueprintId", "SlotCode")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageProgramSlots", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageRouteBlueprint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PackageVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Priority")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ProductSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProductVariantSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProgramBlueprintCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RecipeSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RequiredCapabilitiesJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("RouteCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SupportedOptionCodesJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PackageVersionId", "RouteCode")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageRouteBlueprints", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgrade", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ApprovedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CompletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PreviewChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("RollbackRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RollbackRequestedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("RolledBackAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RolledBackByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SelectedProductSourceKeysJson")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("SourceInstallationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceManifestChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TargetInstallationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetManifestChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("TargetPackageVersionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceInstallationId");
+
+                    b.HasIndex("TargetInstallationId");
+
+                    b.HasIndex("TargetPackageVersionId");
+
+                    b.HasIndex("OrganizationId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("OrganizationId", "SourceInstallationId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL AND \"Status\" IN (0, 1, 2, 3)");
+
+                    b.HasIndex("OrganizationId", "SourceInstallationId", "Status")
+                        .HasDatabaseName("IX_ProductionPackageUpgrades_OrganizationId_SourceInstallatio~1");
+
+                    b.ToTable("ProductionPackageUpgrades", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeAvailabilityChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ResourceKind")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ResourceSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<bool>("SourceAvailabilityBefore")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("SourceResourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("TargetAvailabilityAfter")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("TargetAvailabilityBefore")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("TargetResourceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UpgradeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpgradeId", "ResourceKind", "SourceResourceId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageUpgradeAvailabilityChanges", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeCatalogIdentityChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AfterChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("BeforeChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SourceCodeAfter")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SourceCodeBefore")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("SourceProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TargetCodeAfter")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TargetCodeBefore")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TargetProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UpgradeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceProductId");
+
+                    b.HasIndex("TargetProductId");
+
+                    b.HasIndex("UpgradeId", "ProductSourceKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageUpgradeCatalogIdentityChanges", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeEndpointTarget", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskExecutionEndpointId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("RollbackDeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceConfigurationReleaseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceDeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("TargetDeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UpgradeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KioskExecutionEndpointId");
+
+                    b.HasIndex("UpgradeId", "KioskExecutionEndpointId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageUpgradeEndpointTargets", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeMenuChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AfterBindingChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("AfterMenuItemStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("AfterProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AfterProductVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AfterRecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BeforeBindingChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("BeforeMenuItemStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("BeforeProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("BeforeProductVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BeforeRecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ChangeKind")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UpgradeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MenuId");
+
+                    b.HasIndex("MenuItemId");
+
+                    b.HasIndex("UpgradeId", "MenuItemId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageUpgradeMenuChanges", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeMenuOptionChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("AfterProductOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("BeforeProductOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OptionSourceKey")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UpgradeMenuChangeId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UpgradeMenuChangeId", "OptionSourceKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageUpgradeMenuOptionChanges", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeRollbackAttempt", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AttemptNo")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ReplacedDeploymentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RequestedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UpgradeEndpointTargetId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeploymentId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("UpgradeEndpointTargetId", "AttemptNo")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageUpgradeRollbackAttempts", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ManifestChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ManifestJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ManifestSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("ProductionPackageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ManifestChecksum")
+                        .IsUnique()
+                        .HasFilter("\"ManifestChecksum\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("ProductionPackageId", "Version")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("ProductionPackageVersions", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactDeclaredEffect", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EffectCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("EffectKind")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("FixedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("IngredientCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("OptionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("QuantityMode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequiredWorkcellCapabilityCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TechnicalContractId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Unit")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TechnicalContractId", "EffectCode")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("RobotArtifactDeclaredEffects", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactOrderingConstraint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ConstraintType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("SortHint")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TechnicalContractId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TechnicalContractId", "ConstraintType", "Value", "SortHint")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("RobotArtifactOrderingConstraints", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContractChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ContractCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ContractJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ContractVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MachineModelCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RuntimeTargetCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SourceContractId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContractChecksum")
+                        .IsUnique()
+                        .HasFilter("\"ContractChecksum\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("SourceContractId");
+
+                    b.HasIndex("ContractCode", "ContractVersion")
+                        .IsUnique()
+                        .HasFilter("\"OrganizationId\" IS NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("OrganizationId", "ContractCode", "ContractVersion")
+                        .IsUnique()
+                        .HasFilter("\"OrganizationId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
+                    b.ToTable("RobotArtifactTechnicalContracts", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactTemplates.RobotArtifactTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Checksum")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<long>("ContentLengthBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset>("ExportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FileName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("MachineModelCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("MetadataJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("RuntimeTargetCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TechnicalContractChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TechnicalContractId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TemplateCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("TemplateName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StorageKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("TechnicalContractId");
+
+                    b.HasIndex("TemplateCode", "Checksum")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("RuntimeTargetCode", "MachineModelCode", "Status");
+
+                    b.ToTable("RobotArtifactTemplates", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.Artifacts.RobotArtifact", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -3957,6 +6248,13 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("TechnicalContractChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("TechnicalContractId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -3974,6 +6272,8 @@ namespace Infrastructure.Migrations
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
+                    b.HasIndex("TechnicalContractId");
+
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.HasIndex("OrganizationId", "ArtifactCode", "Checksum")
@@ -3985,18 +6285,33 @@ namespace Infrastructure.Migrations
                     b.ToTable("RobotArtifacts", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotArtifactTemplate", b =>
+            modelBuilder.Entity("Domain.RobotConfiguration.AuthoringImports.RobotAuthoringImport", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Checksum")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                    b.Property<DateTimeOffset?>("AppliedAt")
+                        .HasColumnType("timestamp with time zone");
 
-                    b.Property<long>("ContentLengthBytes")
-                        .HasColumnType("bigint");
+                    b.Property<Guid?>("AppliedRobotProgramId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientExportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ComposedOptionCodesJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid?>("ComposedRecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompositionConfirmedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CompositionPreviewChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4010,28 +6325,69 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("DeletedByAccountId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                    b.Property<Guid?>("DeviceId")
+                        .HasColumnType("uuid");
 
-                    b.Property<DateTimeOffset>("ExportedAt")
+                    b.Property<DateTimeOffset?>("DiscardedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("FileName")
-                        .IsRequired()
+                    b.Property<string>("FailureCode")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ImportChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("LinkedConfigurationReleaseId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("MachineModelCode")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("MetadataJson")
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProposedProgramCode")
+                        .IsRequired()
                         .HasMaxLength(500)
-                        .HasColumnType("jsonb");
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ProposedProgramName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReleaseLinkedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("RuntimeTargetCode")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("SchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StagingStorageKey")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -4039,20 +6395,111 @@ namespace Infrastructure.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
-                    b.Property<string>("StorageKey")
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ValidatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ValidationReportJson")
+                        .HasMaxLength(500)
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AppliedRobotProgramId");
+
+                    b.HasIndex("ComposedRecipeId");
+
+                    b.HasIndex("DeviceId");
+
+                    b.HasIndex("KioskId");
+
+                    b.HasIndex("LinkedConfigurationReleaseId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("OrganizationId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("OrganizationId", "ClientExportId", "ImportChecksum");
+
+                    b.ToTable("RobotAuthoringImports", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.AuthoringImports.RobotAuthoringImportItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ArtifactCode")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("TemplateCode")
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("TemplateName")
+                    b.Property<string>("LuaChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("RobotArtifactId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RobotAuthoringImportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RunOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SidecarChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SidecarFileName")
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("TechnicalContractId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4062,20 +6509,22 @@ namespace Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("StorageKey")
+                    b.HasIndex("RobotArtifactId");
+
+                    b.HasIndex("TechnicalContractId");
+
+                    b.HasIndex("RobotAuthoringImportId", "ArtifactCode")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.HasIndex("TemplateCode", "Checksum")
+                    b.HasIndex("RobotAuthoringImportId", "RunOrder")
                         .IsUnique()
                         .HasFilter("\"DeletedAt\" IS NULL");
 
-                    b.HasIndex("RuntimeTargetCode", "MachineModelCode", "Status");
-
-                    b.ToTable("RobotArtifactTemplates", (string)null);
+                    b.ToTable("RobotAuthoringImportItems", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
+            modelBuilder.Entity("Domain.RobotConfiguration.Programs.RobotProgram", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -4179,7 +6628,7 @@ namespace Infrastructure.Migrations
                     b.ToTable("RobotPrograms", (string)null);
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgramArtifact", b =>
+            modelBuilder.Entity("Domain.RobotConfiguration.Programs.RobotProgramArtifact", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
@@ -4205,6 +6654,10 @@ namespace Infrastructure.Migrations
 
                     b.Property<int>("ParametersSchemaVersion")
                         .HasColumnType("integer");
+
+                    b.Property<string>("RequiredOptionCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<Guid>("RobotArtifactId")
                         .HasColumnType("uuid");
@@ -4435,6 +6888,46 @@ namespace Infrastructure.Migrations
                     b.ToTable("MenuItems", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItemProductOption", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductOptionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductOptionId");
+
+                    b.HasIndex("MenuItemId", "ProductOptionId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.ToTable("MenuItemProductOptions", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Sync.DeadLetters.SyncDeadLetter", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4621,8 +7114,14 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTimeOffset?>("RequestedCommandExpiryAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTimeOffset?>("RespondedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RollbackTargetDeploymentId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -4898,6 +7397,99 @@ namespace Infrastructure.Migrations
                     b.ToTable("SyncEventInbox", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Tenants.Entities.FranchiseOnboarding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("PackageInstallationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ReadyAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RequestChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("RequestJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("RequestSchemaVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KioskId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("PackageInstallationId")
+                        .IsUnique()
+                        .HasFilter("\"PackageInstallationId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("OrganizationId", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("OrganizationId", "Status", "UpdatedAt");
+
+                    b.ToTable("FranchiseOnboardings", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Tenants.Entities.Kiosk", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4951,6 +7543,21 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("OperationalState")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
+
+                    b.Property<DateTimeOffset?>("OperationalStateChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OperationalStateChangedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("OperationalStateReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid");
 
@@ -4970,9 +7577,6 @@ namespace Infrastructure.Migrations
 
                     b.Property<Guid>("StoreId")
                         .HasColumnType("uuid");
-
-                    b.Property<bool>("SupportsOfflineMode")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("TimeZone")
                         .IsRequired()
@@ -5003,6 +7607,55 @@ namespace Infrastructure.Migrations
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Kiosks", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Tenants.Entities.KioskOperationalStateTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromState")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("SourceMaintenanceTicketId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ToState")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SourceMaintenanceTicketId");
+
+                    b.HasIndex("KioskId", "ChangedAt");
+
+                    b.ToTable("KioskOperationalStateTransitions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Tenants.Entities.Organization", b =>
@@ -5143,6 +7796,25 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<string>("SalesPauseReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("SalesPausedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SalesPausedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SalesPausedUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("SalesResumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SalesResumedByAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -5171,36 +7843,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("Stores", (string)null);
                 });
 
-            modelBuilder.Entity("OrderItemProductOptions", b =>
-                {
-                    b.Property<Guid>("OrderItemId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProductOptionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("OrderItemId", "ProductOptionId");
-
-                    b.HasIndex("ProductOptionId");
-
-                    b.ToTable("OrderItemProductOptions", (string)null);
-                });
-
-            modelBuilder.Entity("ProductProductOptions", b =>
-                {
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProductOptionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("ProductId", "ProductOptionId");
-
-                    b.HasIndex("ProductOptionId");
-
-                    b.ToTable("ProductProductOptions", (string)null);
-                });
-
             modelBuilder.Entity("AccountStores", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", null)
@@ -5214,6 +7856,17 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("StoreId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Catalog.Entities.OptionGroup", b =>
+                {
+                    b.HasOne("Domain.Catalog.Entities.Product", "Product")
+                        .WithMany("OptionGroups")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.Product", b =>
@@ -5254,16 +7907,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("TemplateProduct");
                 });
 
-            modelBuilder.Entity("Domain.Catalog.Entities.ProductCategory", b =>
-                {
-                    b.HasOne("Domain.Catalog.Entities.ProductCategory", "ParentCategory")
-                        .WithMany("ChildCategories")
-                        .HasForeignKey("ParentCategoryId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ParentCategory");
-                });
-
             modelBuilder.Entity("Domain.Catalog.Entities.ProductOption", b =>
                 {
                     b.HasOne("Domain.Catalog.Entities.OptionGroup", "OptionGroup")
@@ -5272,21 +7915,26 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
-                        .WithMany()
-                        .HasForeignKey("OrganizationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Domain.Catalog.Entities.ProductOption", "TemplateProductOption")
-                        .WithMany()
-                        .HasForeignKey("TemplateProductOptionId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.Navigation("OptionGroup");
+                });
 
-                    b.Navigation("Organization");
+            modelBuilder.Entity("Domain.Catalog.Entities.ProductOptionIngredientRequirement", b =>
+                {
+                    b.HasOne("Domain.Catalog.Entities.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
-                    b.Navigation("TemplateProductOption");
+                    b.HasOne("Domain.Catalog.Entities.ProductOption", "ProductOption")
+                        .WithMany("IngredientRequirements")
+                        .HasForeignKey("ProductOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Ingredient");
+
+                    b.Navigation("ProductOption");
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
@@ -5358,14 +8006,14 @@ namespace Infrastructure.Migrations
                     b.Navigation("Recipe");
                 });
 
-            modelBuilder.Entity("Domain.Devices.Entities.Device", b =>
+            modelBuilder.Entity("Domain.Devices.Catalog.Device", b =>
                 {
-                    b.HasOne("Domain.Devices.Entities.DeviceModel", "DeviceModel")
+                    b.HasOne("Domain.Devices.Catalog.DeviceModel", "DeviceModel")
                         .WithMany()
                         .HasForeignKey("DeviceModelId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Devices.Entities.DeviceType", "DeviceType")
+                    b.HasOne("Domain.Devices.Catalog.DeviceType", "DeviceType")
                         .WithMany()
                         .HasForeignKey("DeviceTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -5384,15 +8032,24 @@ namespace Infrastructure.Migrations
                     b.Navigation("Kiosk");
                 });
 
-            modelBuilder.Entity("Domain.Devices.Entities.DeviceModel", b =>
+            modelBuilder.Entity("Domain.Devices.Catalog.DeviceModel", b =>
                 {
-                    b.HasOne("Domain.Devices.Entities.DeviceType", "DeviceType")
+                    b.HasOne("Domain.Devices.Catalog.DeviceType", "DeviceType")
                         .WithMany("DeviceModels")
                         .HasForeignKey("DeviceTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("DeviceType");
+                });
+
+            modelBuilder.Entity("Domain.Devices.Connectivity.KioskConnectivityProjection", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointCredentialBinding", b =>
@@ -5430,7 +8087,7 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointSupportedRobotTarget", b =>
                 {
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
                         .WithMany()
                         .HasForeignKey("DeviceId", "KioskId")
                         .HasPrincipalKey("Id", "KioskId")
@@ -5504,7 +8161,7 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("KioskId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
                         .WithMany()
                         .HasForeignKey("DeviceId", "KioskId")
                         .HasPrincipalKey("Id", "KioskId")
@@ -5526,10 +8183,10 @@ namespace Infrastructure.Migrations
                     b.Navigation("Kiosk");
                 });
 
-            modelBuilder.Entity("Domain.Identity.Entities.AccountDevice", b =>
+            modelBuilder.Entity("Domain.Identity.Entities.AccountInvitation", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "Account")
-                        .WithMany("AccountDevices")
+                        .WithMany("AccountInvitations")
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -5537,10 +8194,10 @@ namespace Infrastructure.Migrations
                     b.Navigation("Account");
                 });
 
-            modelBuilder.Entity("Domain.Identity.Entities.AccountInvitation", b =>
+            modelBuilder.Entity("Domain.Identity.Entities.AccountNotificationDevice", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "Account")
-                        .WithMany("AccountInvitations")
+                        .WithMany("NotificationDevices")
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -5608,11 +8265,6 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Identity.Entities.RefreshToken", b =>
                 {
-                    b.HasOne("Domain.Identity.Entities.AccountDevice", "AccountDevice")
-                        .WithMany()
-                        .HasForeignKey("AccountDeviceId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("Domain.Identity.Entities.Account", "Account")
                         .WithMany()
                         .HasForeignKey("AccountId")
@@ -5626,14 +8278,12 @@ namespace Infrastructure.Migrations
 
                     b.Navigation("Account");
 
-                    b.Navigation("AccountDevice");
-
                     b.Navigation("ReplacedByToken");
                 });
 
             modelBuilder.Entity("Domain.Inventory.Entities.IngredientDispenserState", b =>
                 {
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
                         .WithMany("IngredientDispenserStates")
                         .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -5657,6 +8307,21 @@ namespace Infrastructure.Migrations
                     b.Navigation("Kiosk");
                 });
 
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyRebindRecord", b =>
+                {
+                    b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", null)
+                        .WithMany()
+                        .HasForeignKey("ReplacementDispenserStateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", null)
+                        .WithMany()
+                        .HasForeignKey("SourceDispenserStateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Inventory.Entities.StockMovement", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "CreatedByAccount")
@@ -5664,7 +8329,7 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("CreatedByAccountId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
                         .WithMany()
                         .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -5723,7 +8388,7 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
                         .WithMany()
                         .HasForeignKey("DeviceId", "KioskId")
                         .HasPrincipalKey("Id", "KioskId")
@@ -5738,6 +8403,11 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Operations.Entities.MaintenanceTicket", b =>
                 {
+                    b.HasOne("Domain.Operations.Entities.Alert", "Alert")
+                        .WithMany()
+                        .HasForeignKey("AlertId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Identity.Entities.Account", "AssignedToAccount")
                         .WithMany()
                         .HasForeignKey("AssignedToAccountId")
@@ -5753,7 +8423,7 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("DeviceEventId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
                         .WithMany()
                         .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -5781,6 +8451,8 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Alert");
+
                     b.Navigation("AssignedToAccount");
 
                     b.Navigation("CreatedByAccount");
@@ -5798,6 +8470,33 @@ namespace Infrastructure.Migrations
                     b.Navigation("Store");
                 });
 
+            modelBuilder.Entity("Domain.Operations.Entities.NotificationDelivery", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("RecipientAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId", "OrganizationId")
+                        .HasPrincipalKey("Id", "OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId", "OrganizationId")
+                        .HasPrincipalKey("Id", "OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Domain.Operations.Entities.OperationLog", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "Account")
@@ -5805,7 +8504,7 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
                         .WithMany()
                         .HasForeignKey("DeviceId")
                         .OnDelete(DeleteBehavior.Restrict);
@@ -5896,6 +8595,42 @@ namespace Infrastructure.Migrations
                     b.Navigation("Recipe");
                 });
 
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemOption", b =>
+                {
+                    b.HasOne("Domain.Orders.Entities.OrderItem", "OrderItem")
+                        .WithMany("Options")
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OrderItem");
+                });
+
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemOptionIngredientRequirement", b =>
+                {
+                    b.HasOne("Domain.Orders.Entities.OrderItemOption", "OrderItemOption")
+                        .WithMany("IngredientRequirements")
+                        .HasForeignKey("OrderItemOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("OrderItemOption");
+                });
+
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemStatusHistory", b =>
+                {
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ChangedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Orders.Entities.OrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Orders.Entities.OrderStatusHistory", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "ChangedByAccount")
@@ -5912,6 +8647,32 @@ namespace Infrastructure.Migrations
                     b.Navigation("ChangedByAccount");
 
                     b.Navigation("Order");
+                });
+
+            modelBuilder.Entity("Domain.Orders.Incidents.ProductionIncident", b =>
+                {
+                    b.HasOne("Domain.Orders.Entities.Order", null)
+                        .WithMany()
+                        .HasForeignKey("OrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Orders.Entities.OrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.Orders.Incidents.ProductionIncidentHistory", b =>
+                {
+                    b.HasOne("Domain.Orders.Incidents.ProductionIncident", "ProductionIncident")
+                        .WithMany("History")
+                        .HasForeignKey("ProductionIncidentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProductionIncident");
                 });
 
             modelBuilder.Entity("Domain.Payments.Entities.PaymentCallback", b =>
@@ -5975,6 +8736,16 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ControllerArtifactSetDeployment", b =>
                 {
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("RiskAcknowledgedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", "KioskExecutionEndpoint")
                         .WithMany()
                         .HasForeignKey("KioskExecutionEndpointId", "KioskId")
@@ -6047,7 +8818,7 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.RobotConfiguration.Entities.RobotProgram", "RobotProgram")
+                    b.HasOne("Domain.RobotConfiguration.Programs.RobotProgram", "RobotProgram")
                         .WithMany()
                         .HasForeignKey("RobotProgramId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -6063,6 +8834,11 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Identity.Entities.Account", null)
                         .WithMany()
                         .HasForeignKey("RequestedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("RiskAcknowledgedByAccountId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Domain.ProductionConfiguration.Entities.ConfigurationRelease", "ConfigurationRelease")
@@ -6127,6 +8903,12 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Domain.Orders.Entities.OrderItem", null)
+                        .WithMany()
+                        .HasForeignKey("OrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("Domain.Sync.Entities.EdgeCommand", "SourceCommand")
                         .WithMany()
                         .HasForeignKey("SourceCommandId", "KioskExecutionEndpointId")
@@ -6139,70 +8921,445 @@ namespace Infrastructure.Migrations
                     b.Navigation("SourceCommand");
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotArtifact", b =>
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionComposition", b =>
                 {
-                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
+                    b.HasOne("Domain.RobotConfiguration.Programs.RobotProgram", null)
+                        .WithMany()
+                        .HasForeignKey("GeneratedRobotProgramId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageInstallation", null)
+                        .WithMany()
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.Recipe", null)
+                        .WithMany()
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", null)
+                        .WithMany()
+                        .HasForeignKey("TargetExecutionEndpointId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageArtifactDefinition", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageVersion", "PackageVersion")
+                        .WithMany("Artifacts")
+                        .HasForeignKey("PackageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.RobotConfiguration.ArtifactTemplates.RobotArtifactTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("RobotArtifactTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", null)
+                        .WithMany()
+                        .HasForeignKey("TechnicalContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PackageVersion");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageInstallation", b =>
+                {
+                    b.HasOne("Domain.ProductionConfiguration.Entities.ConfigurationRelease", null)
+                        .WithMany()
+                        .HasForeignKey("DraftConfigurationReleaseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.RobotConfiguration.Entities.RobotArtifactTemplate", "SourceRobotArtifactTemplate")
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageVersion", "PackageVersion")
                         .WithMany()
-                        .HasForeignKey("SourceRobotArtifactTemplateId")
+                        .HasForeignKey("PackageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId", "OrganizationId")
+                        .HasPrincipalKey("Id", "OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("Organization");
+                    b.HasOne("Domain.Tenants.Entities.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId", "OrganizationId")
+                        .HasPrincipalKey("Id", "OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.Navigation("SourceRobotArtifactTemplate");
+                    b.Navigation("PackageVersion");
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageMaterialization", b =>
                 {
-                    b.HasOne("Domain.Devices.Entities.Device", "Device")
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageInstallation", "Installation")
+                        .WithMany("Materializations")
+                        .HasForeignKey("InstallationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Installation");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageProductDefinition", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageVersion", "PackageVersion")
+                        .WithMany("Products")
+                        .HasForeignKey("PackageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.Product", null)
                         .WithMany()
-                        .HasForeignKey("DeviceId")
+                        .HasForeignKey("SourceProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PackageVersion");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageProgramBlueprint", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageVersion", "PackageVersion")
+                        .WithMany("Programs")
+                        .HasForeignKey("PackageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PackageVersion");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageProgramSlot", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageProgramBlueprint", "ProgramBlueprint")
+                        .WithMany("Slots")
+                        .HasForeignKey("ProgramBlueprintId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProgramBlueprint");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageRouteBlueprint", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageVersion", "PackageVersion")
+                        .WithMany("Routes")
+                        .HasForeignKey("PackageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PackageVersion");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgrade", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageInstallation", "SourceInstallation")
+                        .WithMany()
+                        .HasForeignKey("SourceInstallationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageInstallation", "TargetInstallation")
+                        .WithMany()
+                        .HasForeignKey("TargetInstallationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageVersion", "TargetPackageVersion")
                         .WithMany()
-                        .HasForeignKey("KioskId")
+                        .HasForeignKey("TargetPackageVersionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("SourceInstallation");
+
+                    b.Navigation("TargetInstallation");
+
+                    b.Navigation("TargetPackageVersion");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeAvailabilityChange", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageUpgrade", "Upgrade")
+                        .WithMany("AvailabilityChanges")
+                        .HasForeignKey("UpgradeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Upgrade");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeCatalogIdentityChange", b =>
+                {
+                    b.HasOne("Domain.Catalog.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("SourceProductId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
+                    b.HasOne("Domain.Catalog.Entities.Product", null)
+                        .WithMany()
+                        .HasForeignKey("TargetProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageUpgrade", "Upgrade")
+                        .WithMany("CatalogIdentityChanges")
+                        .HasForeignKey("UpgradeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Upgrade");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeEndpointTarget", b =>
+                {
+                    b.HasOne("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", null)
+                        .WithMany()
+                        .HasForeignKey("KioskExecutionEndpointId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageUpgrade", "Upgrade")
+                        .WithMany("EndpointTargets")
+                        .HasForeignKey("UpgradeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Upgrade");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeMenuChange", b =>
+                {
+                    b.HasOne("Domain.SalesCatalog.Entities.Menu", null)
+                        .WithMany()
+                        .HasForeignKey("MenuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.SalesCatalog.Entities.MenuItem", null)
+                        .WithMany()
+                        .HasForeignKey("MenuItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageUpgrade", "Upgrade")
+                        .WithMany("MenuChanges")
+                        .HasForeignKey("UpgradeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Upgrade");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeMenuOptionChange", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageUpgradeMenuChange", "UpgradeMenuChange")
+                        .WithMany("OptionChanges")
+                        .HasForeignKey("UpgradeMenuChangeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("UpgradeMenuChange");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeRollbackAttempt", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageUpgradeEndpointTarget", "UpgradeEndpointTarget")
+                        .WithMany("RollbackAttempts")
+                        .HasForeignKey("UpgradeEndpointTargetId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("UpgradeEndpointTarget");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageVersion", b =>
+                {
+                    b.HasOne("Domain.ProductionPackages.ProductionPackage", "ProductionPackage")
+                        .WithMany("Versions")
+                        .HasForeignKey("ProductionPackageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ProductionPackage");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactDeclaredEffect", b =>
+                {
+                    b.HasOne("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", "TechnicalContract")
+                        .WithMany("Effects")
+                        .HasForeignKey("TechnicalContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TechnicalContract");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactOrderingConstraint", b =>
+                {
+                    b.HasOne("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", "TechnicalContract")
+                        .WithMany("OrderingConstraints")
+                        .HasForeignKey("TechnicalContractId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("TechnicalContract");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
                         .WithMany()
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("Domain.Tenants.Entities.Store", "Store")
+                    b.HasOne("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", null)
+                        .WithMany()
+                        .HasForeignKey("SourceContractId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactTemplates.RobotArtifactTemplate", b =>
+                {
+                    b.HasOne("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", null)
+                        .WithMany()
+                        .HasForeignKey("TechnicalContractId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.Artifacts.RobotArtifact", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.RobotConfiguration.ArtifactTemplates.RobotArtifactTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("SourceRobotArtifactTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", null)
+                        .WithMany()
+                        .HasForeignKey("TechnicalContractId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.AuthoringImports.RobotAuthoringImport", b =>
+                {
+                    b.HasOne("Domain.RobotConfiguration.Programs.RobotProgram", null)
+                        .WithMany()
+                        .HasForeignKey("AppliedRobotProgramId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Catalog.Entities.Recipe", null)
+                        .WithMany()
+                        .HasForeignKey("ComposedRecipeId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Devices.Catalog.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.ProductionConfiguration.Entities.ConfigurationRelease", null)
+                        .WithMany()
+                        .HasForeignKey("LinkedConfigurationReleaseId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Store", null)
                         .WithMany()
                         .HasForeignKey("StoreId")
                         .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("Device");
-
-                    b.Navigation("Kiosk");
-
-                    b.Navigation("Organization");
-
-                    b.Navigation("Store");
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgramArtifact", b =>
+            modelBuilder.Entity("Domain.RobotConfiguration.AuthoringImports.RobotAuthoringImportItem", b =>
                 {
-                    b.HasOne("Domain.RobotConfiguration.Entities.RobotArtifact", "RobotArtifact")
+                    b.HasOne("Domain.RobotConfiguration.Artifacts.RobotArtifact", null)
+                        .WithMany()
+                        .HasForeignKey("RobotArtifactId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.RobotConfiguration.AuthoringImports.RobotAuthoringImport", "RobotAuthoringImport")
+                        .WithMany("Items")
+                        .HasForeignKey("RobotAuthoringImportId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", null)
+                        .WithMany()
+                        .HasForeignKey("TechnicalContractId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("RobotAuthoringImport");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.Programs.RobotProgram", b =>
+                {
+                    b.HasOne("Domain.Devices.Catalog.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.Programs.RobotProgramArtifact", b =>
+                {
+                    b.HasOne("Domain.RobotConfiguration.Artifacts.RobotArtifact", null)
                         .WithMany()
                         .HasForeignKey("RobotArtifactId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("Domain.RobotConfiguration.Entities.RobotProgram", "RobotProgram")
+                    b.HasOne("Domain.RobotConfiguration.Programs.RobotProgram", "RobotProgram")
                         .WithMany("RobotProgramArtifacts")
                         .HasForeignKey("RobotProgramId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("RobotArtifact");
 
                     b.Navigation("RobotProgram");
                 });
@@ -6263,6 +9420,23 @@ namespace Infrastructure.Migrations
                     b.Navigation("ProductVariant");
 
                     b.Navigation("Recipe");
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItemProductOption", b =>
+                {
+                    b.HasOne("Domain.SalesCatalog.Entities.MenuItem", "MenuItem")
+                        .WithMany("ProductOptions")
+                        .HasForeignKey("MenuItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.ProductOption", null)
+                        .WithMany()
+                        .HasForeignKey("ProductOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("MenuItem");
                 });
 
             modelBuilder.Entity("Domain.Sync.DeadLetters.SyncDeadLetter", b =>
@@ -6381,6 +9555,30 @@ namespace Infrastructure.Migrations
                     b.Navigation("Kiosk");
                 });
 
+            modelBuilder.Entity("Domain.Tenants.Entities.FranchiseOnboarding", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.ProductionPackages.ProductionPackageInstallation", null)
+                        .WithMany()
+                        .HasForeignKey("PackageInstallationId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Store", null)
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Domain.Tenants.Entities.Kiosk", b =>
                 {
                     b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
@@ -6400,6 +9598,20 @@ namespace Infrastructure.Migrations
                     b.Navigation("Store");
                 });
 
+            modelBuilder.Entity("Domain.Tenants.Entities.KioskOperationalStateTransition", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Operations.Entities.MaintenanceTicket", null)
+                        .WithMany()
+                        .HasForeignKey("SourceMaintenanceTicketId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
             modelBuilder.Entity("Domain.Tenants.Entities.Store", b =>
                 {
                     b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
@@ -6411,36 +9623,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("Organization");
                 });
 
-            modelBuilder.Entity("OrderItemProductOptions", b =>
-                {
-                    b.HasOne("Domain.Orders.Entities.OrderItem", null)
-                        .WithMany()
-                        .HasForeignKey("OrderItemId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Catalog.Entities.ProductOption", null)
-                        .WithMany()
-                        .HasForeignKey("ProductOptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("ProductProductOptions", b =>
-                {
-                    b.HasOne("Domain.Catalog.Entities.Product", null)
-                        .WithMany()
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Catalog.Entities.ProductOption", null)
-                        .WithMany()
-                        .HasForeignKey("ProductOptionId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Domain.Catalog.Entities.OptionGroup", b =>
                 {
                     b.Navigation("ProductOptions");
@@ -6448,12 +9630,14 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Catalog.Entities.Product", b =>
                 {
+                    b.Navigation("OptionGroups");
+
                     b.Navigation("ProductVariants");
                 });
 
-            modelBuilder.Entity("Domain.Catalog.Entities.ProductCategory", b =>
+            modelBuilder.Entity("Domain.Catalog.Entities.ProductOption", b =>
                 {
-                    b.Navigation("ChildCategories");
+                    b.Navigation("IngredientRequirements");
                 });
 
             modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
@@ -6466,12 +9650,12 @@ namespace Infrastructure.Migrations
                     b.Navigation("RecipeItems");
                 });
 
-            modelBuilder.Entity("Domain.Devices.Entities.Device", b =>
+            modelBuilder.Entity("Domain.Devices.Catalog.Device", b =>
                 {
                     b.Navigation("IngredientDispenserStates");
                 });
 
-            modelBuilder.Entity("Domain.Devices.Entities.DeviceType", b =>
+            modelBuilder.Entity("Domain.Devices.Catalog.DeviceType", b =>
                 {
                     b.Navigation("DeviceModels");
                 });
@@ -6490,11 +9674,11 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Identity.Entities.Account", b =>
                 {
-                    b.Navigation("AccountDevices");
-
                     b.Navigation("AccountInvitations");
 
                     b.Navigation("AccountRoles");
+
+                    b.Navigation("NotificationDevices");
 
                     b.Navigation("PasswordResetRequests");
                 });
@@ -6507,6 +9691,21 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Orders.Entities.Order", b =>
                 {
                     b.Navigation("OrderItems");
+                });
+
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItem", b =>
+                {
+                    b.Navigation("Options");
+                });
+
+            modelBuilder.Entity("Domain.Orders.Entities.OrderItemOption", b =>
+                {
+                    b.Navigation("IngredientRequirements");
+                });
+
+            modelBuilder.Entity("Domain.Orders.Incidents.ProductionIncident", b =>
+                {
+                    b.Navigation("History");
                 });
 
             modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ConfigurationRelease", b =>
@@ -6524,7 +9723,66 @@ namespace Infrastructure.Migrations
                     b.Navigation("RobotBindings");
                 });
 
-            modelBuilder.Entity("Domain.RobotConfiguration.Entities.RobotProgram", b =>
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackage", b =>
+                {
+                    b.Navigation("Versions");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageInstallation", b =>
+                {
+                    b.Navigation("Materializations");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageProgramBlueprint", b =>
+                {
+                    b.Navigation("Slots");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgrade", b =>
+                {
+                    b.Navigation("AvailabilityChanges");
+
+                    b.Navigation("CatalogIdentityChanges");
+
+                    b.Navigation("EndpointTargets");
+
+                    b.Navigation("MenuChanges");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeEndpointTarget", b =>
+                {
+                    b.Navigation("RollbackAttempts");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageUpgradeMenuChange", b =>
+                {
+                    b.Navigation("OptionChanges");
+                });
+
+            modelBuilder.Entity("Domain.ProductionPackages.ProductionPackageVersion", b =>
+                {
+                    b.Navigation("Artifacts");
+
+                    b.Navigation("Products");
+
+                    b.Navigation("Programs");
+
+                    b.Navigation("Routes");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.ArtifactContracts.RobotArtifactTechnicalContract", b =>
+                {
+                    b.Navigation("Effects");
+
+                    b.Navigation("OrderingConstraints");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.AuthoringImports.RobotAuthoringImport", b =>
+                {
+                    b.Navigation("Items");
+                });
+
+            modelBuilder.Entity("Domain.RobotConfiguration.Programs.RobotProgram", b =>
                 {
                     b.Navigation("RobotProgramArtifacts");
                 });
@@ -6532,6 +9790,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>
                 {
                     b.Navigation("MenuItems");
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.MenuItem", b =>
+                {
+                    b.Navigation("ProductOptions");
                 });
 
             modelBuilder.Entity("Domain.Sync.DeadLetters.SyncDeadLetter", b =>

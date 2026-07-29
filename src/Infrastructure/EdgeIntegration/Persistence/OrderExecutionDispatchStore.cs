@@ -1,8 +1,14 @@
+using Application.RobotConfiguration.Programs.ReadModels;
+using Application.RobotConfiguration.Programs.Mapping;
+using Application.RobotConfiguration.Programs.Results;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using Domain.Devices.ExecutionEndpoints;
 using Application.EdgeIntegration.Abstractions;
 using Domain.Catalog.Enums;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.Orders.Enums;
 using Domain.ProductionConfiguration.Entities;
@@ -12,6 +18,10 @@ using Domain.Sync.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Devices.ExecutionEndpoints.Projections;
+using Application.Orders.Support;
+using Application.Tenants.Kiosks.Rules;
+using Domain.Tenants.Enums;
+using Domain.Orders.Incidents;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -31,7 +41,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
     {
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
         await _dbContext.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({$"order-execution-dispatch:{orderId:D}"}, 0));",
+            $"SELECT pg_advisory_xact_lock(hashtextextended({OrderWorkflowConcurrency.OrderLockKey(orderId)}, 0));",
             cancellationToken);
         var result = await action(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -47,9 +57,29 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             cancellationToken);
     }
 
+    public Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({KioskOperationalConcurrency.LockKey(kioskId)}, 0));",
+            cancellationToken);
+
+    public Task<bool> IsKioskOperationalAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
+            kiosk => kiosk.Id == kioskId &&
+                kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active &&
+                kiosk.OperationalState == KioskOperationalState.Operational,
+            cancellationToken);
+
     public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Orders
+        return _dbContext.Orders.WhereNotDeleted()
+            .Include(order => order.Kiosk)
+            .Include(order => order.OrderItems)
+                .ThenInclude(item => item.Options)
+                    .ThenInclude(option => option.IngredientRequirements)
             .Include(order => order.OrderItems)
                 .ThenInclude(item => item.ProductVariant)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
@@ -59,7 +89,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
         Guid kioskId,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.KioskExecutionEndpoints
+        return await _dbContext.KioskExecutionEndpoints.WhereNotDeleted()
             .Include(endpoint => endpoint.CredentialBinding)
             .Where(endpoint =>
                 endpoint.KioskId == kioskId &&
@@ -93,6 +123,28 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             .FirstOrDefaultAsync(deployment => deployment.Id == deploymentId, cancellationToken);
     }
 
+    public async Task<IReadOnlySet<Guid>> ListReadyIngredientIdsAsync(
+        Guid kioskId,
+        IReadOnlyCollection<Guid> ingredientIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (ingredientIds.Count == 0)
+        {
+            return new HashSet<Guid>();
+        }
+
+        var ids = await _dbContext.IngredientDispenserStates
+            .Where(state => state.KioskId == kioskId && state.IsActive && ingredientIds.Contains(state.IngredientId))
+            .Where(state =>
+                state.Ingredient.IsActive &&
+                state.Device.Status == DeviceStatus.Online &&
+                state.LevelToQuantityProfileJson != null)
+            .Select(state => state.IngredientId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+        return ids.ToHashSet();
+    }
+
     public Task<EdgeCommand?> GetCommandAsync(
         Guid orderId,
         int dispatchAttemptNo,
@@ -116,6 +168,48 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             .ThenByDescending(command => command.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public Task<EdgeCommand?> GetCommandByIdAsync(
+        Guid commandId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.EdgeCommands.AsNoTracking()
+            .FirstOrDefaultAsync(command => command.Id == commandId, cancellationToken);
+
+    public Task<List<Domain.ProductionExecution.Projections.ProductionExecutionRecord>>
+        ListProductionExecutionRecordsForOrderItemAsync(
+            Guid orderId,
+            Guid orderItemId,
+            CancellationToken cancellationToken = default) =>
+        _dbContext.ProductionExecutionRecords.AsNoTracking()
+            .Include(record => record.SourceCommand)
+            .Where(record =>
+                record.SourceCommand.OrderId == orderId &&
+                record.OrderItemId == orderItemId)
+            .OrderBy(record => record.SourceCommand.DispatchAttemptNo)
+            .ThenBy(record => record.ProductionUnitNo)
+            .ToListAsync(cancellationToken);
+
+    public Task<bool> IsDefectiveOutputRemakeAuthorizedAsync(
+        Guid productionIncidentId,
+        Guid orderId,
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
+        Guid sourceCommandId,
+        Guid sourceProductionJobId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.ProductionIncidents.AsNoTracking().AnyAsync(incident =>
+            incident.Id == productionIncidentId &&
+            incident.OrderId == orderId &&
+            incident.OrderItemId == orderItemId &&
+            incident.ProductionUnitNo == productionUnitNo &&
+            incident.ProductionUnitQuantity == productionUnitQuantity &&
+            incident.SourceCommandId == sourceCommandId &&
+            incident.SourceProductionJobId == sourceProductionJobId &&
+            incident.InspectionOutcome == ProductionInspectionOutcome.Defective &&
+            incident.Resolution == ProductionIncidentResolution.RequestRemake &&
+            incident.Status == ProductionIncidentStatus.ResolutionSelected,
+            cancellationToken);
 
     public Task AddOrderStatusHistoryAsync(
         OrderStatusHistory history,
@@ -146,11 +240,13 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
         int maxOrders,
         CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Orders.AsNoTracking()
+        return await _dbContext.Orders.WhereNotDeleted().AsNoTracking()
             .Where(order =>
                 order.PaymentStatus == PaymentStatus.Paid &&
-                order.Status == OrderStatus.ReadyForExecution &&
-                order.OrderItems.Any(item => item.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced) &&
+                order.Status == OrderStatus.ReadyForFulfillment &&
+                order.Kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active &&
+                order.Kiosk.OperationalState == KioskOperationalState.Operational &&
+                order.OrderItems.Any(item => item.FulfillmentType == FulfillmentType.MachineProduced) &&
                 !_dbContext.EdgeCommands.Any(command =>
                     command.OrderId == order.Id &&
                     command.DispatchAttemptNo == 1))
@@ -173,7 +269,7 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
 
     private IQueryable<ConfigurationRelease> ReleaseGraph()
     {
-        return _dbContext.ConfigurationReleases
+        return _dbContext.ConfigurationReleases.WhereNotDeleted()
             .Include(release => release.ExecutionRoutes)
                 .ThenInclude(route => route.ProductVariant)
                     .ThenInclude(variant => variant.Product)
@@ -181,8 +277,6 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
                 .ThenInclude(route => route.Recipe)
             .Include(release => release.ExecutionRoutes)
                 .ThenInclude(route => route.RobotBindings)
-                    .ThenInclude(binding => binding.RobotProgram)
-                        .ThenInclude(program => program.RobotProgramArtifacts)
-                            .ThenInclude(programArtifact => programArtifact.RobotArtifact);
+                    .ThenInclude(binding => binding.RobotProgram);
     }
 }

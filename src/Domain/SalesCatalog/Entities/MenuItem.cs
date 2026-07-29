@@ -50,6 +50,8 @@ public partial class MenuItem : BusinessEntity
 
     public virtual Recipe? Recipe { get; set; }
 
+    public virtual ICollection<MenuItemProductOption> ProductOptions { get; set; } = new List<MenuItemProductOption>();
+
     public bool IsCurrentlySellable(DateTimeOffset now)
     {
         return Status == MenuItemStatus.Active &&

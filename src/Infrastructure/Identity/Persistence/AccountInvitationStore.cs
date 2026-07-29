@@ -2,6 +2,7 @@ using Application.Identity.Abstractions;
 using Domain.Identity.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace Infrastructure.Identity.Persistence;
 
@@ -48,5 +49,40 @@ public sealed class AccountInvitationStore : IAccountInvitationStore
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public Task<T> ExecuteCreationTransactionAsync<T>(
+        Guid accountId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default) =>
+        ExecuteSerializedAsync($"account-invitation:create:{accountId:D}", action, cancellationToken);
+
+    public Task<T> ExecuteAcceptanceTransactionAsync<T>(
+        string tokenHash,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default) =>
+        ExecuteSerializedAsync($"account-invitation:accept:{tokenHash}", action, cancellationToken);
+
+    private async Task<T> ExecuteSerializedAsync<T>(
+        string lockKey,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken)
+    {
+        if (_dbContext.Database.CurrentTransaction is not null)
+            return await action(cancellationToken);
+
+        var strategy = _dbContext.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable,
+                cancellationToken);
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
+                cancellationToken);
+            var result = await action(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return result;
+        });
     }
 }

@@ -23,7 +23,8 @@ public sealed class CreateStoreCommandHandler
         var organizationId = command.OrganizationId;
         var request = command.Request;
 
-        if (!StoreAccessRules.CanManageOrganizationStores(userContext, organizationId))
+        if (!StoreAccessRules.CanManageOrganizationStores(
+                ScopeRoleSets.StoresManage, userContext, organizationId))
         {
             return ApiResult<StoreResult>.Fail("Access denied.", 403);
         }
@@ -43,6 +44,19 @@ public sealed class CreateStoreCommandHandler
             return ApiResult<StoreResult>.Fail($"Store with code '{code}' already exists in this organization.", 409);
         }
 
+        var openingHoursError = StoreOpeningHoursContract.Validate(request.OpeningHours);
+        if (openingHoursError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(openingHoursError, 400);
+        }
+
+        var timeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim();
+        var timeZoneError = StoreSalesAvailabilityRules.ValidateTimeZone(timeZone);
+        if (timeZoneError is not null)
+        {
+            return ApiResult<StoreResult>.Fail(timeZoneError, 400);
+        }
+
         var store = new Store
         {
             Id = Guid.NewGuid(),
@@ -55,13 +69,13 @@ public sealed class CreateStoreCommandHandler
             City = request.City?.Trim(),
             Province = request.Province?.Trim(),
             Country = request.Country?.Trim(),
-            TimeZone = string.IsNullOrWhiteSpace(request.TimeZone) ? "Asia/Bangkok" : request.TimeZone.Trim(),
+            TimeZone = timeZone,
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             PhoneNumber = request.PhoneNumber?.Trim(),
             Email = request.Email?.Trim().ToLowerInvariant(),
-            OpeningHoursSchemaVersion = request.OpeningHoursSchemaVersion,
-            OpeningHoursJson = request.OpeningHoursJson,
+            OpeningHoursSchemaVersion = 1,
+            OpeningHoursJson = StoreOpeningHoursContract.Serialize(request.OpeningHours),
             CreatedAt = DateTimeOffset.UtcNow,
             CreatedByAccountId = userContext.AccountId
         };

@@ -107,6 +107,34 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "product-categories.read",
+            Description = "Browse the global flat ProductCategory catalog used by product authoring.",
+            Roles = new[] { "SystemAdmin", "Manager" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "product-categories.manage",
+            Description = "Create, update, activate/deactivate, and safely delete unreferenced ProductCategory definitions.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "ingredients.read",
+            Description = "Browse the global ingredient reference catalog used by recipe authoring.",
+            Roles = new[] { "SystemAdmin", "Manager" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "ingredients.manage",
+            Description = "Create, update, activate/deactivate, and safely delete unreferenced ingredient definitions.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "product-templates.read",
             Description = "Browse global product templates for tenant cloning.",
             Roles = new[] { "SystemAdmin", "Manager" },
@@ -135,6 +163,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "payment-methods.manage",
+            Description = "Manage the global payment-method catalog status.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "roles.view",
             Description = "View roles catalog and static permission matrix.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
@@ -149,6 +184,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "dashboard.view",
+            Description = "View management dashboard metrics within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "orders.view",
             Description = "View back-office orders within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
@@ -157,7 +199,7 @@ internal static class PermissionMatrixRules
         new()
         {
             Policy = "orders.manage",
-            Description = "Manage orders (cancel unpaid, flag refund-required) within allowed scope.",
+            Description = "Manage order lifecycle and manual/packaged item fulfillment within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
             ScopeRequired = true
         },
@@ -184,6 +226,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "inventory.configure",
+            Description = "Provision, configure, activate/retire, and safely delete kiosk dispenser topology.",
+            Roles = new[] { "SystemAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "maintenance.view",
             Description = "View maintenance tickets within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
@@ -206,8 +255,22 @@ internal static class PermissionMatrixRules
         new()
         {
             Policy = "operations.view",
-            Description = "View kiosk operations telemetry such as heartbeats and device events within allowed scope.",
+            Description = "View kiosk operations telemetry such as heartbeats, device events, and curated operation logs within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "operations.diagnostics",
+            Description = "View raw operation-log diagnostic payloads within allowed kiosk scope.",
+            Roles = new[] { "SystemAdmin", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "notifications.manage",
+            Description = "Requeue permanently failed notification deliveries within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
         new()
@@ -223,6 +286,20 @@ internal static class PermissionMatrixRules
             Description = "Create, update, status-change, or retire devices/hardware within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "device-catalog.read",
+            Description = "Read the global device type and model catalog.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "device-catalog.manage",
+            Description = "Manage the global device type and model catalog.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
         },
         new()
         {
@@ -319,6 +396,34 @@ internal static class PermissionMatrixRules
             Policy = "release.rollback",
             Description = "Deploy a previously validated release to assigned kiosks as rollback.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "package.read",
+            Description = "Read production package catalog and installation state within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "package.manage",
+            Description = "Author and publish global production package versions.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "package.install",
+            Description = "Install production packages within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "package.fork",
+            Description = "Fork package-managed technical configuration within assigned organization.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         }
     };

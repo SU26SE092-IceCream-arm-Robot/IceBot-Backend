@@ -1,7 +1,10 @@
 using Domain.Sync.DeadLetters;
 using Domain.Sync.Ingestion;
 using System.Text.Json;
-using Application.EdgeIntegration.Commands;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
 using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
 using Application.Sync.Abstractions;
@@ -25,7 +28,15 @@ public sealed class ListSyncDeadLettersQueryHandler
     public async Task<PagedResult<SyncDeadLetterResult>> HandleAsync(ListSyncDeadLettersQuery query, CancellationToken ct = default)
     {
         var page = Math.Max(1, query.PageNumber); var size = Math.Clamp(query.PageSize, 1, 100);
-        var (items, total) = await _store.ListAsync(query.Status, query.EventType, page, size, ct);
+        SyncDeadLetterStatus? status = null;
+        if (!string.IsNullOrWhiteSpace(query.Status) &&
+            (!Enum.TryParse<SyncDeadLetterStatus>(query.Status.Trim(), true, out var parsed) ||
+             !Enum.IsDefined(parsed)))
+            return PagedResult<SyncDeadLetterResult>.Fail(
+                "Invalid sync dead-letter status.", 400, page, size);
+        if (!string.IsNullOrWhiteSpace(query.Status))
+            status = Enum.Parse<SyncDeadLetterStatus>(query.Status.Trim(), true);
+        var (items, total) = await _store.ListAsync(status, query.EventType, page, size, ct);
         return PagedResult<SyncDeadLetterResult>.Success(items.Select(Map), total, page, size);
     }
     internal static SyncDeadLetterResult Map(SyncDeadLetter x) => new()
@@ -91,6 +102,7 @@ public sealed class IgnoreSyncDeadLetterCommandHandler
 
 public sealed class RetrySyncDeadLetterCommandHandler
 {
+    private static readonly TimeSpan StaleRetryTimeout = TimeSpan.FromMinutes(15);
     private readonly ISyncDeadLetterStore _store;
     private readonly IngestExecutionReportCommandHandler _executionReportHandler;
     public RetrySyncDeadLetterCommandHandler(ISyncDeadLetterStore store, IngestExecutionReportCommandHandler executionReportHandler)
@@ -99,7 +111,7 @@ public sealed class RetrySyncDeadLetterCommandHandler
     public async Task<ApiResult<SyncDeadLetterResult>> HandleAsync(RetrySyncDeadLetterCommand command, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(command.Reason)) return ApiResult<SyncDeadLetterResult>.Fail("Retry reason is required.", 400);
-        var item = await _store.GetAsync(command.Id, true, ct);
+        var item = await _store.GetAsync(command.Id, false, ct);
         if (item is null) return ApiResult<SyncDeadLetterResult>.Fail("Sync dead letter not found.", 404);
         if (!item.EventType.StartsWith("ExecutionReport.", StringComparison.Ordinal) || item.SyncEventInbox is null || !item.SourceNodeId.HasValue || !item.KioskId.HasValue)
             return ApiResult<SyncDeadLetterResult>.Fail("This dead-letter event type has no registered replay contract.", 422);
@@ -111,24 +123,121 @@ public sealed class RetrySyncDeadLetterCommandHandler
         catch (JsonException) { return ApiResult<SyncDeadLetterResult>.Fail("Dead-letter payload is not a valid execution report.", 422); }
         if (payload is null || !payload.CommandId.HasValue || !item.EventId.HasValue) return ApiResult<SyncDeadLetterResult>.Fail("Dead-letter execution report payload is incomplete.", 422);
 
-        var attempt = SyncDeadLetterRetryAttempt.Create(item.Id, await _store.GetNextRetryAttemptNumberAsync(item.Id, ct), command.UserContext.AccountId, DateTimeOffset.UtcNow, command.Reason);
-        item.BeginRetry(); item.SyncEventInbox.PrepareManualRetry(DateTimeOffset.UtcNow);
-        await _store.AddRetryAttemptAsync(attempt, ct); await _store.SaveChangesAsync(ct);
+        var started = await BeginRetryAsync(command, ct);
+        if (!started.Result.Succeeded || started.AttemptNumber is null)
+            return started.Result;
 
-        var result = await _executionReportHandler.HandleAsync(payload.ToCommand(item.KioskId.Value, endpoint.Id, item.EventId.Value), ct);
-        attempt.Complete(result.Succeeded, DateTimeOffset.UtcNow, result.Message ?? "No retry result message.");
-        if (result.Succeeded) item.Resolve(command.UserContext.AccountId, DateTimeOffset.UtcNow, $"Retry succeeded: {command.Reason.Trim()}");
-        else item.ReturnToOpen(result.Message ?? "Execution report retry failed.");
-        await _store.SaveChangesAsync(ct);
-        return result.Succeeded ? ApiResult<SyncDeadLetterResult>.Success(ListSyncDeadLettersQueryHandler.Map(item), "Sync dead letter retried successfully.")
-            : ApiResult<SyncDeadLetterResult>.Fail($"Sync retry failed: {result.Message}", result.StatusCode);
+        ApiResult<Application.EdgeIntegration.Reports.Results.ExecutionReportIngestResult> replay;
+        try
+        {
+            replay = await _executionReportHandler.HandleAsync(
+                payload.ToCommand(item.KioskId.Value, endpoint.Id, item.EventId.Value), ct);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            await CompleteRetryAfterExceptionAsync(
+                command, started.AttemptNumber.Value, "Retry was cancelled before completion.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            await CompleteRetryAfterExceptionAsync(command, started.AttemptNumber.Value, ex.Message);
+            return ApiResult<SyncDeadLetterResult>.Fail("Sync retry failed unexpectedly.", 500);
+        }
+
+        return await CompleteRetryAsync(
+            command, started.AttemptNumber.Value, replay.Succeeded,
+            replay.Message ?? "No retry result message.", replay.StatusCode, ct);
+    }
+
+    private async Task<(ApiResult<SyncDeadLetterResult> Result, int? AttemptNumber)> BeginRetryAsync(
+        RetrySyncDeadLetterCommand command,
+        CancellationToken ct) =>
+        await _store.ExecuteSerializedAsync(command.Id, async lockCt =>
+        {
+            var item = await _store.GetAsync(command.Id, true, lockCt);
+            if (item is null)
+                return (ApiResult<SyncDeadLetterResult>.Fail("Sync dead letter not found.", 404), (int?)null);
+            if (item.Status is not (SyncDeadLetterStatus.Open or SyncDeadLetterStatus.RetryInProgress))
+                return (ApiResult<SyncDeadLetterResult>.Fail(
+                    "Only open sync dead letters can be retried.", 409), (int?)null);
+
+            var now = DateTimeOffset.UtcNow;
+            if (item.Status == SyncDeadLetterStatus.RetryInProgress)
+            {
+                var activeAttempt = item.RetryAttempts
+                    .Where(attempt => !attempt.CompletedAt.HasValue)
+                    .OrderByDescending(attempt => attempt.AttemptNumber)
+                    .FirstOrDefault();
+                if (activeAttempt is not null && activeAttempt.RequestedAt > now - StaleRetryTimeout)
+                    return (ApiResult<SyncDeadLetterResult>.Fail(
+                        "Sync dead-letter retry is already in progress.", 409), (int?)null);
+
+                activeAttempt?.Complete(false, now, "Retry attempt exceeded the progress timeout.");
+                item.ReturnToOpen("Previous retry attempt exceeded the progress timeout.");
+            }
+
+            var attemptNumber = await _store.GetNextRetryAttemptNumberAsync(item.Id, lockCt);
+            var attempt = SyncDeadLetterRetryAttempt.Create(
+                item.Id, attemptNumber, command.UserContext.AccountId, now, command.Reason);
+            item.BeginRetry();
+            item.SyncEventInbox!.PrepareManualRetry(now);
+            await _store.AddRetryAttemptAsync(attempt, lockCt);
+            await _store.SaveChangesAsync(lockCt);
+            return (ApiResult<SyncDeadLetterResult>.Success(ListSyncDeadLettersQueryHandler.Map(item)),
+                (int?)attemptNumber);
+        }, ct);
+
+    private Task<ApiResult<SyncDeadLetterResult>> CompleteRetryAsync(
+        RetrySyncDeadLetterCommand command,
+        int attemptNumber,
+        bool succeeded,
+        string message,
+        int failureStatusCode,
+        CancellationToken ct) =>
+        _store.ExecuteSerializedAsync(command.Id, async lockCt =>
+        {
+            var item = await _store.GetAsync(command.Id, true, lockCt)
+                ?? throw new DomainRuleException("Sync dead letter not found.");
+            var attempt = item.RetryAttempts.Single(value => value.AttemptNumber == attemptNumber);
+            if (!attempt.CompletedAt.HasValue)
+                attempt.Complete(succeeded, DateTimeOffset.UtcNow, message);
+            if (item.Status == SyncDeadLetterStatus.RetryInProgress)
+            {
+                if (succeeded)
+                    item.Resolve(command.UserContext.AccountId, DateTimeOffset.UtcNow,
+                        $"Retry succeeded: {command.Reason.Trim()}");
+                else
+                    item.ReturnToOpen(message);
+            }
+            await _store.SaveChangesAsync(lockCt);
+            return succeeded
+                ? ApiResult<SyncDeadLetterResult>.Success(
+                    ListSyncDeadLettersQueryHandler.Map(item), "Sync dead letter retried successfully.")
+                : ApiResult<SyncDeadLetterResult>.Fail($"Sync retry failed: {message}", failureStatusCode);
+        }, ct);
+
+    private async Task CompleteRetryAfterExceptionAsync(
+        RetrySyncDeadLetterCommand command,
+        int attemptNumber,
+        string message)
+    {
+        try
+        {
+            await CompleteRetryAsync(command, attemptNumber, false, message, 500, CancellationToken.None);
+        }
+        catch
+        {
+            // A later retry can reclaim the stale attempt after StaleRetryTimeout.
+        }
     }
 
     private sealed class ExecutionReportReplayPayload
     {
         public Guid? CommandId { get; init; } public string ReportType { get; init; } = ""; public string Status { get; init; } = "";
         public long SequenceNumber { get; init; } public DateTimeOffset EdgeCreatedAt { get; init; } public DateTimeOffset? ExecutorReportedAt { get; init; }
-        public Guid? DeploymentId { get; init; } public Guid? SourceProductionJobId { get; init; } public Guid? WorkcellId { get; init; } public Guid? ControllerId { get; init; }
+        public Guid? DeploymentId { get; init; } public Guid? SourceProductionJobId { get; init; } public Guid? OrderItemId { get; init; }
+        public int? ProductionUnitNo { get; init; } public int? ProductionUnitQuantity { get; init; } public Guid? WorkcellId { get; init; } public Guid? ControllerId { get; init; }
         public string? ExecutionPlanChecksum { get; init; } public long? ActiveSetVersion { get; init; } public string? ActiveSetChecksum { get; init; }
         public Guid? SourceConfigurationReleaseId { get; init; } public string? ReleaseChecksum { get; init; } public bool? PhysicalOutputMayHaveOccurred { get; init; }
         public string? ErrorCode { get; init; } public string? ErrorMessage { get; init; } public string? PayloadJson { get; init; }
@@ -138,6 +247,7 @@ public sealed class RetrySyncDeadLetterCommandHandler
             KioskId = kioskId, EndpointId = endpointId, CommandId = CommandId!.Value, SourceEventId = eventId,
             SequenceNumber = SequenceNumber, EdgeCreatedAt = EdgeCreatedAt, ExecutorReportedAt = ExecutorReportedAt,
             ReportType = ReportType, Status = Status, DeploymentId = DeploymentId, SourceProductionJobId = SourceProductionJobId,
+            OrderItemId = OrderItemId, ProductionUnitNo = ProductionUnitNo, ProductionUnitQuantity = ProductionUnitQuantity,
             WorkcellId = WorkcellId, ControllerId = ControllerId, ExecutionPlanChecksum = ExecutionPlanChecksum,
             ActiveSetVersion = ActiveSetVersion, ActiveSetChecksum = ActiveSetChecksum, SourceConfigurationReleaseId = SourceConfigurationReleaseId,
             ReleaseChecksum = ReleaseChecksum, PhysicalOutputMayHaveOccurred = PhysicalOutputMayHaveOccurred, ErrorCode = ErrorCode,

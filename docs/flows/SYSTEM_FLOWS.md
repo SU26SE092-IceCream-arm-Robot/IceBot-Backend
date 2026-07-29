@@ -2,13 +2,13 @@
 
 This document is the flow index for IceBot backend-facing workflows. Read the smallest flow file that matches the task instead of reading every flow.
 
-Business/user-facing flows live in the project-level `Docs/BUSINESS_FLOWS.md`.
+Business/user-facing flows live in the `IceBot-Product` repository at `product/`.
 
 Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md).
 
 ## Search Keywords
 
-`system flow`, `system overview`, `flow index`, `which flow doc`, `setup to sale`, `back-office setup flow`, `management read flow`, `catalog runtime menu`, `robot Lua artifact`, `RobotProgram`, `configuration deployment`, `checkout to execution`, `post-payment fan-out`, `tablet status`, `edge command flow`, `runtime readiness check`, `execution event sync`, `paid but edge cannot execute`, `edge offline`, `duplicate notification`, `operations support`, `management dashboard`, `maintenance ticket`
+`system flow`, `system overview`, `flow index`, `which flow doc`, `setup to sale`, `back-office setup flow`, `management read flow`, `catalog runtime menu`, `robot Lua artifact`, `RobotProgram`, `configuration deployment`, `checkout to execution`, `post-payment fan-out`, `tablet status`, `edge command flow`, `runtime readiness check`, `execution event sync`, `production incident`, `defective output`, `remake`, `paid but edge cannot execute`, `edge offline`, `duplicate notification`, `operations support`, `management dashboard`, `maintenance ticket`
 
 ## Flow Lookup
 
@@ -19,27 +19,13 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 | GraphQL/REST read models for management UI | [Management Read Flow](MANAGEMENT_READ_FLOW.md) |
 | Catalog -> Sales Catalog -> runtime menu -> tablet | [Catalog Runtime Menu Flow](CATALOG_RUNTIME_MENU_FLOW.md) |
 | Fairino `.lua` export, artifact/program management, release, and Edge deployment | [Robot Lua Artifact Flow](ROBOT_LUA_ARTIFACT_FLOW.md) |
+| Franchise-oriented Production Package publication and installation | [Production Package Installation Flow](PRODUCTION_PACKAGE_INSTALLATION_FLOW.md) |
+| Production Package preview, materialization, cutover, rollback, and abandonment | [Production Package Upgrade Flow](PRODUCTION_PACKAGE_UPGRADE_FLOW.md) |
 | Tablet checkout, payment, edge command, robot execution, status projection | [Checkout Execution Flow](CHECKOUT_EXECUTION_FLOW.md) |
+| Outcome unknown, partial/defective output inspection, discard, exact-unit remake, or compensation | [Production Incident Resolution Flow](PRODUCTION_INCIDENT_RESOLUTION_FLOW.md) |
 | Telemetry, heartbeat, events, inventory reporting, manual support | [Operations Support Flow](OPERATIONS_SUPPORT_FLOW.md) |
 | Manual kiosk/device/order support ticket lifecycle | [Maintenance Ticket Flow](MAINTENANCE_TICKET_FLOW.md) |
-| Paid-but-not-executable, edge offline, duplicate retry paths | [Failure Flows](FAILURE_FLOWS.md) |
-
-## Current Assumptions
-
-- One tablet per kiosk.
-- Tablet may use Cloud runtime menu for catalog display, but should prefer Local Edge runtime projection for final device/robot availability when the edge service is available.
-- Tablet uses Cloud for order/payment.
-- Bank transfer QR is the first payment method.
-- No inventory reservation before payment.
-- Cloud can publish MQTT notifications.
-- Edge still pulls from Cloud for retry/offline recovery.
-- MQTT is notification only, not source of truth.
-
-## Source Of Truth Reminder
-
-Do not treat one UI screen as one backend source of truth.
-
-UI screens may aggregate data from several contexts, especially through GraphQL management read models.
+| Route a failure to its owning workflow | [Failure Flow Index](FAILURE_FLOW_INDEX.md) |
 
 ## Related Docs
 

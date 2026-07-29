@@ -5,7 +5,7 @@ namespace Domain.Orders.Enums
         Draft = 1,
         PendingPayment = 2,
         Paid = 3,
-        ReadyForExecution = 4,
+        ReadyForFulfillment = 4,
         Accepted = 5,
         Preparing = 6,
         Ready = 7,
@@ -15,6 +15,7 @@ namespace Domain.Orders.Enums
         ExecutionRejected = 11,
         RefundRequired = 12,
         Refunded = 13,
-        Compensated = 14
+        Compensated = 14,
+        FulfillmentIssue = 15
     }
 }

@@ -1,10 +1,17 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
-using Application.Devices.Abstractions;
+using Application.Devices.Catalog.Abstractions;
+using Application.Devices.ExecutionEndpoints.Abstractions;
+using Application.Devices.Telemetry.Abstractions;
+using Application.Devices.Connectivity.Abstractions;
+using Application.Devices.Credentials.Abstractions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Protocol;
+using Polly;
+using Polly.Retry;
 
 namespace Infrastructure.EdgeIntegration.Mqtt;
 
@@ -13,16 +20,45 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
     private const string ControlTopic = "$CONTROL/dynamic-security/v1";
     private const string ResponseTopic = "$CONTROL/dynamic-security/v1/response";
     private readonly MqttCredentialProvisioningOptions _options;
+    private readonly ILogger<MosquittoDynamicSecurityCredentialProvisioner> _logger;
+    private readonly ResiliencePipeline _commandPipeline;
 
-    public MosquittoDynamicSecurityCredentialProvisioner(IOptions<MqttCredentialProvisioningOptions> options)
+    public MosquittoDynamicSecurityCredentialProvisioner(
+        IOptions<MqttCredentialProvisioningOptions> options,
+        ILogger<MosquittoDynamicSecurityCredentialProvisioner> logger)
     {
         _options = options.Value;
+        _logger = logger;
+        _commandPipeline = new ResiliencePipelineBuilder()
+            .AddRetry(new RetryStrategyOptions
+            {
+                ShouldHandle = new PredicateBuilder().Handle<MqttCredentialTransportException>(),
+                MaxRetryAttempts = _options.RetryCount,
+                Delay = TimeSpan.FromMilliseconds(_options.RetryDelayMilliseconds),
+                BackoffType = DelayBackoffType.Exponential,
+                UseJitter = true,
+                OnRetry = args =>
+                {
+                    _logger.LogWarning(
+                        args.Outcome.Exception,
+                        "Retrying Mosquitto dynamic-security command after transport failure. Attempt={AttemptNumber}.",
+                        args.AttemptNumber + 1);
+                    return ValueTask.CompletedTask;
+                }
+            })
+            .Build();
     }
 
     public string ProviderName => _options.Provider;
 
     public string GetSubscribeTopic(Guid endpointId) =>
         $"{_options.TopicPrefix.Trim().Trim('/')}/execution-endpoints/{endpointId:D}/commands/available";
+
+    public string GetUplinkPublishTopicPattern(Guid endpointId) =>
+        $"{_options.TopicPrefix.Trim().Trim('/')}/execution-endpoints/{endpointId:D}/uplink/{{messageType}}";
+
+    public string GetUplinkResultTopic(Guid endpointId) =>
+        $"{_options.TopicPrefix.Trim().Trim('/')}/execution-endpoints/{endpointId:D}/uplink/results";
 
     public async Task ProvisionOrReplaceAsync(
         Guid endpointId,
@@ -31,7 +67,7 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
         CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
-        var createError = await SendAsync(new
+        var createError = await ExecuteCommandAsync(new
         {
             command = "createClient",
             username,
@@ -45,9 +81,9 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
         if (!createError.Contains("already exists", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(createError);
 
-        ThrowIfError(await SendAsync(new { command = "setClientPassword", username, password }, cancellationToken));
-        ThrowIfError(await SendAsync(new { command = "enableClient", username }, cancellationToken));
-        var roleError = await SendAsync(new
+        ThrowIfError(await ExecuteCommandAsync(new { command = "setClientPassword", username, password }, cancellationToken));
+        ThrowIfError(await ExecuteCommandAsync(new { command = "enableClient", username }, cancellationToken));
+        var roleError = await ExecuteCommandAsync(new
         {
             command = "addClientRole",
             username,
@@ -64,10 +100,27 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
         CancellationToken cancellationToken = default)
     {
         EnsureEnabled();
-        ThrowIfError(await SendAsync(new { command = "disableClient", username }, cancellationToken));
+        var error = await ExecuteCommandAsync(new { command = "disableClient", username }, cancellationToken);
+        if (error is null ||
+            error.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+            error.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        ThrowIfError(error);
     }
 
-    private async Task<string?> SendAsync(object command, CancellationToken cancellationToken)
+    private async Task<string?> ExecuteCommandAsync(object command, CancellationToken cancellationToken)
+    {
+        string? result = null;
+        await _commandPipeline.ExecuteAsync(
+            async resilienceToken => result = await SendOnceAsync(command, resilienceToken),
+            cancellationToken);
+        return result;
+    }
+
+    private async Task<string?> SendOnceAsync(object command, CancellationToken cancellationToken)
     {
         var factory = new MqttClientFactory();
         using var client = factory.CreateMqttClient();
@@ -87,19 +140,31 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
 
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(_options.TimeoutSeconds));
-        await client.ConnectAsync(optionsBuilder.Build(), timeout.Token);
-        await client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
-            .WithTopicFilter(filter => filter.WithTopic(ResponseTopic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
-            .Build(), timeout.Token);
+        string responseJson;
+        try
+        {
+            await client.ConnectAsync(optionsBuilder.Build(), timeout.Token);
+            await client.SubscribeAsync(new MqttClientSubscribeOptionsBuilder()
+                .WithTopicFilter(filter => filter.WithTopic(ResponseTopic).WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce))
+                .Build(), timeout.Token);
 
-        var payload = JsonSerializer.Serialize(new { commands = new[] { command } });
-        await client.PublishAsync(new MqttApplicationMessageBuilder()
-            .WithTopic(ControlTopic)
-            .WithPayload(payload)
-            .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
-            .Build(), timeout.Token);
+            var payload = JsonSerializer.Serialize(new { commands = new[] { command } });
+            await client.PublishAsync(new MqttApplicationMessageBuilder()
+                .WithTopic(ControlTopic)
+                .WithPayload(payload)
+                .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtLeastOnce)
+                .Build(), timeout.Token);
+            responseJson = await response.Task.WaitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new MqttCredentialTransportException("Mosquitto dynamic-security command timed out.", ex);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new MqttCredentialTransportException("Mosquitto dynamic-security transport failed.", ex);
+        }
 
-        var responseJson = await response.Task.WaitAsync(timeout.Token);
         await client.DisconnectAsync();
         using var document = JsonDocument.Parse(responseJson);
         var first = document.RootElement.GetProperty("responses")[0];
@@ -117,5 +182,13 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
     private static void ThrowIfError(string? error)
     {
         if (!string.IsNullOrWhiteSpace(error)) throw new InvalidOperationException(error);
+    }
+
+    private sealed class MqttCredentialTransportException : Exception
+    {
+        public MqttCredentialTransportException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
     }
 }

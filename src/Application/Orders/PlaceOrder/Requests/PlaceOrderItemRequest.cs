@@ -8,5 +8,5 @@ public sealed class PlaceOrderItemRequest
 
     public int Quantity { get; set; }
 
-    public string? OptionsJson { get; set; }
+    public List<SelectedProductOptionRequest> SelectedOptions { get; set; } = new();
 }

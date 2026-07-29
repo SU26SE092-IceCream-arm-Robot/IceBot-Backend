@@ -11,6 +11,7 @@ public sealed class UpdateMaintenanceTicketRequest
     [StringLength(1000)]
     public string? Description { get; init; }
     public required MaintenancePriority Priority { get; init; }
+    public MaintenanceOperationalImpact? OperationalImpact { get; init; }
     public Guid? DeviceId { get; init; }
     public Guid? OrderId { get; init; }
     public Guid? DeviceEventId { get; init; }

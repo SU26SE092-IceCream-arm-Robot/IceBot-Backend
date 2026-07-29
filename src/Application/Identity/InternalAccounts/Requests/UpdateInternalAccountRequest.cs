@@ -1,5 +1,3 @@
-using Domain.Identity.Enums;
-
 namespace Application.Identity.InternalAccounts.Requests
 {
     public class UpdateInternalAccountRequest
@@ -9,7 +7,6 @@ namespace Application.Identity.InternalAccounts.Requests
         public string? PhoneNumber { get; set; }
         public string? Address { get; set; }
         public string? Gender { get; set; }
-        public AccountStatus? Status { get; set; }
         public bool? LocalLoginEnabled { get; set; }
         public bool? GoogleLoginEnabled { get; set; }
         public string? GoogleEmail { get; set; }

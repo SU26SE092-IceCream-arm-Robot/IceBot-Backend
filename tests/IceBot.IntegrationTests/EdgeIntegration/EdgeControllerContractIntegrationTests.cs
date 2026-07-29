@@ -1,3 +1,4 @@
+using Application.RobotConfiguration.Storage.Abstractions;
 using Domain.Sync.Ingestion;
 using Domain.Devices.ExecutionEndpoints;
 using System.Net;
@@ -6,12 +7,19 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json.Nodes;
 using Application.EdgeIntegration;
-using Application.EdgeIntegration.Commands;
-using Application.EdgeIntegration.Services;
-using Application.RobotConfiguration.Abstractions;
+using Application.EdgeIntegration.Dispatch;
+using Application.EdgeIntegration.Reports;
+using Application.EdgeIntegration.CommandDelivery.Commands;
+using Application.EdgeIntegration.Dispatch.Commands;
+using Application.EdgeIntegration.Reports.Commands;
+using Application.EdgeIntegration.Timeouts.Commands;
+using Application.EdgeIntegration.CommandDelivery.Services;
+using Application.EdgeIntegration.Dispatch.Services;
+using Application.EdgeIntegration.Reports.Services;
+using Application.RobotConfiguration.Artifacts.Abstractions;
 using Domain.Common.Enums;
-using Domain.Devices.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
+using Domain.Devices.Telemetry;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Sync.Entities;
@@ -67,8 +75,9 @@ public sealed class EdgeControllerContractIntegrationTests
         Assert.False(installed.Data.Duplicate);
 
         var activeEventId = Guid.NewGuid();
-        var active = await ReportAsync(graph, activeEventId, 2, "Active");
-        var duplicate = await ReportAsync(graph, activeEventId, 2, "Active");
+        var activeAt = DateTimeOffset.UtcNow;
+        var active = await ReportAsync(graph, activeEventId, 2, "Active", edgeCreatedAt: activeAt);
+        var duplicate = await ReportAsync(graph, activeEventId, 2, "Active", edgeCreatedAt: activeAt);
 
         Assert.True(active.Succeeded);
         Assert.True(active.Data!.Applied);
@@ -107,8 +116,11 @@ public sealed class EdgeControllerContractIntegrationTests
         await AcknowledgeAsync(graph, "Accepted");
 
         var sourceEventId = Guid.NewGuid();
-        var failed = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch", "Downloaded bytes did not match the manifest.");
-        var duplicate = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch", "Downloaded bytes did not match the manifest.");
+        var failedAt = DateTimeOffset.UtcNow;
+        var failed = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch",
+            "Downloaded bytes did not match the manifest.", failedAt);
+        var duplicate = await ReportAsync(graph, sourceEventId, 1, "Failed", "ChecksumMismatch",
+            "Downloaded bytes did not match the manifest.", failedAt);
 
         Assert.True(failed.Succeeded);
         Assert.True(failed.Data!.Applied);
@@ -122,7 +134,7 @@ public sealed class EdgeControllerContractIntegrationTests
         Assert.Equal(1, await assertionContext.SyncEventInbox.CountAsync(x => x.EventId == sourceEventId));
     }
 
-    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Results.EdgeCommandPullResult>> PullAsync(
+    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.CommandDelivery.Results.EdgeCommandPullResult>> PullAsync(
         DeploymentGraph graph)
     {
         await using var dbContext = _fixture.CreateDbContext();
@@ -137,7 +149,7 @@ public sealed class EdgeControllerContractIntegrationTests
         });
     }
 
-    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Results.EdgeCommandAckResult>> AcknowledgeAsync(
+    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.CommandDelivery.Results.EdgeCommandAckResult>> AcknowledgeAsync(
         DeploymentGraph graph,
         string status,
         string? rejectionCode = null,
@@ -155,24 +167,23 @@ public sealed class EdgeControllerContractIntegrationTests
             AckStatus = status,
             AcknowledgedAt = DateTimeOffset.UtcNow,
             RejectionCode = rejectionCode,
-            RejectionMessage = rejectionMessage
+            RejectionMessage = rejectionMessage,
+            LocalStatePersisted = string.Equals(status, "Accepted", StringComparison.OrdinalIgnoreCase) ? true : null
         });
     }
 
-    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Results.ExecutionReportIngestResult>> ReportAsync(
+    private async Task<Application.Shared.Wrappers.ApiResult<Application.EdgeIntegration.Reports.Results.ExecutionReportIngestResult>> ReportAsync(
         DeploymentGraph graph,
         Guid sourceEventId,
         long sequenceNumber,
         string status,
         string? errorCode = null,
-        string? errorMessage = null)
+        string? errorMessage = null,
+        DateTimeOffset? edgeCreatedAt = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
         var reportStore = new ExecutionReportStore(dbContext);
         var handler = new IngestExecutionReportCommandHandler(
-            reportStore,
-            reportStore,
-            reportStore,
             reportStore,
             new NoOpRealtimeNotificationPublisher(),
             Options.Create(new ExecutionReportIngestionOptions()));
@@ -183,10 +194,12 @@ public sealed class EdgeControllerContractIntegrationTests
             CommandId = graph.CommandId,
             SourceEventId = sourceEventId,
             SequenceNumber = sequenceNumber,
-            EdgeCreatedAt = DateTimeOffset.UtcNow,
+            EdgeCreatedAt = edgeCreatedAt ?? DateTimeOffset.UtcNow,
             ReportType = "Deployment",
             Status = status,
             DeploymentId = graph.DeploymentId,
+            SourceConfigurationReleaseId = graph.ReleaseId,
+            ReleaseChecksum = graph.ReleaseChecksum,
             ErrorCode = errorCode,
             ErrorMessage = errorMessage
         });
@@ -281,7 +294,8 @@ public sealed class EdgeControllerContractIntegrationTests
         dbContext.AddRange(deployment, command);
         await dbContext.SaveChangesAsync();
 
-        return new DeploymentGraph(kiosk.Id, endpoint.Id, deployment.Id, command.Id, checksum);
+        return new DeploymentGraph(
+            kiosk.Id, endpoint.Id, deployment.Id, command.Id, release.Id, releaseChecksum, checksum);
     }
 
     private static string Sha256(byte[] bytes) => Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
@@ -300,5 +314,7 @@ public sealed class EdgeControllerContractIntegrationTests
         Guid EndpointId,
         Guid DeploymentId,
         Guid CommandId,
+        Guid ReleaseId,
+        string ReleaseChecksum,
         string ArtifactChecksum);
 }

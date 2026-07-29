@@ -1,5 +1,6 @@
 using Domain.Common;
 using Domain.Catalog.Entities;
+using System.Text.Json;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -18,6 +19,14 @@ public class ExecutionRoute : BusinessEntity
     public int Priority { get; private set; }
 
     public string? RequiredCapabilitiesJson { get; private set; }
+
+    public string SupportedOptionCodesJson { get; private set; } = "[]";
+
+    public int? ProductionDefinitionSchemaVersion { get; private set; }
+
+    public string? ProductionDefinitionJson { get; private set; }
+
+    public string? ProductionDefinitionChecksum { get; private set; }
 
     public virtual ConfigurationRelease ConfigurationRelease { get; private set; } = null!;
 
@@ -38,7 +47,8 @@ public class ExecutionRoute : BusinessEntity
         Guid recipeId,
         string routeCode,
         int priority,
-        string? requiredCapabilitiesJson = null)
+        string? requiredCapabilitiesJson,
+        IReadOnlyCollection<string> supportedOptionCodes)
     {
         if (productVariantId == Guid.Empty)
         {
@@ -60,15 +70,31 @@ public class ExecutionRoute : BusinessEntity
             throw new DomainRuleException("Execution route priority cannot be negative.");
         }
 
+        var normalizedOptionCodes = supportedOptionCodes
+            .Select(code => code?.Trim().ToUpperInvariant())
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Cast<string>()
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        if (normalizedOptionCodes.Length != supportedOptionCodes.Count)
+        {
+            throw new DomainRuleException("Execution route supported option codes must be non-empty and unique.");
+        }
+
         return new ExecutionRoute
         {
             ProductVariantId = productVariantId,
             RecipeId = recipeId,
             RouteCode = routeCode.Trim(),
             Priority = priority,
-            RequiredCapabilitiesJson = requiredCapabilitiesJson
+            RequiredCapabilitiesJson = requiredCapabilitiesJson,
+            SupportedOptionCodesJson = JsonSerializer.Serialize(normalizedOptionCodes)
         };
     }
+
+    public IReadOnlyCollection<string> GetSupportedOptionCodes() =>
+        JsonSerializer.Deserialize<string[]>(SupportedOptionCodesJson) ?? [];
 
     internal ExecutionRouteRobotBinding AddRobotBinding(
         Guid robotProgramId,
@@ -86,5 +112,14 @@ public class ExecutionRoute : BusinessEntity
             requiredWorkcellCapabilityCode);
         _robotBindings.Add(binding);
         return binding;
+    }
+
+    public void SetPublishedProductionDefinition(int schemaVersion, string definitionJson, string checksum)
+    {
+        if (schemaVersion <= 0 || string.IsNullOrWhiteSpace(definitionJson) || string.IsNullOrWhiteSpace(checksum))
+            throw new DomainRuleException("Production definition schema, JSON, and checksum are required.");
+        ProductionDefinitionSchemaVersion = schemaVersion;
+        ProductionDefinitionJson = definitionJson;
+        ProductionDefinitionChecksum = checksum.Trim();
     }
 }

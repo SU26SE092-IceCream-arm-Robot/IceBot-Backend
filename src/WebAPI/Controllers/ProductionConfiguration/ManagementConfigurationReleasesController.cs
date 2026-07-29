@@ -1,5 +1,9 @@
-using Application.ProductionConfiguration.Commands;
-using Application.ProductionConfiguration.Queries;
+using Application.ProductionConfiguration.Releases.Commands;
+using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Releases.Queries;
+using Application.ProductionConfiguration.Deployments.Queries;
+using Application.ProductionConfiguration.Readiness.Queries;
 using Domain.ProductionConfiguration.Enums;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
@@ -99,14 +103,12 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
     [Authorize(Policy = "release.publish")]
     public async Task<IActionResult> CreateConfigurationRelease(
         Guid organizationId,
-        [FromBody] CreateConfigurationReleaseRequest request,
         CancellationToken cancellationToken)
     {
         var command = new CreateConfigurationReleaseCommand
         {
             UserContext = User.GetUserContext(),
-            OrganizationId = organizationId,
-            ReleaseManifestSchemaVersion = request.ReleaseManifestSchemaVersion
+            OrganizationId = organizationId
         };
         var result = await _createConfigurationReleaseHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -126,11 +128,11 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
             OrganizationId = organizationId,
             ReleaseId = releaseId,
             Routes = request.Routes.Select(route => new ConfigurationReleaseRouteInput(
-                route.ProductVariantId,
                 route.RecipeId,
                 route.RouteCode,
                 route.Priority,
                 route.RequiredCapabilitiesJson,
+                route.SupportedOptionCodes,
                 route.RobotBindings.Select(binding => new ConfigurationReleaseRobotBindingInput(
                     binding.RobotProgramId,
                     binding.BindingOrder,
@@ -187,12 +189,6 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
 
 }
 
-public sealed class CreateConfigurationReleaseRequest
-{
-    [Range(1, int.MaxValue)]
-    public int ReleaseManifestSchemaVersion { get; init; } = 1;
-}
-
 public sealed class ReplaceConfigurationReleaseRoutesRequest
 {
     [Required, MinLength(1)]
@@ -201,7 +197,6 @@ public sealed class ReplaceConfigurationReleaseRoutesRequest
 
 public sealed class ConfigurationReleaseRouteRequest
 {
-    public Guid ProductVariantId { get; init; }
     public Guid RecipeId { get; init; }
 
     [Required, StringLength(100)]
@@ -211,6 +206,9 @@ public sealed class ConfigurationReleaseRouteRequest
     public int Priority { get; init; }
 
     public string? RequiredCapabilitiesJson { get; init; }
+
+    [Required]
+    public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
 
     [Required, MinLength(1)]
     public IReadOnlyCollection<ConfigurationReleaseRobotBindingRequest> RobotBindings { get; init; } = Array.Empty<ConfigurationReleaseRobotBindingRequest>();

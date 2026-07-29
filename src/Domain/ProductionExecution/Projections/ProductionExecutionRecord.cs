@@ -1,6 +1,6 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.ProductionExecution.Enums;
 
 namespace Domain.ProductionExecution.Projections;
@@ -11,6 +11,9 @@ public class ProductionExecutionRecord : AuditedEntity
     public Guid KioskExecutionEndpointId { get; private set; }
     public KioskExecutionProfile ExecutionProfile { get; private set; }
     public Guid SourceProductionJobId { get; private set; }
+    public Guid OrderItemId { get; private set; }
+    public int ProductionUnitNo { get; private set; }
+    public int ProductionUnitQuantity { get; private set; }
     public Guid? WorkcellId { get; private set; }
     public Guid? ControllerId { get; private set; }
     public string? ExecutionPlanChecksum { get; private set; }
@@ -48,6 +51,9 @@ public class ProductionExecutionRecord : AuditedEntity
         ProductionExecutionStatus status,
         PhysicalOutputState physicalOutputState,
         Guid sourceProductionJobId,
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
         Guid? workcellId = null,
         Guid? controllerId = null,
         string? executionPlanChecksum = null,
@@ -56,9 +62,9 @@ public class ProductionExecutionRecord : AuditedEntity
         string? errorCode = null,
         string? errorMessage = null)
     {
-        if (sourceCommandId == Guid.Empty || sourceProductionJobId == Guid.Empty ||
+        if (sourceCommandId == Guid.Empty || sourceProductionJobId == Guid.Empty || orderItemId == Guid.Empty ||
             kioskExecutionEndpointId == Guid.Empty || sourceExecutorId == Guid.Empty ||
-            sourceEventId == Guid.Empty || sequenceNumber <= 0)
+            sourceEventId == Guid.Empty || sequenceNumber <= 0 || productionUnitNo <= 0 || productionUnitQuantity <= 0)
         {
             throw new DomainRuleException("Production execution provenance and sequence are required.");
         }
@@ -70,6 +76,9 @@ public class ProductionExecutionRecord : AuditedEntity
             ExecutionProfile = executionProfile,
             SourceExecutorId = sourceExecutorId,
             SourceProductionJobId = sourceProductionJobId,
+            OrderItemId = orderItemId,
+            ProductionUnitNo = productionUnitNo,
+            ProductionUnitQuantity = productionUnitQuantity,
             WorkcellId = workcellId,
             ControllerId = controllerId,
             ExecutionPlanChecksum = executionPlanChecksum,
@@ -115,6 +124,30 @@ public class ProductionExecutionRecord : AuditedEntity
         LastExecutorReportedAt = executorReportedAt;
         CloudReceivedAt = cloudReceivedAt;
         return true;
+    }
+
+    public void EnsureSameProvenance(
+        Guid orderItemId,
+        int productionUnitNo,
+        int productionUnitQuantity,
+        Guid? workcellId,
+        Guid? controllerId,
+        string? executionPlanChecksum,
+        long? activeSetVersion,
+        string? activeSetChecksum)
+    {
+        if (OrderItemId != orderItemId ||
+            ProductionUnitNo != productionUnitNo ||
+            ProductionUnitQuantity != productionUnitQuantity ||
+            WorkcellId != workcellId ||
+            ControllerId != controllerId ||
+            !string.Equals(ExecutionPlanChecksum, executionPlanChecksum, StringComparison.Ordinal) ||
+            ActiveSetVersion != activeSetVersion ||
+            !string.Equals(ActiveSetChecksum, activeSetChecksum, StringComparison.Ordinal))
+        {
+            throw new DomainRuleException(
+                "Production execution report provenance does not match the first report for this source job.");
+        }
     }
 
     private bool CanApply(Guid sourceEventId, long sequenceNumber)

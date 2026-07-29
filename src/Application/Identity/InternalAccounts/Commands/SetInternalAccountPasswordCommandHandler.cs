@@ -42,7 +42,6 @@ public sealed class SetInternalAccountPasswordCommandHandler
         }
 
         account.Password = HashedPassword.From(_passwordHasher.HashPassword(request.NewPassword));
-        account.LocalLoginEnabled = request.EnableLocalLogin || account.LocalLoginEnabled;
         account.LockedUntil = null;
         account.FailedLoginCount = 0;
         account.UpdatedAt = DateTimeOffset.UtcNow;

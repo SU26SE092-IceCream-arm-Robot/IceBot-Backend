@@ -54,4 +54,78 @@ public partial class Recipe : BusinessEntity, IKioskScoped
     public virtual Recipe? TemplateRecipe { get; set; }
 
     public virtual ICollection<RecipeItem> RecipeItems { get; set; } = new List<RecipeItem>();
+
+    public void UpdateDraft(
+        string name,
+        decimal yieldQuantity,
+        string unit,
+        int? estimatedDurationSeconds,
+        DateTimeOffset? effectiveFrom,
+        DateTimeOffset? effectiveTo,
+        bool isDefault,
+        Guid? actorId,
+        DateTimeOffset now)
+    {
+        EnsureDraft();
+        if (effectiveFrom.HasValue && effectiveTo.HasValue && effectiveFrom > effectiveTo)
+        {
+            throw new DomainRuleException("Recipe effectiveFrom must be before effectiveTo.");
+        }
+
+        Name = name;
+        YieldQuantity = yieldQuantity;
+        Unit = unit;
+        EstimatedDurationSeconds = estimatedDurationSeconds;
+        EffectiveFrom = effectiveFrom;
+        EffectiveTo = effectiveTo;
+        IsDefault = isDefault;
+        UpdatedAt = now;
+        UpdatedByAccountId = actorId;
+    }
+
+    public void Publish(Guid? actorId, DateTimeOffset now)
+    {
+        EnsureStatus(RecipeStatus.Draft, "Only Draft recipes can be published.");
+        if (RecipeItems.Count == 0 || RecipeItems.All(item => item.IsOptional))
+        {
+            throw new DomainRuleException("A recipe must contain at least one required ingredient before publication.");
+        }
+
+        Status = RecipeStatus.Published;
+        UpdatedAt = now;
+        UpdatedByAccountId = actorId;
+    }
+
+    public void Activate(Guid? actorId, DateTimeOffset now)
+    {
+        EnsureStatus(RecipeStatus.Published, "Only Published recipes can be activated.");
+        Status = RecipeStatus.Active;
+        UpdatedAt = now;
+        UpdatedByAccountId = actorId;
+    }
+
+    public void Retire(Guid? actorId, DateTimeOffset now)
+    {
+        if (Status == RecipeStatus.Retired)
+        {
+            return;
+        }
+
+        Status = RecipeStatus.Retired;
+        UpdatedAt = now;
+        UpdatedByAccountId = actorId;
+    }
+
+    public void EnsureDraft()
+    {
+        EnsureStatus(RecipeStatus.Draft, "Only Draft recipes can be edited.");
+    }
+
+    private void EnsureStatus(RecipeStatus expected, string message)
+    {
+        if (Status != expected)
+        {
+            throw new DomainRuleException(message);
+        }
+    }
 }

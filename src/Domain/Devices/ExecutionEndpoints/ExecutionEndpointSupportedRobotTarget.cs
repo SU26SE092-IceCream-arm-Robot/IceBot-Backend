@@ -1,5 +1,6 @@
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 
 namespace Domain.Devices.ExecutionEndpoints;
 

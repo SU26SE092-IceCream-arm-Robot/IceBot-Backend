@@ -44,6 +44,8 @@ public partial class PaymentTransaction : BusinessEntity
 
     public PaymentTransactionStatus Status { get; set; } = PaymentTransactionStatus.Pending;
 
+    public PaymentSettlementDisposition SettlementDisposition { get; private set; }
+
     public DateTimeOffset RequestedAt { get; set; }
 
     public DateTimeOffset? AuthorizedAt { get; set; }
@@ -108,9 +110,9 @@ public partial class PaymentTransaction : BusinessEntity
             throw new DomainRuleException("Payment amount must be greater than zero.");
         }
 
-        if (Status is PaymentTransactionStatus.Cancelled or PaymentTransactionStatus.Refunded)
+        if (Status == PaymentTransactionStatus.Refunded)
         {
-            throw new DomainRuleException("Cannot mark a cancelled or refunded payment as paid.");
+            throw new DomainRuleException("Cannot mark a refunded payment as paid.");
         }
 
         ProviderTransactionId = providerTransactionId ?? ProviderTransactionId;
@@ -151,13 +153,90 @@ public partial class PaymentTransaction : BusinessEntity
 
     public void Cancel(DateTimeOffset cancelledAt)
     {
-        if (Status == PaymentTransactionStatus.Paid)
+        if (Status == PaymentTransactionStatus.Cancelled)
         {
-            throw new DomainRuleException("Cannot cancel a paid transaction.");
+            return;
+        }
+
+        if (Status is PaymentTransactionStatus.Paid or PaymentTransactionStatus.Refunded)
+        {
+            throw new DomainRuleException("Cannot cancel a paid or refunded transaction.");
         }
 
         CancelledAt = cancelledAt;
         Status = PaymentTransactionStatus.Cancelled;
+        ClearRetryState();
+    }
+
+    public void AssignPrimarySettlement()
+    {
+        if (Status != PaymentTransactionStatus.Paid)
+        {
+            throw new DomainRuleException("Only a paid transaction can become the primary settlement.");
+        }
+
+        if (SettlementDisposition is not (PaymentSettlementDisposition.Unassigned or PaymentSettlementDisposition.Primary))
+        {
+            throw new DomainRuleException("A duplicate payment cannot become the primary settlement.");
+        }
+
+        SettlementDisposition = PaymentSettlementDisposition.Primary;
+    }
+
+    public void MarkDuplicateRefundRequired(string reason)
+    {
+        if (Status != PaymentTransactionStatus.Paid)
+        {
+            throw new DomainRuleException("Only a paid transaction can require duplicate-payment intervention.");
+        }
+
+        if (string.IsNullOrWhiteSpace(reason))
+        {
+            throw new DomainRuleException("Duplicate-payment intervention reason is required.");
+        }
+
+        if (SettlementDisposition is PaymentSettlementDisposition.Primary or PaymentSettlementDisposition.DuplicateResolved)
+        {
+            throw new DomainRuleException("The payment settlement disposition cannot be changed to an unresolved duplicate.");
+        }
+
+        SettlementDisposition = PaymentSettlementDisposition.DuplicateRefundRequired;
+        LastErrorCode = "DUPLICATE_PAYMENT_REFUND_REQUIRED";
+        LastErrorMessage = reason.Trim();
+    }
+
+    public void ResolveDuplicatePayment(bool moneyWasRefunded)
+    {
+        if (SettlementDisposition != PaymentSettlementDisposition.DuplicateRefundRequired)
+        {
+            throw new DomainRuleException("Only an unresolved duplicate payment can be resolved.");
+        }
+
+        if (moneyWasRefunded)
+        {
+            Status = PaymentTransactionStatus.Refunded;
+        }
+
+        SettlementDisposition = PaymentSettlementDisposition.DuplicateResolved;
+        LastErrorCode = null;
+        LastErrorMessage = null;
+    }
+
+    public void MarkExpired(DateTimeOffset expiredAt)
+    {
+        if (Status == PaymentTransactionStatus.Expired)
+        {
+            return;
+        }
+
+        if (Status is PaymentTransactionStatus.Paid or PaymentTransactionStatus.Refunded)
+        {
+            throw new DomainRuleException("Cannot expire a paid or refunded transaction.");
+        }
+
+        CancelledAt = expiredAt;
+        Status = PaymentTransactionStatus.Expired;
+        ClearRetryState();
     }
 
     public bool CanRetry => Status is PaymentTransactionStatus.Pending or PaymentTransactionStatus.Failed

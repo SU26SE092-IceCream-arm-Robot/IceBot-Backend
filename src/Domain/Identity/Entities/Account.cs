@@ -47,7 +47,7 @@ public partial class Account : BusinessEntity
 
     public int FailedLoginCount { get; set; }
 
-    public virtual ICollection<AccountDevice> AccountDevices { get; set; } = new List<AccountDevice>();
+    public virtual ICollection<AccountNotificationDevice> NotificationDevices { get; set; } = new List<AccountNotificationDevice>();
 
     public virtual ICollection<AccountRole> AccountRoles { get; set; } = new List<AccountRole>();
 

@@ -24,5 +24,4 @@ public sealed class CreateOrganizationRequest
 
     public string? Address { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

@@ -13,4 +13,7 @@ public sealed class EdgeCommandMqttOptions
     public string ClientId { get; set; } = "icebot-cloud-backend";
     public string TopicPrefix { get; set; } = "icebot";
     public int ConnectTimeoutSeconds { get; set; } = 5;
+    public int PublishTimeoutSeconds { get; set; } = 6;
+    public int PublishRetryCount { get; set; } = 1;
+    public int PublishRetryDelayMilliseconds { get; set; } = 250;
 }

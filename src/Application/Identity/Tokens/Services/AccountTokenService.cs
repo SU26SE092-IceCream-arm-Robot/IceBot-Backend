@@ -3,6 +3,7 @@ using Application.Identity.Authentication.Results;
 using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
 using Domain.Identity.Entities;
+using Domain.Identity.Enums;
 
 namespace Application.Identity.Tokens.Services
 {
@@ -54,6 +55,12 @@ namespace Application.Identity.Tokens.Services
             {
                 return ApiResult<AuthenticatedAccountResult>.Fail("Account not found for this token.", 401);
             }
+            if (account.Status != AccountStatus.Active)
+            {
+                await _refreshTokens.RevokeAllForAccountAsync(
+                    account.Id, "Account is not active", ipAddress, userAgent);
+                return ApiResult<AuthenticatedAccountResult>.Fail("Account is not active.", 401);
+            }
 
             var roles = ResolveRoleClaims(account);
             var accessToken = _accessTokenGenerator.GenerateAccessToken(account.Id, account.UserName, roles, account.Status);
@@ -86,7 +93,6 @@ namespace Application.Identity.Tokens.Services
                 FullName = account.FullName ?? string.Empty,
                 Email = account.Email,
                 ImageUrl = account.ImageUrl,
-                Address = account.Address,
                 Roles = roles.Select(role => new AuthenticatedAccountRoleResult
                 {
                     RoleCode = role.RoleCode,
@@ -94,10 +100,8 @@ namespace Application.Identity.Tokens.Services
                     StoreId = role.StoreId,
                     KioskId = role.KioskId
                 }).ToList(),
-                Status = account.Status.ToString(),
                 LocalLoginEnabled = account.LocalLoginEnabled,
-                GoogleLoginEnabled = account.GoogleLoginEnabled,
-                Gender = account.Gender
+                GoogleLoginEnabled = account.GoogleLoginEnabled
             };
         }
 

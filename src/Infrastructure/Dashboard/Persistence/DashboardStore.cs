@@ -20,11 +20,11 @@ public sealed class DashboardStore : IDashboardStore
         IReadOnlyCollection<Guid> allowedKioskIds,
         CancellationToken cancellationToken = default)
     {
-        var orgsQuery = _dbContext.Organizations.AsNoTracking();
-        var storesQuery = _dbContext.Stores.AsNoTracking();
-        var kiosksQuery = _dbContext.Kiosks.AsNoTracking();
-        var ordersQuery = _dbContext.Orders.AsNoTracking();
-        var dispensersQuery = _dbContext.IngredientDispenserStates.AsNoTracking();
+        var orgsQuery = _dbContext.Organizations.WhereNotDeleted().AsNoTracking();
+        var storesQuery = _dbContext.Stores.WhereNotDeleted().AsNoTracking();
+        var kiosksQuery = _dbContext.Kiosks.WhereNotDeleted().AsNoTracking();
+        var ordersQuery = _dbContext.Orders.WhereNotDeleted().AsNoTracking();
+        var dispensersQuery = _dbContext.IngredientDispenserStates.WhereNotDeleted().AsNoTracking();
         var eventsQuery = _dbContext.DeviceEvents.AsNoTracking();
 
         if (!isSystemAdmin)
@@ -52,11 +52,20 @@ public sealed class DashboardStore : IDashboardStore
 
         var kioskCount = kioskStats.Sum(x => x.Count);
         var activeKioskCount = kioskStats.FirstOrDefault(x => x.Status == Domain.Tenants.Enums.KioskStatus.Active)?.Count ?? 0;
-        var offlineKioskCount = kioskStats.FirstOrDefault(x => x.Status == Domain.Tenants.Enums.KioskStatus.Offline)?.Count ?? 0;
-        var maintenanceKioskCount = kioskStats.FirstOrDefault(x => x.Status == Domain.Tenants.Enums.KioskStatus.Maintenance)?.Count ?? 0;
+        var visibleKioskIds = kiosksQuery.Select(kiosk => kiosk.Id);
+        var offlineKioskCount = await _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .CountAsync(
+                connectivity => visibleKioskIds.Contains(connectivity.KioskId) &&
+                    connectivity.Status == Domain.Devices.Connectivity.KioskConnectivityStatus.Unreachable,
+                cancellationToken);
+        var maintenanceKioskCount = await kiosksQuery.CountAsync(
+            kiosk => kiosk.OperationalState == Domain.Tenants.Enums.KioskOperationalState.Maintenance,
+            cancellationToken);
 
         var pendingOrderCount = await ordersQuery.CountAsync(o => o.Status == Domain.Orders.Enums.OrderStatus.PendingPayment, cancellationToken);
-        var paidOrderCount = await ordersQuery.CountAsync(o => o.Status == Domain.Orders.Enums.OrderStatus.Paid, cancellationToken);
+        var paidOrderCount = await ordersQuery.CountAsync(
+            order => order.PaymentStatus == Domain.Orders.Enums.PaymentStatus.Paid,
+            cancellationToken);
         var refundRequiredOrderCount = await ordersQuery.CountAsync(o => o.Status == Domain.Orders.Enums.OrderStatus.RefundRequired, cancellationToken);
 
         var lowStockDispenserCount = await dispensersQuery.CountAsync(d => d.CurrentLevelStatus == Domain.Inventory.Enums.IngredientLevelStatus.Low, cancellationToken);

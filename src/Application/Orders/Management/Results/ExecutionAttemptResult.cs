@@ -1,6 +1,21 @@
 namespace Application.Orders.Management.Results;
 
-public sealed class ExecutionAttemptResult
+public sealed class ExecutionAttemptSummaryResult
+{
+    public Guid SourceCommandId { get; init; }
+    public int DispatchAttemptNo { get; init; }
+    public string CommandStatus { get; init; } = null!;
+    public DateTimeOffset CreatedAt { get; init; }
+    public DateTimeOffset? DeliveredAt { get; init; }
+    public DateTimeOffset? RespondedAt { get; init; }
+    public string? RejectionCode { get; init; }
+    public string? RejectionMessage { get; init; }
+    public string? ExecutionStatus { get; init; }
+    public string? ObservationStatus { get; init; }
+    public string? CustomerExecutionStatus { get; init; }
+}
+
+public sealed class ExecutionAttemptDiagnosticsResult
 {
     public Guid SourceCommandId { get; init; }
     public Guid OrderId { get; init; }
@@ -30,12 +45,26 @@ public sealed class ExecutionAttemptResult
 
 public sealed class ExecutionAttemptDetailResult
 {
-    public required ExecutionAttemptResult Attempt { get; init; }
+    public required ExecutionAttemptDiagnosticsResult Attempt { get; init; }
     public ExecutionAttemptReferenceResult? PreviousAttempt { get; init; }
     public ExecutionAttemptReferenceResult? NextAttempt { get; init; }
     public required ExecutionAttemptProvenanceResult Provenance { get; init; }
     public IReadOnlyCollection<ExecutionDeliveryAttemptResult> DeliveryAttempts { get; init; } = [];
     public IReadOnlyCollection<ProductionExecutionResult> ProductionExecutions { get; init; } = [];
+    public IReadOnlyCollection<ProductionUnitOutcomeSummaryResult> ProductionUnitOutcomes { get; init; } = [];
+}
+
+public sealed class ProductionUnitOutcomeSummaryResult
+{
+    public Guid OrderItemId { get; init; }
+    public int ProductionUnitStartNo { get; init; }
+    public int ExpectedQuantity { get; init; }
+    public int CompletedQuantity { get; init; }
+    public int FailedQuantity { get; init; }
+    public int ManualInterventionQuantity { get; init; }
+    public int InProgressQuantity { get; init; }
+    public int UnreportedQuantity { get; init; }
+    public string? AggregateStatus { get; init; }
 }
 
 public sealed class ExecutionAttemptReferenceResult
@@ -72,6 +101,9 @@ public sealed class ProductionExecutionResult
 {
     public Guid Id { get; init; }
     public Guid? SourceProductionJobId { get; init; }
+    public Guid OrderItemId { get; init; }
+    public int ProductionUnitNo { get; init; }
+    public int ProductionUnitQuantity { get; init; }
     public Guid? WorkcellId { get; init; }
     public Guid? ControllerId { get; init; }
     public string? ExecutionPlanChecksum { get; init; }

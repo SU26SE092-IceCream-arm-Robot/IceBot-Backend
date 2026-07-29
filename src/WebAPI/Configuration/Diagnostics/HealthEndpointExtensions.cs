@@ -317,11 +317,9 @@ public static class HealthEndpointExtensions
         try
         {
             using var timeoutCts = CreateTimeoutCancellationToken(timeoutSeconds, cancellationToken);
-            var auth = firebaseClient.GetAuth();
-
             try
             {
-                await auth.GetUserAsync("__icebot_diagnostics_probe__", timeoutCts.Token);
+                await firebaseClient.GetUserAsync("__icebot_diagnostics_probe__", timeoutCts.Token);
             }
             catch (FirebaseAuthException ex) when (IsExpectedFirebaseProbeMiss(ex))
             {

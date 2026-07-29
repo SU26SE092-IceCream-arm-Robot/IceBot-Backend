@@ -1,11 +1,15 @@
+using Application.RobotConfiguration.Storage.Abstractions;
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
 using System.Text;
-using Application.RobotConfiguration.Abstractions;
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Services;
-using Domain.RobotConfiguration.Entities;
+using Application.RobotConfiguration.Artifacts.Abstractions;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Storage.Services;
+using Domain.RobotConfiguration.Artifacts;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using IceBot.UnitTests.TestSupport;
+using Application.Shared.Concurrency;
 
 namespace IceBot.UnitTests.RobotConfiguration;
 
@@ -75,20 +79,53 @@ public sealed class BulkUploadRobotArtifactsTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task HandleAsync_MapsObjectStorageOutageToServiceUnavailableItem()
+    {
+        var organizationId = Guid.NewGuid();
+        var store = CreateStore(organizationId);
+        var storage = Substitute.For<IArtifactObjectStorage>();
+        storage.WriteImmutableAsync(
+                Arg.Any<ArtifactObjectWriteRequest>(),
+                Arg.Any<Stream>(),
+                Arg.Any<CancellationToken>())
+            .Returns<Task<ArtifactObjectWriteResult>>(_ =>
+                throw new ArtifactObjectStorageUnavailableException(
+                    "storage offline", new IOException("test outage")));
+        var handler = CreateHandler(store, storage);
+
+        var result = await handler.HandleAsync(new BulkUploadRobotArtifactsCommand
+        {
+            UserContext = TestData.SystemAdmin(),
+            OrganizationId = organizationId,
+            Items = [Item("offline.lua", "OFFLINE")]
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(503, result.StatusCode);
+        var item = Assert.Single(result.Data!.Items);
+        Assert.False(item.Succeeded);
+        Assert.Equal(503, item.StatusCode);
+        Assert.Equal("Artifact object storage is temporarily unavailable.", item.Message);
+    }
+
     private static BulkUploadRobotArtifactsCommandHandler CreateHandler(
-        IRobotConfigurationStore store,
+        IRobotArtifactStore store,
         IArtifactObjectStorage storage)
     {
         var contentService = new ArtifactUploadContentService(
             storage,
             NullLogger<ArtifactUploadContentService>.Instance);
         return new BulkUploadRobotArtifactsCommandHandler(
-            new UploadRobotArtifactCommandHandler(store, contentService));
+            new UploadRobotArtifactCommandHandler(
+                store,
+                contentService,
+                InlineTechnicalResourceMutationCoordinator.Instance));
     }
 
-    private static IRobotConfigurationStore CreateStore(Guid organizationId)
+    private static IRobotArtifactStore CreateStore(Guid organizationId)
     {
-        var store = Substitute.For<IRobotConfigurationStore>();
+        var store = Substitute.For<IRobotArtifactStore>();
         store.OrganizationExistsAsync(organizationId, Arg.Any<CancellationToken>()).Returns(true);
         return store;
     }

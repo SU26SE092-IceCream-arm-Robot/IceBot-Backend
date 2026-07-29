@@ -6,6 +6,17 @@ namespace Application.EdgeIntegration.Abstractions;
 
 public interface IEdgeCommandStore
 {
+    Task AcquireKioskOperationalLockAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<T> ExecuteEndpointDeliverySerializedAsync<T>(
+        Guid endpointId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
+    Task<T> ExecuteSerializedAsync<T>(
+        Guid commandId,
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
+
     Task<Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint?> GetEndpointForCommandAuthAsync(
         Guid endpointId,
         CancellationToken cancellationToken = default);
@@ -18,6 +29,8 @@ public interface IEdgeCommandStore
         CancellationToken cancellationToken = default);
 
     Task<EdgeCommand?> GetByIdAsync(Guid commandId, CancellationToken cancellationToken = default);
+
+    Task AcquireOrderWorkflowLockAsync(Guid orderId, CancellationToken cancellationToken = default);
 
     Task<Domain.Orders.Entities.Order?> GetOrderForAcknowledgementAsync(
         Guid orderId,

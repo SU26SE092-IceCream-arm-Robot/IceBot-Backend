@@ -1,5 +1,6 @@
+using Domain.Devices.Telemetry;
 using Domain.Common;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Common.Enums;
 using Domain.Tenants.Entities;
 

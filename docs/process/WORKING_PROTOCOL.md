@@ -78,6 +78,11 @@ During editing:
 - update DI and docs when contracts change;
 - do not add future-facing infrastructure without a current use case.
 
+For a workflow that crosses layers, modules, persistence operations, jobs, or
+external dependencies, follow [Vertical Slice Review](VERTICAL_SLICE_REVIEW.md).
+Freeze scope and define lifecycle, tenancy, idempotency, concurrency,
+transaction, I/O, retry, cleanup, and retention invariants before editing.
+
 ## Refactor Rules
 
 Build success does not prove design fit.
@@ -136,7 +141,7 @@ Docs should reduce repeated reasoning, not duplicate long explanations.
 
 Use the project documentation index first when the task spans multiple repos or document areas:
 
-- [Project Documentation Index](../../Docs/README.md)
+- [Product Documentation Index](../../../IceBot-Product/README.md)
 
 Do not read all docs by default. Read the smallest relevant set, usually 1-3 files, then inspect code as needed.
 
@@ -144,7 +149,7 @@ Links are routing hints, not mandatory recursive reads. If a linked file was alr
 
 Use:
 
-- [RAG Context Map](../RAG_CONTEXT_MAP.md) when the right backend doc is unclear.
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md) when the right backend doc is unclear.
 - [Documentation Rules](DOCUMENTATION_RULES.md) for RAG-friendly document structure.
 - [Architecture](../../ARCHITECTURE.md) for high-level architecture.
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md) for domain ownership.
@@ -154,7 +159,7 @@ Use:
 - [System Flows](../flows/SYSTEM_FLOWS.md) for the flow index, then the matching flow-specific document.
 - [IoT Contract](../iot/IOT_CONTRACT.md) for tablet-edge-cloud flow.
 
-The project-level `Vault/` folder is a personal reasoning notebook, not implementation truth. Use it only as background context unless a decision has been promoted into `Docs/` or repository docs.
+The project-level `Vault/` folder is a personal reasoning notebook, not implementation truth. Use it only as background context unless a decision has been promoted into `IceBot-Product/` or repository docs.
 
 Do not load `Vault/` by default. Use it only when the user asks about reasoning history, trade-offs, rejected designs, unresolved ideas, or why a decision was considered.
 
@@ -211,11 +216,17 @@ A change is done when:
 - any skipped verification is stated explicitly;
 - remaining warnings or risks are reported.
 
+For a substantial vertical slice, completion additionally requires failure-path
+evidence for every applicable invariant and an independent review of the final
+diff against the frozen scope. Build success and happy-path coverage alone are
+not sufficient.
+
 ## Related Docs
 
 - [Documentation Rules](DOCUMENTATION_RULES.md)
-- [RAG Context Map](../RAG_CONTEXT_MAP.md)
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md)
 - [Architecture](../../ARCHITECTURE.md)
 - [Boundary Contexts](../architecture/BOUNDARY_CONTEXTS.md)
 - [Dependency Rules](../architecture/DEPENDENCY_RULES.md)
 - [Naming Rules](NAMING_RULES.md)
+- [Vertical Slice Review](VERTICAL_SLICE_REVIEW.md)

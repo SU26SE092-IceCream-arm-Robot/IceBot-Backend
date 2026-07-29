@@ -36,8 +36,6 @@ public sealed class ProductResult
 
     public string? ImageUrl { get; set; }
 
-    public string? MetadataJson { get; set; }
-
     public TenantScopeType ScopeType { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
@@ -45,4 +43,6 @@ public sealed class ProductResult
     public DateTimeOffset? UpdatedAt { get; set; }
 
     public List<ProductVariantResult> Variants { get; set; } = new();
+
+    public List<OptionGroupResult> OptionGroups { get; set; } = new();
 }

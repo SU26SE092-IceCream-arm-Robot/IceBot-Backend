@@ -1,10 +1,16 @@
-using Application.ProductionConfiguration.Commands;
-using Application.ProductionConfiguration.Queries;
-using Application.ProductionConfiguration.ReadModels;
+using Application.ProductionConfiguration.Releases.Commands;
+using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Releases.Queries;
+using Application.ProductionConfiguration.Deployments.Queries;
+using Application.ProductionConfiguration.Readiness.Queries;
+using Application.ProductionConfiguration.Releases.ReadModels;
+using Application.ProductionConfiguration.Deployments.ReadModels;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Authorization;
+using Application.ProductionConfiguration.Deployments.Services;
 using System.ComponentModel.DataAnnotations;
 
 namespace WebAPI.Controllers.ProductionConfiguration;
@@ -19,19 +25,22 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     private readonly RollbackConfigurationDeploymentCommandHandler _rollbackHandler;
     private readonly DeployFullEdgeConfigurationCommandHandler _fullEdgeHandler;
     private readonly DeployLowCostArtifactSetCommandHandler _lowCostHandler;
+    private readonly ConfigurationDeploymentPreviewHandler _deploymentPreview;
 
     public ManagementConfigurationDeploymentsController(
         ListConfigurationDeploymentsQueryHandler listHandler,
         GetConfigurationDeploymentQueryHandler getHandler,
         RollbackConfigurationDeploymentCommandHandler rollbackHandler,
         DeployFullEdgeConfigurationCommandHandler fullEdgeHandler,
-        DeployLowCostArtifactSetCommandHandler lowCostHandler)
+        DeployLowCostArtifactSetCommandHandler lowCostHandler,
+        ConfigurationDeploymentPreviewHandler deploymentPreview)
     {
         _listHandler = listHandler;
         _getHandler = getHandler;
         _rollbackHandler = rollbackHandler;
         _fullEdgeHandler = fullEdgeHandler;
         _lowCostHandler = lowCostHandler;
+        _deploymentPreview = deploymentPreview;
     }
 
     [HttpGet("configuration-deployments")]
@@ -51,25 +60,60 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("configuration-deployments/{deploymentId:guid}")]
+    [HttpGet("kiosks/{kioskId:guid}/configuration-deployments")]
     [Authorize(Policy = "deployment.read")]
-    public async Task<IActionResult> Get(Guid deploymentId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ListForKiosk(
+        Guid kioskId,
+        [FromQuery] Guid? configurationReleaseId, [FromQuery] ConfigurationDeploymentProfile? profile,
+        [FromQuery] ConfigurationDeploymentReadStatus? status, [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20, CancellationToken cancellationToken = default)
     {
-        var result = await _getHandler.HandleAsync(
-            new GetConfigurationDeploymentQuery(deploymentId) { UserContext = User.GetUserContext() }, cancellationToken);
+        var result = await _listHandler.HandleAsync(new ListConfigurationDeploymentsQuery
+        {
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            ConfigurationReleaseId = configurationReleaseId,
+            Profile = profile,
+            Status = status,
+            PageNumber = pageNumber,
+            PageSize = pageSize
+        }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("configuration-deployments/{deploymentId:guid}/rollback")]
+    [HttpGet("kiosks/{kioskId:guid}/configuration-deployments/{deploymentId:guid}")]
+    [Authorize(Policy = "deployment.read")]
+    public async Task<IActionResult> Get(Guid kioskId, Guid deploymentId, CancellationToken cancellationToken)
+    {
+        var result = await _getHandler.HandleAsync(
+            new GetConfigurationDeploymentQuery(kioskId, deploymentId) { UserContext = User.GetUserContext() }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("kiosks/{kioskId:guid}/configuration-deployments/{deploymentId:guid}/artifacts")]
+    [Authorize(Policy = "deployment.read")]
+    public async Task<IActionResult> GetArtifacts(
+        Guid kioskId,
+        Guid deploymentId,
+        [FromServices] GetConfigurationDeploymentArtifactsQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(
+            new GetConfigurationDeploymentArtifactsQuery(User.GetUserContext(), kioskId, deploymentId),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("kiosks/{kioskId:guid}/configuration-deployments/{deploymentId:guid}/rollback")]
     [Authorize(Policy = "release.rollback")]
     public async Task<IActionResult> Rollback(
-        Guid deploymentId, [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
-        [FromBody] RollbackConfigurationDeploymentRequest request, CancellationToken cancellationToken)
+        Guid kioskId, Guid deploymentId, [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        CancellationToken cancellationToken)
     {
         var result = await _rollbackHandler.HandleAsync(new RollbackConfigurationDeploymentCommand
         {
-            UserContext = User.GetUserContext(), TargetDeploymentId = deploymentId,
-            IdempotencyKey = idempotencyKey, CommandExpiryAt = request.CommandExpiryAt
+            UserContext = User.GetUserContext(), KioskId = kioskId, TargetDeploymentId = deploymentId,
+            IdempotencyKey = idempotencyKey
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -85,8 +129,28 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             UserContext = User.GetUserContext(), KioskId = kioskId,
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
-            IdempotencyKey = idempotencyKey, CommandExpiryAt = request.CommandExpiryAt
+            IdempotencyKey = idempotencyKey,
+            DeploymentPreviewChecksum = request.DeploymentPreviewChecksum,
+            AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk
         }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("kiosks/{kioskId:guid}/configuration-deployments/preview")]
+    [Authorize(Policy = "release.deploy")]
+    public async Task<IActionResult> PreviewDeployment(
+        Guid kioskId,
+        [FromBody] ConfigurationDeploymentPreviewRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _deploymentPreview.HandleAsync(
+            User.GetUserContext(),
+            kioskId,
+            request.ConfigurationReleaseId,
+            request.KioskExecutionEndpointId,
+            request.Selections.Select(item => new DeploymentPreviewSelection(
+                item.ExecutionRouteId, item.RobotProgramId)).ToArray(),
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -102,17 +166,13 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
+            DeploymentPreviewChecksum = request.DeploymentPreviewChecksum,
+            AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk,
             Selections = request.Selections.Select(item => new DeployLowCostArtifactSelection(
-                item.ExecutionRouteId, item.RobotProgramId)).ToArray(),
-            CommandExpiryAt = request.CommandExpiryAt
+                item.ExecutionRouteId, item.RobotProgramId)).ToArray()
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
-}
-
-public sealed class RollbackConfigurationDeploymentRequest
-{
-    public DateTimeOffset? CommandExpiryAt { get; init; }
 }
 
 public sealed class DeployFullEdgeConfigurationRequest
@@ -123,7 +183,18 @@ public sealed class DeployFullEdgeConfigurationRequest
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
 
-    public DateTimeOffset? CommandExpiryAt { get; init; }
+    [Required, StringLength(64, MinimumLength = 64)]
+    public string DeploymentPreviewChecksum { get; init; } = string.Empty;
+
+    public bool AcknowledgeRemainingRisk { get; init; }
+
+}
+
+public sealed class ConfigurationDeploymentPreviewRequest
+{
+    [Required] public Guid ConfigurationReleaseId { get; init; }
+    public Guid? KioskExecutionEndpointId { get; init; }
+    public IReadOnlyCollection<DeployLowCostArtifactSetSelectionRequest> Selections { get; init; } = [];
 }
 
 public sealed class DeployLowCostArtifactSetRequest
@@ -134,10 +205,14 @@ public sealed class DeployLowCostArtifactSetRequest
     [Required]
     public Guid KioskExecutionEndpointId { get; init; }
 
+    [Required, StringLength(64, MinimumLength = 64)]
+    public string DeploymentPreviewChecksum { get; init; } = string.Empty;
+
+    public bool AcknowledgeRemainingRisk { get; init; }
+
     [Required, MinLength(1)]
     public IReadOnlyCollection<DeployLowCostArtifactSetSelectionRequest> Selections { get; init; } = [];
 
-    public DateTimeOffset? CommandExpiryAt { get; init; }
 }
 
 public sealed class DeployLowCostArtifactSetSelectionRequest

@@ -1,12 +1,19 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Inventory.Entities;
 using Domain.Orders.Entities;
+using Domain.Orders.Incidents;
 using Domain.ProductionConfiguration.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Domain.Sync.Ingestion;
 
 namespace Application.EdgeIntegration.Abstractions;
+
+public interface IExecutionReportUnitOfWork :
+    IExecutionReportReceiptStore,
+    IDeploymentReportStore,
+    IProductionExecutionReportStore,
+    IExecutionStockEvidenceStore;
 
 public interface IExecutionReportReceiptStore
 {
@@ -32,21 +39,36 @@ public interface IDeploymentReportStore
 
 public interface IProductionExecutionReportStore
 {
+    Task AcquireOrderWorkflowLockAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task<ProductionExecutionRecord?> GetProductionExecutionRecordAsync(
         Guid sourceCommandId,
         Guid sourceProductionJobId,
+        CancellationToken cancellationToken = default);
+    Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsAsync(
+        Guid sourceCommandId,
+        Guid orderItemId,
+        CancellationToken cancellationToken = default);
+    Task<List<ProductionExecutionRecord>> ListProductionExecutionRecordsForOrderItemAsync(
+        Guid orderId,
+        Guid orderItemId,
         CancellationToken cancellationToken = default);
     Task AddProductionExecutionRecordAsync(ProductionExecutionRecord record, CancellationToken cancellationToken = default);
     Task<OrderExecutionRecord?> GetOrderExecutionRecordAsync(Guid sourceCommandId, CancellationToken cancellationToken = default);
     Task AddOrderExecutionRecordAsync(OrderExecutionRecord record, CancellationToken cancellationToken = default);
     Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task AddOrderStatusHistoryAsync(OrderStatusHistory history, CancellationToken cancellationToken = default);
+    Task AddOrderItemStatusHistoryAsync(OrderItemStatusHistory history, CancellationToken cancellationToken = default);
+    Task<ProductionIncident?> GetProductionIncidentBySourceAsync(
+        Guid sourceCommandId, Guid sourceProductionJobId, CancellationToken cancellationToken = default);
+    Task AddProductionIncidentAsync(ProductionIncident incident, CancellationToken cancellationToken = default);
 }
 
 public interface IExecutionStockEvidenceStore
 {
     Task AcquireStockMovementLocksAsync(IEnumerable<Guid> sourceEventIds, CancellationToken cancellationToken = default);
+    Task AcquireDispenserMutationLocksAsync(IEnumerable<Guid> dispenserStateIds, CancellationToken cancellationToken = default);
     Task<IngredientDispenserState?> GetDispenserStateAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
-    Task<bool> StockMovementExistsAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
+    Task<bool> IsIngredientExpectedForOrderItemAsync(Guid orderId, Guid orderItemId, Guid ingredientId, CancellationToken cancellationToken = default);
+    Task<StockMovement?> GetStockMovementBySourceEventIdAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
     Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
 }

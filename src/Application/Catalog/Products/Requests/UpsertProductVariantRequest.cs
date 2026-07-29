@@ -20,15 +20,10 @@ public sealed class UpsertProductVariantRequest
 
     public decimal BasePrice { get; set; }
 
-    public string Currency { get; set; } = "VND";
-
-    public bool IsAvailable { get; set; } = true;
-
     public int DisplayOrder { get; set; }
 
     public int? PreparationTimeSeconds { get; set; }
 
     public string? ImageUrl { get; set; }
 
-    public string? MetadataJson { get; set; }
 }

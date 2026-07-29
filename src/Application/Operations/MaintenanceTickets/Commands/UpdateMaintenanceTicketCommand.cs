@@ -43,6 +43,11 @@ public sealed class UpdateMaintenanceTicketCommandHandler
             return ApiResult<MaintenanceTicketResult>.Fail("Title is required.", 400);
         }
 
+        if (req.OperationalImpact.HasValue && !Enum.IsDefined(req.OperationalImpact.Value))
+        {
+            return ApiResult<MaintenanceTicketResult>.Fail("Invalid maintenance operational impact.", 400);
+        }
+
         // 1. Fetch MaintenanceTicket
         var ticket = await _ticketStore.GetByIdAsync(command.TicketId, cancellationToken);
         if (ticket is null)
@@ -62,6 +67,14 @@ public sealed class UpdateMaintenanceTicketCommandHandler
         if (ticket.Status is MaintenanceTicketStatus.Resolved or MaintenanceTicketStatus.Closed or MaintenanceTicketStatus.Cancelled)
         {
             return ApiResult<MaintenanceTicketResult>.Fail("Cannot update a resolved, closed, or cancelled maintenance ticket.", 400);
+        }
+
+        var operationalImpact = req.OperationalImpact ?? ticket.OperationalImpact;
+        if (ticket.Status == MaintenanceTicketStatus.InProgress &&
+            ticket.OperationalImpact != operationalImpact)
+        {
+            return ApiResult<MaintenanceTicketResult>.Fail(
+                "Operational impact cannot be changed after maintenance work has started.", 409);
         }
 
         // 4. Validate optional DeviceId
@@ -98,6 +111,7 @@ public sealed class UpdateMaintenanceTicketCommandHandler
         ticket.Title = req.Title.Trim();
         ticket.Description = req.Description?.Trim();
         ticket.Priority = req.Priority;
+        ticket.OperationalImpact = operationalImpact;
         ticket.DeviceId = req.DeviceId;
         ticket.OrderId = req.OrderId;
         ticket.DeviceEventId = req.DeviceEventId;

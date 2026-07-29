@@ -1,7 +1,7 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.SalesCatalog.Abstractions;
 using Domain.Catalog.Entities;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.SalesCatalog.Entities;
 using Domain.SalesCatalog.Enums;
 using Domain.ProductionConfiguration.Enums;
@@ -9,6 +9,9 @@ using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
+using Application.SalesCatalog.ReadModels;
+using Application.ProductionConfiguration.Routes.Support;
 
 namespace Infrastructure.SalesCatalog.Persistence;
 
@@ -23,7 +26,7 @@ public sealed class MenuStore : IMenuStore
 
     public Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Kiosks
+        return _dbContext.Kiosks.WhereNotDeleted()
             .AsNoTracking()
             .Include(kiosk => kiosk.Store)
             .Include(kiosk => kiosk.Organization)
@@ -70,7 +73,8 @@ public sealed class MenuStore : IMenuStore
         return ApplyMenuFilters(
                 _dbContext.Menus
                     .AsNoTracking()
-                    .Include(menu => menu.MenuItems),
+                    .Include(menu => menu.MenuItems)
+                        .ThenInclude(item => item.ProductOptions),
                 search,
                 organizationId,
                 storeId,
@@ -101,6 +105,8 @@ public sealed class MenuStore : IMenuStore
                 .ThenInclude(item => item.ProductVariant)
             .Include(menu => menu.MenuItems)
                 .ThenInclude(item => item.Recipe)
+                    .ThenInclude(recipe => recipe!.RecipeItems)
+                        .ThenInclude(recipeItem => recipeItem.Ingredient)
             .Where(menu =>
                 menu.Status == MenuStatus.Active &&
                 (menu.EffectiveFrom == null || menu.EffectiveFrom <= now) &&
@@ -124,36 +130,54 @@ public sealed class MenuStore : IMenuStore
             .ToListAsync(cancellationToken);
     }
 
-    public Task<bool> HasActiveProductionRouteAsync(
+    public async Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
         Guid kioskId,
         Guid productVariantId,
         Guid recipeId,
+        DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.ExecutionEndpointReadinessProjections
+        var routes = await _dbContext.ExecutionEndpointReadinessProjections
             .AsNoTracking()
-            .AnyAsync(readiness =>
+            .Where(readiness =>
                 readiness.KioskId == kioskId &&
                 readiness.Readiness == ExecutionReadinessState.Ready &&
                 readiness.Safety == ExecutionSafetyState.Safe &&
+                readiness.CloudReceivedAt >= readinessReceivedAfter &&
                 readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
-                _dbContext.ConfigurationReleases.Any(release =>
+                _dbContext.ConfigurationReleases.WhereNotDeleted().Any(release =>
                     release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
                         ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
                         : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
                     release.Status == ConfigurationReleaseStatus.Published &&
-                    release.ExecutionRoutes.Any(route =>
-                        route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
-                        route.RobotBindings.Any() &&
+                    release.ExecutionRoutes.Any(route => route.ProductVariantId == productVariantId &&
+                        route.RecipeId == recipeId && route.RobotBindings.Any() &&
                         route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
-                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))),
-                cancellationToken);
+                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
+            .SelectMany(readiness => _dbContext.ConfigurationReleases.WhereNotDeleted()
+                .Where(release => release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
+                    ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
+                    : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId))
+                .SelectMany(release => release.ExecutionRoutes.Where(route =>
+                    route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
+                    route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
+                        capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
+            .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
+            .Select(route => new { route.Id, route.SupportedOptionCodesJson, route.RequiredCapabilitiesJson })
+            .ToListAsync(cancellationToken);
+        var route = routes.FirstOrDefault(candidate =>
+            !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
+                candidate.RequiredCapabilitiesJson));
+        return route is null ? null : new ActiveProductionRouteOptionPolicy(route.Id,
+            (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
+                .ToHashSet(StringComparer.OrdinalIgnoreCase));
     }
 
     public Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default)
     {
         var query = _dbContext.Menus
             .Include(menu => menu.MenuItems)
+                .ThenInclude(item => item.ProductOptions)
             .Where(menu => menu.Id == menuId);
 
         if (asNoTracking)
@@ -171,6 +195,7 @@ public sealed class MenuStore : IMenuStore
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.MenuItems
+            .Include(item => item.ProductOptions)
             .Where(item => item.MenuId == menuId && item.Id == menuItemId);
 
         if (asNoTracking)
@@ -183,7 +208,7 @@ public sealed class MenuStore : IMenuStore
 
     public Task<Product?> GetProductByIdAsync(Guid productId, CancellationToken cancellationToken = default)
     {
-        return _dbContext.Products
+        return _dbContext.Products.WhereNotDeleted()
             .AsNoTracking()
             .FirstOrDefaultAsync(product => product.Id == productId, cancellationToken);
     }
@@ -199,7 +224,100 @@ public sealed class MenuStore : IMenuStore
     {
         return _dbContext.Recipes
             .AsNoTracking()
+            .Include(recipe => recipe.RecipeItems)
+                .ThenInclude(item => item.Ingredient)
             .FirstOrDefaultAsync(recipe => recipe.Id == recipeId, cancellationToken);
+    }
+
+    public Task<Domain.Devices.Connectivity.KioskConnectivityProjection?> GetKioskConnectivityAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .FirstOrDefaultAsync(connectivity => connectivity.KioskId == kioskId, cancellationToken);
+
+    public Task<List<ProductOption>> ListProductOptionsAsync(
+        Guid productId,
+        IReadOnlyCollection<Guid> optionIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (optionIds.Count == 0)
+        {
+            return Task.FromResult(new List<ProductOption>());
+        }
+
+        return _dbContext.Products.WhereNotDeleted()
+            .AsNoTracking()
+            .Where(product => product.Id == productId)
+            .SelectMany(product => product.OptionGroups)
+            .SelectMany(group => group.ProductOptions)
+            .Where(option => optionIds.Contains(option.Id) && option.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (menuItemIds.Count == 0)
+        {
+            return Task.FromResult(new List<MenuItemProductOptionReadModel>());
+        }
+
+        return ProjectMenuItemOptions(menuItemIds).ToListAsync(cancellationToken);
+    }
+
+    public Task<List<MenuItemOptionGroupReadModel>> ListMenuItemOptionGroupsAsync(
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (menuItemIds.Count == 0)
+        {
+            return Task.FromResult(new List<MenuItemOptionGroupReadModel>());
+        }
+
+        return (from menuItem in _dbContext.MenuItems.AsNoTracking()
+                join optionGroup in _dbContext.OptionGroups.AsNoTracking()
+                    on menuItem.ProductId equals optionGroup.ProductId
+                where menuItemIds.Contains(menuItem.Id) && optionGroup.IsActive
+                select new MenuItemOptionGroupReadModel(
+                    menuItem.Id,
+                    optionGroup.Id,
+                    optionGroup.Code,
+                    optionGroup.Name,
+                    optionGroup.SelectionType,
+                    optionGroup.MinSelections,
+                    optionGroup.MaxSelections,
+                    optionGroup.IsRequired))
+            .ToListAsync(cancellationToken);
+    }
+
+    private IQueryable<MenuItemProductOptionReadModel> ProjectMenuItemOptions(IReadOnlyCollection<Guid> menuItemIds)
+    {
+        return from membership in _dbContext.MenuItemProductOptions.AsNoTracking()
+               join option in _dbContext.ProductOptions.AsNoTracking() on membership.ProductOptionId equals option.Id
+               join optionGroup in _dbContext.OptionGroups.AsNoTracking() on option.OptionGroupId equals optionGroup.Id
+               where menuItemIds.Contains(membership.MenuItemId) && membership.DeletedAt == null &&
+                     option.DeletedAt == null && optionGroup.IsActive
+               select new MenuItemProductOptionReadModel(
+                   membership.MenuItemId,
+                   option.Id,
+                   optionGroup.Id,
+                   optionGroup.Code,
+                   optionGroup.Name,
+                   optionGroup.SelectionType,
+                   optionGroup.MinSelections,
+                   optionGroup.MaxSelections,
+                   optionGroup.IsRequired,
+                   option.Code,
+                   option.Name,
+                   option.Description,
+                   option.PriceDelta,
+                   option.ExecutionImpact,
+                   option.IsAvailable,
+                   !_dbContext.ProductOptionIngredientRequirements.Any(requirement =>
+                       requirement.ProductOptionId == option.Id && !requirement.Ingredient.IsActive),
+                   option.IsDefault,
+                   option.DisplayOrder);
     }
 
     public Task<bool> MenuCodeExistsAsync(
@@ -240,18 +358,18 @@ public sealed class MenuStore : IMenuStore
         Guid? kioskId,
         CancellationToken cancellationToken = default)
     {
-        if (!await _dbContext.Organizations.AnyAsync(x => x.Id == organizationId, cancellationToken))
+        if (!await _dbContext.Organizations.WhereNotDeleted().AnyAsync(x => x.Id == organizationId, cancellationToken))
         {
             return false;
         }
 
-        if (storeId.HasValue && !await _dbContext.Stores.AnyAsync(
+        if (storeId.HasValue && !await _dbContext.Stores.WhereNotDeleted().AnyAsync(
                 x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
         {
             return false;
         }
 
-        return !kioskId.HasValue || await _dbContext.Kiosks.AnyAsync(
+        return !kioskId.HasValue || await _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
             x => x.Id == kioskId && x.OrganizationId == organizationId &&
                  (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
     }
@@ -264,6 +382,18 @@ public sealed class MenuStore : IMenuStore
     public Task AddMenuItemAsync(MenuItem menuItem, CancellationToken cancellationToken = default)
     {
         return _dbContext.MenuItems.AddAsync(menuItem, cancellationToken).AsTask();
+    }
+
+    public void ReplaceMenuItemProductOptions(
+        MenuItem menuItem,
+        IReadOnlyCollection<MenuItemProductOption> replacements)
+    {
+        _dbContext.MenuItemProductOptions.RemoveRange(menuItem.ProductOptions);
+        menuItem.ProductOptions.Clear();
+        foreach (var replacement in replacements)
+        {
+            menuItem.ProductOptions.Add(replacement);
+        }
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

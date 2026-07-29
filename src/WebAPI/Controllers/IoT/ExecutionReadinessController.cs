@@ -1,11 +1,17 @@
+using Domain.Devices.ExecutionEndpoints;
 using System.ComponentModel.DataAnnotations;
-using Application.Devices.Commands;
+using Application.Devices.Catalog.Commands;
+using Application.Devices.ExecutionEndpoints.Commands;
+using Application.Devices.Telemetry.Commands;
+using Application.Devices.Connectivity.Commands;
+using Application.Devices.Credentials.Commands;
 using Application.Shared.Wrappers;
 using Asp.Versioning;
-using Domain.Devices.Enums;
+using Domain.Devices.Catalog;
 using Domain.ProductionExecution.Enums;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Configuration.Security;
+using Application.Devices.Connectivity.Contracts;
 
 namespace WebAPI.Controllers.IoT;
 [ApiController, ApiVersion("1.0")]
@@ -30,6 +36,13 @@ public sealed class ExecutionReadinessController : ControllerBase
             Readiness = request.Readiness, Activity = request.Activity, Safety = request.Safety,
             CurrentCommandId = request.CurrentCommandId, PhysicalOutputState = request.PhysicalOutputState,
             FaultCode = request.FaultCode,
+            LocalPersistenceHealth = new LocalPersistenceHealthInput(
+                request.LocalPersistenceHealth.StorageWritable,
+                request.LocalPersistenceHealth.FreeSpaceBytes,
+                request.LocalPersistenceHealth.MinimumRequiredFreeSpaceBytes,
+                request.LocalPersistenceHealth.LocalDatabaseHealth,
+                request.LocalPersistenceHealth.PendingEventCount,
+                request.LocalPersistenceHealth.MaximumPendingEventCount),
             Capabilities = request.Capabilities.Select(x => new ExecutionCapabilityInput(x.CapabilityCode, x.WorkcellCode, x.IsAvailable, x.UnavailableReason)).ToArray()
         }, ct);
         return StatusCode(result.StatusCode, result);
@@ -46,7 +59,17 @@ public sealed class ExecutionReadinessRequest
     public Guid? CurrentCommandId { get; init; }
     public PhysicalOutputState PhysicalOutputState { get; init; } = PhysicalOutputState.Unknown;
     [StringLength(100)] public string? FaultCode { get; init; }
+    [Required] public LocalPersistenceHealthRequest LocalPersistenceHealth { get; init; } = null!;
     [MaxLength(200)] public IReadOnlyList<ExecutionCapabilityRequest> Capabilities { get; init; } = [];
+}
+public sealed class LocalPersistenceHealthRequest
+{
+    public bool StorageWritable { get; init; }
+    [Range(0, long.MaxValue)] public long FreeSpaceBytes { get; init; }
+    [Range(1, long.MaxValue)] public long MinimumRequiredFreeSpaceBytes { get; init; }
+    public LocalDatabaseHealth LocalDatabaseHealth { get; init; }
+    [Range(0, int.MaxValue)] public int PendingEventCount { get; init; }
+    [Range(1, int.MaxValue)] public int MaximumPendingEventCount { get; init; }
 }
 public sealed class ExecutionCapabilityRequest
 {

@@ -15,6 +15,8 @@ public sealed class AlertResult
     public string? SourceType { get; init; }
     public Guid? SourceId { get; init; }
     public DateTimeOffset RaisedAt { get; init; }
+    public DateTimeOffset LastOccurredAt { get; init; }
+    public int OccurrenceCount { get; init; }
     public Guid? AcknowledgedByAccountId { get; init; }
     public DateTimeOffset? AcknowledgedAt { get; init; }
     public DateTimeOffset? ResolvedAt { get; init; }

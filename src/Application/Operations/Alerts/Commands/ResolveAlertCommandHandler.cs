@@ -3,8 +3,8 @@ using Application.Abstractions.Realtime.Events;
 using Application.Operations.Abstractions;
 using Application.Operations.Alerts.Mapping;
 using Application.Operations.Alerts.Results;
-using Application.Operations.Alerts.Rules;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Domain.Common;
 using Domain.Operations.Enums;
 
@@ -31,17 +31,23 @@ public sealed class ResolveAlertCommandHandler
             return ApiResult<AlertResult>.Fail("Resolution notes are required.", 400);
         }
 
-        var outcome = await _store.ExecuteSerializedAsync(
+        AlertChangedEvent? notification = null;
+        var result = await _store.ExecuteSerializedAsync(
             command.AlertId,
-            ct => HandleLockedAsync(command, notes, ct),
+            async ct =>
+            {
+                var outcome = await HandleLockedAsync(command, notes, ct);
+                notification = outcome.Notification;
+                return outcome.Result;
+            },
             cancellationToken);
 
-        if (outcome.Notification is not null)
+        if (notification is not null)
         {
-            await _publisher.PublishAlertChangedAsync(outcome.Notification, cancellationToken);
+            await _publisher.PublishAlertChangedAsync(notification, cancellationToken);
         }
 
-        return outcome.Result;
+        return result;
     }
 
     private async Task<LifecycleOutcome> HandleLockedAsync(
@@ -50,16 +56,17 @@ public sealed class ResolveAlertCommandHandler
         CancellationToken cancellationToken)
     {
 
-        var alert = await _store.GetByIdAsync(command.AlertId, cancellationToken);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AlertsManage, command.UserContext);
+        var alert = await _store.GetAccessibleByIdAsync(
+            command.AlertId,
+            command.UserContext.IsSystemAdmin,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
+            cancellationToken);
         if (alert is null)
         {
             return new LifecycleOutcome(ApiResult<AlertResult>.Fail("Alert not found.", 404), null);
-        }
-
-        if (!AlertAccessRules.CanAccess(
-                command.UserContext, alert.Kiosk.OrganizationId, alert.Kiosk.StoreId, alert.KioskId))
-        {
-            return new LifecycleOutcome(ApiResult<AlertResult>.Fail("Access denied.", 403), null);
         }
 
         var oldStatus = alert.Status;
@@ -72,7 +79,6 @@ public sealed class ResolveAlertCommandHandler
             {
                 alert.UpdatedAt = now;
                 alert.UpdatedByAccountId = command.UserContext.AccountId;
-                alert.Version++;
                 await _store.SaveChangesAsync(cancellationToken);
                 notification = new AlertChangedEvent
                 {
@@ -86,7 +92,9 @@ public sealed class ResolveAlertCommandHandler
                     OldStatus = oldStatus.ToString(),
                     NewStatus = alert.Status.ToString(),
                     UpdatedAt = now,
-                    Version = checked((int)alert.Version)
+                    Version = checked((int)alert.Version),
+                    OccurrenceCount = alert.OccurrenceCount,
+                    LastOccurredAt = alert.LastOccurredAt
                 };
             }
         }

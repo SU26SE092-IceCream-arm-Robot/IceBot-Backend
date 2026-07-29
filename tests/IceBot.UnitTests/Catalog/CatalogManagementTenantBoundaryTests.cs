@@ -6,6 +6,8 @@ using Application.Identity.Tokens.Claims;
 using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.Menus.Commands;
 using Application.SalesCatalog.Menus.Requests;
+using Application.Shared.Ownership;
+using Application.Shared.Concurrency;
 using Application.Tenants;
 using Domain.Catalog.Entities;
 using Domain.SalesCatalog.Entities;
@@ -44,7 +46,10 @@ public sealed class CatalogManagementTenantBoundaryTests
         var store = Substitute.For<IProductStore>();
         store.GetProductByIdAsync(product.Id, false, Arg.Any<CancellationToken>()).Returns(product);
 
-        var result = await new UpdateProductCommandHandler(store).HandleAsync(new UpdateProductCommand
+        var result = await new UpdateProductCommandHandler(
+            store,
+            Substitute.For<ITechnicalResourceMutationPolicy>(),
+            InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateProductCommand
         {
             Scope = new ProductManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
             ProductId = product.Id,
@@ -53,6 +58,115 @@ public sealed class CatalogManagementTenantBoundaryTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(404, result.StatusCode);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateProduct_RejectsTechnicalIdentityChange_WhenPackageManaged()
+    {
+        var organizationId = Guid.NewGuid();
+        var product = ProductFor(organizationId);
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(product.Id, false, Arg.Any<CancellationToken>()).Returns(product);
+        var ownership = Substitute.For<ITechnicalResourceMutationPolicy>();
+        ownership.ValidateDefinitionMutationAsync(TechnicalResourceKind.Product, product.Id,
+                Arg.Any<CancellationToken>())
+            .Returns("Package-managed technical configuration must be forked before its definition can be changed.");
+
+        var result = await new UpdateProductCommandHandler(
+            store, ownership, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateProductCommand
+        {
+            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+            ProductId = product.Id,
+            Request = new UpdateProductRequest { Code = "CHANGED" }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task UpdateProduct_RejectsCurrencyChange_WhenReferencedByMenuItem()
+    {
+        var organizationId = Guid.NewGuid();
+        var product = ProductFor(organizationId);
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(product.Id, false, Arg.Any<CancellationToken>()).Returns(product);
+        store.IsProductReferencedByMenuItemsAsync(product.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await new UpdateProductCommandHandler(
+            store,
+            Substitute.For<ITechnicalResourceMutationPolicy>(),
+            InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateProductCommand
+        {
+            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+            ProductId = product.Id,
+            Request = new UpdateProductRequest { Currency = "USD" }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.Equal("VND", product.Currency);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeleteProduct_RejectsProductReferencedByMenuItem()
+    {
+        var organizationId = Guid.NewGuid();
+        var product = ProductFor(organizationId);
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(product.Id, false, Arg.Any<CancellationToken>()).Returns(product);
+        store.IsProductReferencedByMenuItemsAsync(product.Id, Arg.Any<CancellationToken>()).Returns(true);
+
+        var result = await new DeleteProductCommandHandler(
+            store,
+            Substitute.For<ITechnicalResourceMutationPolicy>(),
+            InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new DeleteProductCommand
+        {
+            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+            ProductId = product.Id
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.Null(product.DeletedAt);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeleteProductVariant_RejectsVariantReferencedByMenuItem()
+    {
+        var organizationId = Guid.NewGuid();
+        var product = ProductFor(organizationId);
+        var variant = new ProductVariant
+        {
+            Id = Guid.NewGuid(),
+            ProductId = product.Id,
+            Code = "DEFAULT",
+            Name = "Default"
+        };
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(product.Id, true, Arg.Any<CancellationToken>()).Returns(product);
+        store.GetProductVariantByIdAsync(product.Id, variant.Id, false, Arg.Any<CancellationToken>())
+            .Returns(variant);
+        store.IsProductVariantReferencedByMenuItemsAsync(variant.Id, Arg.Any<CancellationToken>())
+            .Returns(true);
+
+        var result = await new DeleteProductVariantCommandHandler(
+            store,
+            Substitute.For<ITechnicalResourceMutationPolicy>(),
+            InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new DeleteProductVariantCommand
+        {
+            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+            ProductId = product.Id,
+            VariantId = variant.Id
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.Null(variant.DeletedAt);
         await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 
@@ -70,7 +184,6 @@ public sealed class CatalogManagementTenantBoundaryTests
             Request = new CreateProductRequest
             {
                 StoreId = storeId,
-                ScopeType = TenantScopeType.Store,
                 Code = "COFFEE",
                 Name = "Coffee",
                 BasePrice = 10_000
@@ -98,7 +211,8 @@ public sealed class CatalogManagementTenantBoundaryTests
         var store = Substitute.For<IMenuStore>();
         store.GetMenuByIdAsync(menu.Id, false, Arg.Any<CancellationToken>()).Returns(menu);
 
-        var result = await new UpdateMenuCommandHandler(store).HandleAsync(new UpdateMenuCommand
+        var result = await new UpdateMenuCommandHandler(
+            store, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateMenuCommand
         {
             Scope = new MenuManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
             MenuId = menu.Id,

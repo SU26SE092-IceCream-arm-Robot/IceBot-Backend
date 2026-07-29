@@ -11,6 +11,7 @@ public interface IStoreStore
     Task<IReadOnlyList<Store>> ListByOrganizationIdsAsync(IEnumerable<Guid> organizationIds, EntityStatus? status, string? search, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<Store>> ListAccessibleAsync(IEnumerable<Guid> organizationIds, IEnumerable<Guid> storeIds, Guid? organizationId, EntityStatus? status, string? search, CancellationToken cancellationToken = default);
     Task<Store?> GetByIdAsync(Guid storeId, CancellationToken cancellationToken = default);
+    Task<Store?> GetByOrganizationAndIdAsync(Guid organizationId, Guid storeId, CancellationToken cancellationToken = default);
     Task AddAsync(Store store, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

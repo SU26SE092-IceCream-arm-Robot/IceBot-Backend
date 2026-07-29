@@ -20,6 +20,7 @@ public sealed class GetTenantTreeQueryHandler
     {
         var userContext = query.UserContext;
         var includeInactive = query.IncludeInactive;
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.TenantTreeView, userContext);
 
         IReadOnlyList<Organization> organizations;
         IReadOnlyList<Store> stores;
@@ -34,12 +35,12 @@ public sealed class GetTenantTreeQueryHandler
         else
         {
             var scopedStores = await _tenantTreeStore.ListStoresByIdsAsync(
-                userContext.AllowedStoreIds,
+                scope.StoreIds,
                 includeInactive,
                 cancellationToken);
 
             var scopedKiosks = await _tenantTreeStore.ListKiosksByIdsAsync(
-                userContext.AllowedKioskIds,
+                scope.KioskIds,
                 includeInactive,
                 cancellationToken);
 
@@ -47,16 +48,16 @@ public sealed class GetTenantTreeQueryHandler
             stores = await _tenantTreeStore.ListStoresAsync(includeInactive, cancellationToken);
             kiosks = await _tenantTreeStore.ListKiosksAsync(includeInactive, cancellationToken);
 
-            var allowedOrganizationIds = userContext.AllowedOrganizationIds
+            var allowedOrganizationIds = scope.OrganizationIds
                 .Concat(scopedStores.Select(store => store.OrganizationId))
                 .Concat(scopedKiosks.Select(kiosk => kiosk.OrganizationId))
                 .ToHashSet();
 
-            var allowedStoreIds = userContext.AllowedStoreIds
+            var allowedStoreIds = scope.StoreIds
                 .Concat(scopedKiosks.Select(kiosk => kiosk.StoreId))
                 .ToHashSet();
 
-            var allowedKioskIds = userContext.AllowedKioskIds.ToHashSet();
+            var allowedKioskIds = scope.KioskIds.ToHashSet();
 
             organizations = organizations
                 .Where(organization => allowedOrganizationIds.Contains(organization.Id))
@@ -64,14 +65,14 @@ public sealed class GetTenantTreeQueryHandler
 
             stores = stores
                 .Where(store =>
-                    userContext.AllowedOrganizationIds.Contains(store.OrganizationId) ||
+                    scope.OrganizationIds.Contains(store.OrganizationId) ||
                     allowedStoreIds.Contains(store.Id))
                 .ToList();
 
             kiosks = kiosks
                 .Where(kiosk =>
-                    userContext.AllowedOrganizationIds.Contains(kiosk.OrganizationId) ||
-                    userContext.AllowedStoreIds.Contains(kiosk.StoreId) ||
+                    scope.OrganizationIds.Contains(kiosk.OrganizationId) ||
+                    scope.StoreIds.Contains(kiosk.StoreId) ||
                     allowedKioskIds.Contains(kiosk.Id))
                 .ToList();
         }

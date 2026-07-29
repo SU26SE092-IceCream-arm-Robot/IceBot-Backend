@@ -1,6 +1,6 @@
 using Domain.Devices.Telemetry;
 using Domain.Common;
-using Domain.Devices.Entities;
+using Domain.Devices.Catalog;
 using Domain.Identity.Entities;
 using Domain.Operations.Enums;
 using Domain.Orders.Entities;
@@ -22,6 +22,8 @@ public partial class MaintenanceTicket : SyncAggregateEntity, IKioskScoped
 
     public Guid? DeviceEventId { get; set; }
 
+    public Guid? AlertId { get; set; }
+
     public Guid? AssignedToAccountId { get; set; }
 
     public string TicketNumber { get; set; } = null!;
@@ -35,6 +37,8 @@ public partial class MaintenanceTicket : SyncAggregateEntity, IKioskScoped
     public MaintenancePriority Priority { get; set; } = MaintenancePriority.Medium;
 
     public MaintenanceTicketStatus Status { get; set; } = MaintenanceTicketStatus.Open;
+
+    public MaintenanceOperationalImpact OperationalImpact { get; set; } = MaintenanceOperationalImpact.None;
 
     public DateTimeOffset ReportedAt { get; set; }
 
@@ -69,6 +73,8 @@ public partial class MaintenanceTicket : SyncAggregateEntity, IKioskScoped
     public virtual Order? Order { get; set; }
 
     public virtual DeviceEvent? DeviceEvent { get; set; }
+
+    public virtual Alert? Alert { get; set; }
 
     Guid? IOrganizationScoped.OrganizationId
     {

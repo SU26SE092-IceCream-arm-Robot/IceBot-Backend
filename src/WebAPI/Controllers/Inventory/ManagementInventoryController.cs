@@ -11,7 +11,7 @@ namespace WebAPI.Controllers.Inventory;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/management/inventory")]
+[Route("api/v{version:apiVersion}/management")]
 public sealed class ManagementInventoryController : ControllerBase
 {
     private readonly GetDispenserStatesQueryHandler _getStatesHandler;
@@ -31,12 +31,13 @@ public sealed class ManagementInventoryController : ControllerBase
         _adjustHandler = adjustHandler;
     }
 
-    [HttpGet("dispenser-states")]
+    [HttpGet("inventory/dispenser-states")]
     [Authorize(Policy = "inventory.view")]
     public async Task<IActionResult> GetDispenserStates(
         [FromQuery] Guid? organizationId,
         [FromQuery] Guid? storeId,
         [FromQuery] Guid? kioskId,
+        [FromQuery] bool? isActive,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
         CancellationToken cancellationToken = default)
@@ -47,6 +48,7 @@ public sealed class ManagementInventoryController : ControllerBase
             OrganizationId = organizationId,
             StoreId = storeId,
             KioskId = kioskId,
+            IsActive = isActive,
             PageNumber = pageNumber,
             PageSize = pageSize
         };
@@ -55,7 +57,7 @@ public sealed class ManagementInventoryController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("stock-movements")]
+    [HttpGet("inventory/stock-movements")]
     [Authorize(Policy = "inventory.view")]
     public async Task<IActionResult> GetStockMovements(
         [FromQuery] Guid? organizationId,
@@ -79,9 +81,10 @@ public sealed class ManagementInventoryController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("dispenser-states/{id:guid}/refill")]
+    [HttpPost("kiosks/{kioskId:guid}/inventory/dispenser-states/{id:guid}/refill")]
     [Authorize(Policy = "inventory.manage")]
     public async Task<IActionResult> RefillDispenser(
+        Guid kioskId,
         Guid id,
         [FromBody] RefillDispenserRequest request,
         CancellationToken cancellationToken)
@@ -93,6 +96,7 @@ public sealed class ManagementInventoryController : ControllerBase
 
         var command = new RefillDispenserCommand
         {
+            KioskId = kioskId,
             DispenserStateId = id,
             UserContext = User.GetUserContext(),
             Quantity = request.Quantity,
@@ -104,9 +108,10 @@ public sealed class ManagementInventoryController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("dispenser-states/{id:guid}/adjust-estimate")]
+    [HttpPost("kiosks/{kioskId:guid}/inventory/dispenser-states/{id:guid}/adjust-estimate")]
     [Authorize(Policy = "inventory.manage")]
     public async Task<IActionResult> AdjustDispenserEstimate(
+        Guid kioskId,
         Guid id,
         [FromBody] AdjustDispenserEstimateRequest request,
         CancellationToken cancellationToken)
@@ -118,6 +123,7 @@ public sealed class ManagementInventoryController : ControllerBase
 
         var command = new AdjustDispenserEstimateCommand
         {
+            KioskId = kioskId,
             DispenserStateId = id,
             UserContext = User.GetUserContext(),
             EstimatedQuantity = request.EstimatedQuantity,

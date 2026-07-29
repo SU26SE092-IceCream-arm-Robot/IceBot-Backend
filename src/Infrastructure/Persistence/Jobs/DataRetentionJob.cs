@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Infrastructure.Operations.Automation;
+using System.Diagnostics;
 
 namespace Infrastructure.Persistence.Jobs;
 
@@ -35,24 +37,42 @@ public sealed class DataRetentionJob : BackgroundService
 
     private async Task RunAsync(CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             using var scope = _scopeFactory.CreateScope();
             var purger = scope.ServiceProvider.GetRequiredService<DataRetentionPurger>();
             var result = await purger.PurgeAsync(DateTimeOffset.UtcNow, cancellationToken);
             _logger.LogInformation(
-                "Retention purge deleted {Heartbeats} heartbeats, {DeviceEvents} device events, {OperationLogs} operation logs, {SyncInboxReceipts} processed inbox receipts, and {ExecutionRequestNonces} expired request nonces.",
+                "Retention purge deleted {Heartbeats} heartbeats, {DeviceEvents} device events, {OperationLogs} operation logs, {SyncInboxReceipts} processed inbox receipts, {ExecutionRequestNonces} expired request nonces, {RefreshTokens} refresh tokens, {PasswordResetRequests} password-reset requests, {AccountInvitations} invitations, and {NotificationDeliveries} terminal notification deliveries.",
                 result.Heartbeats,
                 result.DeviceEvents,
                 result.OperationLogs,
                 result.SyncInboxReceipts,
-                result.ExecutionRequestNonces);
+                result.ExecutionRequestNonces,
+                result.RefreshTokens,
+                result.PasswordResetRequests,
+                result.AccountInvitations,
+                result.NotificationDeliveries);
+            foreach (var failure in result.Failures)
+            {
+                OperationalAutomationMetrics.RecordCandidateFailure("data_retention");
+                _logger.LogError(
+                    "Data retention purge failed for category {Category}: {Error}",
+                    failure.Category,
+                    failure.Error);
+            }
+            OperationalAutomationMetrics.RecordRun(
+                "data_retention",
+                result.Failures.Count == 0 ? "succeeded" : "partial_failure",
+                stopwatch.Elapsed);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
+            OperationalAutomationMetrics.RecordRun("data_retention", "failed", stopwatch.Elapsed);
             _logger.LogError(ex, "Data retention purge failed.");
         }
     }

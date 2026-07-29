@@ -1,5 +1,9 @@
 # Robot Artifact Operational Smoke Test
 
+## Search Keywords
+
+`robot artifact smoke test`, `Lua upload`, `RobotProgram`, `configuration release`, `deployment`, `execution endpoint`, `MinIO`, `artifact checksum`
+
 Use this workflow to validate PostgreSQL migrations, MinIO object storage, execution-endpoint compatibility, and the complete artifact authoring/deployment path.
 
 The end-to-end business flow and API lookup remain owned by [Robot Lua Artifact Flow](../flows/ROBOT_LUA_ARTIFACT_FLOW.md). This document owns only operational setup and executable verification.
@@ -24,7 +28,7 @@ Secret key: minioadmin
 
 Override `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET_NAME`, and `MINIO_DOWNLOAD_ENDPOINT` outside source control when defaults are unsuitable. `MINIO_DOWNLOAD_ENDPOINT` must be reachable by the actual Edge/controller, not only by the backend container.
 
-The backend creates the private bucket on the first object write. PostgreSQL stores artifact metadata only.
+Development configuration and the local backend compose set `AutoCreateBucket=true`, so backend startup creates the private bucket when it is absent. Production defaults to `false`: infrastructure must provision the bucket before the API starts. PostgreSQL stores artifact metadata only.
 
 ## Apply Migrations To A Test Database
 
@@ -81,3 +85,10 @@ The broader Edge/controller integration suite additionally verifies presigned do
 $env:ICEBOT_RUN_INTEGRATION_TESTS = "true"
 dotnet test tests\IceBot.IntegrationTests\IceBot.IntegrationTests.csproj
 ```
+
+## Related Docs
+
+- [Robot Lua Artifact Flow](../flows/ROBOT_LUA_ARTIFACT_FLOW.md)
+- [Robot Lua Deployment And Activation Flow](../flows/ROBOT_LUA_DEPLOYMENT_AND_ACTIVATION_FLOW.md)
+- [Deployment Configuration](DEPLOYMENT_CONFIG.md)
+- [MQTT Operations](MQTT_OPERATIONS.md)

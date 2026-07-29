@@ -1,12 +1,15 @@
 namespace Domain.ProductionConfiguration.ValueObjects;
 
+using Domain.RobotConfiguration.Programs;
+
 public sealed record PublishedRobotProgramSnapshot(
     Guid Id,
     string Code,
     Guid OrganizationId,
     int ManifestSchemaVersion,
     string ManifestChecksum,
-    IReadOnlyCollection<PublishedRobotArtifactSnapshot> Artifacts);
+    IReadOnlyCollection<PublishedRobotArtifactSnapshot> Artifacts,
+    RobotProgramRestartPolicy RestartPolicy = RobotProgramRestartPolicy.ManualOnly);
 
 public sealed record PublishedRobotArtifactSnapshot(
     Guid ProgramArtifactId,
@@ -18,4 +21,7 @@ public sealed record PublishedRobotArtifactSnapshot(
     string StorageKey,
     string RuntimeTargetCode,
     string MachineModelCode,
-    long ContentLengthBytes);
+    long ContentLengthBytes,
+    Guid? TechnicalContractId = null,
+    string? TechnicalContractChecksum = null,
+    string? RequiredOptionCode = null);

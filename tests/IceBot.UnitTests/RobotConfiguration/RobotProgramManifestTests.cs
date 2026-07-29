@@ -1,8 +1,19 @@
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Programs.ReadModels;
+using Application.RobotConfiguration.Programs.Mapping;
+using Application.RobotConfiguration.Programs.Results;
+using Application.RobotConfiguration.Programs.Queries;
+using Application.RobotConfiguration.Programs.Commands;
+using Domain.RobotConfiguration.Programs;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Domain.RobotConfiguration.Entities;
+using System.Text.Json.Nodes;
+using Domain.RobotConfiguration.Artifacts;
 using Domain.Tenants.Enums;
+using Domain.RobotConfiguration.Programs.Manifests;
 using IceBot.UnitTests.TestSupport;
 
 namespace IceBot.UnitTests.RobotConfiguration;
@@ -20,12 +31,14 @@ public sealed class RobotProgramManifestTests
             "Make ice cream",
             TenantScopeType.Organization,
             organizationId);
-        var secondStep = program.AddArtifact(secondArtifact.Id, 20, "{\"speed\":2}");
-        var firstStep = program.AddArtifact(firstArtifact.Id, 10, "{\"speed\":1}");
-        TestData.SetProperty(secondStep, nameof(RobotProgramArtifact.RobotArtifact), secondArtifact);
-        TestData.SetProperty(firstStep, nameof(RobotProgramArtifact.RobotArtifact), firstArtifact);
+        program.AddArtifact(secondArtifact.Id, 20, "{\"speed\":2}");
+        program.AddArtifact(firstArtifact.Id, 10, "{\"speed\":1}");
 
-        program.Publish(DateTimeOffset.UtcNow);
+        program.Publish(DateTimeOffset.UtcNow,
+        [
+            Snapshot(firstArtifact),
+            Snapshot(secondArtifact)
+        ]);
 
         using var manifest = JsonDocument.Parse(program.ProgramManifestJson!);
         var artifacts = manifest.RootElement.GetProperty("Artifacts").EnumerateArray().ToArray();
@@ -36,4 +49,98 @@ public sealed class RobotProgramManifestTests
             SHA256.HashData(Encoding.UTF8.GetBytes(program.ProgramManifestJson!))).ToLowerInvariant();
         Assert.Equal(expectedChecksum, program.ProgramManifestChecksum);
     }
+
+    [Fact]
+    public void Publish_RejectsSnapshotThatDoesNotMatchProgramMembership()
+    {
+        var organizationId = Guid.NewGuid();
+        var assignedArtifact = TestData.PublishedArtifact(organizationId, "ASSIGNED", "assigned.lua", 'a');
+        var unrelatedArtifact = TestData.PublishedArtifact(organizationId, "OTHER", "other.lua", 'b');
+        var program = RobotProgram.CreateDraft(
+            "MAKE_ICE_CREAM",
+            "Make ice cream",
+            TenantScopeType.Organization,
+            organizationId);
+        program.AddArtifact(assignedArtifact.Id, 10);
+
+        var exception = Assert.Throws<Domain.Common.DomainRuleException>(() =>
+            program.Publish(DateTimeOffset.UtcNow, [Snapshot(unrelatedArtifact)]));
+
+        Assert.Equal(
+            "Robot program publication requires published robot artifact snapshots.",
+            exception.Message);
+    }
+
+    [Fact]
+    public void Parse_ReturnsTypedPublishedManifest()
+    {
+        var organizationId = Guid.NewGuid();
+        var artifact = TestData.PublishedArtifact(organizationId, "ARTIFACT", "artifact.lua", 'c');
+        var program = RobotProgram.CreateDraft(
+            "MAKE_ICE_CREAM",
+            "Make ice cream",
+            TenantScopeType.Organization,
+            organizationId);
+        program.AddArtifact(artifact.Id, 10, "{\"speed\":2}");
+        program.Publish(DateTimeOffset.UtcNow, [Snapshot(artifact)]);
+
+        var manifest = RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!);
+
+        Assert.Equal(program.Id, manifest.Id);
+        Assert.Equal(2, manifest.SchemaVersion);
+        Assert.Equal(RobotProgramRestartPolicy.ManualOnly, manifest.RestartPolicy);
+        var item = Assert.Single(manifest.Artifacts);
+        Assert.Equal(artifact.Id, item.RobotArtifact.Id);
+        Assert.Equal(artifact.Checksum, item.RobotArtifact.Checksum);
+    }
+
+    [Fact]
+    public void Publish_PreservesOptionConditionalExecution()
+    {
+        var organizationId = Guid.NewGuid();
+        var artifact = TestData.PublishedArtifact(organizationId, "TOPPING", "topping.lua", 'd');
+        var program = RobotProgram.CreateDraft("MAKE_TOPPING", "Make topping",
+            TenantScopeType.Organization, organizationId);
+        program.AddArtifact(artifact.Id, 10, requiredOptionCode: "extra_nuts");
+
+        program.Publish(DateTimeOffset.UtcNow, [Snapshot(artifact)]);
+
+        var item = Assert.Single(RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!).Artifacts);
+        Assert.Equal("EXTRA_NUTS", item.RequiredOptionCode);
+    }
+
+    [Fact]
+    public void Parse_LegacySchema1ManifestWithoutRestartPolicy_DefaultsToManualOnly()
+    {
+        var organizationId = Guid.NewGuid();
+        var artifact = TestData.PublishedArtifact(organizationId, "LEGACY", "legacy.lua", 'e');
+        var program = RobotProgram.CreateDraft(
+            "LEGACY_PROGRAM",
+            "Legacy program",
+            TenantScopeType.Organization,
+            organizationId);
+        program.AddArtifact(artifact.Id, 10);
+        program.Publish(DateTimeOffset.UtcNow, [Snapshot(artifact)]);
+        var node = JsonNode.Parse(program.ProgramManifestJson!)!.AsObject();
+        node[nameof(RobotProgramManifestDocument.SchemaVersion)] = 1;
+        node.Remove(nameof(RobotProgramManifestDocument.RestartPolicy));
+
+        var manifest = RobotProgramManifestBuilder.Parse(node.ToJsonString());
+
+        Assert.Equal(RobotProgramRestartPolicy.ManualOnly, manifest.RestartPolicy);
+    }
+
+    private static RobotArtifactManifestSnapshot Snapshot(RobotArtifact artifact) => new(
+        artifact.Id,
+        artifact.ArtifactCode,
+        artifact.ArtifactName,
+        artifact.FileName,
+        artifact.Status,
+        artifact.Checksum,
+        artifact.StorageKey,
+        artifact.RuntimeTargetCode,
+        artifact.MachineModelCode,
+        artifact.ContentLengthBytes,
+        artifact.TechnicalContractId,
+        artifact.TechnicalContractChecksum);
 }

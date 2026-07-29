@@ -12,6 +12,7 @@ This document describes operational visibility and manual support flows after ki
 Kiosk / Edge
   -> heartbeat
   -> device events
+  -> local operation logs
   -> stock movements
   -> execution events
   -> Cloud read models
@@ -25,16 +26,16 @@ Order issue
   -> inspect order overview
   -> inspect order status history
   -> inspect payment status
-  -> inspect kiosk heartbeat/events
+  -> inspect kiosk heartbeat/events/logs
   -> mark refund required or create refund record when needed
 ```
 
 ## Rules
 
-- Heartbeats and device events are operational evidence.
+- Heartbeats, device events, and Edge local operation logs are operational evidence. Operation-log list/detail reads are kiosk-scoped and return curated fields; raw payload is available only through the separate scoped diagnostics permission.
 - `DeviceEvent` remains immutable evidence. Error/Critical device-event ingestion creates a separate actionable `Alert`; see [Alert Lifecycle Flow](ALERT_LIFECYCLE_FLOW.md). Maintenance tickets remain separate manual work items.
 - Inventory V1 is reporting/operations only and does not control runtime sellability.
-- Maintenance Ticket V1 is a manual support workflow for kiosk/device/order/event issues, not an auto-alert engine.
+- Maintenance tickets are separate from the alert engine. Most are created manually; configured inventory-empty alert automation may create one linked ticket without transferring alert lifecycle ownership to Maintenance.
 - Manual refund/compensation is tracked in the backend, but actual money movement can be staff-handled outside provider integration in V1.
 - Operations telemetry APIs expose curated heartbeat/event fields only. Do not return raw `PayloadJson` by default.
 
@@ -50,7 +51,7 @@ These events allow operations dashboard screens to reflect live maintenance upda
 
 - [System Flows](SYSTEM_FLOWS.md)
 - [Maintenance Ticket Flow](MAINTENANCE_TICKET_FLOW.md)
-- [Failure Flows](FAILURE_FLOWS.md)
+- [Failure Flow Index](FAILURE_FLOW_INDEX.md)
 - [API Surface Rules](../api/API_SURFACE_RULES.md)
 - [Authorization Rules](../api/AUTHORIZATION_RULES.md)
 - [IoT Contract](../iot/IOT_CONTRACT.md)

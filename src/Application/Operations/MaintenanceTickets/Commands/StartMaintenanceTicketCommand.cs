@@ -7,6 +7,8 @@ using Application.Operations.MaintenanceTickets.Results;
 using Application.Operations.MaintenanceTickets.Rules;
 using Application.Shared.Wrappers;
 using Domain.Common;
+using Domain.Operations.Enums;
+using Domain.Tenants.Enums;
 
 namespace Application.Operations.MaintenanceTickets.Commands;
 
@@ -33,48 +35,110 @@ public sealed class StartMaintenanceTicketCommandHandler
         StartMaintenanceTicketCommand command,
         CancellationToken cancellationToken = default)
     {
-        var user = command.UserContext;
+        MaintenanceTicketChangedEvent? ticketEvent = null;
+        KioskOperationalStateChangedEvent? kioskEvent = null;
+        var result = await _ticketStore.ExecuteInTransactionAsync(
+            async ct =>
+            {
+                var ticket = await _ticketStore.GetByIdAsync(command.TicketId, ct);
+                if (ticket is null)
+                {
+                    return ApiResult<MaintenanceTicketResult>.Fail("Maintenance ticket not found.", 404);
+                }
 
-        var ticket = await _ticketStore.GetByIdAsync(command.TicketId, cancellationToken);
-        if (ticket is null)
+                if (!MaintenanceTicketAccessRules.CanStart(
+                        command.UserContext,
+                        ticket.OrganizationId,
+                        ticket.StoreId,
+                        ticket.KioskId))
+                {
+                    return ApiResult<MaintenanceTicketResult>.Fail("Access denied.", 403);
+                }
+
+                await _ticketStore.AcquireKioskOperationalLockAsync(ticket.KioskId, ct);
+                if (ticket.OperationalImpact == MaintenanceOperationalImpact.BlocksNewOrders &&
+                    await _ticketStore.HasRunningExecutionAsync(ticket.KioskId, ct))
+                {
+                    return ApiResult<MaintenanceTicketResult>.Fail(
+                        "Maintenance that blocks orders cannot start while an execution is running. Use RequestsEmergencyStop when immediate safety intervention must be requested.",
+                        409);
+                }
+
+                var oldStatus = ticket.Status.ToString();
+                var oldOperationalState = ticket.Kiosk.OperationalState;
+                var changedAt = DateTimeOffset.UtcNow;
+                try
+                {
+                    ticket.StartWork();
+                    ticket.UpdatedAt = changedAt;
+                    var targetState = ticket.OperationalImpact switch
+                    {
+                        MaintenanceOperationalImpact.BlocksNewOrders => KioskOperationalState.Maintenance,
+                        MaintenanceOperationalImpact.RequestsEmergencyStop => KioskOperationalState.EmergencyStopRequested,
+                        _ => (KioskOperationalState?)null
+                    };
+                    if (targetState.HasValue)
+                    {
+                        var transition = ticket.Kiosk.ChangeOperationalState(
+                            targetState.Value,
+                            $"Maintenance ticket {ticket.TicketNumber} started.",
+                            command.UserContext.AccountId,
+                            changedAt,
+                            ticket.Id);
+                        if (transition is not null)
+                        {
+                            await _ticketStore.AddOperationalStateTransitionAsync(transition, ct);
+                            kioskEvent = new KioskOperationalStateChangedEvent
+                            {
+                                KioskId = ticket.KioskId,
+                                OrganizationId = ticket.OrganizationId,
+                                StoreId = ticket.StoreId,
+                                OldState = oldOperationalState.ToString(),
+                                NewState = targetState.Value.ToString(),
+                                Reason = transition.Reason,
+                                ChangedByAccountId = command.UserContext.AccountId,
+                                SourceMaintenanceTicketId = ticket.Id,
+                                ChangedAt = changedAt
+                            };
+                        }
+                    }
+
+                    await _ticketStore.SaveChangesAsync(ct);
+                }
+                catch (DomainRuleException exception)
+                {
+                    return ApiResult<MaintenanceTicketResult>.Fail(exception.Message, 400);
+                }
+
+                var response = MaintenanceTicketResultMapper.ToResult(ticket);
+                ticketEvent = new MaintenanceTicketChangedEvent
+                {
+                    TicketId = response.Id,
+                    TicketNumber = response.TicketNumber,
+                    KioskId = response.KioskId,
+                    OrganizationId = response.OrganizationId,
+                    StoreId = response.StoreId,
+                    OldStatus = oldStatus,
+                    NewStatus = response.Status,
+                    Priority = response.Priority,
+                    UpdatedAt = response.UpdatedAt ?? changedAt,
+                    Version = 1
+                };
+                return ApiResult<MaintenanceTicketResult>.Success(
+                    response,
+                    "Maintenance ticket status updated to InProgress.");
+            },
+            cancellationToken);
+
+        if (ticketEvent is not null)
         {
-            return ApiResult<MaintenanceTicketResult>.Fail("Maintenance ticket not found.", 404);
+            await _publisher.PublishMaintenanceTicketChangedAsync(ticketEvent, cancellationToken);
+        }
+        if (kioskEvent is not null)
+        {
+            await _publisher.PublishKioskOperationalStateChangedAsync(kioskEvent, cancellationToken);
         }
 
-        string oldStatus = ticket.Status.ToString();
-
-        if (!MaintenanceTicketAccessRules.CanStart(user, ticket.OrganizationId, ticket.StoreId, ticket.KioskId))
-        {
-            return ApiResult<MaintenanceTicketResult>.Fail("Access denied.", 403);
-        }
-
-        try
-        {
-            ticket.StartWork();
-            ticket.UpdatedAt = DateTimeOffset.UtcNow;
-            await _ticketStore.SaveChangesAsync(cancellationToken);
-        }
-        catch (DomainRuleException ex)
-        {
-            return ApiResult<MaintenanceTicketResult>.Fail(ex.Message, 400);
-        }
-
-        var result = MaintenanceTicketResultMapper.ToResult(ticket);
-
-        await _publisher.PublishMaintenanceTicketChangedAsync(new MaintenanceTicketChangedEvent
-        {
-            TicketId = result.Id,
-            TicketNumber = result.TicketNumber,
-            KioskId = result.KioskId,
-            OrganizationId = result.OrganizationId,
-            StoreId = result.StoreId,
-            OldStatus = oldStatus,
-            NewStatus = result.Status.ToString(),
-            Priority = result.Priority.ToString(),
-            UpdatedAt = result.UpdatedAt ?? DateTimeOffset.UtcNow,
-            Version = 1
-        }, cancellationToken);
-
-        return ApiResult<MaintenanceTicketResult>.Success(result, "Maintenance ticket status updated to InProgress.");
+        return result;
     }
 }

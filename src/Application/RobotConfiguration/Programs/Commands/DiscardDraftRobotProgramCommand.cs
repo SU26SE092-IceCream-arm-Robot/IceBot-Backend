@@ -1,0 +1,11 @@
+using Application.RobotConfiguration.Artifacts.Abstractions;
+using Application.Identity.Tokens.Claims;
+
+namespace Application.RobotConfiguration.Programs.Commands;
+
+public sealed class DiscardDraftRobotProgramCommand
+{
+    public required CurrentUserContext UserContext { get; init; }
+    public Guid OrganizationId { get; init; }
+    public Guid ProgramId { get; init; }
+}

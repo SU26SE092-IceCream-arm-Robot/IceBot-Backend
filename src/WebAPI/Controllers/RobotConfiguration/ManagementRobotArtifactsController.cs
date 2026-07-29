@@ -1,11 +1,13 @@
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Queries;
+using Application.RobotConfiguration.ArtifactTemplates.Commands;
+using Application.RobotConfiguration.Artifacts.Results;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Artifacts.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using WebAPI.Authorization;
-using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.Artifacts;
 using Application.Shared.Wrappers;
 
 namespace WebAPI.Controllers.RobotConfiguration;
@@ -85,7 +87,21 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("organizations/{organizationId:guid}/robot-artifacts/bulk")]
+    [HttpGet("organizations/{organizationId:guid}/robot-artifacts/{artifactId:guid}/usage")]
+    [Authorize(Policy = "artifact.read")]
+    public async Task<IActionResult> GetUsage(
+        Guid organizationId,
+        Guid artifactId,
+        [FromServices] GetRobotArtifactUsageQueryHandler handler,
+        CancellationToken cancellationToken)
+    {
+        var result = await handler.HandleAsync(
+            new GetRobotArtifactUsageQuery(User.GetUserContext(), organizationId, artifactId),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("organizations/{organizationId:guid}/robot-artifacts")]
     [Authorize(Policy = "artifact.upload")]
     [Consumes("multipart/form-data")]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600)]
@@ -124,7 +140,8 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
                     MachineModelCode = item.MachineModelCode,
                     ExportedAt = item.ExportedAt,
                     Description = item.Description,
-                    MetadataJson = item.MetadataJson
+                    MetadataJson = item.MetadataJson,
+                    TechnicalContractId = item.TechnicalContractId
                 };
             }).ToArray();
 
@@ -184,7 +201,7 @@ public sealed class ManagementRobotArtifactsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/publish-bulk")]
+    [HttpPatch("organizations/{organizationId:guid}/robot-artifacts/publish")]
     [Authorize(Policy = "artifact.upload")]
     public async Task<IActionResult> BulkPublishRobotArtifacts(
         Guid organizationId,
@@ -303,4 +320,5 @@ public sealed class BulkUploadRobotArtifactManifestItemRequest
     public string? Description { get; init; }
 
     public string? MetadataJson { get; init; }
+    public Guid? TechnicalContractId { get; init; }
 }

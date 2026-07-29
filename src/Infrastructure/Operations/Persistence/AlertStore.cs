@@ -67,7 +67,7 @@ public sealed class AlertStore : IAlertStore
         CancellationToken cancellationToken = default) =>
         ApplyFilters(status, severity, organizationId, storeId, kioskId, deviceId, from, to,
                 isSystemAdmin, allowedOrganizationIds, allowedStoreIds, allowedKioskIds)
-            .OrderByDescending(alert => alert.RaisedAt)
+            .OrderByDescending(alert => alert.LastOccurredAt)
             .ThenByDescending(alert => alert.Id)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
@@ -79,6 +79,31 @@ public sealed class AlertStore : IAlertStore
             .Include(alert => alert.Device)
             .Include(alert => alert.AcknowledgedByAccount)
             .FirstOrDefaultAsync(alert => alert.Id == alertId && alert.DeletedAt == null, cancellationToken);
+
+    public Task<Alert?> GetAccessibleByIdAsync(
+        Guid alertId,
+        bool isSystemAdmin,
+        IReadOnlyCollection<Guid> allowedOrganizationIds,
+        IReadOnlyCollection<Guid> allowedStoreIds,
+        IReadOnlyCollection<Guid> allowedKioskIds,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _dbContext.Alerts
+            .Include(alert => alert.Kiosk)
+            .Include(alert => alert.Device)
+            .Include(alert => alert.AcknowledgedByAccount)
+            .Where(alert => alert.Id == alertId && alert.DeletedAt == null);
+
+        if (!isSystemAdmin)
+        {
+            query = query.Where(alert =>
+                allowedOrganizationIds.Contains(alert.Kiosk.OrganizationId) ||
+                allowedStoreIds.Contains(alert.Kiosk.StoreId) ||
+                allowedKioskIds.Contains(alert.KioskId));
+        }
+
+        return query.FirstOrDefaultAsync(cancellationToken);
+    }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _dbContext.SaveChangesAsync(cancellationToken);
@@ -107,8 +132,8 @@ public sealed class AlertStore : IAlertStore
         if (storeId.HasValue) query = query.Where(alert => alert.Kiosk.StoreId == storeId.Value);
         if (kioskId.HasValue) query = query.Where(alert => alert.KioskId == kioskId.Value);
         if (deviceId.HasValue) query = query.Where(alert => alert.DeviceId == deviceId.Value);
-        if (from.HasValue) query = query.Where(alert => alert.RaisedAt >= from.Value);
-        if (to.HasValue) query = query.Where(alert => alert.RaisedAt <= to.Value);
+        if (from.HasValue) query = query.Where(alert => alert.LastOccurredAt >= from.Value);
+        if (to.HasValue) query = query.Where(alert => alert.LastOccurredAt <= to.Value);
 
         if (!isSystemAdmin)
         {

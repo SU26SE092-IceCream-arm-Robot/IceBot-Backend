@@ -8,19 +8,14 @@ internal static class OrderResultMapper
 {
     public static OrderResult ToResult(Order order, OrderExecutionRecord? executionRecord = null)
     {
-        var customerStatusInfo = Application.Shared.Utils.OrderStatusProjector.ProjectFromOrderAndExecution(order, executionRecord);
+        var customerStatusInfo = Application.Orders.Support.OrderStatusProjector.ProjectFromOrderAndExecution(order, executionRecord);
 
         return new OrderResult
         {
             Id = order.Id,
             KioskId = order.KioskId,
-            StoreId = order.StoreId,
-            OrganizationId = order.OrganizationId,
             OrderNumber = order.OrderNumber,
             ClientOrderId = order.ClientOrderId,
-            RuntimeSnapshotId = order.RuntimeSnapshotId,
-            RuntimeSnapshotGeneratedAt = order.RuntimeSnapshotGeneratedAt,
-            Channel = order.Channel,
             Status = order.Status,
             PaymentStatus = order.PaymentStatus,
             Currency = order.Currency,
@@ -30,6 +25,7 @@ internal static class OrderResultMapper
             TotalAmount = order.TotalAmount,
             PaidAmount = order.PaidAmount,
             PlacedAt = order.PlacedAt,
+            PaymentDeadlineAt = order.PaymentDeadlineAt,
             PaidAt = order.PaidAt,
             CompletedAt = order.CompletedAt,
             CancelledAt = order.CancelledAt,
@@ -47,17 +43,28 @@ internal static class OrderResultMapper
                     ProductVariantId = item.ProductVariantId,
                     RecipeId = item.RecipeId,
                     ClientLineId = item.ClientLineId,
-                    MenuItemCodeSnapshot = item.MenuItemCodeSnapshot,
-                    MenuItemNameSnapshot = item.MenuItemNameSnapshot,
-                    ProductCodeSnapshot = item.ProductCodeSnapshot,
-                    ProductNameSnapshot = item.ProductNameSnapshot,
-                    ProductVariantCodeSnapshot = item.ProductVariantCodeSnapshot,
-                    ProductVariantNameSnapshot = item.ProductVariantNameSnapshot,
-                    RecipeVersionSnapshot = item.RecipeVersionSnapshot,
+                    MenuItemCode = item.MenuItemCodeSnapshot,
+                    MenuItemName = item.MenuItemNameSnapshot,
+                    ProductCode = item.ProductCodeSnapshot,
+                    ProductName = item.ProductNameSnapshot,
+                    ProductVariantCode = item.ProductVariantCodeSnapshot,
+                    ProductVariantName = item.ProductVariantNameSnapshot,
+                    RecipeVersion = item.RecipeVersionSnapshot,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     DiscountAmount = item.DiscountAmount,
                     TotalAmount = item.TotalAmount,
+                    SelectedOptions = item.Options
+                        .OrderBy(option => option.OptionGroupCodeSnapshot)
+                        .ThenBy(option => option.CodeSnapshot)
+                        .Select(option => new OrderItemOptionResult
+                        {
+                            ProductOptionId = option.ProductOptionId,
+                            OptionGroupCode = option.OptionGroupCodeSnapshot,
+                            Code = option.CodeSnapshot,
+                            Name = option.NameSnapshot,
+                            PriceDelta = option.UnitPriceDelta
+                        }).ToList(),
                     Status = item.Status
                 })
                 .ToList()

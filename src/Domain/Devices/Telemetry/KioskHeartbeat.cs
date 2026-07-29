@@ -1,5 +1,5 @@
 using Domain.Common;
-using Domain.Devices.Enums;
+using Domain.Devices.Telemetry;
 using Domain.Tenants.Entities;
 
 namespace Domain.Devices.Telemetry;

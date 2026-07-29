@@ -1,3 +1,5 @@
+using Domain.RobotConfiguration.Programs.Manifests;
+using Domain.RobotConfiguration.Programs;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -31,7 +33,8 @@ public static class ControllerArtifactSetManifestBuilder
                     item.ContentLengthBytes,
                     item.RunOrder,
                     item.ParametersSchemaVersion,
-                    item.ParametersJson
+                    item.ParametersJson,
+                    item.RequiredOptionCode
                 }).ToArray()
         };
         var json = JsonSerializer.Serialize(document);

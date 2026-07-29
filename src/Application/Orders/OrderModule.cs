@@ -15,9 +15,21 @@ public static class OrderModule
         services.AddScoped<Management.Queries.GetOrderExecutionAttemptsQueryHandler>();
         services.AddScoped<Management.Queries.GetExecutionAttemptQueryHandler>();
         services.AddScoped<Management.Queries.GetOrderOverviewQueryHandler>();
+        services.AddScoped<Management.Queries.ListFulfillmentQueueQueryHandler>();
+        services.AddScoped<Management.Queries.GetOrderItemStatusHistoryQueryHandler>();
         services.AddScoped<Management.Commands.CancelManagementOrderCommandHandler>();
         services.AddScoped<Management.Commands.MarkOrderRefundRequiredCommandHandler>();
         services.AddScoped<Management.Commands.RedispatchOrderExecutionCommandHandler>();
+        services.AddScoped<Management.Commands.RequestOrderItemProductionRemakeCommandHandler>();
+        services.AddScoped<Management.Commands.RecordManualOrderItemFulfillmentEventCommandHandler>();
+        services.AddScoped<Management.Commands.SetPackagedOrderItemFulfillmentCommandHandler>();
+        services.AddScoped<Management.Automation.FulfillmentReminderService>();
+        services.AddScoped<IncidentResolution.ListProductionIncidentsQueryHandler>();
+        services.AddScoped<IncidentResolution.GetProductionIncidentQueryHandler>();
+        services.AddScoped<IncidentResolution.OpenProductionIncidentCommandHandler>();
+        services.AddScoped<IncidentResolution.RecordProductionInspectionCommandHandler>();
+        services.AddScoped<IncidentResolution.SelectProductionIncidentResolutionCommandHandler>();
+        services.AddScoped<IncidentResolution.CompleteProductionIncidentCommandHandler>();
 
         return services;
     }

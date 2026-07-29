@@ -1,9 +1,12 @@
+using Domain.RobotConfiguration.Artifacts;
+using Domain.RobotConfiguration.Programs;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
 using Domain.ProductionConfiguration.Manifests;
 using Domain.ProductionConfiguration.Enums;
 using Domain.Tenants.Entities;
 using Domain.ProductionConfiguration.ValueObjects;
+using Domain.RobotConfiguration.Programs.Manifests;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -70,7 +73,8 @@ public class ConfigurationRelease : BusinessEntity
         Guid recipeId,
         string routeCode,
         int priority,
-        string? requiredCapabilitiesJson = null)
+        string? requiredCapabilitiesJson,
+        IReadOnlyCollection<string> supportedOptionCodes)
     {
         EnsureDraft();
 
@@ -79,7 +83,8 @@ public class ConfigurationRelease : BusinessEntity
             throw new DomainRuleException("A configuration release can contain only one route with the same code.");
         }
 
-        var route = ExecutionRoute.Create(productVariantId, recipeId, routeCode, priority, requiredCapabilitiesJson);
+        var route = ExecutionRoute.Create(productVariantId, recipeId, routeCode, priority,
+            requiredCapabilitiesJson, supportedOptionCodes);
         _executionRoutes.Add(route);
         return route;
     }
@@ -93,6 +98,7 @@ public class ConfigurationRelease : BusinessEntity
     public IReadOnlyCollection<ExecutionRoute> ReplaceRoutes(
         IEnumerable<(Guid ProductVariantId, Guid RecipeId, string RouteCode, int Priority,
             string? RequiredCapabilitiesJson,
+            IReadOnlyCollection<string> SupportedOptionCodes,
             IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)> Bindings)> replacements)
     {
         EnsureDraft();
@@ -101,7 +107,7 @@ public class ConfigurationRelease : BusinessEntity
         foreach (var replacement in replacements)
         {
             var route = AddRoute(replacement.ProductVariantId, replacement.RecipeId, replacement.RouteCode,
-                replacement.Priority, replacement.RequiredCapabilitiesJson);
+                replacement.Priority, replacement.RequiredCapabilitiesJson, replacement.SupportedOptionCodes);
             foreach (var binding in replacement.Bindings)
                 route.AddRobotBinding(binding.RobotProgramId, binding.BindingOrder, binding.CapabilityCode);
         }
@@ -111,6 +117,18 @@ public class ConfigurationRelease : BusinessEntity
 
     public void Publish(
         DateTimeOffset publishedAt,
+        Guid publishedByAccountId,
+        IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
+    {
+        var manifest = PreparePublication(publishedByAccountId, programSnapshots);
+        ManifestJson = manifest.Json;
+        ReleaseChecksum = manifest.Checksum;
+        PublishedAt = publishedAt;
+        PublishedByAccountId = publishedByAccountId;
+        Status = ConfigurationReleaseStatus.Published;
+    }
+
+    public ConfigurationReleaseManifest PreparePublication(
         Guid publishedByAccountId,
         IReadOnlyDictionary<Guid, PublishedRobotProgramSnapshot> programSnapshots)
     {
@@ -131,12 +149,7 @@ public class ConfigurationRelease : BusinessEntity
             throw new DomainRuleException("Configuration release publisher account id is required.");
         }
 
-        var manifest = ConfigurationReleaseManifestBuilder.Create(this, programSnapshots);
-        ManifestJson = manifest.Json;
-        ReleaseChecksum = manifest.Checksum;
-        PublishedAt = publishedAt;
-        PublishedByAccountId = publishedByAccountId;
-        Status = ConfigurationReleaseStatus.Published;
+        return ConfigurationReleaseManifestBuilder.CreateContent(this, programSnapshots);
     }
 
     public void Retire(DateTimeOffset retiredAt)
@@ -170,8 +183,8 @@ public class ConfigurationRelease : BusinessEntity
     {
         if ((Status != ConfigurationReleaseStatus.Published &&
                 !(allowRetiredRelease && Status == ConfigurationReleaseStatus.Retired)) ||
-            endpoint.ExecutionProfile != Domain.Devices.Enums.KioskExecutionProfile.FullEdge ||
-            endpoint.Status != Domain.Devices.Enums.KioskExecutionEndpointStatus.Active ||
+            endpoint.ExecutionProfile != KioskExecutionProfile.FullEdge ||
+            endpoint.Status != KioskExecutionEndpointStatus.Active ||
             endpoint.FullEdgeRuntimeId != edgeRuntimeId)
         {
             throw new DomainRuleException("Only a published release can deploy to its active Full Edge endpoint.");
@@ -217,13 +230,11 @@ public class ConfigurationRelease : BusinessEntity
                     endpoint.Kiosk,
                     "Robot program");
 
-                foreach (var programArtifact in binding.RobotProgram.RobotProgramArtifacts)
+                var programManifest = RobotProgramManifestBuilder.Parse(
+                    binding.RobotProgram.ProgramManifestJson
+                        ?? throw new DomainRuleException("Published robot program manifest is missing."));
+                foreach (var programArtifact in programManifest.Artifacts)
                 {
-                    if (programArtifact.RobotArtifact is null)
-                    {
-                        throw new DomainRuleException("Robot program artifacts must be loaded before validating deployment compatibility.");
-                    }
-
                     if (!endpoint.SupportsRobotTarget(
                             programArtifact.RobotArtifact.RuntimeTargetCode,
                             programArtifact.RobotArtifact.MachineModelCode,

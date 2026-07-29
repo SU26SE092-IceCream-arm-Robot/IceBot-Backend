@@ -55,6 +55,35 @@ Do not apply soft-delete filters to immutable evidence or retry keys:
 
 Reason: those keys protect audit, deduplication, retry, and historical evidence. They should not be reused after deletion.
 
+## Soft Delete Query Visibility
+
+EF global query filters are not universal. Do not apply one to a soft-deleted
+principal when a required dependent remains visible as immutable evidence. EF
+otherwise warns about the required navigation and can hide historical rows
+through an implicit inner join.
+
+The following principals intentionally use explicit query visibility instead of
+an EF global filter:
+
+- `Account`
+- `Organization`, `Store`, and `Kiosk`
+- `Device`
+- `Product` and `Ingredient`
+- `IngredientDispenserState`
+- `Order` and `PaymentTransaction`
+- `ConfigurationRelease`
+- `KioskExecutionEndpoint`
+
+Normal operational stores must start their query with
+`WhereNotDeleted()`. Evidence, deduplication, retention, object-reference
+cleanup, and provider callback paths may deliberately read all rows. Such an
+unfiltered path must be named or commented by its evidence/operational purpose;
+it is not a convenience bypass.
+
+All other `ISoftDeletable` entities continue to use the DbContext global
+filter. When adding a required relationship from a non-soft-deleted dependent,
+audit the principal's visibility policy before relying on the global filter.
+
 ## Nullable Unique Columns
 
 PostgreSQL allows multiple `NULL` values in a unique index. If uniqueness should apply only when the value exists, use an explicit filter:

@@ -18,12 +18,8 @@ public sealed class UpdateProductRequest
 
     public string? Currency { get; set; }
 
-    public bool? IsAvailable { get; set; }
-
     public int? PreparationTimeSeconds { get; set; }
 
     public string? ImageUrl { get; set; }
-
-    public string? MetadataJson { get; set; }
 
 }

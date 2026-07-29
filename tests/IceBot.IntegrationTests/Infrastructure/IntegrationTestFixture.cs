@@ -1,7 +1,9 @@
+using Application.RobotConfiguration.Storage.Services;
+using Application.RobotConfiguration.Storage.Abstractions;
 using DotNet.Testcontainers.Builders;
 using DotNet.Testcontainers.Containers;
 using Infrastructure.Data;
-using Infrastructure.RobotConfiguration.ObjectStorage;
+using Infrastructure.RobotConfiguration.Storage.ObjectStorage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Testcontainers.PostgreSql;
@@ -67,7 +69,11 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
         return new IceBotDbContext(options);
     }
 
-    public MinioArtifactObjectStorage CreateObjectStorage(int downloadUrlExpirySeconds = 300)
+    public MinioArtifactObjectStorage CreateObjectStorage(
+        int downloadUrlExpirySeconds = 300,
+        bool autoCreateBucket = false,
+        int readRetryCount = 2,
+        int readRetryDelayMilliseconds = 200)
     {
         var endpoint = $"{_minio.Hostname}:{_minio.GetMappedPublicPort(9000)}";
         return new MinioArtifactObjectStorage(Options.Create(new RobotArtifactObjectStorageOptions
@@ -79,9 +85,13 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             BucketName = BucketName,
             UseSsl = false,
             DownloadUseSsl = false,
-            DownloadUrlExpirySeconds = downloadUrlExpirySeconds
+            AutoCreateBucket = autoCreateBucket,
+            DownloadUrlExpirySeconds = downloadUrlExpirySeconds,
+            ReadRetryCount = readRetryCount,
+            ReadRetryDelayMilliseconds = readRetryDelayMilliseconds
         }));
     }
+
 }
 
 [CollectionDefinition(IntegrationTestFixture.CollectionName, DisableParallelization = true)]

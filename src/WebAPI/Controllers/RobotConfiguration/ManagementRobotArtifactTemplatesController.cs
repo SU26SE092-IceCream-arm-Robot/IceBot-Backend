@@ -1,9 +1,13 @@
+using Application.RobotConfiguration.ArtifactTemplates.Results;
+using Application.RobotConfiguration.ArtifactTemplates.Queries;
+using Application.RobotConfiguration.ArtifactTemplates.Commands;
+using Application.RobotConfiguration.Artifacts.Results;
 using System.ComponentModel.DataAnnotations;
-using Application.RobotConfiguration.Commands;
-using Application.RobotConfiguration.Queries;
+using Application.RobotConfiguration.Artifacts.Commands;
+using Application.RobotConfiguration.Artifacts.Queries;
 using Application.Shared.Wrappers;
 using Asp.Versioning;
-using Domain.RobotConfiguration.Enums;
+using Domain.RobotConfiguration.Artifacts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WebAPI.Authorization;
@@ -56,7 +60,7 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("robot-artifact-templates/bulk")]
+    [HttpPost("robot-artifact-templates")]
     [Authorize(Policy = "artifact-template.manage")]
     [Consumes("multipart/form-data")]
     [RequestFormLimits(MultipartBodyLengthLimit = 104857600)]

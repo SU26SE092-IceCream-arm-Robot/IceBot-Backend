@@ -19,6 +19,8 @@ public class ManagementStoresController : ControllerBase
     private readonly UpdateStoreCommandHandler _updateStore;
     private readonly DisableStoreCommandHandler _disableStore;
     private readonly ActivateStoreCommandHandler _activateStore;
+    private readonly PauseStoreSalesCommandHandler _pauseStoreSales;
+    private readonly ResumeStoreSalesCommandHandler _resumeStoreSales;
 
     public ManagementStoresController(
         ListStoresQueryHandler listStores,
@@ -26,7 +28,9 @@ public class ManagementStoresController : ControllerBase
         CreateStoreCommandHandler createStore,
         UpdateStoreCommandHandler updateStore,
         DisableStoreCommandHandler disableStore,
-        ActivateStoreCommandHandler activateStore)
+        ActivateStoreCommandHandler activateStore,
+        PauseStoreSalesCommandHandler pauseStoreSales,
+        ResumeStoreSalesCommandHandler resumeStoreSales)
     {
         _listStores = listStores;
         _getStore = getStore;
@@ -34,6 +38,8 @@ public class ManagementStoresController : ControllerBase
         _updateStore = updateStore;
         _disableStore = disableStore;
         _activateStore = activateStore;
+        _pauseStoreSales = pauseStoreSales;
+        _resumeStoreSales = resumeStoreSales;
     }
 
     [HttpGet("stores")]
@@ -137,6 +143,42 @@ public class ManagementStoresController : ControllerBase
             StoreId = storeId
         };
         var result = await _activateStore.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPatch("organizations/{organizationId:guid}/stores/{storeId:guid}/sales-pause")]
+    [Authorize(Policy = "stores.manage")]
+    public async Task<IActionResult> PauseStoreSales(
+        Guid organizationId,
+        Guid storeId,
+        [FromBody] PauseStoreSalesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var command = new PauseStoreSalesCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            Request = request
+        };
+        var result = await _pauseStoreSales.HandleAsync(command, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPatch("organizations/{organizationId:guid}/stores/{storeId:guid}/sales-resume")]
+    [Authorize(Policy = "stores.manage")]
+    public async Task<IActionResult> ResumeStoreSales(
+        Guid organizationId,
+        Guid storeId,
+        CancellationToken cancellationToken)
+    {
+        var command = new ResumeStoreSalesCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            StoreId = storeId
+        };
+        var result = await _resumeStoreSales.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

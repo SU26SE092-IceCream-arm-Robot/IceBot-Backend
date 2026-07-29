@@ -3,6 +3,7 @@ using Application.Operations.Abstractions;
 using Application.Operations.MaintenanceTickets.Mapping;
 using Application.Operations.MaintenanceTickets.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Domain.Operations.Enums;
 
 namespace Application.Operations.MaintenanceTickets.Queries;
@@ -40,6 +41,10 @@ public sealed class ListMaintenanceTicketsQueryHandler
         var pageNumber = query.PageNumber <= 0 ? 1 : query.PageNumber;
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
+        if (query.FromDate.HasValue && query.ToDate.HasValue && query.FromDate > query.ToDate)
+            return PagedResult<MaintenanceTicketResult>.Fail(
+                "Maintenance-ticket from timestamp cannot be after to timestamp.", 400, pageNumber, pageSize);
+
         // Parse Status
         MaintenanceTicketStatus? parsedStatus = null;
         if (!string.IsNullOrWhiteSpace(query.Status))
@@ -64,10 +69,7 @@ public sealed class ListMaintenanceTicketsQueryHandler
             parsedPriority = priorityVal;
         }
 
-        // Extract tenancy allowed IDs
-        var allowedOrgs = user.AllowedOrganizationIds.ToList();
-        var allowedStores = user.AllowedStoreIds.ToList();
-        var allowedKiosks = user.AllowedKioskIds.ToList();
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.MaintenanceView, user);
 
         // Query total count
         var totalCount = await _ticketStore.CountAsync(
@@ -81,9 +83,9 @@ public sealed class ListMaintenanceTicketsQueryHandler
             query.FromDate,
             query.ToDate,
             user.IsSystemAdmin,
-            allowedOrgs,
-            allowedStores,
-            allowedKiosks,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             cancellationToken);
 
         // Query items
@@ -98,9 +100,9 @@ public sealed class ListMaintenanceTicketsQueryHandler
             query.FromDate,
             query.ToDate,
             user.IsSystemAdmin,
-            allowedOrgs,
-            allowedStores,
-            allowedKiosks,
+            scope.OrganizationIds,
+            scope.StoreIds,
+            scope.KioskIds,
             pageNumber,
             pageSize,
             cancellationToken);
