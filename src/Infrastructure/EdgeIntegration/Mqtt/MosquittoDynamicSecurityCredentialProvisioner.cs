@@ -54,6 +54,12 @@ public sealed class MosquittoDynamicSecurityCredentialProvisioner : IMqttEndpoin
     public string GetSubscribeTopic(Guid endpointId) =>
         $"{_options.TopicPrefix.Trim().Trim('/')}/execution-endpoints/{endpointId:D}/commands/available";
 
+    public string GetUplinkPublishTopicPattern(Guid endpointId) =>
+        $"{_options.TopicPrefix.Trim().Trim('/')}/execution-endpoints/{endpointId:D}/uplink/{{messageType}}";
+
+    public string GetUplinkResultTopic(Guid endpointId) =>
+        $"{_options.TopicPrefix.Trim().Trim('/')}/execution-endpoints/{endpointId:D}/uplink/results";
+
     public async Task ProvisionOrReplaceAsync(
         Guid endpointId,
         string username,

@@ -30,6 +30,12 @@ public sealed class MqttEndpointCredentialWorkflowTests
         Assert.Equal(ExecutionEndpointMqttCredentialStatus.Active, fixture.Endpoint.MqttCredential!.Status);
         Assert.Equal(1, result.Data!.CredentialVersion);
         Assert.False(string.IsNullOrWhiteSpace(result.Data.Password));
+        Assert.Equal(
+            $"icebot/execution-endpoints/{fixture.Endpoint.Id:D}/uplink/{{messageType}}",
+            result.Data.UplinkPublishTopicPattern);
+        Assert.Equal(
+            $"icebot/execution-endpoints/{fixture.Endpoint.Id:D}/uplink/results",
+            result.Data.UplinkResultTopic);
         Received.InOrder(() =>
         {
             fixture.Store.SaveChangesAsync(Arg.Any<CancellationToken>());
@@ -201,6 +207,10 @@ public sealed class MqttEndpointCredentialWorkflowTests
         var provisioner = Substitute.For<IMqttEndpointCredentialProvisioner>();
         provisioner.ProviderName.Returns("MosquittoDynamicSecurity");
         provisioner.GetSubscribeTopic(endpoint.Id).Returns($"icebot/execution-endpoints/{endpoint.Id:D}/commands/available");
+        provisioner.GetUplinkPublishTopicPattern(endpoint.Id)
+            .Returns($"icebot/execution-endpoints/{endpoint.Id:D}/uplink/{{messageType}}");
+        provisioner.GetUplinkResultTopic(endpoint.Id)
+            .Returns($"icebot/execution-endpoints/{endpoint.Id:D}/uplink/results");
         provisioner.ProvisionOrReplaceAsync(
                 Arg.Any<Guid>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);

@@ -6,7 +6,14 @@
 
 ## Ownership
 
-MQTT is a best-effort command-available wake-up channel. `EdgeCommand` in PostgreSQL and the authenticated command-pull API remain authoritative.
+MQTT has two transport roles:
+
+- Cloud-to-Edge command-available wake-up remains best effort. `EdgeCommand` in
+  PostgreSQL and authenticated command pull remain authoritative.
+- Edge-to-Cloud telemetry, readiness, execution reports, production events, and
+  state summaries use typed QoS 1 uplink messages. The owning Application
+  handler and committed Cloud state remain authoritative; broker acceptance is
+  not business acceptance.
 
 ```text
 Cloud commits EdgeCommand
@@ -17,6 +24,11 @@ Cloud commits EdgeCommand
 ```
 
 The wake-up contains no executable payload. Duplicate and missing MQTT messages are expected and harmless because Edge deduplicates pulled commands and also polls periodically.
+
+For uplink, Edge keeps every message in its local outbox until Cloud publishes a
+matching application result. Missing results are retried with the same message
+and evidence identity. HTTPS ingest remains a recovery fallback and invokes the
+same handlers.
 
 ## Local Broker
 
@@ -66,9 +78,18 @@ dotnet run --project .\src\WebAPI\WebAPI.csproj
 
 Local ACL boundary:
 
-- `icebot-backend` may publish `icebot/execution-endpoints/+/commands/available`.
+- `icebot-backend` may publish
+  `icebot/execution-endpoints/+/commands/available` and
+  `icebot/execution-endpoints/+/uplink/results`.
+- Cloud uplink consumers use the shared group `icebot-cloud-uplink` and subscribe
+  to one exact wildcard topic per allowed message type. They do not subscribe
+  to `uplink/results`.
 - An Edge MQTT username must equal its `executionEndpointId` UUID.
-- That endpoint may subscribe only to `icebot/execution-endpoints/{executionEndpointId}/commands/available`.
+- That endpoint may subscribe only to its `commands/available` and
+  `uplink/results` topics.
+- That endpoint may publish only the allowed typed message names below its own
+  `icebot/execution-endpoints/{executionEndpointId}/uplink/` prefix. It cannot
+  publish `results` or another endpoint's messages.
 - No anonymous access is enabled.
 - The management API creates or rotates the broker client through Mosquitto
   Dynamic Security. PostgreSQL stores lifecycle metadata only; it never stores
@@ -94,6 +115,79 @@ POST /api/v1/iot/execution-endpoints/{endpointId}/commands/pull
 
 Edge must also pull on a periodic timer and immediately after reconnect. MQTT receipt does not mark a command Delivered or Accepted; only the command pull/ack contracts do that.
 
+## Edge Uplink
+
+Publish topic:
+
+```text
+icebot/execution-endpoints/{executionEndpointId}/uplink/{messageType}
+```
+
+Allowed message types:
+
+```text
+heartbeat
+telemetry-events
+readiness
+execution-report
+production-events
+state-summaries
+```
+
+Every payload uses this envelope:
+
+```json
+{
+  "schemaVersion": 1,
+  "messageId": "uuid",
+  "sentAt": "2026-07-29T10:00:00Z",
+  "payload": {}
+}
+```
+
+Cloud result topic:
+
+```text
+icebot/execution-endpoints/{executionEndpointId}/uplink/results
+```
+
+Result:
+
+```json
+{
+  "schemaVersion": 1,
+  "messageId": "uuid",
+  "endpointId": "uuid",
+  "messageType": "readiness",
+  "processedAt": "2026-07-29T10:00:01Z",
+  "succeeded": true,
+  "statusCode": 200,
+  "retryable": false,
+  "message": "Execution readiness applied.",
+  "data": {}
+}
+```
+
+Rules:
+
+- QoS is 1 and retain is false in both directions.
+- Broker PUBACK means only that the broker accepted the message.
+- `messageId` correlates transport results; domain idempotency remains the
+  event ID, sequence, revision, or command/report identity inside `payload`.
+- Edge removes an outbox entry only after a matching successful or
+  non-retryable application result.
+- `retryable=true`, result timeout, disconnect, or broker failure retries the
+  identical envelope and domain evidence identities.
+- A `207` batch result is transport success; Edge must inspect per-item results
+  and retain only failed/retryable items as defined by the owning contract.
+- Message type selects a strict typed payload. Unknown fields, unknown enum
+  values, unsupported schema versions, and topic/message mismatches are
+  rejected.
+- MQTT and HTTPS must use the same persistent source executor identity,
+  event IDs, sequence numbers, state revisions, and command IDs.
+- MQTT is not used for command pull/ack, checkpoint reads, artifact/file
+  transfer, or signed object download.
+
 ## Production
 
 Production must use:
@@ -101,9 +195,9 @@ Production must use:
 - a broker endpoint reachable only from approved backend and Edge networks;
 - TLS (`EdgeCommandMqtt__UseTls=true`) with a trusted broker certificate;
 - a unique backend client id per backend instance;
-- backend publish credentials stored in the deployment secret manager;
+- backend publish/subscribe credentials stored in the deployment secret manager;
 - one revocable MQTT identity per execution endpoint;
-- endpoint-scoped subscribe ACLs and a backend-only publish ACL;
+- endpoint-scoped bidirectional ACLs and separate backend publish/subscribe ACLs;
 - broker connection, authentication failure, publish failure, and client-session metrics;
 - credential rotation coordinated with execution-endpoint provisioning.
 
@@ -119,6 +213,12 @@ POST   /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credent
 PATCH  /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   rotate
 DELETE /api/v1/management/kiosks/{kioskId}/execution-endpoints/{id}/mqtt-credential   revoke
 ```
+
+Provision and rotation return the password once together with:
+
+- `subscribeTopic` for command wake-up;
+- `uplinkPublishTopicPattern` for the allowed typed uplink message name;
+- `uplinkResultTopic` for Cloud application results.
 
 Broker mutation and database audit cannot share a distributed transaction.
 The handler commits a durable `PendingProvision`, `PendingRotation`, or
@@ -153,9 +253,19 @@ broker client first. Disabling an endpoint blocks command pull/dispatch but does
 not rotate or delete its MQTT identity, so reactivation can preserve the same
 subscriber setup.
 
-For multiple backend replicas, each replica needs a unique MQTT client id. Retained wake-ups remain disabled; durable command recovery comes from command pull, not broker retention.
+For multiple backend replicas, each replica needs a unique MQTT client id and
+the same uplink consumer group. Shared subscriptions distribute each uplink
+message to one replica. Retained wake-ups and uplink messages remain disabled;
+durable command recovery comes from command pull, while durable uplink recovery
+comes from the Edge local outbox and Cloud application result.
 
-Backend publish outcomes are exported through `icebot.mqtt.wakeup.publish.attempts`. Broker-side connection/session/authentication metrics remain owned by Mosquitto/EMQX and should be scraped or exported separately; application metrics cannot observe subscriber disconnects that never reach the backend.
+Backend wake-up outcomes are exported through
+`icebot.mqtt.wakeup.publish.attempts`. Uplink outcomes and processing latency
+use `icebot.mqtt.uplink.messages` and
+`icebot.mqtt.uplink.processing.latency`. Broker-side
+connection/session/authentication metrics remain owned by Mosquitto/EMQX and
+should be scraped or exported separately; application metrics cannot observe
+disconnects or rejected broker ACL operations that never reach the backend.
 
 ## Related Docs
 

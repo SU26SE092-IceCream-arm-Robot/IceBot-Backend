@@ -282,6 +282,24 @@ namespace Infrastructure
                 .ValidateOnStart();
             services.AddSingleton<IMqttEdgeCommandTransport, MqttNetEdgeCommandTransport>();
             services.AddSingleton<IEdgeCommandWakeUpPublisher, MqttEdgeCommandWakeUpPublisher>();
+            services.AddOptions<EdgeUplinkMqttOptions>()
+                .Bind(config.GetSection(EdgeUplinkMqttOptions.SectionName))
+                .Validate(options =>
+                        !options.Enabled ||
+                        (!string.IsNullOrWhiteSpace(options.Host) &&
+                         options.Port is > 0 and <= 65535 &&
+                         !string.IsNullOrWhiteSpace(options.Username) &&
+                         !string.IsNullOrWhiteSpace(options.Password) &&
+                         !string.IsNullOrWhiteSpace(options.ClientId) &&
+                         options.HasValidTopicConfiguration() &&
+                         options.ConnectTimeoutSeconds > 0 &&
+                         options.PublishTimeoutSeconds > 0 &&
+                         options.ReconnectDelaySeconds > 0 &&
+                         options.MaxPayloadBytes is >= 1024 and <= 4 * 1024 * 1024 &&
+                         options.MaxConcurrentMessages is >= 1 and <= 256),
+                    "Enabled MQTT Edge uplink settings are incomplete or invalid.")
+                .ValidateOnStart();
+            services.AddHostedService<MqttEdgeUplinkConsumer>();
             services.AddOptions<MqttCredentialProvisioningOptions>()
                 .Bind(config.GetSection(MqttCredentialProvisioningOptions.SectionName))
                 .Validate(options => !options.Enabled ||

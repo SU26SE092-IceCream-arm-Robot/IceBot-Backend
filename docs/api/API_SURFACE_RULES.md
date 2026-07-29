@@ -48,7 +48,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Global product templates | `/api/v1/management/product-templates/*` | SystemAdmin-only platform template authoring |
 | Organization product and menu management | `/api/v1/management/organizations/{organizationId}/products/*`, `/api/v1/management/organizations/{organizationId}/menus/*` | tenant-scoped catalog/menu/pricing operations |
 | Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-authoring-imports/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/organizations/{organizationId}/robot-programs/*`, `/api/v1/management/organizations/{organizationId}/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments/*` | stage and validate one Fairino authoring bundle, materialize Draft artifacts/programs, publish immutable robot configuration, and request/read/rollback Full Edge or low-cost controller deployment |
-| Global robot artifact templates | `/api/v1/management/robot-artifact-templates/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts/from-template` | manage reusable global Lua templates and clone a Published template into an organization-owned Draft artifact |
+| Global robot artifact templates | `/api/v1/management/robot-artifact-templates/*`, `/api/v1/management/robot-artifact-template-contracts/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts/from-template` | manage reusable global Lua templates and their platform-owned technical contracts, then clone a Published template into an organization-owned Draft artifact |
 | Back-office order operations | GraphQL `orders`, `order`, `orderStatusHistory`, `orderExecutionAttempts`; REST `/api/v1/management/orders/*`, `/api/v1/management/refunds/*` | scoped order reads in GraphQL; cancellation, redispatch, refund-required, manual refund commands, and restricted execution diagnostics in REST |
 | Inventory management | `/api/v1/management/inventory/*`, `/api/v1/management/kiosks/{kioskId}/inventory/*`, `/api/v1/management/kiosks/{kioskId}/configuration-releases/{releaseId}/inventory-readiness` | dispenser topology, release readiness, state, stock movement history, refill, estimate adjustment |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/device-events`, `/api/v1/management/kiosks/{kioskId}/operation-logs` | kiosk connectivity history, device warnings/errors, and Edge local operation logs |
@@ -69,6 +69,16 @@ Management routes should expose the resource owner in the path when the owner is
 - Use `/management/orders/{orderId}/...` for order-owned workflow commands and audit reads such as refunds, redispatch, status history, execution attempts, cancellation, and refund-required transitions.
 
 Create and mutation routes should prefer the parent owner path. Global list/search routes are acceptable when they are management indexes and the handler/store applies explicit scoped filtering. Do not choose a global route only because the child id is globally unique; if the parent owner changes validation meaning or reduces operator mistakes, put the parent in the route.
+
+## Management Route Naming
+
+- Name collection routes after the owned resource. Use `POST` on the collection when one request creates one or more resources of that collection; transport cardinality does not belong in route names. For example, multipart upload uses `POST .../robot-artifacts`, not `/bulk`.
+- Put a lifecycle action after the item or collection it changes: `/{id}/publish`, `/{id}/retire`, or `/publish` for an atomic selected set. Do not alternate between `publish-bulk` and `bulk-publish`.
+- Name workflow commands after their observable result. Use `materialize`, `publish-resources`, and `create-release-draft`; avoid generic actions such as `apply` or `process`.
+- Use one verb-object order across related commands. Robot composition uses `preview-composition` and `confirm-composition`.
+- Distinguish platform templates from tenant-owned resources in the noun itself when both are exposed. Platform contracts use `/robot-artifact-template-contracts`; tenant contracts use `/organizations/{organizationId}/robot-artifact-technical-contracts`.
+- A global route without an owner is allowed for a read-only cross-scope index, such as `/configuration-deployments`. Item mutation and detail routes still include the physical or tenant owner.
+- Do not retain legacy aliases before first production deployment. Controller attributes, generated OpenAPI, flow docs, and frontend operation catalogs must change together.
 
 ## Tablet / Customer APIs
 

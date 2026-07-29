@@ -113,6 +113,11 @@ POST /api/v1/management/product-templates/{productId}/variants/{variantId}/recip
 ### Robot And Production Configuration Routes
 
 ```text
+GET/POST /api/v1/management/robot-artifact-template-contracts
+GET/PUT/DELETE /api/v1/management/robot-artifact-template-contracts/{contractId}
+POST /api/v1/management/robot-artifact-template-contracts/{contractId}/validation-preview
+PATCH /api/v1/management/robot-artifact-template-contracts/{contractId}/publish
+PATCH /api/v1/management/robot-artifact-template-contracts/{contractId}/retire
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/publish
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/retire
 DELETE /api/v1/management/robot-artifact-templates/{templateId}
@@ -131,14 +136,14 @@ POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports
 GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}
 GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/workspace
 POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/validate
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/apply
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/composition-preview
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/composition-confirm
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/publish
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/release-draft
+POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/materialize
+POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/preview-composition
+POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/confirm-composition
+POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/publish-resources
+POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/create-release-draft
 POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/discard
-POST /api/v1/management/organizations/{organizationId}/robot-artifacts/bulk
-PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish-bulk
+POST /api/v1/management/organizations/{organizationId}/robot-artifacts
+PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish
 GET /api/v1/management/organizations/{organizationId}/robot-artifacts
 GET /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}
 GET /api/v1/management/organizations/{organizationId}/robot-artifacts/{artifactId}/usage
@@ -373,7 +378,7 @@ registration is not an assignment prerequisite.
 - Execution endpoint credential rotation is a maintenance operation. It revokes the current credential binding and activates the new credential reference in one database save. Rotation preserves the endpoint's prior Active or Disabled state; Provisioning and Retired endpoints cannot rotate. Hot credential overlap is not part of V1.
 - Robot artifact bulk upload is the only public upload contract. It accepts one to 50 multipart `.lua` files, stores file bytes in S3-compatible object storage, and stores immutable metadata in `RobotArtifact`.
 - Bulk robot artifact upload accepts up to 50 files plus a JSON manifest that supplies per-file metadata. Uploaded artifacts remain unassigned Draft inventory and do not change any robot-program sequence. Request-shape errors reject the whole request; upload failures use item-level atomicity and return per-item results without rolling back successful items.
-- Robot authoring import is the simplified custom-authoring surface above advanced artifact/program CRUD. Upload accepts one Fairino ZIP plus target scope and requires `Idempotency-Key`; normal FE never sends artifact IDs, contract IDs, storage keys, checksums, or membership IDs. Validation is read-only for authoring resources. Apply requires both `artifact.upload` and `program.manage`, creates Draft resources only, preserves manifest `RunOrder`, and is serialized by import identity. `POST .../{importId}/publish` is a separate explicit, resumable confirmation that publishes contracts, assigns them, publishes artifacts, then publishes the program. Release attachment and deployment remain separate operations.
+- Robot authoring import is the simplified custom-authoring surface above advanced artifact/program CRUD. Upload accepts one Fairino ZIP plus target scope and requires `Idempotency-Key`; normal FE never sends artifact IDs, contract IDs, storage keys, checksums, or membership IDs. Validation is read-only for authoring resources. Materialization requires both `artifact.upload` and `program.manage`, creates Draft resources only, preserves manifest `RunOrder`, and is serialized by import identity. `POST .../{importId}/publish-resources` is a separate explicit, resumable confirmation that publishes contracts, assigns them, publishes artifacts, then publishes the program. Release attachment and deployment remain separate operations.
 - The robot-authoring workspace is a read model, not a write owner. It combines current import progress, existing package ownership, release status, deployment candidates, blockers, and next actions. Package ownership is informational: the workspace does not automatically require a fork. A separate explicit customization workflow decides whether a package-managed resource must be forked before mutation.
 - Artifact upload retry identity is organization + normalized artifact code + SHA-256. An exact retry returns the existing artifact id and metadata as success; bulk results expose `uploadedCount`, `existingCount`, and per-item `wasExisting`.
 - Artifact review URLs are organization-scoped, short-lived, and generated only after confirming the private object exists. They are not durable download contracts and must not be stored by clients.

@@ -15,9 +15,9 @@ public sealed class ManagementRobotArtifactTechnicalContractsController(
     RobotArtifactTechnicalContractHandlers handlers,
     AssignRobotArtifactTechnicalContractHandler assignment) : ControllerBase
 {
-    [HttpGet("robot-artifact-technical-contracts")]
+    [HttpGet("robot-artifact-template-contracts")]
     [Authorize(Policy = "artifact-template.read")]
-    public async Task<IActionResult> ListGlobal(
+    public async Task<IActionResult> ListTemplates(
         [FromQuery] RobotArtifactContractStatus? status,
         [FromQuery] string? search,
         [FromQuery] int pageNumber = 1,
@@ -30,63 +30,63 @@ public sealed class ManagementRobotArtifactTechnicalContractsController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpGet("robot-artifact-technical-contracts/{contractId:guid}")]
+    [HttpGet("robot-artifact-template-contracts/{contractId:guid}")]
     [Authorize(Policy = "artifact-template.read")]
-    public async Task<IActionResult> GetGlobal(Guid contractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetTemplate(Guid contractId, CancellationToken cancellationToken)
     {
         var result = await handlers.GetAsync(
             new GetRobotArtifactTechnicalContractQuery(User.GetUserContext(), null, contractId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("robot-artifact-technical-contracts")]
+    [HttpPost("robot-artifact-template-contracts")]
     [Authorize(Policy = "artifact-template.manage")]
-    public async Task<IActionResult> CreateGlobal(
+    public async Task<IActionResult> CreateTemplate(
         [FromBody] RobotArtifactTechnicalContractRequest request, CancellationToken cancellationToken)
     {
         var result = await handlers.CreateAsync(ToCommand(request, null), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("robot-artifact-technical-contracts/{contractId:guid}/publish")]
+    [HttpPatch("robot-artifact-template-contracts/{contractId:guid}/publish")]
     [Authorize(Policy = "artifact-template.manage")]
-    public async Task<IActionResult> PublishGlobal(Guid contractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> PublishTemplate(Guid contractId, CancellationToken cancellationToken)
     {
         var result = await handlers.PublishAsync(
             new PublishRobotArtifactTechnicalContractCommand(User.GetUserContext(), null, contractId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPut("robot-artifact-technical-contracts/{contractId:guid}")]
+    [HttpPut("robot-artifact-template-contracts/{contractId:guid}")]
     [Authorize(Policy = "artifact-template.manage")]
-    public async Task<IActionResult> ReplaceGlobal(Guid contractId,
+    public async Task<IActionResult> ReplaceTemplate(Guid contractId,
         [FromBody] RobotArtifactTechnicalContractDefinitionRequest request, CancellationToken cancellationToken)
     {
         var result = await handlers.ReplaceAsync(ToReplaceCommand(request, null, contractId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("robot-artifact-technical-contracts/{contractId:guid}/validation-preview")]
+    [HttpPost("robot-artifact-template-contracts/{contractId:guid}/validation-preview")]
     [Authorize(Policy = "artifact-template.manage")]
-    public async Task<IActionResult> ValidateGlobal(Guid contractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> ValidateTemplate(Guid contractId, CancellationToken cancellationToken)
     {
         var result = await handlers.ValidateAsync(
             new ValidateRobotArtifactTechnicalContractCommand(User.GetUserContext(), null, contractId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("robot-artifact-technical-contracts/{contractId:guid}/retire")]
+    [HttpPatch("robot-artifact-template-contracts/{contractId:guid}/retire")]
     [Authorize(Policy = "artifact-template.manage")]
-    public async Task<IActionResult> RetireGlobal(Guid contractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> RetireTemplate(Guid contractId, CancellationToken cancellationToken)
     {
         var result = await handlers.RetireAsync(
             new RetireRobotArtifactTechnicalContractCommand(User.GetUserContext(), null, contractId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpDelete("robot-artifact-technical-contracts/{contractId:guid}")]
+    [HttpDelete("robot-artifact-template-contracts/{contractId:guid}")]
     [Authorize(Policy = "artifact-template.manage")]
-    public async Task<IActionResult> DiscardGlobal(Guid contractId, CancellationToken cancellationToken)
+    public async Task<IActionResult> DiscardTemplate(Guid contractId, CancellationToken cancellationToken)
     {
         var result = await handlers.DiscardAsync(
             new DiscardRobotArtifactTechnicalContractCommand(User.GetUserContext(), null, contractId), cancellationToken);

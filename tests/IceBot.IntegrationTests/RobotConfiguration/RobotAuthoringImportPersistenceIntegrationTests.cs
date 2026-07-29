@@ -50,7 +50,7 @@ public sealed class RobotAuthoringImportPersistenceIntegrationTests(IntegrationT
 
         var tracked = await store.BeginMutationAsync(organizationId, inserted.Import.Id, default);
         Assert.NotNull(tracked);
-        await store.LockApplyResourceIdentitiesAsync(
+        await store.LockMaterializationResourceIdentitiesAsync(
             organizationId, null, null, null, tracked!.ProposedProgramCode,
             tracked.Items.Select(item => item.ArtifactCode).ToArray(), default);
         tracked.MarkValidated("{\"canApply\":true,\"errors\":[],\"warnings\":[],\"existingArtifactCount\":0,\"newArtifactCount\":1,\"existingContractCount\":0,\"newContractCount\":1}",

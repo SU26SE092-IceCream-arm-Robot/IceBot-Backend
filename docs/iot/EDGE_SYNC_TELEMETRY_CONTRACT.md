@@ -6,6 +6,25 @@ This document owns Edge-to-Cloud telemetry, production-history replay, state-sum
 
 `device event`, `telemetry replay`, `production sync`, `checkpoint`, `state summary`, `heartbeat`, `readiness`, `capability projection`, `SyncEventInbox`, `ExecutionReadinessChanged`
 
+## Transport
+
+Typed MQTT uplink is the primary realtime transport for heartbeat, telemetry
+replay, readiness, production events, and state summaries:
+
+```text
+icebot/execution-endpoints/{endpointId}/uplink/{messageType}
+```
+
+The JSON shown in the HTTPS sections below is the `payload` inside the common
+MQTT envelope. HTTPS endpoints remain supported for bootstrap, broker outage,
+manual diagnostics, and recovery. Both transports invoke the same handlers and
+therefore share tenancy validation, idempotency identities, transaction
+boundaries, and result semantics. Edge must not allocate a new event ID,
+sequence, or revision merely because it changes transport.
+
+The common envelope, application result topic, retry rules, and ACL boundary are
+defined in [MQTT Operations](../operations/MQTT_OPERATIONS.md).
+
 ### Device Warning/Error Evidence
 
 ```http

@@ -100,6 +100,8 @@ The `IceBot.Payments.PayOS` meter adds provider-specific failure classification 
 | Metric | Type | Meaning | Bounded tags |
 | --- | --- | --- | --- |
 | `icebot.mqtt.wakeup.publish.attempts` | Counter | MQTT wake-up outcomes, including disabled/succeeded/failed | `outcome`, `command.type` |
+| `icebot.mqtt.uplink.messages` | Counter | MQTT Edge uplink application outcomes | `outcome`, `message.type` |
+| `icebot.mqtt.uplink.processing.latency` | Histogram (seconds) | Broker delivery to application result publication | `message.type` |
 | `icebot.mqtt.credentials.reconciliation.outcomes` | Counter | Durable MQTT credential reconciliation outcomes | `outcome` |
 | `icebot.mqtt.credentials.operation.timeouts` | Counter | Provisioning or rotation operations that exceeded the five-minute lease | `operation` |
 | `icebot.mqtt.credentials.revocation.retry.attempts` | Counter | Automatic stale revocation retries | `outcome` |
@@ -131,7 +133,9 @@ The `IceBot.Payments.PayOS` meter adds provider-specific failure classification 
 
 Rules:
 
-- Metrics are recorded only after their owning database commit succeeds.
+- Business-state metrics are recorded only after their owning database commit
+  succeeds. MQTT transport rejection metrics may be recorded before a handler
+  or database transaction exists.
 - Duplicate ACKs and duplicate execution reports do not add latency/transition measurements.
 - The stale/unreachable gauge is refreshed from PostgreSQL every 30 seconds; it is not an in-memory lifecycle counter.
 - IDs such as command, order, kiosk, endpoint, or device must never be metric tags. Use traces/logs for entity-level investigation.
@@ -141,6 +145,9 @@ Rules:
 - Payment-session reconciliation uses the persisted provider order code. `AwaitingWebhook` means provider lookup reported paid while Cloud is still waiting for the signed webhook; it must be investigated through order-scoped payment diagnostics rather than treated as fulfillment success.
 - Alert on any sustained increase of `icebot.payment_session.interventions`, especially `AwaitingWebhook`, `IdentityMismatch`, and `AmountMismatch`. Use the tenant-scoped intervention queue to identify affected orders; metric tags intentionally contain no payment or order IDs.
 - MQTT disabled is an explicit outcome, not a publish failure. Alert only on `outcome=failed` when MQTT is expected to be enabled.
+- Alert on sustained MQTT uplink `retryable`, `malformed`, or `invalid_size`
+  outcomes. Broker ACL rejection and disconnected clients require broker-side
+  metrics because those messages never reach the application consumer.
 - MQTT credential metrics use only bounded operation/outcome tags. Endpoint identity remains in structured logs and management alerts.
 - Alert when an enabled automation job has no recent `last_success` update, when `partial_failure` is sustained, or when candidate failures grow. Inspect logs by job and candidate ID; IDs deliberately remain out of metric tags.
 
