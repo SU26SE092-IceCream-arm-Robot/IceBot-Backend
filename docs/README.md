@@ -37,6 +37,7 @@ Use [Documentation Routing Map](DOCUMENTATION_ROUTING_MAP.md) only when the righ
 | Tablet/edge/cloud contract | [IoT Contract](iot/IOT_CONTRACT.md) |
 | Naming conventions | [Naming Rules](process/NAMING_RULES.md) |
 | Deployment/runtime configuration | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
+| Local demo accounts and repeat-safe development seeding | [Local Development Bootstrap](operations/LOCAL_DEVELOPMENT_BOOTSTRAP.md) |
 | Robot artifact operational smoke | [Robot Artifact Operational Smoke Test](operations/ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md) |
 | Observability/logging/traces/metrics | [Observability](operations/OBSERVABILITY.md) |
 | Manual critical rule checks | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |

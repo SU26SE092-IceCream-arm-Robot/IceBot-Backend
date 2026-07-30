@@ -4,6 +4,7 @@ using Domain.Tenants.Entities;
 using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.RobotConfiguration.AuthoringImports.Persistence;
 using Application.Shared.Concurrency;
+using Application.RobotConfiguration.AuthoringImports.Queries;
 using Infrastructure.Concurrency;
 using Domain.RobotConfiguration.Programs;
 using Domain.Tenants.Enums;
@@ -16,6 +17,44 @@ namespace IceBot.IntegrationTests.RobotConfiguration;
 [Collection(IntegrationTestFixture.CollectionName)]
 public sealed class RobotAuthoringImportPersistenceIntegrationTests(IntegrationTestFixture fixture)
 {
+    [IntegrationFact]
+    public async Task ListImports_IsOrganizationScopedFilteredAndDeterministicallyOrdered()
+    {
+        var organizationId = await SeedOrganizationAsync();
+        var otherOrganizationId = await SeedOrganizationAsync();
+        var actorId = Guid.NewGuid();
+        var sharedCreatedAt = DateTimeOffset.UtcNow;
+        Guid firstId;
+        Guid secondId;
+
+        await using (var seedContext = fixture.CreateDbContext())
+        {
+            var first = CreateImport(organizationId, actorId, Guid.NewGuid().ToString("N"));
+            first.CreatedAt = sharedCreatedAt;
+            var second = CreateImport(organizationId, actorId, Guid.NewGuid().ToString("N"));
+            second.CreatedAt = sharedCreatedAt;
+            var other = CreateImport(otherOrganizationId, actorId, Guid.NewGuid().ToString("N"));
+            other.CreatedAt = sharedCreatedAt.AddMinutes(1);
+            seedContext.RobotAuthoringImports.AddRange(first, second, other);
+            await seedContext.SaveChangesAsync();
+            firstId = first.Id;
+            secondId = second.Id;
+        }
+
+        await using var readContext = fixture.CreateDbContext();
+        var store = new RobotAuthoringImportStore(readContext);
+        var criteria = new RobotAuthoringImportListCriteria(
+            organizationId, RobotAuthoringImportPublicStatus.Uploaded, null, null, null, "MAKE", 1, 20);
+
+        var count = await store.CountImportsAsync(criteria, default);
+        var imports = await store.ListImportsAsync(criteria, default);
+
+        Assert.Equal(2, count);
+        Assert.Equal(new[] { firstId, secondId }.OrderDescending().ToArray(), imports.Select(item => item.Id).ToArray());
+        Assert.All(imports, item => Assert.Equal(organizationId, item.OrganizationId));
+        Assert.All(imports, item => Assert.Equal(1, item.ItemCount));
+    }
+
     [IntegrationFact]
     public async Task ConcurrentSameIdempotencyKey_ConvergesToOneImport()
     {

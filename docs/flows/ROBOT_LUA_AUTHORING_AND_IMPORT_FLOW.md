@@ -15,6 +15,9 @@ RobotProgram by calling artifact, technical-contract, and program CRUD routes
 one by one after a normal Fairino export.
 
 ```text
+GET import inbox
+-> choose or resume import
+-> GET workspace
 POST import bundle
 -> GET workspace
 -> POST validate
@@ -28,6 +31,15 @@ POST import bundle
 -> GET workspace
 -> use normal release publication/deployment workflow
 ```
+
+On initial page load or after losing a local `importId`, read
+`GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports`
+first. It is the durable organization-scoped inbox; use its selected `importId`
+to open the workspace. It accepts `status`, `storeId`, `kioskId`, `deviceId`,
+`search`, `pageNumber`, and `pageSize`. `status` uses the public lifecycle
+names `Uploaded`, `Validated`, `Materialized`, `ResourcesPublished`, `Failed`,
+or `Discarded`. The inbox returns safe operational summaries only, not staged
+bundle/object-storage data or item checksums.
 
 After every mutation, read `GET .../robot-authoring-imports/{importId}/workspace`.
 It is the convergence read model for import status, validation, package
@@ -65,6 +77,7 @@ validation `canMaterialize`. The persistence aggregate retains its internal
 | --- | --- | --- | --- |
 | 1. Edit project | Fairino-Studio user | No backend API | Saves Blockly/editor state in a local `.fairobot` project. |
 | 2. Export Lua | Fairino-Studio user | No backend API | The normal `Export LUA` action produces only one `*-export.zip` containing `export-manifest.json`, ordered `.lua` files under `artifacts/`, and matching `.icebot.json` sidecars under `contracts/`. A separate advanced menu command exports individual Lua/sidecar files for debugging. A normal editor step becomes one file; a paired loop becomes one file whose sidecar merges the semantics of both loop steps and requires one shared execution phase. |
+| 2I. Find/resume import | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports` | Reads the durable, paged organization import inbox after reload or hand-off. Filters only narrow the authorized organization result. Select a returned `importId`, then read its workspace; the inbox never returns staged ZIP bytes, storage keys, raw Lua, or item checksums. |
 | 2A. Stage authoring bundle | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports` | Uploads one bounded ZIP with `Idempotency-Key`, validates archive structure and target consistency, and creates a durable organization-scoped import session. It does not create or publish runtime resources. |
 | 2B. Validate authoring bundle | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/validate` | Rechecks the staged checksum, sidecars, explicit `RunOrder`, existing artifact revisions, technical-contract identities, and program identity. Ambiguous revisions, Retired resources, and a Published artifact bound to another contract block materialization. Sidecar V1 is strictly opaque and may declare only `System`/`Motion` effects without ingredient, option, quantity, or capability semantics. Typed production semantics require V2. `System`/`Motion` effects cannot carry ingredient, option, or quantity fields. `Ingredient` requires `ingredientCode` and may carry `optionCode` when that ingredient consumption is conditional on an option. `Option` requires `optionCode` and may carry `ingredientCode` when the option consumes an ingredient. Composition accepts either typed representation for an option ingredient but still requires an exact option and ingredient match. Errors block materialization; valid V1 artifacts remain warnings during composition. |
 | 2C. Materialize authoring bundle | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/materialize` | Requires both `artifact.upload` and `program.manage`. Materializes Draft technical contracts, immutable Draft artifacts, and one ordered Draft RobotProgram in one serialized metadata transaction. It never publishes or deploys. A newly created Draft contract is retained on the import item and is assigned to its artifact only after the contract is explicitly published. |

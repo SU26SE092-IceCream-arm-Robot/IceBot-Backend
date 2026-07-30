@@ -275,6 +275,13 @@ internal static class PermissionMatrixRules
         },
         new()
         {
+            Policy = "notifications.view",
+            Description = "View notification delivery status and retry evidence without provider diagnostic details.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "devices.view",
             Description = "View devices/hardware details within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },

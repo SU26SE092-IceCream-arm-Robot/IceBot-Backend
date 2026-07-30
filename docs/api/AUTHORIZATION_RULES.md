@@ -178,6 +178,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `inventory.configure` | `SystemAdmin`, `Manager`, `Technician` | Provision and configure dispenser topology, activate/retire states, and delete only unused states within assigned scope |
 | `operations.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosk heartbeat history, device events, and curated operation logs within assigned scope |
 | `operations.diagnostics` | `SystemAdmin`, `Technician` | View raw operation-log payloads and order execution diagnostics within assigned kiosk scope |
+| `notifications.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View normal notification delivery status and retry evidence within assigned scope; message content and provider diagnostics are excluded |
 | `notifications.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Requeue permanently failed notification deliveries within assigned scope; reason and actor are audited |
 | `maintenance.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View maintenance tickets within assigned scope |
 | `maintenance.create` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Create maintenance tickets within assigned scope |

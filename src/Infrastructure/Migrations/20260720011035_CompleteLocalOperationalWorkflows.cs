@@ -13,9 +13,9 @@ namespace Infrastructure.Migrations
         {
             CompleteLocalOperationalWorkflowsManualSteps.EnsureUniqueProviderPaymentIdentity(migrationBuilder);
 
-            migrationBuilder.DropIndex(
-                name: "IX_PaymentTransactions_ProviderOrderCode",
-                table: "PaymentTransactions");
+            // Older local databases may have been initialized without this
+            // InitialCreate index. The replacement index below is authoritative.
+            migrationBuilder.Sql("DROP INDEX IF EXISTS \"IX_PaymentTransactions_ProviderOrderCode\";");
 
             migrationBuilder.AddColumn<string>(
                 name: "MaterializationIdentitySuffix",
