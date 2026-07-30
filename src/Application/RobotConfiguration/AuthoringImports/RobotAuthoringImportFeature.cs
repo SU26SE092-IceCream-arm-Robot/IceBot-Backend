@@ -15,6 +15,7 @@ using Application.RobotConfiguration.Artifacts.Commands;
 using Application.RobotConfiguration.Programs.Commands;
 using Application.RobotConfiguration.ArtifactContracts;
 using Application.Shared.Concurrency;
+using Application.RobotConfiguration.AuthoringImports.Queries;
 
 namespace Application.RobotConfiguration.AuthoringImports;
 
@@ -23,6 +24,8 @@ public interface IRobotAuthoringImportStore
     Task<bool> ScopeExistsAsync(Guid organizationId, Guid? storeId, Guid? kioskId, Guid? deviceId, CancellationToken cancellationToken);
     Task<RobotAuthoringImport?> GetByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, bool tracked, CancellationToken cancellationToken);
     Task<RobotAuthoringImport?> GetAsync(Guid organizationId, Guid importId, bool tracked, CancellationToken cancellationToken);
+    Task<int> CountImportsAsync(RobotAuthoringImportListCriteria criteria, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RobotAuthoringImportListRow>> ListImportsAsync(RobotAuthoringImportListCriteria criteria, CancellationToken cancellationToken);
     Task<IReadOnlyList<RobotArtifactTechnicalContract>> GetContractsAsync(Guid organizationId, IReadOnlyCollection<string> codes, bool tracked, CancellationToken cancellationToken);
     Task<IReadOnlyList<RobotArtifact>> GetArtifactsAsync(Guid organizationId, IReadOnlyCollection<string> codes, bool tracked, CancellationToken cancellationToken);
     Task<RobotProgram?> GetProgramAsync(Guid organizationId, Guid? storeId, Guid? kioskId, Guid? deviceId, string code, bool tracked, CancellationToken cancellationToken);
@@ -90,22 +93,12 @@ public sealed record RobotAuthoringImportResult(Guid Id, Guid OrganizationId, Gu
         RobotAuthoringImportValidationReport? validation = null;
         if (!string.IsNullOrWhiteSpace(value.ValidationReportJson))
             validation = JsonSerializer.Deserialize<RobotAuthoringImportValidationReport>(value.ValidationReportJson);
-        var actions = value.Status switch
-        {
-            RobotAuthoringImportStatus.Uploaded => new[] { "ValidateImport", "DiscardImport" },
-            RobotAuthoringImportStatus.Validated when validation?.CanMaterialize == true => new[] { "MaterializeImport", "DiscardImport" },
-            RobotAuthoringImportStatus.Validated => new[] { "ResolveArtifactRevisionConflict", "DiscardImport" },
-            RobotAuthoringImportStatus.Applied when value.LinkedConfigurationReleaseId.HasValue =>
-                new[] { "ReviewConfigurationReleaseDraft", "PublishConfigurationRelease" },
-            RobotAuthoringImportStatus.Applied when value.PublishedAt.HasValue =>
-                new[] { "CreateConfigurationReleaseDraft" },
-            RobotAuthoringImportStatus.Applied => new[] { "PreviewSemanticComposition", "ReviewTechnicalContracts", "PublishImportResources" },
-            RobotAuthoringImportStatus.Failed => new[] { "ValidateImport", "DiscardImport" },
-            _ => Array.Empty<string>()
-        };
-        var publicStatus = value.Status == RobotAuthoringImportStatus.Applied
-            ? value.PublishedAt.HasValue ? "ResourcesPublished" : "Materialized"
-            : value.Status.ToString();
+        var actions = RobotAuthoringImportLifecycleProjection.GetNextActions(
+            value.Status,
+            validation?.CanMaterialize == true,
+            value.LinkedConfigurationReleaseId,
+            value.PublishedAt);
+        var publicStatus = RobotAuthoringImportLifecycleProjection.GetPublicStatus(value.Status, value.PublishedAt);
         return new RobotAuthoringImportResult(value.Id, value.OrganizationId, value.StoreId, value.KioskId,
             value.DeviceId, value.ClientExportId, value.ImportChecksum, value.SchemaVersion, publicStatus,
             value.ProposedProgramCode, value.ProposedProgramName, value.RuntimeTargetCode, value.MachineModelCode,

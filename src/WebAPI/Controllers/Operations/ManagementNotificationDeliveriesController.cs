@@ -12,12 +12,12 @@ namespace WebAPI.Controllers.Operations;
 [Route("api/v{version:apiVersion}/management/organizations/{organizationId:guid}/notification-deliveries")]
 [Authorize]
 public sealed class ManagementNotificationDeliveriesController(
-    NotificationDeliveryDiagnosticsService service,
+    NotificationDeliveryOperationsService service,
     RequeueNotificationDeliveryService recovery)
     : ControllerBase
 {
     [HttpGet]
-    [Authorize(Policy = "operations.diagnostics")]
+    [Authorize(Policy = "notifications.view")]
     public async Task<IActionResult> List(Guid organizationId, [FromQuery] string? status,
         [FromQuery] string? notificationType, [FromQuery] Guid? recipientAccountId,
         [FromQuery] Guid? kioskId, [FromQuery] DateTimeOffset? from, [FromQuery] DateTimeOffset? to,
@@ -31,7 +31,7 @@ public sealed class ManagementNotificationDeliveriesController(
     }
 
     [HttpGet("{deliveryId:guid}")]
-    [Authorize(Policy = "operations.diagnostics")]
+    [Authorize(Policy = "notifications.view")]
     public async Task<IActionResult> Get(Guid organizationId, Guid deliveryId,
         CancellationToken cancellationToken)
     {

@@ -35,6 +35,7 @@ public static class OperationsModule
         services.AddScoped<GetOperationLogQueryHandler>();
         services.AddScoped<GetOperationLogDiagnosticsQueryHandler>();
         services.AddScoped<NotificationDeliveryDiagnosticsService>();
+        services.AddScoped<NotificationDeliveryOperationsService>();
         services.AddScoped<RequeueNotificationDeliveryService>();
         services.AddScoped<IMaintenanceAssignmentNotifier, MaintenanceAssignmentNotifier>();
         services.AddScoped<MqttCredentialOperationalAlertReconciler>();

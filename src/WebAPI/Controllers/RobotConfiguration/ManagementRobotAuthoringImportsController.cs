@@ -2,6 +2,7 @@ using Application.RobotConfiguration.AuthoringImports;
 using Application.RobotConfiguration.AuthoringImports.ReleaseLinkage;
 using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.RobotConfiguration.AuthoringImports.Workspace;
+using Application.RobotConfiguration.AuthoringImports.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +16,31 @@ namespace WebAPI.Controllers.RobotConfiguration;
 [Route("api/v{version:apiVersion}/management/organizations/{organizationId:guid}/robot-authoring-imports")]
 public sealed class ManagementRobotAuthoringImportsController(
     RobotAuthoringImportHandlers handlers,
+    ListRobotAuthoringImportsQueryHandler listHandler,
     CreateRobotAuthoringReleaseDraftCommandHandler createReleaseDraftHandler,
     RobotAuthoringCompositionHandlers compositionHandlers,
     RobotAuthoringWorkspaceHandler workspaceHandler) : ControllerBase
 {
     private const long MaximumMultipartRequestBytes = RobotAuthoringBundleCodec.MaximumArchiveBytes + 1024 * 1024;
+
+    [HttpGet]
+    [Authorize(Policy = "program.read")]
+    public async Task<IActionResult> List(
+        Guid organizationId,
+        [FromQuery] string? status,
+        [FromQuery] Guid? storeId,
+        [FromQuery] Guid? kioskId,
+        [FromQuery] Guid? deviceId,
+        [FromQuery] string? search,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await listHandler.HandleAsync(new ListRobotAuthoringImportsQuery(
+            User.GetUserContext(), organizationId, status, storeId, kioskId, deviceId, search, pageNumber, pageSize),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
 
     [HttpPost]
     [Authorize(Policy = "artifact.upload")]

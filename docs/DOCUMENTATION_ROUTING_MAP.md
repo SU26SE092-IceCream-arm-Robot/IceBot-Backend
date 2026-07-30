@@ -26,6 +26,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Current work protocol, whether to edit, verification, migrations | [Working Protocol](process/WORKING_PROTOCOL.md) | [Documentation Rules](process/DOCUMENTATION_RULES.md) |
 | Wide scan, finding ledger, root-cause remediation, vertical-slice review, invariant checklist, pattern scan, failure scenarios, completion evidence | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) | [Working Protocol](process/WORKING_PROTOCOL.md), [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 | Deployment runtime config, environment variables, appsettings, health/info | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) | [API Surface Rules](api/API_SURFACE_RULES.md) |
+| Local demo accounts, repeat-safe development role seed, `ICEBOT-DEMO` tenant tree | [Local Development Bootstrap](operations/LOCAL_DEVELOPMENT_BOOTSTRAP.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Observability, Serilog, OpenTelemetry, Aspire Dashboard, debug body logging, OTLP | [Observability](operations/OBSERVABILITY.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | Manual backend critical rule checks before handoff | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) | [Working Protocol](process/WORKING_PROTOCOL.md) |
 | How backend docs should be structured for RAG/search | [Documentation Rules](process/DOCUMENTATION_RULES.md) | this file |

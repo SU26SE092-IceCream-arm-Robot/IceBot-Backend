@@ -125,6 +125,7 @@ public static class ScopeRoleSets
     public static readonly string[] PackageFork = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OperationsView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] OperationsDiagnostics = ["SystemAdmin", "Technician"];
+    public static readonly string[] NotificationsView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] NotificationsManage = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] DashboardView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
 }
