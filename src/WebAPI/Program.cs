@@ -62,7 +62,13 @@ try
 
     app.UseIceBotSwagger();
 
-    app.UseHttpsRedirection();
+    // The local Next.js proxy targets the Development HTTP listener. Keep the
+    // production redirect, but avoid redirecting proxied local API calls to a
+    // browser-facing self-signed HTTPS endpoint.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
 
     app.UseCors("FrontendOnly");
 

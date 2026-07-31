@@ -4,6 +4,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Sinks.OpenTelemetry;
 using Application.EdgeIntegration.Observability;
+using Application.Payments.PaymentSessions.Observability;
 using Application.ProductionPackages.Upgrades;
 using Infrastructure.Payments.Observability;
 using Infrastructure.Firebase;
@@ -109,6 +110,7 @@ public static class ObservabilityExtensions
             {
                 metrics
                     .AddMeter(IceBotEdgeMetrics.MeterName)
+                    .AddMeter(PaymentWebhookMetrics.MeterName)
                     .AddMeter(PayOsResilienceMetrics.MeterName)
                     .AddMeter(FirebaseAccountPushNotificationSender.MeterName)
                     .AddMeter(RobotAuthoringImportObservability.InstrumentationName)

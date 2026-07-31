@@ -15,6 +15,7 @@ public sealed class EdgeUplinkContractTests
             null!,
             null!,
             null!,
+            null!,
             null!);
         var result = await dispatcher.DispatchAsync(
             Guid.NewGuid(),
@@ -41,6 +42,7 @@ public sealed class EdgeUplinkContractTests
             {
                 "execution-report",
                 "heartbeat",
+                "inventory-observations",
                 "production-events",
                 "readiness",
                 "state-summaries",

@@ -6,6 +6,7 @@ using Domain.Devices.Catalog;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Telemetry;
 using Domain.ProductionExecution.Enums;
+using Domain.Inventory.Enums;
 
 namespace Application.EdgeIntegration.Uplink;
 
@@ -17,6 +18,7 @@ public static class EdgeUplinkMessageTypes
     public const string ExecutionReport = "execution-report";
     public const string ProductionEvents = "production-events";
     public const string StateSummaries = "state-summaries";
+    public const string InventoryObservations = "inventory-observations";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(
         [
@@ -25,7 +27,8 @@ public static class EdgeUplinkMessageTypes
             Readiness,
             ExecutionReport,
             ProductionEvents,
-            StateSummaries
+            StateSummaries,
+            InventoryObservations
         ],
         StringComparer.Ordinal);
 }
@@ -237,4 +240,21 @@ public sealed class EdgeStateSummaryUplink
     public int SummarySchemaVersion { get; init; } = 1;
     public DateTimeOffset EdgeCreatedAt { get; init; }
     public JsonElement Payload { get; init; }
+}
+
+public sealed class EdgeInventoryObservationsUplink
+{
+    public Guid SourceExecutorId { get; init; }
+    public IReadOnlyList<EdgeInventorySensorObservationUplink> Observations { get; init; } = [];
+}
+
+public sealed class EdgeInventorySensorObservationUplink
+{
+    public Guid SourceEventId { get; init; }
+    public Guid IngredientDispenserStateId { get; init; }
+    public Guid DeviceId { get; init; }
+    public long ObservationSequence { get; init; }
+    public IngredientLevelStatus ObservedLevelStatus { get; init; }
+    public DateTimeOffset ObservedAt { get; init; }
+    public JsonElement? SensorPayload { get; init; }
 }

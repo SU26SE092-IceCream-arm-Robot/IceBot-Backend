@@ -46,8 +46,8 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 13. Tablet renders QR.
 14. Customer pays.
 15. Payment provider calls Cloud webhook.
-16. Cloud verifies provider callback and signature.
-17. Cloud updates PaymentTransaction = Paid and Order = ReadyForFulfillment in one DB transaction.
+16. Cloud verifies provider callback and signature before payment/order lookup. A verified callback with no matching local provider transaction is acknowledged without creating callback/payment/order evidence or dispatching fulfillment.
+17. For a matching payment transaction, Cloud updates PaymentTransaction = Paid and Order = ReadyForFulfillment in one DB transaction.
 18. Cloud commits payment/order state.
 19. After the payment transaction commits, Cloud dispatches execution attempt `1`.
    A reconciliation worker repairs any paid `ReadyForFulfillment` order whose required machine-execution command was not created.

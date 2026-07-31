@@ -1,15 +1,15 @@
 # Edge Sync and Telemetry Contract
 
-This document owns Edge-to-Cloud telemetry, production-history replay, state-summary recovery, heartbeat, and readiness/capability projection contracts.
+This document owns Edge-to-Cloud telemetry, inventory sensor observations, production-history replay, state-summary recovery, heartbeat, and readiness/capability projection contracts.
 
 ## Search Keywords
 
-`device event`, `telemetry replay`, `production sync`, `checkpoint`, `state summary`, `heartbeat`, `readiness`, `capability projection`, `SyncEventInbox`, `ExecutionReadinessChanged`
+`device event`, `telemetry replay`, `inventory observation`, `production sync`, `checkpoint`, `state summary`, `heartbeat`, `readiness`, `capability projection`, `SyncEventInbox`, `ExecutionReadinessChanged`
 
 ## Transport
 
 Typed MQTT uplink is the primary realtime transport for heartbeat, telemetry
-replay, readiness, production events, and state summaries:
+replay, inventory observations, readiness, production events, and state summaries:
 
 ```text
 icebot/execution-endpoints/{endpointId}/uplink/{messageType}
@@ -32,6 +32,42 @@ POST /api/v1/iot/execution-endpoints/{endpointId}/device-events
 ```
 
 This single-event endpoint accepts authenticated `Warning`, `Error`, or `Critical` evidence for a device attached to the reporting kiosk. `originNodeId` must match the execution endpoint profile identity. `eventId` is globally unique and acts as the idempotency key; a retry returns the existing event and does not publish SignalR again. `occurredAt` uses the Edge telemetry future-skew limit. Optional structured payload is limited to 16384 characters, stored as evidence, and excluded from the normal management read API. After commit, Cloud publishes `DeviceEventCreated` to the kiosk operations group. A newly accepted `Error` or `Critical` event creates an Open Alert in the same transaction and publishes `AlertChanged`; Warning remains evidence only.
+
+### Inventory Sensor Observations
+
+Edge publishes dispenser-level observations through MQTT message type
+`inventory-observations`. The payload is authenticated as the endpoint's bound
+executor identity and is not a management REST write surface.
+
+```json
+{
+  "sourceExecutorId": "uuid-bound-to-execution-endpoint",
+  "observations": [
+    {
+      "sourceEventId": "uuid",
+      "ingredientDispenserStateId": "uuid",
+      "deviceId": "uuid",
+      "observationSequence": 311,
+      "observedLevelStatus": "Low",
+      "observedAt": "2026-07-31T10:00:00Z",
+      "sensorPayload": { "sensor": "level-switch", "raw": "LOW" }
+    }
+  ]
+}
+```
+
+Rules:
+
+- The batch has 1 to 100 observations. `sourceEventId` is unique within the batch and `(sourceExecutorId, sourceEventId)` is the Cloud idempotency identity.
+- `observationSequence` is positive and must be persistent per source executor and dispenser state. A reused source event with different dispenser, device, sequence, or level is a conflict.
+- The endpoint must be Active with an active credential, and its bound profile identity must equal `sourceExecutorId`.
+- Cloud verifies that the dispenser state is active, belongs to the endpoint kiosk, and is bound to the supplied device. Edge cannot report another kiosk's inventory by changing IDs.
+- V1 supports only `Low`, `Medium`, and `Full`. `Unknown` is not an observed physical level.
+- `observedAt` is evidence and can be at most five minutes ahead of Cloud receive time. Cloud receive time is timeout authority.
+- An observation at or below the latest applied sequence, or no newer than the current dispenser measurement, is stored as `OutOfOrder` audit evidence and does not overwrite the inventory projection.
+- If the dispenser has a configured Low/Medium/Full calibration profile, Cloud derives `EstimatedQuantity` from that profile. Without calibration, the level changes but quantity remains unknown.
+- Raw `sensorPayload` is bounded diagnostic evidence and is not exposed in normal inventory responses. The dispenser history exposes the observation level, disposition, time, derived estimate, and endpoint reference.
+- This channel describes physical inventory evidence. It does not prove a custom Lua program consumed the recipe quantity, does not create a stock movement, and does not change V1 menu sellability or checkout admission.
 
 ### Telemetry Replay
 

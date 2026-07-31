@@ -10,7 +10,7 @@ MQTT has two transport roles:
 
 - Cloud-to-Edge command-available wake-up remains best effort. `EdgeCommand` in
   PostgreSQL and authenticated command pull remain authoritative.
-- Edge-to-Cloud telemetry, readiness, execution reports, production events, and
+- Edge-to-Cloud telemetry, inventory observations, readiness, execution reports, production events, and
   state summaries use typed QoS 1 uplink messages. The owning Application
   handler and committed Cloud state remain authoritative; broker acceptance is
   not business acceptance.
@@ -132,6 +132,7 @@ readiness
 execution-report
 production-events
 state-summaries
+inventory-observations
 ```
 
 Every payload uses this envelope:
@@ -185,6 +186,11 @@ Rules:
   rejected.
 - MQTT and HTTPS must use the same persistent source executor identity,
   event IDs, sequence numbers, state revisions, and command IDs.
+- `inventory-observations` uses `(sourceExecutorId, sourceEventId)` for
+  idempotency and a positive persistent `observationSequence` per dispenser.
+  Edge keeps the same observation evidence until a non-retryable application
+  result; it must not replace a rejected or out-of-order observation with a
+  new event identity.
 - MQTT is not used for command pull/ack, checkpoint reads, artifact/file
   transfer, or signed object download.
 
