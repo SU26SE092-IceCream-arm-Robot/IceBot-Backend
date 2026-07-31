@@ -5,9 +5,11 @@
 **Source basis**: Derived strictly from `deliverables/00_repo_evidence/repo_truth_map.md`, `deliverables/00_repo_evidence/functional_inventory.md`, `deliverables/00_repo_evidence/database_inventory.md`, and `deliverables/01_project_introduction/project_introduction.md`, per the authoring rules in `deliverables/DELIVERABLES_AGENT.md`. No `src/` or `docs/` files were modified. A fifth requested input, `deliverables/00_repo_evidence/evidence_review_final.md`, does not exist in the repository at the time of writing; this document was produced from the four evidence/introduction files that do exist (see §8).
 
 **Status legend** used throughout (per functional_inventory.md methodology, `functional_inventory.md:9-12`):
-- **Supported** — directly observed working code (route/consumer → handler → domain/persistence).
-- **Inferred** — reasonable reading of code/naming/docs where the exact mechanism was not independently re-verified line-by-line.
-- **Unclear** — described only in `docs/` with no corresponding code found, or a genuine gap/discrepancy flagged in the evidence.
+- **Supported** — directly observed in source code (route/consumer → handler → domain/persistence chain read in `src/`). This means **statically code-evidenced**, not runtime-verified: no test-execution, integration-test, or production-monitoring evidence backs this status anywhere in this document, since the evidence base does not map to `tests/IceBot.UnitTests`/`tests/IceBot.IntegrationTests` (see §8). Treat "Supported" as "the code exists and is wired," not "confirmed working at runtime."
+- **Inferred** — reasonable reading of code/naming/docs where the exact mechanism was not independently re-verified line-by-line (e.g. confirmed only via controller/job wiring or a sibling-pattern match rather than a full method read).
+- **Unclear** — described only in `docs/` with no corresponding code found, or a genuine gap/discrepancy flagged in the evidence, or a universal/absolute claim that was not checked exhaustively across every affected surface.
+
+**A note on wording**: this document, following `functional_inventory.md`'s own requirement-candidate phrasing, uses words like "atomically," "exactly once," "idempotently," "recover," "guarantee," and "immutable" where the cited evidence source uses them. These describe the mechanism as coded/documented (e.g. a unique index, a single transaction scope, a status-machine guard) — they are **not** claims independently verified by concurrency testing, chaos testing, or production observation, none of which exist in the evidence base. Where this SRS's own wording (rather than the evidence file's) makes such a claim, it is called out individually below.
 
 ---
 
@@ -15,7 +17,7 @@
 
 ### 1.1 Purpose
 
-This Software Requirements Specification (SRS) documents the functional and non-functional requirements of the IceBot Backend as they exist in the current codebase, for use by the project team as a shared baseline before producing the final academic SRS report. It translates the repo-evidence inventories already gathered (`repo_truth_map.md`, `functional_inventory.md`, `database_inventory.md`) into standard SRS structure (functional requirements, non-functional requirements, data requirements, business rules), with every requirement traceable to a concrete evidence path.
+This Software Requirements Specification (SRS) documents the functional and non-functional requirements of the IceBot Backend as they exist in the current codebase, for use by the project team as a shared baseline before producing the final academic SRS report. It translates the repo-evidence inventories already gathered (`repo_truth_map.md`, `functional_inventory.md`, `database_inventory.md`) into standard SRS structure (functional requirements, non-functional requirements, data requirements, business rules), with each requirement traceable to one or more `functional_inventory.md` row IDs and their underlying evidence paths. `[Open Question]` A team review (`deliverables/05_team_review/codex_review_project_intro_srs.md`) found that several `functional_inventory.md` row IDs were originally cited only via an en-dash range (e.g. `TEN-01`–`TEN-04`) in a consolidated FR's `Related`/`Evidence` fields, making the interior IDs of that range non-obvious on a literal ID search; those ranges have been expanded to explicit, individually-listed IDs throughout §4 in response. The consolidation itself (260 inventory rows into 133 FRs) remains a many-to-one grouping, not a formal row-by-row traceability matrix — producing the latter is flagged as a follow-up in §8 rather than attempted here.
 
 ### 1.2 Scope
 
@@ -55,7 +57,7 @@ Out of scope for this SRS (see also `project_introduction.md` §8 "Out-of-Scope 
 
 - `deliverables/DELIVERABLES_AGENT.md` — authoring rules for this deliverables folder.
 - `deliverables/00_repo_evidence/repo_truth_map.md` — architecture, actors, modules, flows, API surface, database summary.
-- `deliverables/00_repo_evidence/functional_inventory.md` — 265-row functional capability inventory with per-row evidence paths (primary FR source for §4).
+- `deliverables/00_repo_evidence/functional_inventory.md` — functional capability inventory with per-row evidence paths (primary FR source for §4). Its own Summary table totals 265 rows; a direct count of `ID`-prefixed rows yields 260 (Operations is short 4 rows against its stated 26, Payments is short 1 row against its stated 17). This SRS uses the mechanically-verified 260 figure and flags 265 as the file's own uncorrected total — see §8.
 - `deliverables/00_repo_evidence/database_inventory.md` — entity list, relationships, constraints/indexes, JSON field roles, multi-tenancy fields, physical database notes (primary source for §6).
 - `deliverables/01_project_introduction/project_introduction.md` — team-facing project overview and scope baseline.
 - Backend source-of-truth docs cited transitively via the above (e.g. `ARCHITECTURE.md`, `docs/api/API_SURFACE_RULES.md`, `docs/api/AUTHORIZATION_RULES.md`, `docs/architecture/BOUNDARY_CONTEXTS.md`, `docs/architecture/MULTI_TENANCY_RULES.md`, `docs/flows/*.md`, `docs/iot/IOT_CONTRACT.md`, `docs/data/*.md`) — not re-read directly for this document; inherited via the evidence files above.
@@ -70,7 +72,7 @@ Section 2 gives the overall product description (perspective, functions, user cl
 
 ### 2.1 Product Perspective
 
-IceBot Backend is not a standalone product but the Cloud half of a two-tier system: Cloud (this repository) and Edge (kiosk-local runtime, external to this repo). It is built as a Modular Monolith with Clean Architecture layering (`WebAPI → Infrastructure → Application → Domain`), organized into bounded contexts rather than microservices. It integrates with one external payment provider (PayOS), one external identity provider (Firebase/Google), one object store (MinIO), one MQTT broker (Mosquitto), and one push-notification channel (FCM). Evidence: `repo_truth_map.md` §1–§2; `project_introduction.md` §3, §11.
+IceBot Backend is not a standalone product but the Cloud half of a two-tier system: Cloud (this repository) and Edge (kiosk-local runtime, external to this repo). It is built as a Modular Monolith with Clean Architecture layering (`WebAPI → Infrastructure → Application → Domain`), organized into bounded contexts rather than microservices. As currently configured, it integrates with one payment provider (PayOS), one identity provider (Firebase/Google), one object store (MinIO), one MQTT broker (Mosquitto), and one push-notification channel (FCM). `[Assumption]` The evidence establishes only the current configured adapter for each integration, not that the product architecturally requires exactly one instance of each or that these are permanent/sole providers — see `project_introduction.md` §11. Evidence: `repo_truth_map.md` §1–§2; `project_introduction.md` §3, §11.
 
 ### 2.2 Product Functions
 
@@ -92,7 +94,7 @@ See `project_introduction.md` §6 for the full actor table (SystemAdmin, OrgAdmi
 ### 2.4 Operating Environment
 
 - **Runtime**: ASP.NET Core Web API (WebAPI project), containerized (`docker/Dockerfile`, `docker/docker-compose.yml`).
-- **Database**: PostgreSQL 17 via Npgsql/EF Core, database name `IceBotDB`. Evidence: `database_inventory.md` §7.
+- **Database**: PostgreSQL 17 via Npgsql/EF Core, database name `IceBotDB`, per the current `docker/docker-compose.yml` configuration. `[Assumption]` This is the current deployment baseline observed in configuration, not necessarily a binding "shall use PostgreSQL 17" product requirement independent of environment. Evidence: `database_inventory.md` §7.
 - **Object storage**: MinIO (S3-compatible), sibling container, for robot artifact binaries. Evidence: `database_inventory.md` §7.
 - **Messaging**: MQTT broker (Mosquitto with Dynamic Security plugin) for Edge uplink/wake-up traffic and per-endpoint credential provisioning. Evidence: `functional_inventory.md` MQTT section.
 - **External network dependencies**: PayOS (payment), Firebase (Google login verification, and implicitly FCM for push). Evidence: `project_introduction.md` §11.
@@ -130,7 +132,7 @@ Evidence: `repo_truth_map.md` §6; `functional_inventory.md` (all management-pre
 | PayOS payment provider | Outbound (session create) + Inbound (webhook) | HTTPS REST, JSON, signature-verified webhook | `functional_inventory.md` PAY-01, PAY-03 |
 | Firebase (Google Identity) | Outbound (token verification) | HTTPS, ID token verification | `functional_inventory.md` IDN-02 |
 | MinIO object storage | Outbound (put/get/presigned URL) | S3-compatible API | `database_inventory.md` §7; `functional_inventory.md` RC-05 |
-| MQTT broker (Mosquitto Dynamic Security) | Outbound (publish wake-up, credential provisioning) + Inbound (uplink subscribe) | MQTT v5-style topics, QoS1 | `functional_inventory.md` MQTT-01–MQTT-04 |
+| MQTT broker (Mosquitto Dynamic Security) | Outbound (publish wake-up, credential provisioning) + Inbound (uplink subscribe) | Topic-based pub/sub, QoS1 for the wake-up publish (`functional_inventory.md` MQTT-01); protocol version not established in the evidence — `[Open Question]` | `functional_inventory.md` MQTT-01, MQTT-02, MQTT-03, MQTT-04 |
 | PostgreSQL | Outbound | Npgsql/EF Core | `database_inventory.md` §7 |
 | Push notification channel (FCM-style) | Outbound | Device push token delivery | `functional_inventory.md` IDN-12, OPS-07, OPS-21 |
 
@@ -151,7 +153,7 @@ Evidence: `repo_truth_map.md` §6; `functional_inventory.md` (all management-pre
 | Payment provider webhook | `/api/v1/payments/.../webhook` | Provider signature verification | `repo_truth_map.md` §6 |
 | IoT/edge (REST) | `/api/v1/iot/execution-endpoints/{endpointId}/...` | mTLS (Full Edge) or ECDSA P-256 signed request (Low-Cost Controller) | `repo_truth_map.md` §6 |
 | IoT/edge (MQTT) | `icebot/execution-endpoints/{endpointId}/...` topics | MQTT broker credential (per-endpoint, Mosquitto Dynamic Security) | `functional_inventory.md` MQTT section |
-| GraphQL | `/graphql` | JWT + scoped RBAC policy, read-only management aggregation | `repo_truth_map.md` §6 |
+| GraphQL | `/graphql` | JWT + scoped RBAC policy, management aggregation. Documented as read-only in `repo_truth_map.md` §6, but this was not independently re-verified against `src/WebAPI/GraphQL/` in the evidence pass — `[Unclear]`, see §8.2. | `repo_truth_map.md` §6 |
 | SignalR | `/hubs/orders`, `/hubs/operations`, `/hubs/management-dashboard` | JWT + scoped group-join authorization | `repo_truth_map.md` §6; `functional_inventory.md` SignalR section |
 | Health/info probes | `/health...`, `/info` | Public probe | `repo_truth_map.md` §6 |
 
@@ -281,7 +283,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Main Flow**: 1) List/view filtered by search/status and scope. 2) Update profile/auth-method toggles (requires an existing password before enabling local login; clears `GoogleSubjectId` when `GoogleEmail` changes). 3) Disable sets `Disabled` and revokes sessions.
 - **Alternative/Exception Flow**: None material.
 - **Related**: `IDN-18`, `IDN-19`, `IDN-20`, `IDN-21`.
-- **Evidence**: `functional_inventory.md` IDN-18–IDN-21.
+- **Evidence**: `functional_inventory.md` IDN-18, IDN-19, IDN-20, IDN-21.
 - **Status**: Supported.
 
 #### FR-012 — Admin Set/Reset Account Password
@@ -329,7 +331,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Status**: Supported.
 
 #### FR-016 — Enforce Scoped RBAC on Management Endpoints
-- **Description**: The system shall enforce scoped RBAC (role + matching organization/store/kiosk scope from the same `AccountRole`) on every management endpoint.
+- **Description**: The system shall enforce scoped RBAC (role + matching organization/store/kiosk scope from the same `AccountRole`) on management endpoints decorated with an authorization policy.
 - **Actor**: System (cross-cutting).
 - **Trigger**: Any request to a `[Authorize(Policy=...)]`-decorated endpoint.
 - **Preconditions**: Caller presents a JWT with role + `role_scope` claims.
@@ -337,7 +339,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Alternative/Exception Flow**: Return 401 (unauthenticated) or 403 (authenticated but out-of-scope/role); reject cross-scope composition (e.g., a role valid for one org combined with a different org's resource).
 - **Related**: `IDN-28`.
 - **Evidence**: `functional_inventory.md` IDN-28.
-- **Status**: Supported.
+- **Status**: Supported for the endpoints cited throughout §4 (each was read against its declared policy). `[Open Question]` Whether this holds for *every* management REST action, GraphQL resolver, and SignalR hub method — including any not individually cited in `functional_inventory.md` — was not established by an exhaustive authorization-coverage audit; treat the universal form of this requirement as unverified until such an audit is performed.
 
 ### 4.2 Tenants
 
@@ -348,8 +350,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Unique uppercase `Code` (create); organization not soft-deleted (update).
 - **Main Flow**: 1) Create with unique code. 2) SystemAdmin views/updates all fields; OrgAdmin views/updates only Name/Email/Phone/Address for their assigned organization. 3) SystemAdmin-only activate/disable.
 - **Alternative/Exception Flow**: Reject updates to a soft-deleted organization.
-- **Related**: `TEN-01`–`TEN-04`.
-- **Evidence**: `functional_inventory.md` TEN-01–TEN-04.
+- **Related**: `TEN-01`, `TEN-02`, `TEN-03`, `TEN-04`.
+- **Evidence**: `functional_inventory.md` TEN-01, TEN-02, TEN-03, TEN-04.
 - **Status**: Supported.
 
 #### FR-018 — Store Lifecycle and Sales-Pause Management
@@ -359,8 +361,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Parent organization active (create, activate); store active (pause).
 - **Main Flow**: 1) Create store with unique code within organization, validated opening-hours/time zone. 2) Update details (`Code` immutable; time-zone change requires sales-paused state first). 3) Pause requires a reason and optional auto-resume time, without cancelling existing orders; resume clears pause state immediately.
 - **Alternative/Exception Flow**: Disabling a store does not cascade-disable its kiosks.
-- **Related**: `TEN-05`–`TEN-10`.
-- **Evidence**: `functional_inventory.md` TEN-05–TEN-10.
+- **Related**: `TEN-05`, `TEN-06`, `TEN-07`, `TEN-08`, `TEN-09`, `TEN-10`.
+- **Evidence**: `functional_inventory.md` TEN-05, TEN-06, TEN-07, TEN-08, TEN-09, TEN-10.
 - **Status**: Supported.
 
 #### FR-019 — Kiosk Lifecycle, Details, and Operational State
@@ -370,8 +372,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Parent store/organization active (create, or set `Active` lifecycle status).
 - **Main Flow**: 1) Create in `Provisioning` status, code unique across organization, inheriting `OrganizationId`. 2) Update details keeping `Code`/`StoreId`/`OrganizationId` immutable. 3) Change lifecycle status (`Provisioning`/`Active`/`Disabled`/`Retired`), publishing `KioskStatusChanged`. 4) Change operational state (`Operational`/`PausedByOperator`/`Maintenance`/`Cleaning`/`Restocking`/`EmergencyStopRequested`/`OutOfService`) independently, with a required audit reason.
 - **Alternative/Exception Flow**: Reject `Maintenance`/`Cleaning`/`Restocking` while an execution is running.
-- **Related**: `TEN-11`–`TEN-15`.
-- **Evidence**: `functional_inventory.md` TEN-11–TEN-15.
+- **Related**: `TEN-11`, `TEN-12`, `TEN-13`, `TEN-14`, `TEN-15`.
+- **Evidence**: `functional_inventory.md` TEN-11, TEN-12, TEN-13, TEN-14, TEN-15.
 - **Status**: Supported.
 
 #### FR-020 — Franchise Onboarding Workflow
@@ -381,8 +383,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: `Idempotency-Key` header supplied for start; only Pending/Failed onboardings may be cancelled.
 - **Main Flow**: 1) Start with idempotency key, store/kiosk requests, optional package selection. 2) Progress through checkpoints, stopping deliberately at `ReadyForActivation` without auto-activating. 3) Resume from last completed checkpoint using a claim/lease to prevent concurrent runs, without recreating already-provisioned resources.
 - **Alternative/Exception Flow**: Cancel requires a reason and does not delete already-provisioned resources; Running/ReadyForActivation onboardings cannot be cancelled.
-- **Related**: `TEN-16`–`TEN-19`.
-- **Evidence**: `functional_inventory.md` TEN-16–TEN-19.
+- **Related**: `TEN-16`, `TEN-17`, `TEN-18`, `TEN-19`.
+- **Evidence**: `functional_inventory.md` TEN-16, TEN-17, TEN-18, TEN-19.
 - **Status**: Supported.
 
 #### FR-021 — Role Scope Options Lookup and Tenant Tree Navigation
@@ -405,8 +407,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Immutable, unique type/model code; models only under an active DeviceType.
 - **Main Flow**: 1) Author type with capability/active flag. 2) Author model with capability list. 3) Any authenticated device-management user reads without tenant scope.
 - **Alternative/Exception Flow**: Block retiring a model still assigned to any non-retired device.
-- **Related**: `DEV-01`–`DEV-03`.
-- **Evidence**: `functional_inventory.md` DEV-01–DEV-03.
+- **Related**: `DEV-01`, `DEV-02`, `DEV-03`.
+- **Evidence**: `functional_inventory.md` DEV-01, DEV-02, DEV-03.
 - **Status**: Supported.
 
 #### FR-023 — Device Registration, Update, Status, and Retirement
@@ -416,8 +418,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Active, compatible DeviceType/DeviceModel; kiosk-unique code and globally unique serial number.
 - **Main Flow**: 1) Register in `Provisioning` status. 2) List/view scoped to caller's assignment. 3) Update details re-validating type/model/serial. 4) Change status among non-terminal states. 5) Retire (soft-delete), atomically retiring active dispenser topology states.
 - **Alternative/Exception Flow**: `Retired` status must use the dedicated retire endpoint, not the status-change endpoint; retire is blocked while the owning kiosk has an Accepted/Running execution.
-- **Related**: `DEV-04`–`DEV-08`.
-- **Evidence**: `functional_inventory.md` DEV-04–DEV-08.
+- **Related**: `DEV-04`, `DEV-05`, `DEV-06`, `DEV-07`, `DEV-08`.
+- **Evidence**: `functional_inventory.md` DEV-04, DEV-05, DEV-06, DEV-07, DEV-08.
 - **Status**: Supported.
 
 #### FR-024 — Device Replacement (Hardware Swap)
@@ -438,8 +440,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Kiosk-unique endpoint code; endpoint Provisioning/Disabled for target replacement; at least one supported robot target and a unique profile identity before activation.
 - **Main Flow**: 1) Create in `Provisioning`, binding Full Edge to mTLS or Low-Cost Controller to signed-command auth. 2) Replace supported robot target set. 3) Provision credential (fingerprint or ECDSA public key) and activate. 4) Manage Active↔Disabled↔Retired lifecycle. 5) Rotate credential, revoking the previous binding.
 - **Alternative/Exception Flow**: Retirement requires the MQTT credential to already be revoked; activation is blocked without a valid credential/profile identity.
-- **Related**: `DEV-10`–`DEV-14`, `DEV-17`.
-- **Evidence**: `functional_inventory.md` DEV-10–DEV-14, DEV-17.
+- **Related**: `DEV-10`, `DEV-11`, `DEV-12`, `DEV-13`, `DEV-14`, `DEV-17`.
+- **Evidence**: `functional_inventory.md` DEV-10, DEV-11, DEV-12, DEV-13, DEV-14, DEV-17.
 - **Status**: Supported.
 
 #### FR-026 — MQTT Subscriber Credential Lifecycle and Reconciliation
@@ -515,8 +517,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Caller holds `operations.view` policy.
 - **Main Flow**: 1) Aggregate kiosk state for dashboards. 2) Return paged, curated heartbeat/event history without raw payload by default.
 - **Alternative/Exception Flow**: None material.
-- **Related**: `DEV-23`–`DEV-25`.
-- **Evidence**: `functional_inventory.md` DEV-23–DEV-25.
+- **Related**: `DEV-23`, `DEV-24`, `DEV-25`.
+- **Evidence**: `functional_inventory.md` DEV-23, DEV-24, DEV-25.
 - **Status**: Supported.
 
 ### 4.4 Catalog
@@ -528,8 +530,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Unique code (create).
 - **Main Flow**: 1) Create/update with unique code. 2) Toggle `IsActive` idempotently. 3) Delete only if unreferenced by any recipe or inventory data.
 - **Alternative/Exception Flow**: Reject deletion (409) if referenced.
-- **Related**: `CAT-01`–`CAT-04`.
-- **Evidence**: `functional_inventory.md` CAT-01–CAT-04.
+- **Related**: `CAT-01`, `CAT-02`, `CAT-03`, `CAT-04`.
+- **Evidence**: `functional_inventory.md` CAT-01, CAT-02, CAT-03, CAT-04.
 - **Status**: Supported.
 
 #### FR-034 — Product Category Authoring and Lifecycle
@@ -561,8 +563,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Tenant scope is global XOR org/store/kiosk-consistent.
 - **Main Flow**: 1) Create/update with scope validation. 2) Toggle `IsAvailable` independent of lifecycle scope validation. 3) Delete only if not referenced by a non-deleted MenuItem, cascading soft-delete to variants under a mutation lock.
 - **Alternative/Exception Flow**: Reject deletion (409) if referenced by a MenuItem.
-- **Related**: `CAT-07`–`CAT-09`.
-- **Evidence**: `functional_inventory.md` CAT-07–CAT-09.
+- **Related**: `CAT-07`, `CAT-08`, `CAT-09`.
+- **Evidence**: `functional_inventory.md` CAT-07, CAT-08, CAT-09.
 - **Status**: Supported.
 
 #### FR-037 — Clone Product From Global Template
@@ -616,8 +618,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: At most one active/non-retired default recipe per variant; ≥1 required ingredient to publish; item replacement only while Draft; versioning only from a Published/Active/Retired source.
 - **Main Flow**: 1) Create Draft recipe. 2) Replace 1–100 validated recipe items. 3) Transition status per lifecycle rules. 4) Create a new Draft version copying items from a non-Draft source.
 - **Alternative/Exception Flow**: Recipes are retired, not deleted — there is no dedicated delete endpoint.
-- **Related**: `CAT-15`–`CAT-19`.
-- **Evidence**: `functional_inventory.md` CAT-15–CAT-19.
+- **Related**: `CAT-15`, `CAT-16`, `CAT-17`, `CAT-18`, `CAT-19`.
+- **Evidence**: `functional_inventory.md` CAT-15, CAT-16, CAT-17, CAT-18, CAT-19.
 - **Status**: Supported.
 
 ### 4.5 Sales Catalog
@@ -629,8 +631,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Validated tenant scope, code uniqueness, effective window.
 - **Main Flow**: 1) Create/update with scope validation. 2) On activation, re-validate every currently Active MenuItem's authoring preflight (product/variant/recipe ownership, currency match, option satisfiability), rejecting (409) if any fails. 3) Soft-delete cascades to items.
 - **Alternative/Exception Flow**: Reject activation if any active item fails preflight.
-- **Related**: `SC-01`–`SC-03`.
-- **Evidence**: `functional_inventory.md` SC-01–SC-03.
+- **Related**: `SC-01`, `SC-02`, `SC-03`.
+- **Evidence**: `functional_inventory.md` SC-01, SC-02, SC-03.
 - **Status**: Supported.
 
 #### FR-043 — Menu Item Authoring, Status Lifecycle, and Deletion
@@ -640,8 +642,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Referenced variant/options belong to the same product; distributed mutation lock on Menu+Product.
 - **Main Flow**: 1) Add/update item under lock. 2) Activation preflight: product/variant existence and currency match, machine-produced variants require a Published/Active recipe with only active ingredients, option groups statically satisfiable. 3) Soft-delete preserving historical order references.
 - **Alternative/Exception Flow**: Reject activation (409) on preflight failure.
-- **Related**: `SC-04`–`SC-06`.
-- **Evidence**: `functional_inventory.md` SC-04–SC-06.
+- **Related**: `SC-04`, `SC-05`, `SC-06`.
+- **Evidence**: `functional_inventory.md` SC-04, SC-05, SC-06.
 - **Status**: Supported.
 
 #### FR-044 — Menu / Menu Item List and Detail Read
@@ -752,8 +754,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Caller holds `inventory.view`.
 - **Main Flow**: 1) Topology view flags inactive devices/containers/ingredients. 2) Rebind history returns full audited disposition/transfer detail. 3) Unified timeline merges stock movements, topology changes, and rebinds, resolving human actors where available.
 - **Alternative/Exception Flow**: None material.
-- **Related**: `INV-09`–`INV-11`.
-- **Evidence**: `functional_inventory.md` INV-09–INV-11.
+- **Related**: `INV-09`, `INV-10`, `INV-11`.
+- **Evidence**: `functional_inventory.md` INV-09, INV-10, INV-11.
 - **Status**: Supported.
 
 #### FR-054 — Dispenser/Stock-Movement Listing and Inventory Summary Rollup
@@ -853,8 +855,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: `Fail` requires a reason.
 - **Main Flow**: 1) Record event idempotently by `FulfillmentEventId`. 2) Aggregate order status.
 - **Alternative/Exception Flow**: Duplicate event ids are no-ops (idempotent).
-- **Related**: `ORD-08`–`ORD-10`.
-- **Evidence**: `functional_inventory.md` ORD-08–ORD-10.
+- **Related**: `ORD-08`, `ORD-09`, `ORD-10`.
+- **Evidence**: `functional_inventory.md` ORD-08, ORD-09, ORD-10.
 - **Status**: Supported.
 
 #### FR-063 — Execution-Attempt Diagnostics
@@ -875,8 +877,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Caller holds `orders.view` and tenant scope.
 - **Main Flow**: 1) Query with filters (search/status/paymentStatus/org/store/kiosk). 2) Return scoped results.
 - **Alternative/Exception Flow**: `fulfillmentQueue` and `orderItemStatusHistory` are implemented but not mentioned in `docs/flows/MANAGEMENT_READ_FLOW.md`.
-- **Related**: `ORD-12`–`ORD-18`.
-- **Evidence**: `functional_inventory.md` ORD-12–ORD-18.
+- **Related**: `ORD-12`, `ORD-13`, `ORD-14`, `ORD-15`, `ORD-16`, `ORD-17`, `ORD-18`.
+- **Evidence**: `functional_inventory.md` ORD-12, ORD-13, ORD-14, ORD-15, ORD-16, ORD-17, ORD-18.
 - **Status**: Supported.
 
 #### FR-065 — Automatic Overdue-Fulfillment Reminder
@@ -897,8 +899,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Inspection outcome must be recorded before resolution selection.
 - **Main Flow**: 1) Open incident. 2) Record inspection outcome. 3) Select resolution (idempotently), cross-invoking remake dispatch (FR-061) or refund flows (FR-076) as needed. 4) Close with audit notes.
 - **Alternative/Exception Flow**: Resolution selection is rejected until inspection is recorded.
-- **Related**: `ORD-20`–`ORD-24`.
-- **Evidence**: `functional_inventory.md` ORD-20–ORD-24.
+- **Related**: `ORD-20`, `ORD-21`, `ORD-22`, `ORD-23`, `ORD-24`.
+- **Evidence**: `functional_inventory.md` ORD-20, ORD-21, ORD-22, ORD-23, ORD-24.
 - **Status**: Supported.
 
 #### FR-067 — Real-Time Order/Fulfillment/Execution Notifications
@@ -1020,8 +1022,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Reject requires a reason; mark-processed/cancel apply only to non-terminal refunds.
 - **Main Flow**: 1) Apply the requested transition. 2) Update order/payment status accordingly, including duplicate-payment resolution on mark-processed.
 - **Alternative/Exception Flow**: Rejecting leaves the order RefundRequired.
-- **Related**: `PAY-12`–`PAY-14`.
-- **Evidence**: `functional_inventory.md` PAY-12–PAY-14.
+- **Related**: `PAY-12`, `PAY-13`, `PAY-14`.
+- **Evidence**: `functional_inventory.md` PAY-12, PAY-13, PAY-14.
 - **Status**: Supported.
 
 #### FR-078 — Real-Time Payment Notifications and Intervention Push
@@ -1044,8 +1046,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Alert Open (acknowledge/resolve).
 - **Main Flow**: 1) List/view ordered by latest occurrence. 2) Acknowledge recording actor/timestamp. 3) Resolve with mandatory resolution notes, terminating the lifecycle.
 - **Alternative/Exception Flow**: None material.
-- **Related**: `OPS-01`–`OPS-03`.
-- **Evidence**: `functional_inventory.md` OPS-01–OPS-03.
+- **Related**: `OPS-01`, `OPS-02`, `OPS-03`.
+- **Evidence**: `functional_inventory.md` OPS-01, OPS-02, OPS-03.
 - **Status**: Supported.
 
 #### FR-080 — Automatic Alert Creation and Correlation
@@ -1055,8 +1057,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Event severity within Error/Critical, or inventory/credential state crosses a threshold.
 - **Main Flow**: 1) Create or correlate one Open alert per source/threshold. 2) Raise/resolve `INVENTORY_LOW`/`INVENTORY_EMPTY` or `MQTT_CREDENTIAL_*` alerts as state changes.
 - **Alternative/Exception Flow**: Maintains exactly one active alert per threshold rather than duplicating.
-- **Related**: `OPS-04`–`OPS-06`.
-- **Evidence**: `functional_inventory.md` OPS-04–OPS-06.
+- **Related**: `OPS-04`, `OPS-05`, `OPS-06`.
+- **Evidence**: `functional_inventory.md` OPS-04, OPS-05, OPS-06.
 - **Status**: Supported.
 
 #### FR-081 — Critical Alert Push Notification
@@ -1077,8 +1079,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Caller holds `maintenance.create`/`.view`/`.manage`.
 - **Main Flow**: 1) Create with generated ticket number. 2) List/view filtered by tenant/priority/status/assignee/date. 3) Edit fields and evidence links.
 - **Alternative/Exception Flow**: None material.
-- **Related**: `OPS-08`–`OPS-10`.
-- **Evidence**: `functional_inventory.md` OPS-08–OPS-10.
+- **Related**: `OPS-08`, `OPS-09`, `OPS-10`.
+- **Evidence**: `functional_inventory.md` OPS-08, OPS-09, OPS-10.
 - **Status**: Supported.
 
 #### FR-083 — Maintenance Ticket Work Lifecycle
@@ -1088,8 +1090,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Ticket in the appropriate prior state (Open→Assigned→InProgress→Resolved→Closed; Cancel from Open/Assigned/InProgress).
 - **Main Flow**: 1) Assign to an eligible Technician/Manager/OrgAdmin in scope. 2) Start work, applying kiosk state change if required. 3) Resolve with mandatory notes. 4) Close. 5) Or cancel with a mandatory reason.
 - **Alternative/Exception Flow**: None material beyond state-machine enforcement.
-- **Related**: `OPS-11`–`OPS-15`.
-- **Evidence**: `functional_inventory.md` OPS-11–OPS-15.
+- **Related**: `OPS-11`, `OPS-12`, `OPS-13`, `OPS-14`, `OPS-15`.
+- **Evidence**: `functional_inventory.md` OPS-11, OPS-12, OPS-13, OPS-14, OPS-15.
 - **Status**: Supported.
 
 #### FR-084 — Automatic Maintenance Ticket from Inventory-Empty Alert
@@ -1121,8 +1123,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Requeue applies only to permanently-failed deliveries and requires a reason (3–500 chars).
 - **Main Flow**: 1) List/view outbox status/attempts/errors. 2) Requeue without repeating the source business transition. 3) Job claims and attempts due deliveries up to a max-attempt limit.
 - **Alternative/Exception Flow**: None material.
-- **Related**: `OPS-19`–`OPS-21`.
-- **Evidence**: `functional_inventory.md` OPS-19–OPS-21.
+- **Related**: `OPS-19`, `OPS-20`, `OPS-21`.
+- **Evidence**: `functional_inventory.md` OPS-19, OPS-20, OPS-21.
 - **Status**: Supported.
 
 #### FR-087 — Real-Time Operations Notifications
@@ -1256,7 +1258,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Main Flow**: 1) Upload and stage bundle. 2) Validate structure/checksum/RunOrder/existing-identity conflicts. 3) Materialize into Draft resources in one serialized metadata transaction. 4) Discard if abandoned before Materialized, best-effort deleting staged bundle.
 - **Alternative/Exception Flow**: Validation returns `CanMaterialize=false` with errors/warnings rather than blocking silently.
 - **Related**: `RC-11`, `RC-12`, `RC-13`, `RC-14`.
-- **Evidence**: `functional_inventory.md` RC-11–RC-14.
+- **Evidence**: `functional_inventory.md` RC-11, RC-12, RC-13, RC-14.
 - **Status**: Supported.
 
 #### FR-099 — Preview/Confirm Semantic Composition and Publish Import Resources
@@ -1291,6 +1293,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Related**: `RC-19`.
 - **Evidence**: `functional_inventory.md` RC-19.
 - **Status**: Supported.
+
+`[Inferred]` — `RC-20` ("Apply"→"Materialize" import terminology) is a naming/documentation note in `functional_inventory.md`, not a distinct functional capability: it records that the public API surface for FR-098's materialize step uses "materialize" terminology while the persisted enum value is internally still named `Applied`. It is called out here explicitly so it is not mistaken for an uncovered gap. Evidence: `functional_inventory.md` RC-20.
 
 ### 4.11 Production Configuration
 
@@ -1479,8 +1483,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Preconditions**: Cutover requires all frozen endpoints Active on successor; rollback dispatches up to 3 attempts/endpoint; abandon requires ReadyForReview/Failed state and no still-referenced successor resources.
 - **Main Flow**: 1) List/detail upgrades. 2) Cutover reassigns canonical product codes, rebinds menu items, supersedes source installation transactionally. 3) Rollback dispatches then restores. 4) Abandon soft-deletes successor roots preserving audit provenance.
 - **Alternative/Exception Flow**: Abandon is rejected if successor resources are still referenced.
-- **Related**: `PP-12`–`PP-15`.
-- **Evidence**: `functional_inventory.md` PP-12–PP-15.
+- **Related**: `PP-12`, `PP-13`, `PP-14`, `PP-15`.
+- **Evidence**: `functional_inventory.md` PP-12, PP-13, PP-14, PP-15.
 - **Status**: Supported.
 
 #### FR-119 — Stale Upgrade Reconciliation
@@ -1496,7 +1500,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 
 ### 4.13 IoT REST and MQTT Edge Contract
 
-Device event ingestion, batch telemetry, heartbeat, and readiness ingestion (`IOT-01`–`IOT-04`) are the same capabilities as FR-028, FR-029, FR-027, and FR-030 respectively (§4.3), reachable identically over REST or MQTT (see FR-141); they are not repeated here.
+Device event ingestion (`IOT-01`), batch telemetry (`IOT-02`), heartbeat (`IOT-03`), and readiness ingestion (`IOT-04`) are the same capabilities as FR-028, FR-029, FR-027, and FR-030 respectively (§4.3), reachable identically over REST or MQTT (see FR-126); they are not repeated here.
 
 #### FR-120 — Edge Command Pull (Dispatch Delivery)
 - **Description**: The system shall let an authenticated, active execution endpoint pull up to N pending commands, enrich artifact payloads with short-lived URLs, and record a delivery attempt.
@@ -1595,8 +1599,8 @@ Device event ingestion, batch telemetry, heartbeat, and readiness ingestion (`IO
 - **Preconditions**: Caller has scoped access to the target order/kiosk/dashboard scope.
 - **Main Flow**: 1) Verify access. 2) Add/remove connection to/from the group.
 - **Alternative/Exception Flow**: Throw `HubException` if unauthorized.
-- **Related**: `SIG-01`–`SIG-03`.
-- **Evidence**: `functional_inventory.md` SIG-01–SIG-03.
+- **Related**: `SIG-01`, `SIG-02`, `SIG-03`.
+- **Evidence**: `functional_inventory.md` SIG-01, SIG-02, SIG-03.
 - **Status**: Supported.
 
 Note: the realtime push events themselves (`SIG-04` order/payment, `SIG-05` kiosk/operations, `SIG-06` dashboard invalidation) are already specified per-domain at FR-067 (orders), FR-078 (payments), FR-087 (operations), and FR-130 (dashboard) — not repeated here to avoid duplication.
@@ -1643,8 +1647,8 @@ Note: the realtime push events themselves (`SIG-04` order/payment, `SIG-05` kios
 - **Preconditions**: Retry is scoped to `ExecutionReport.*` event types only.
 - **Main Flow**: 1) List/inspect. 2) Retry replays via `IngestExecutionReportCommandHandler` (FR-122); success resolves the dead letter. 3) Resolve/ignore mark terminal status with audit note.
 - **Alternative/Exception Flow**: Retry returns 422 for non-`ExecutionReport.*` event types — production-event/state-summary dead letters have no automated replay path and must be resolved/ignored manually instead.
-- **Related**: `SYNC-04`–`SYNC-07`.
-- **Evidence**: `functional_inventory.md` SYNC-04–SYNC-07.
+- **Related**: `SYNC-04`, `SYNC-05`, `SYNC-06`, `SYNC-07`.
+- **Evidence**: `functional_inventory.md` SYNC-04, SYNC-05, SYNC-06, SYNC-07.
 - **Status**: Supported (SYNC-04, SYNC-06, SYNC-07); Partial (SYNC-05, retry scope limitation).
 
 ### 4.16 Dashboard
@@ -1671,19 +1675,21 @@ Write endpoints that can be safely retried (order placement, payment session cre
 The system shall tolerate temporary Edge/Cloud disconnection by queuing durable commands (`EdgeCommand`), retrying delivery, and dead-lettering unresolvable sync events rather than requiring continuous connectivity. Evidence: `repo_truth_map.md` §2, §8; `functional_inventory.md` Sync section. Status: Supported.
 
 #### NFR-003 — Automated Reconciliation of Stuck Workflows
-Background jobs shall detect and recover from missed order dispatch, stale kiosk connectivity, stuck configuration deployments/package upgrades, and stalled payment sessions, without requiring manual intervention in the common case. Evidence: `functional_inventory.md` SYNC-01, SYNC-02, DEV-22, PC-11, PP-16, PAY-07. Status: Supported.
+Background jobs shall periodically scan for and act on missed order dispatch, stale kiosk connectivity, stuck configuration deployments/package upgrades, and stalled payment sessions — each job's exact action is the specific transition it performs (e.g., mark connectivity `Unreachable`, fail a deployment with a reason code, schedule a payment retry), not a general guarantee of recovery. `[Inferred]` Several of these paths deliberately terminate in a manual-intervention or support-required state rather than resolving automatically (e.g. `PAY-16`'s intervention notification, `SYNC-02`'s `SupportRequired` observation status) — the word "recover" should be read as "detect and attempt the coded remediation," not "guarantee resolution without an operator." Evidence: `functional_inventory.md` SYNC-01, SYNC-02, DEV-22, PC-11, PP-16, PAY-07, PAY-16. Status: Supported (job existence and the specific transition each performs); Inferred (that these transitions constitute "recovery" in every case).
 
 #### NFR-004 — Restrictive Default Referential Integrity
-Foreign keys shall default to `Restrict` delete behavior to prevent accidental cascading data loss, with `Cascade` reserved for genuine parent-owns-child relationships (e.g., technical contract → declared effects, authoring import → items, production package parent → child). Evidence: `database_inventory.md` §3. Status: Supported (with an unresolved question over whether the global convention loop silently reverts explicit `Cascade` settings — see §8).
+Foreign keys shall default to `Restrict` delete behavior to prevent accidental cascading data loss. Several configuration classes additionally write an explicit `Cascade` setting for specific parent-owns-child relationships (e.g., technical contract → declared effects, authoring import → items, production package parent → child), but `database_inventory.md` §9 item 6 explicitly leaves open whether `IceBotDbContext.ConfigureEntityConventions`'s later global loop overwrites those explicit `Cascade` settings back to `Restrict` — this was not settled by static reading alone. Evidence: `database_inventory.md` §3, §9 item 6. Status: Supported (the global `Restrict` default). `[Unclear]` whether the explicit `Cascade` exceptions actually take effect at runtime — see §8.
+
+
 
 #### NFR-005 — Consistent Monetary and Quantity Precision
 All `decimal` fields (money, quantities) shall use `precision(18,4)` by a global EF Core convention, avoiding per-entity precision drift. Evidence: `database_inventory.md` §7. Status: Supported.
 
 #### NFR-006 — Auditable, Append-Only Evidence Trails
-State transitions on Orders, Payments, Alerts, Maintenance Tickets, and Operations shall be recorded in append-only history tables, and order/order-item records shall carry immutable order-time snapshots (product/recipe/price) so historical evidence is not affected by later catalog changes. Evidence: `database_inventory.md` §2, §5. Status: Supported (with one noted inconsistency: `OrderItemStatusHistory`/`ProductionIncidentHistory` lack the audit columns that `OrderStatusHistory` has — see §8).
+Order and order-item status transitions, and production-incident status transitions, shall be recorded in dedicated append-only history tables (`OrderStatusHistory`, `OrderItemStatusHistory`, `ProductionIncidentHistory`), and order/order-item records shall carry immutable order-time snapshots (product/recipe/price) so historical evidence is not affected by later catalog changes. `[Inferred]` Alerts and Maintenance Tickets do not have an equivalent dedicated per-aggregate history table in the evidence — their lifecycle is tracked via status/timestamp fields on the aggregate itself, with `OperationLog` providing a separate, general-purpose evidence trail rather than a one-to-one audit table per aggregate; this is a narrower claim than "every named aggregate has an append-only history table." Evidence: `database_inventory.md` §2, §5. Status: Supported (Orders/OrderItem/ProductionIncident history tables; order-time snapshots); Inferred (that Alerts/Maintenance Tickets/Operations are covered by the same uniform pattern). One noted inconsistency: `OrderItemStatusHistory`/`ProductionIncidentHistory` lack the audit columns that `OrderStatusHistory` has — see §8.
 
 #### NFR-007 — Scoped Role-Based Access Control
-Every management endpoint shall enforce a JWT-carried role plus matching organization/store/kiosk scope (from the same `AccountRole`) before allowing access, rejecting cross-scope composition. Evidence: `functional_inventory.md` IDN-28. Status: Supported.
+Management endpoints decorated with an authorization policy shall enforce a JWT-carried role plus matching organization/store/kiosk scope (from the same `AccountRole`) before allowing access, rejecting cross-scope composition. Evidence: `functional_inventory.md` IDN-28. Status: Supported for the specific endpoints cited in §4 (see FR-016). `[Open Question]` Whether every management endpoint, GraphQL resolver, and SignalR hub method enforces this without exception was not established by an exhaustive audit.
 
 #### NFR-008 — Endpoint-Level Transport Authentication for Edge Traffic
 IoT/Edge REST and MQTT traffic shall authenticate per execution-endpoint profile — mutual TLS with certificate-fingerprint pinning for Full Edge, or ECDSA P-256 signed requests with nonce deduplication for Low-Cost Controllers — with credentials provisioned/rotated/revoked explicitly and MQTT broker passwords never persisted (returned once at generation time only). Evidence: `repo_truth_map.md` §3, §8; `functional_inventory.md` DEV-10–DEV-15, MQTT-04. Status: Supported.
@@ -1707,10 +1713,10 @@ The kiosk runtime-menu projection shall be cacheable for a short, bounded interv
 Scheduled data-retention deletions (heartbeats, device events, operation logs, processed sync inbox rows, expired identity credentials, notification deliveries) shall run in bounded batches (`BatchSize=1000`, `MaxBatchesPerRun=20`) rather than a single unbounded delete, to limit lock/transaction duration. Evidence: `database_inventory.md` §7. Status: Supported.
 
 #### NFR-015 — Modular Monolith Boundary Discipline
-The system shall preserve bounded-context separation (no direct cross-context domain dependency outside documented, intentional references) to allow independent evolution of business areas without requiring a distributed microservice topology. Evidence: `repo_truth_map.md` §2, §4. Status: Supported.
+The system shall preserve bounded-context separation (no direct cross-context domain dependency outside documented, intentional references). Evidence: `repo_truth_map.md` §2, §4. Status: Supported (the boundary structure itself). `[Inferred rationale]` That this boundary discipline "allows independent evolution of business areas without requiring a distributed microservice topology" is the architectural rationale documented in `ARCHITECTURE.md`/`repo_truth_map.md`, not an outcome independently verified by observing actual independent-evolution events (e.g. a context being extracted or changed without touching others).
 
 #### NFR-016 — Horizontally Shareable MQTT Uplink Consumption
-MQTT uplink message consumption shall use shared-subscription topic groups (`$share/{group}/...`) so multiple consumer instances can share the uplink load without duplicate processing. Evidence: `functional_inventory.md` MQTT-02. Status: Supported.
+MQTT uplink message consumption shall use shared-subscription topic groups (`$share/{group}/...`) so a message is delivered to only one member of the consumer group at the broker level. Evidence: `functional_inventory.md` MQTT-02. Status: Supported (the shared-subscription topic configuration). `[Inferred]` Broker-level load-sharing reduces duplicate *delivery* across consumer instances; it does not by itself prove "no duplicate processing" end-to-end — that additionally depends on the per-message idempotency/deduplication each handler performs (see FR-027–FR-030, FR-122, FR-124), which is a separate, already-cited mechanism.
 
 #### NFR-017 — Indexed High-Volume/Time-Series Tables
 High-volume, time-ordered tables (`KioskHeartbeats`, `DeviceEvents`, `OperationLogs`, `SyncEventInbox`, `SyncDeadLetters`) shall carry dedicated time-based indexes to support efficient range scans as data grows. Evidence: `database_inventory.md` §4. Status: Supported, with one known gap — `EdgeCommandDeliveryAttempts` lacks its documented `SentAt`-bearing time index (see §8).
@@ -1722,16 +1728,16 @@ The codebase shall preserve the `WebAPI → Infrastructure → Application → D
 EF Core global conventions (string length defaults, JSON column mapping by `*Json` naming convention, GUID vs. identity key generation strategy per base entity type) shall apply uniformly to reduce per-entity configuration drift and reviewer surprise. Evidence: `database_inventory.md` §5, §7. Status: Supported.
 
 #### NFR-020 — Separated Operational and Diagnostic Visibility
-Curated operational read APIs (no raw payload) shall be distinct from diagnostics-scoped reads (raw payload, retries, provenance), gated by a dedicated `operations.diagnostics`-class policy, so ordinary staff visibility does not require exposing raw evidence. Evidence: `functional_inventory.md` OPS-17/18, PAY-06, ORD-11. Status: Supported.
+For the endpoints cited below, curated operational read APIs (no raw payload) are distinct from diagnostics-scoped reads (raw payload, retries, provenance), gated by a dedicated `operations.diagnostics`-class policy. Evidence: `functional_inventory.md` OPS-17, OPS-18, PAY-06, ORD-11. Status: Supported for these cited endpoints. `[Open Question]` Whether this curated/diagnostics separation is applied consistently and completely across *every* raw-payload or provenance-bearing surface in the system (not just the ones directly cited) was not established by an exhaustive audit.
 
 #### NFR-021 — Periodic Operational Metrics Publication
 The system shall periodically publish counts of stale/unreachable in-flight executions as operational metrics for external monitoring. Evidence: `functional_inventory.md` SYNC-03. Status: Supported.
 
 #### NFR-022 — External Storage for Large Binary Artifacts
-Robot artifact binaries (`.lua` files) shall be stored in an S3-compatible object store (MinIO), not the relational database, keeping the primary database lean and allowing independent scaling/backup of binary content. Evidence: `database_inventory.md` §7. Status: Supported.
+Robot artifact binaries (`.lua` files) shall be stored in an S3-compatible object store (MinIO), not the relational database. Evidence: `database_inventory.md` §7. Status: Supported (the storage split itself). `[Inferred rationale]` "Keeping the primary database lean" and "allowing independent scaling/backup of binary content" are the architectural rationale for this split, not independently measured/observed benefits (e.g. no backup-procedure or scaling-test evidence was found).
 
 #### NFR-023 — Structural Tenant-Consistency Enforcement
-Composite foreign keys (e.g., `(KioskId, OrganizationId)`, `(TargetExecutionEndpointId, KioskId)`) shall make cross-tenant row persistence structurally invalid for the relationships they cover, even though reads are not filtered by a blanket EF Core tenant query filter. Evidence: `database_inventory.md` §3, §6. Status: Supported (reads rely on application-layer scoping, not a global filter — flagged as a design choice, not a gap, in `database_inventory.md` §6).
+For the specific relationships enumerated in `database_inventory.md` §3 (e.g. `DeviceEvent → Device` via `(DeviceId, KioskId)`, `EdgeCommand → KioskExecutionEndpoint` via `(TargetExecutionEndpointId, KioskId)`, `KioskConfigurationDeployment → ConfigurationRelease` via `(ConfigurationReleaseId, OrganizationId)`), composite foreign keys make cross-tenant row persistence structurally invalid for *those* relationships. This is an enumerated set of examples, not a claim that every cross-context or cross-tenant reference in the schema is covered by an equivalent composite-FK guard — relationships not listed in `database_inventory.md` §3 are not asserted to have this protection. Reads are not filtered by a blanket EF Core tenant query filter in any case (a design choice, not a gap, per `database_inventory.md` §6); tenant scoping for reads relies on application-layer handlers. Evidence: `database_inventory.md` §3, §6. Status: Supported for the enumerated relationships; `[Unclear]` whether an equivalent guarantee holds for cross-tenant references not covered by an enumerated composite FK.
 
 #### NFR-024 — Distributed Job Coordination via Advisory Locks
 Singleton/distributed background jobs (e.g., robot-artifact orphan cleanup) shall use PostgreSQL advisory locks to prevent duplicate concurrent runs across multiple service instances. Evidence: `database_inventory.md` §7. Status: Supported.
@@ -1746,10 +1752,12 @@ The system does not currently implement PostgreSQL native table partitioning for
 Full entity-level detail lives in `deliverables/00_repo_evidence/database_inventory.md`; this section summarizes it for SRS purposes.
 
 ### 6.1 Persistence Platform
-PostgreSQL 17 via Npgsql/EF Core (`IceBotDbContext`), database `IceBotDB`. As of the evidence snapshot: ~130 `DbSet<T>` properties, ~99 tables created across 5 migrations (`InitialCreate`, `CatchUpProductionPackageAndExecutionWorkflows`, `CompleteLocalOperationalWorkflows`, `CompleteLocalOperationalChanges`, `AddProductionIncidents`). Evidence: `database_inventory.md` §1, §7.
+PostgreSQL 17 via Npgsql/EF Core (`IceBotDbContext`), database `IceBotDB`, per current configuration (`[Assumption]` current deployment default, not necessarily a binding version requirement). `IceBotDbContext.cs` (`src/Infrastructure/Data/IceBotDbContext.cs:109-214`) exposes **98** `DbSet<T>` properties — verified by direct count against the source file, correcting `database_inventory.md`'s own stated "~130" (see §8). At least 99 tables have been created cumulatively across 5 migrations (`InitialCreate`, `CatchUpProductionPackageAndExecutionWorkflows`, `CompleteLocalOperationalWorkflows`, `CompleteLocalOperationalChanges`, `AddProductionIncidents`) — this is a sum of `CreateTable` calls across migration history, not an independently re-verified current-schema table count from the model snapshot; treat it as a lower bound. Evidence: `database_inventory.md` §1, §7; `src/Infrastructure/Data/IceBotDbContext.cs:109-214`.
 
 ### 6.2 Entity Groups (by bounded context)
-Tenants (Organization, Store, Kiosk, KioskOperationalStateTransition, FranchiseOnboarding); Identity (Account, AccountRole, AccountNotificationDevice, AccountInvitation, PasswordResetRequest, RefreshToken, Role, AccountStores join); Catalog (ProductCategory, Product, ProductVariant, OptionGroup, ProductOption, ProductOptionIngredientRequirement, Recipe, RecipeItem, Ingredient); Inventory (IngredientDispenserState, InventoryTopologyChangeRecord, InventoryTopologyRebindRecord, StockMovement); SalesCatalog (Menu, MenuItem, MenuItemProductOption); Orders (Order, OrderItem, OrderItemOption, OrderItemOptionIngredientRequirement, OrderStatusHistory, OrderItemStatusHistory, ProductionIncident, ProductionIncidentHistory); Payments (PaymentMethod, PaymentTransaction, PaymentCallback, Refund); Devices (DeviceType, DeviceModel, Device, DeviceEvent, KioskHeartbeat, KioskConnectivityProjection, KioskExecutionEndpoint, ExecutionEndpointCredentialBinding, ExecutionEndpointMqttCredential, ExecutionEndpointReadinessProjection, ExecutionEndpointCapabilityProjection, ExecutionEndpointRequestNonce, ExecutionEndpointSupportedRobotTarget); RobotConfiguration (RobotProgram, RobotProgramArtifact, RobotArtifact, RobotArtifactTemplate, RobotArtifactTechnicalContract, RobotArtifactDeclaredEffect, RobotArtifactOrderingConstraint, RobotAuthoringImport, RobotAuthoringImportItem); ProductionConfiguration/Execution/Packages (ConfigurationRelease, ExecutionRoute, ExecutionRouteRobotBinding, KioskConfigurationDeployment, ControllerArtifactSetDeployment(+Item), OrderExecutionRecord, ProductionExecutionRecord, plus the full ProductionPackage/Version/Definition/Installation/Materialization/Composition and Upgrade family); Operations (Alert, MaintenanceTicket, OperationLog, NotificationDelivery); Sync (SyncEventInbox, ProductionEventCheckpoint, EdgeStateSummary, SyncDeadLetter, SyncDeadLetterRetryAttempt, EdgeCommand, EdgeCommandDeliveryAttempt). Evidence: `database_inventory.md` §1.
+Per `repo_truth_map.md` §4 and `database_inventory.md` §1, Production Configuration, Production Execution, and Production Packages are three distinct bounded-context ownership concepts (configuration-time routing/binding; Cloud-side execution/audit projections; franchise packaging), grouped together below only for brevity of listing — they remain separate contexts, not one merged context.
+
+Tenants (Organization, Store, Kiosk, KioskOperationalStateTransition, FranchiseOnboarding); Identity (Account, AccountRole, AccountNotificationDevice, AccountInvitation, PasswordResetRequest, RefreshToken, Role, AccountStores join); Catalog (ProductCategory, Product, ProductVariant, OptionGroup, ProductOption, ProductOptionIngredientRequirement, Recipe, RecipeItem, Ingredient); Inventory (IngredientDispenserState, InventoryTopologyChangeRecord, InventoryTopologyRebindRecord, StockMovement); SalesCatalog (Menu, MenuItem, MenuItemProductOption); Orders (Order, OrderItem, OrderItemOption, OrderItemOptionIngredientRequirement, OrderStatusHistory, OrderItemStatusHistory, ProductionIncident, ProductionIncidentHistory); Payments (PaymentMethod, PaymentTransaction, PaymentCallback, Refund); Devices (DeviceType, DeviceModel, Device, DeviceEvent, KioskHeartbeat, KioskConnectivityProjection, KioskExecutionEndpoint, ExecutionEndpointCredentialBinding, ExecutionEndpointMqttCredential, ExecutionEndpointReadinessProjection, ExecutionEndpointCapabilityProjection, ExecutionEndpointRequestNonce, ExecutionEndpointSupportedRobotTarget); RobotConfiguration (RobotProgram, RobotProgramArtifact, RobotArtifact, RobotArtifactTemplate, RobotArtifactTechnicalContract, RobotArtifactDeclaredEffect, RobotArtifactOrderingConstraint, RobotAuthoringImport, RobotAuthoringImportItem); **Production Configuration** (ConfigurationRelease, ExecutionRoute, ExecutionRouteRobotBinding, KioskConfigurationDeployment, ControllerArtifactSetDeployment(+Item)); **Production Execution** (OrderExecutionRecord, ProductionExecutionRecord); **Production Packages** (the full ProductionPackage/Version/Definition/Installation/Materialization/Composition and Upgrade family); Operations (Alert, MaintenanceTicket, OperationLog, NotificationDelivery); Sync (SyncEventInbox, ProductionEventCheckpoint, EdgeStateSummary, SyncDeadLetter, SyncDeadLetterRetryAttempt, EdgeCommand, EdgeCommandDeliveryAttempt). Evidence: `database_inventory.md` §1.
 
 ### 6.3 Key Relationship Patterns
 - **Global delete-behavior convention**: every FK defaults to `Restrict`, with a small explicit set of `Cascade` parent-owns-child pairs (see NFR-004).
@@ -1761,19 +1769,19 @@ Tenants (Organization, Store, Kiosk, KioskOperationalStateTransition, FranchiseO
 
 ### 6.4 Constraints and Indexes
 - Soft-delete-aware uniqueness (unique only among non-deleted rows) for reusable business codes (`Organization.Code`, `Store.(OrganizationId,Code)`, `Account.UserName/Email`, `Product.(scope…,Code)`, `Device.(KioskId,Code)`/`SerialNumber`, etc.).
-- Immutable evidence/retry keys (`PaymentTransaction.TransactionNumber`, `Order.OrderNumber`, `Refund.RefundNumber`) are unique **without** a soft-delete filter, since they must remain unique forever.
-- Business-invariant partial unique indexes: at most one default `ProductOption` per group; at most one default non-retired `Recipe` per variant; at most one `Primary`-settlement `PaymentTransaction` per order; at most one Pending/Installed `KioskConfigurationDeployment` per kiosk; at most one active (non-terminal) `ProductionPackageUpgrade` per installation; at most one active `IngredientDispenserState` container binding per device slot.
+- Immutable evidence/retry keys (`PaymentTransaction.TransactionNumber`, `Order.OrderNumber`, `Refund.RefundNumber`) carry a unique index that is **not** filtered by soft-delete, i.e. they are unique across retained rows including soft-deleted ones — physical deletion or a future migration change could still free the value, so "unique forever" would overstate what the index itself guarantees.
+- Business-invariant partial unique indexes, each scoped exactly to its own filter predicate (do not generalize the "active"/"default" condition across aggregates — each entity's predicate is distinct): at most one default `ProductOption` per group (filtered `IsDefault = TRUE AND DeletedAt IS NULL`); at most one default, non-retired `Recipe` per variant (filtered `IsDefault = TRUE AND Status <> 4 AND DeletedAt IS NULL`); at most one `Primary`-settlement `PaymentTransaction` per order (filtered `SettlementDisposition = 1`); at most one Pending/Installed `KioskConfigurationDeployment` per kiosk (filtered `Status IN (1,2)`); at most one active, non-terminal `ProductionPackageUpgrade` per installation (filtered `DeletedAt IS NULL AND Status IN (0,1,2,3)`); at most one active `IngredientDispenserState` container binding per device slot (filtered `IsActive = TRUE AND DeletedAt IS NULL`).
 - Check constraints: `KioskExecutionEndpoint` profile/identity consistency; `ProductionPackageInstallation` kiosk-requires-store.
 - Evidence: `database_inventory.md` §4.
 
 ### 6.5 JSON Field Roles
-Any `string` property ending in `Json` is mapped to PostgreSQL `jsonb` by a blanket global convention. Four roles observed: (1) **source-of-truth configuration** (mutable pre-publish, versioned — e.g. `Kiosk.SettingsJson`, `RobotProgram.ProgramManifestJson`); (2) **immutable order/execution-time snapshot** (e.g. `OrderItem.RecipeSnapshotJson`, `PaymentTransaction.RawRequestJson/RawResponseJson`); (3) **append-only external evidence/debug payload** (e.g. `DeviceEvent.PayloadJson`, `SyncEventInbox.PayloadJson`); (4) **metadata / non-critical extension** (e.g. `Organization.MetadataJson`, `Product.MetadataJson`). Evidence: `database_inventory.md` §5.
+Any `string` property ending in `Json` is mapped to PostgreSQL `jsonb` by a blanket global convention (this mapping mechanism is directly observed in code). `[Inferred]` The four-role taxonomy below — (1) **source-of-truth configuration** (mutable pre-publish, versioned — e.g. `Kiosk.SettingsJson`, `RobotProgram.ProgramManifestJson`); (2) **immutable order/execution-time snapshot** (e.g. `OrderItem.RecipeSnapshotJson`, `PaymentTransaction.RawRequestJson/RawResponseJson`); (3) **append-only external evidence/debug payload** (e.g. `DeviceEvent.PayloadJson`, `SyncEventInbox.PayloadJson`); (4) **metadata / non-critical extension** (e.g. `Organization.MetadataJson`, `Product.MetadataJson`) — is an interpretive categorization cross-checked against `docs/data/JSON_FIELD_RULES.md` and field-naming conventions, not a role tag stated verbatim on each field in code. Evidence: `database_inventory.md` §5.
 
 ### 6.6 Multi-Tenancy Data Model
-Tenant root is `Organization → Store → Kiosk`, both `Store.OrganizationId` and `Kiosk.OrganizationId`/`Kiosk.StoreId` non-nullable. `TenantScopeType` enum resolution order is `Device > Kiosk > Store > Organization > Global`. Entities implementing the full override hierarchy (`Product`, `Recipe`, `Menu`, `RobotProgram`) carry a nullable Org/Store/Kiosk[/Device] tuple plus a `ScopeType` and (for Product/Recipe) a `Template*Id` lineage field. Some entities carry only a required `OrganizationId` (no override hierarchy — e.g. `ConfigurationRelease`, `RobotArtifact`). Others derive tenant ownership only by joining through a scoped owner with no duplicated `OrganizationId` column (e.g. `Alert`, `OperationLog`, `SyncEventInbox`). There is no blanket EF Core tenant query filter; scoping is enforced in application-layer handlers plus the composite-FK consistency pairs above. Evidence: `database_inventory.md` §6.
+Tenant root is `Organization → Store → Kiosk`, both `Store.OrganizationId` and `Kiosk.OrganizationId`/`Kiosk.StoreId` non-nullable. The shared `TenantScopeType` enum's resolution order `Device > Kiosk > Store > Organization > Global` is not uniformly valid for every entity that uses it: `RobotProgram` explicitly rejects `ScopeType.Global` at creation (`ValidateScope()`) despite the enum defining that value, so each entity's actually-allowed scope subset must be checked individually rather than assuming the full five-value range applies everywhere — see BR-02 and §8. Entities implementing the full override hierarchy (`Product`, `Recipe`, `Menu`, `RobotProgram`) carry a nullable Org/Store/Kiosk[/Device] tuple plus a `ScopeType` and (for Product/Recipe) a `Template*Id` lineage field. Some entities carry only a required `OrganizationId` (no override hierarchy — e.g. `ConfigurationRelease`, `RobotArtifact`). Others derive tenant ownership only by joining through a scoped owner with no duplicated `OrganizationId` column (e.g. `Alert`, `OperationLog`, `SyncEventInbox`). There is no blanket EF Core tenant query filter; scoping is enforced in application-layer handlers plus the composite-FK consistency pairs in §6.3 (which cover only the specific relationships enumerated there — see NFR-023). Evidence: `database_inventory.md` §6.
 
 ### 6.7 Physical Database Notes
-PostgreSQL 17, Npgsql provider with `EnableRetryOnFailure`. Soft delete is a global query filter except for 12 principal types with required non-deleted dependents (`Account`, `Organization`, `Store`, `Kiosk`, `Device`, `Product`, `Ingredient`, `IngredientDispenserState`, `Order`, `PaymentTransaction`, `ConfigurationRelease`, `KioskExecutionEndpoint`), which require an explicit `WhereNotDeleted()` call. Data retention defaults: `HeartbeatDays=30`, `DeviceEventDays=90`, `OperationLogDays=90`, `ProcessedSyncInboxDays=180`, `ExpiredIdentityCredentialDays=30`, `NotificationDeliveryDays=90`, deleted in bounded batches. Robot artifact binaries live in MinIO, not PostgreSQL. No native table partitioning exists yet. Evidence: `database_inventory.md` §7.
+PostgreSQL 17, Npgsql provider with `EnableRetryOnFailure`. Soft delete is a global query filter except for 12 principal types with required non-deleted dependents (`Account`, `Organization`, `Store`, `Kiosk`, `Device`, `Product`, `Ingredient`, `IngredientDispenserState`, `Order`, `PaymentTransaction`, `ConfigurationRelease`, `KioskExecutionEndpoint`), for which the codebase provides an explicit `WhereNotDeleted()` extension method that calling code is expected to use. `[Inferred]` The existence of this exception list and helper method is directly observed in code; whether every query against these 12 types actually calls `WhereNotDeleted()` where needed (i.e. full compliance with the convention) was not verified — this is a developer-responsibility convention, not an enforced/audited guarantee. Data retention defaults: `HeartbeatDays=30`, `DeviceEventDays=90`, `OperationLogDays=90`, `ProcessedSyncInboxDays=180`, `ExpiredIdentityCredentialDays=30`, `NotificationDeliveryDays=90`, deleted in bounded batches. Robot artifact binaries live in MinIO, not PostgreSQL. No native table partitioning exists yet. Evidence: `database_inventory.md` §7.
 
 ---
 
@@ -1782,17 +1790,17 @@ PostgreSQL 17, Npgsql provider with `EnableRetryOnFailure`. Soft delete is a glo
 The following cross-cutting rules recur across multiple functional requirements in §4 and are called out once here rather than repeated per FR.
 
 - **BR-01 — Role assignment hierarchy**: A caller may only assign a role to another account if the caller's own role outranks or equals the target role in the hierarchy SystemAdmin > OrgAdmin > Manager, and the requested scope must be within the caller's own allowed scope. Evidence: `functional_inventory.md` IDN-23, IDN-24.
-- **BR-02 — Tenant scope resolution order**: Where an entity supports scope override, resolution follows Device > Kiosk > Store > Organization > Global (most specific wins). Evidence: `database_inventory.md` §6.
+- **BR-02 — Tenant scope resolution order**: Where an entity supports scope override, resolution follows Device > Kiosk > Store > Organization > Global (most specific wins). `[Inferred]` This order is not uniformly valid for every scoped entity — e.g. `RobotProgram` rejects `Global` at creation despite the shared enum defining it — so each entity's legal scope subset should be confirmed individually rather than assumed from the enum alone (see §6.6, §8). Evidence: `database_inventory.md` §6.
 - **BR-03 — Payment/execution decoupling**: Payment confirmation and robot execution are explicitly decoupled in time; a reconciliation worker repairs missed dispatch rather than requiring execution to happen synchronously with payment. Evidence: `repo_truth_map.md` §5 item 4.
-- **BR-04 — MQTT is notification-only**: MQTT delivers best-effort wake-up/uplink traffic only; the durable source of truth for commands/reports is always the Cloud database, reached via REST pull/ack or the equivalent MQTT uplink handler backed by the same Application handler. Evidence: `repo_truth_map.md` §8; `functional_inventory.md` MQTT-01, MQTT-02.
-- **BR-05 — Soft-delete exceptions for principal types**: `Account`, `Organization`, `Store`, `Kiosk`, `Device`, `Product`, `Ingredient`, `IngredientDispenserState`, `Order`, `PaymentTransaction`, `ConfigurationRelease`, and `KioskExecutionEndpoint` are excluded from the automatic soft-delete query filter because they have required, non-soft-deleted evidence dependents; callers must explicitly filter via `WhereNotDeleted()`. Evidence: `database_inventory.md` §7.
+- **BR-04 — MQTT command delivery is notification-only; uplink evidence has a dual path**: For Cloud→Edge command delivery, MQTT (`MQTT-01`) only publishes a best-effort wake-up notification — it never carries the command payload itself; Edge must always pull the actual command and send its acknowledgement over REST (`IOT-05`, `IOT-06`), there is no MQTT equivalent for command pull/ack. For Edge→Cloud evidence (heartbeat, telemetry, readiness, execution reports, production-sync events/state-summaries), both a REST endpoint and an MQTT uplink handler exist and dispatch to the same Application handler, so either transport reaches the same durable Cloud-database record. Evidence: `repo_truth_map.md` §8; `functional_inventory.md` MQTT-01, MQTT-02, IOT-05, IOT-06.
+- **BR-05 — Soft-delete exceptions for principal types**: `Account`, `Organization`, `Store`, `Kiosk`, `Device`, `Product`, `Ingredient`, `IngredientDispenserState`, `Order`, `PaymentTransaction`, `ConfigurationRelease`, and `KioskExecutionEndpoint` are excluded from the automatic soft-delete query filter because they have required, non-soft-deleted evidence dependents; the codebase provides a `WhereNotDeleted()` extension for callers to use explicitly. `[Inferred]` This is a convention that creates a developer responsibility, not an enforced or audited guarantee — whether every query against these 12 types actually applies the filter where needed was not verified. Evidence: `database_inventory.md` §7.
 - **BR-06 — Activation preflight for sellable items**: A Menu or MenuItem cannot be set Active unless its referenced product/variant/recipe/options pass a full preflight (currency match, active recipe for machine-produced variants, statically satisfiable option groups). Evidence: `functional_inventory.md` SC-02, SC-05.
 - **BR-07 — Recipe lifecycle immutability**: Recipes follow a strict Draft→Published→Active→Retired lifecycle; ingredient items can only be replaced while Draft; recipes are retired, never deleted. Evidence: `functional_inventory.md` CAT-15–CAT-17.
 - **BR-08 — Robot artifact publish gating**: A Draft robot artifact can only be published when it has a compatible Published technical contract and its object-storage checksum/size has been verified. Evidence: `functional_inventory.md` RC-04.
 - **BR-09 — Configuration release publish gating**: A Configuration Release can only be published after route/binding validation and a passing inventory-readiness check (the same policy used at deployment preview/deploy time). Evidence: `functional_inventory.md` PC-03, PC-05, PC-10; INV-14.
 - **BR-10 — Production package version immutability**: Once published, a `ProductionPackageVersion`'s manifest is immutable; installations/upgrades reference it by exact version rather than a mutable pointer. Evidence: `functional_inventory.md` PP-02, PP-05, PP-11.
 - **BR-11 — Refund/incident mandatory reasons**: Refund-required flagging, refund rejection, maintenance-ticket cancellation, and several other state transitions require a non-empty audit reason. Evidence: `functional_inventory.md` ORD-05, PAY-13, OPS-15.
-- **BR-12 — One active constraint per resource slot**: At most one default option per option group, one default non-retired recipe per variant, one Primary-settlement payment transaction per order, one Pending/Installed configuration deployment per kiosk, one active upgrade per installation, and one active container binding per device slot — enforced by partial unique indexes, not just application logic. Evidence: `database_inventory.md` §4.
+- **BR-12 — One active constraint per resource slot**: At most one default option per option group, one default non-retired recipe per variant, one Primary-settlement payment transaction per order, one Pending/Installed configuration deployment per kiosk, one active (non-terminal) upgrade per installation, and one active container binding per device slot — each enforced by its own partial unique index with its own distinct filter predicate (see §6.4; "active"/"default" is not the same predicate across these six cases), not just application logic. Evidence: `database_inventory.md` §4.
 - **BR-13 — Idempotency-key deduplication**: Where an `Idempotency-Key` is accepted, repeating the same key with the same logical request must return the original result rather than creating a duplicate resource or side effect. Evidence: `functional_inventory.md` (see NFR-001 evidence list).
 - **BR-14 — Kiosk operational-state guard during execution**: A kiosk cannot be transitioned to `Maintenance`/`Cleaning`/`Restocking` while an execution is Accepted/Running; several inventory operations (rebind, device retire/replace) are similarly blocked during an active execution. Evidence: `functional_inventory.md` TEN-15, DEV-08, INV-05.
 - **BR-15 — Inspection-before-resolution**: A production incident's resolution cannot be selected until an inspection outcome has been recorded. Evidence: `functional_inventory.md` ORD-22, ORD-23.
@@ -1835,6 +1843,17 @@ The following cross-cutting rules recur across multiple functional requirements 
 - `[Assumption]` The overall business motivation (why this product, target market sizing, competitive context) is not present in the evidence files, since those were derived from code/architecture docs rather than a business plan.
 - `[Open Question]` Whether the two `Partial`-status features (IDN-15b, SYNC-05) are planned for completion within this project's remaining timeline, or accepted as permanent limitations, should be confirmed with the team/supervisor.
 - `[Assumption]` No frontend/tablet/mobile client implementation exists in this repository; all UI-facing claims in this SRS (§3.1) are inferred from the API contract, not from observed frontend code.
+
+### 8.6 Carried from team review (`deliverables/05_team_review/codex_review_project_intro_srs.md`)
+- `[Open Question]` The requested path `deliverables/00_repo_evidence/evidence_review_final.md` still does not exist; the review used a differently-located file, `deliverables/05_review_checklists/evidence_review_final.md`. This path discrepancy should be corrected in the document set or explicitly explained in the final report.
+- `[Open Question]` `functional_inventory.md`'s own Summary table states 265 rows; a direct count of `ID`-prefixed rows yields 260 (Operations is short 4 rows against its stated 26; Payments is short 1 row against its stated 17). This SRS uses 260 throughout and does not correct `functional_inventory.md` itself (out of scope per the rule against modifying `00_repo_evidence/`) — whether 260 or 265 is the intended authoritative count remains open.
+- `[Open Question]` `database_inventory.md` states "~130 `DbSet<T>` properties"; a direct count against `src/Infrastructure/Data/IceBotDbContext.cs:109-214` finds 98. This SRS uses the verified 98 figure (§6.1) and does not correct `database_inventory.md` itself.
+- `[Open Question]` This SRS consolidates 260 inventory rows into 133 FRs by narrative grouping (each FR's `Related`/`Evidence` fields now individually list every consolidated ID, per this revision). A formal, separately-maintained inventory-ID-to-FR traceability matrix (one row per `functional_inventory.md` ID, with its FR number and confidence/status) does not yet exist and would be a more rigorous artifact than in-line grouping — flagged as a follow-up deliverable, not produced here.
+- `[Open Question]` No test-execution or `tests/IceBot.UnitTests`/`tests/IceBot.IntegrationTests` coverage evidence backs any `Supported` status in this document (see the Status legend at the top of this file); "Supported" should be read as "statically code-evidenced," and no FR/NFR should be read as implying a runtime-verified guarantee until test or execution evidence is linked.
+- `[Open Question]` Whether scoped RBAC is enforced on every management endpoint, GraphQL resolver, and SignalR hub method (FR-016, NFR-007) was not established by an exhaustive authorization-coverage audit.
+- `[Open Question]` Whether explicit `Cascade` delete-behavior configurations are actually preserved after `IceBotDbContext.ConfigureEntityConventions`'s global `Restrict` loop runs (NFR-004) was not settled by static reading alone.
+- `[Open Question]` The following platform/operational concerns were raised by team review as materially relevant to a complete SRS but were not found addressed in the evidence base, and are not claimed as implemented or absent here: (a) identity/reference-data bootstrap seeding beyond the one `PaymentMethodCatalogHostedService` note already in `functional_inventory.md`'s Notes section; (b) robot-artifact object-storage startup validation (distinct from FR-101's orphan-cleanup job); (c) API versioning/deprecation policy and a structured error/problem-response envelope; (d) rate limiting, CORS policy, and request/body size limits on public, IoT, and artifact-upload interfaces; (e) backup/restore procedures and disaster-recovery targets (RPO/RTO); (f) whether deleted/soft-deleted records can be viewed or restored by any actor, and the audit-visibility rules for deleted data. Each should be either evidenced from the codebase or explicitly scoped out in the final report, rather than left silently unaddressed.
+- `[Open Question]` Which background jobs (reconciliation, cleanup, retention, notification-delivery) are mandatory for correctness versus optional per deployment profile, and which are actually enabled in a given environment, was not established in the evidence base.
 
 ---
 

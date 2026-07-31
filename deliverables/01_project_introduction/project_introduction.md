@@ -4,7 +4,7 @@
 
 **Source basis**: This document is derived strictly from repo evidence already collected in `deliverables/00_repo_evidence/` — specifically `repo_truth_map.md`, `functional_inventory.md`, and `database_inventory.md` — plus the authoring rules in `deliverables/DELIVERABLES_AGENT.md`. No `src/` or `docs/` files were read beyond what those evidence documents already cite, and none were modified. Statements not directly traceable to evidence are marked `[Assumption]` or `[Open Question]`.
 
-> Note: a fifth input file, `deliverables/00_repo_evidence/evidence_review_final.md`, was requested but does not currently exist in the repository. This document was produced from the four evidence files that do exist; if `evidence_review_final.md` is added later, this introduction should be revisited against it.
+> Note: a fifth input file, `deliverables/00_repo_evidence/evidence_review_final.md`, was requested but does not currently exist in the repository. This document was produced from the four evidence files that do exist; if `evidence_review_final.md` is added later, this introduction should be revisited against it. (A later team review, `deliverables/05_team_review/codex_review_project_intro_srs.md`, found a similarly-named file at `deliverables/05_review_checklists/evidence_review_final.md` — a different path than what was originally requested; this discrepancy is noted here rather than silently resolved.)
 
 ---
 
@@ -28,7 +28,7 @@ Evidence: `repo_truth_map.md` §2 (`ARCHITECTURE.md:5-37, 137-174`).
 ## 3. Project Context
 
 - **Architecture style**: Modular Monolith with bounded-context separation, tactical DDD where domain rules matter, CQRS-lite for complex workflows, and event-driven integration for sync/robot runtime/payment callbacks/operational events. Compile-time dependency direction: `WebAPI → Infrastructure → Application → Domain`.
-- **Persistence**: PostgreSQL 17 via EF Core (`IceBotDbContext`), ~99 tables across 5 migrations as of this inventory. Binary robot artifacts (`.lua` files) are stored in MinIO (S3-compatible object storage), not the database.
+- **Persistence**: PostgreSQL 17 via EF Core (`IceBotDbContext`). `database_inventory.md` reports 98 `DbSet<T>` properties (verified directly against `src/Infrastructure/Data/IceBotDbContext.cs`, which corrects that file's own "~130" figure) and at least 99 tables created cumulatively across 5 migrations — a lower bound from summed `CreateTable` calls, not an independently re-verified current-schema count. `[Open Question]` whether the current physical table count differs from this migration-based tally. Binary robot artifacts (`.lua` files) are stored in MinIO (S3-compatible object storage), not the database.
 - **Communication with Edge/kiosks**: REST (`/api/v1/iot/...`) plus MQTT for best-effort wake-up notifications and (per the evidence) full duplex uplink message consumption; MQTT is explicitly documented as *not* the source of truth for execution state.
 - **Realtime UI updates**: SignalR hubs (`/hubs/orders`, `/hubs/operations`, `/hubs/management-dashboard`).
 - **Query surface**: REST for most writes and tablet/IoT traffic; GraphQL (HotChocolate) for most management-side reads.
@@ -51,7 +51,7 @@ Based on the business flows and functional inventory, the system exists to addre
 
 ## 5. Proposed Solution
 
-The repository *is* the proposed/implemented solution (this is a working backend, not a proposal document). At a high level, the solution consists of:
+The repository *is* the proposed/implemented solution — an implementation repository containing wired backend code, not a proposal document. `[Inferred]`: static source and wiring evidence show the pieces connected end-to-end (route → handler → domain → persistence); this does not by itself prove the system runs successfully in a given environment, is correctly configured, or passes its test suite (no test-coverage mapping exists in the evidence base). At a high level, the solution consists of:
 
 - A **Cloud backend** (this repository) exposing REST + GraphQL + SignalR + IoT/MQTT surfaces, organized around bounded contexts with EF Core/PostgreSQL persistence.
 - A **checkout → payment → execution pipeline**: tablet places an order → Cloud validates and creates `Order`/`PaymentTransaction` → PayOS payment session/QR → webhook confirms payment → Cloud dispatches an `ExecuteOrder` edge command → Edge pulls, executes, and reports back → Cloud finalizes the order. Evidence: `repo_truth_map.md` §5 item 4.
@@ -77,7 +77,7 @@ Per `repo_truth_map.md` §3 and `functional_inventory.md`:
 
 ## 7. System Scope
 
-Confirmed as implemented (Status = `Implemented`/`Partial` in `functional_inventory.md`, 265 inventoried capabilities total):
+Directly evidenced by code in `functional_inventory.md`, which lists 260 identifiable capability rows (its own summary table totals 265 — a 5-row overcount against the Operations and Payments sections that was not corrected in that file; treat 260 as the mechanically-verified count and 265 as an open discrepancy, see §12). Rows marked `Implemented` there are the basis for the list below; the 2 rows marked `Partial` (IDN-15b, SYNC-05) are known-incomplete limitations, not confirmed-complete features — they are called out in §8 rather than folded into this scope list. `functional_inventory.md`'s own `Status` legend distinguishes: `Implemented` = code read directly wiring route/consumer → handler → domain/persistence (i.e. statically code-evidenced, not independently runtime- or test-verified); `Partial` = incomplete/narrower than documented; `Documented-only` = no code found (none of the latter were identified). In scope:
 
 - **Identity & Access**: local + Google (Firebase) login, invitation-based account onboarding, refresh-token/session management, scoped RBAC (role + organization/store/kiosk scope).
 - **Tenants**: organization/store/kiosk lifecycle, sales-pause/resume, franchise onboarding workflow, role-scope lookups.
@@ -121,12 +121,12 @@ Grouped by bounded context (see §7 for full detail; row counts from `functional
 4. Sales catalog & runtime menu projection (11)
 5. Inventory: dispenser provisioning, refill, rebind, readiness (15)
 6. Order checkout, fulfillment, and incident resolution (25)
-7. Payment sessions, webhook handling, refunds (17)
+7. Payment sessions, webhook handling, refunds (16; `functional_inventory.md`'s own summary table states 17 — see §12 discrepancy note)
 8. Device catalog, execution endpoints, telemetry ingestion (25)
 9. Robot Lua artifact authoring, import, and program building (20)
 10. Production configuration releases and deployment (12)
 11. Production package installation and upgrade (franchise rollout) (16)
-12. Operations: alerts, maintenance tickets, notifications (26)
+12. Operations: alerts, maintenance tickets, notifications (22; `functional_inventory.md`'s own summary table states 26 — see §12 discrepancy note)
 13. IoT REST + MQTT edge contract (9 + 4)
 14. Realtime SignalR push and GraphQL management reads (6 + 1)
 15. Edge/cloud sync and dead-letter recovery (7)
@@ -180,7 +180,7 @@ Key points reflected in the diagram (all evidenced in `repo_truth_map.md` §2, �
 | **Firebase Cloud Messaging (FCM)** | Push notification delivery to registered account devices (`AccountNotificationDevice`). | `functional_inventory.md` IDN-12–IDN-14, Operations notification-delivery rows |
 | **Fairino robotics tooling** | Source of exported `.lua` robot programs and `.icebot.json` technical-contract sidecars consumed by the Robot Configuration authoring pipeline. | `functional_inventory.md` RC-02, RC-08, RC-11 |
 
-`[Assumption]` The exact commercial/contractual nature of the PayOS and Fairino relationships (e.g., whether they are the sole/permanent providers or swappable) is not stated in the evidence and is out of scope for a code-derived document.
+`[Assumption]` The evidence establishes only that PayOS, Firebase/Google, MinIO, Mosquitto, FCM, and Fairino are the *currently configured* adapters/integrations. Whether each is a sole/permanent provider (vs. a replaceable adapter), and the commercial/contractual nature of the PayOS and Fairino relationships specifically, is not stated in the evidence and is out of scope for a code-derived document.
 
 ## 12. Assumptions and Open Questions
 
@@ -193,6 +193,11 @@ Carried forward from the evidence files (not resolved here, per `deliverables/DE
 - `[Open Question]` Several discrepancies between code and `docs/` were flagged during database evidence-gathering (e.g., `RobotProgram` missing a documented `TemplateProgramId` field, `EdgeCommandDeliveryAttempts` missing a documented time index, ambiguity over whether explicit `Cascade` delete behaviors survive a later global `Restrict` override) — see `database_inventory.md` §9 for the full list. These are flagged for reviewer attention, not resolved here.
 - `[Assumption]` The overall business motivation (why this product, target market sizing, competitive context) is not present in the evidence files, since those were derived from code/architecture docs rather than a business plan. If the team has a separate brief/proposal document, it should be reconciled with this section before the final report.
 - `[Open Question]` Whether the features listed as `Partial` (IDN-15b, SYNC-05) are planned for completion within this project's remaining timeline, or are accepted as permanent limitations, should be confirmed with the team/supervisor.
+- `[Open Question]` `functional_inventory.md`'s own Summary table totals 265 rows, but a direct count of that file's `ID`-prefixed rows yields 260 — the Operations section is short 4 rows against its stated 26, and Payments is short 1 row against its stated 17. This is an error in the evidence file itself (not corrected here per the rule against modifying `00_repo_evidence/`); 260 is the mechanically-verified figure and is used throughout this document, with 265 flagged as the file's own uncorrected total. (Flagged in `deliverables/05_team_review/codex_review_project_intro_srs.md`.)
+- `[Open Question]` `database_inventory.md` states "~130 `DbSet<T>` properties" for `IceBotDbContext`; a direct count against `src/Infrastructure/Data/IceBotDbContext.cs` finds 98. This document uses the verified 98 figure; the discrepancy in the evidence file itself is not corrected here.
+- `[Open Question]` Whether scoped RBAC is enforced on *every* management endpoint, GraphQL resolver, and SignalR hub method (as opposed to the specific endpoints directly cited in `functional_inventory.md`) was not settled by an exhaustive authorization-coverage audit; the evidence supports the pattern on the cited endpoints, not a verified universal guarantee.
+- `[Open Question]` Several platform/operational concerns raised by team review were not found addressed in the evidence base and are not claimed here: identity/reference-data bootstrap seeding beyond the one `PaymentMethodCatalogHostedService` note in `functional_inventory.md`'s Notes section, API versioning/deprecation policy, a structured error/problem-response contract, rate limiting, CORS policy, request-size limits, and backup/restore or disaster-recovery (RPO/RTO) provisions. Whether these exist elsewhere in the codebase or are genuinely absent was not determined by this evidence pass.
+- `[Open Question]` Whether soft-deleted records can be viewed or restored by any actor, and what the audit-visibility rules are for deleted data, was not established in the evidence base beyond the structural soft-delete mechanism described in `database_inventory.md` §7.
 
 ---
 
