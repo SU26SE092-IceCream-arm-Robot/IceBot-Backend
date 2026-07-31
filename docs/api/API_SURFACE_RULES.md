@@ -37,7 +37,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | --- | --- | --- |
 | Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password, accept invitation |
 | Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password`, `/api/v1/me/access`, `/api/v1/me/notification-devices` | own profile, edit profile, change password, inspect current token access, and manage the caller's FCM registrations |
-| Account management | `/api/v1/management/accounts/*` | create internal account, invitation link generation, assign/update roles, effective access, disable account, set password |
+| Account management | `/api/v1/management/organizations/{organizationId}/accounts/*` | create internal account, invitation link generation, assign/update roles, effective access, disable account, set password |
 | Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
@@ -158,7 +158,7 @@ POST /api/v1/authentication/accept-invitation
 Rules:
 
 - Login and forgot/reset password endpoints can be public.
-- Account management remains under `/management/accounts`.
+- Account management is organization-owned under `/management/organizations/{organizationId}/accounts`. The route organization is the tenant authority; every submitted account role must carry that same `OrganizationId`.
 - Change password for a logged-in user stays under `/me/password`.
 - Refresh rotation rechecks persisted `AccountStatus` inside the token transaction. A non-Active account has its remaining refresh sessions revoked and receives no replacement token.
 - Account onboarding and invitation lifecycle rules live in [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md).

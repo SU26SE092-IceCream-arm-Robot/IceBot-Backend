@@ -41,6 +41,11 @@ public sealed class SetInternalAccountPasswordCommandHandler
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
         }
 
+        if (!AccountManagementAccessRules.CanManageAccount(command.UserContext, command.OrganizationId, account))
+        {
+            return ApiResult<InternalAccountResult>.Fail("Account is outside the current organization's management scope.", 403);
+        }
+
         account.Password = HashedPassword.From(_passwordHasher.HashPassword(request.NewPassword));
         account.LockedUntil = null;
         account.FailedLoginCount = 0;
@@ -49,6 +54,8 @@ public sealed class SetInternalAccountPasswordCommandHandler
         await _accounts.SaveChangesAsync(cancellationToken);
         await _refreshTokens.RevokeAllForAccountAsync(account.Id, "Password changed by admin", null);
 
-        return ApiResult<InternalAccountResult>.Success(InternalAccountResultMapper.ToResult(account), "Password updated.");
+        return ApiResult<InternalAccountResult>.Success(
+            InternalAccountResultMapper.ToResult(account, organizationId: command.OrganizationId),
+            "Password updated.");
     }
 }

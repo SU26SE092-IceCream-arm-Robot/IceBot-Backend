@@ -33,6 +33,11 @@ public sealed class CreateInternalAccountInvitationCommandHandler
             return ApiResult<AccountInvitationResult>.Fail("Account not found.", 404);
         }
 
+        if (!AccountManagementAccessRules.CanManageAccount(command.UserContext, command.OrganizationId, account))
+        {
+            return ApiResult<AccountInvitationResult>.Fail("Account is outside the current organization's management scope.", 403);
+        }
+
         if (account.Status != AccountStatus.Invited)
         {
             return ApiResult<AccountInvitationResult>.Fail("Invitation can only be created for accounts with Invited status.", 400);

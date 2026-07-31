@@ -3,6 +3,7 @@ using Application.Identity.Access.Mapping;
 using Application.Identity.Access.Results;
 using Application.Shared.Wrappers;
 using Application.Tenants;
+using Application.Identity.InternalAccounts;
 
 namespace Application.Identity.InternalAccounts.Queries;
 
@@ -25,16 +26,13 @@ public sealed class GetInternalAccountEffectiveAccessQueryHandler
             return ApiResult<AccountAccessResult>.Fail("Account not found.", 404);
         }
 
-        if (!ScopeAccessRules.SharesAnyActiveScope(
-                ScopeRoleSets.AccountsRead,
-                query.UserContext,
-                account.AccountRoles))
+        if (!AccountManagementAccessRules.CanReadAccount(query.UserContext, query.OrganizationId, account))
         {
             return ApiResult<AccountAccessResult>.Fail("Access denied.", 403);
         }
 
         return ApiResult<AccountAccessResult>.Success(
-            AccountAccessResultMapper.FromAccount(account),
+            AccountAccessResultMapper.FromAccount(account, query.OrganizationId),
             "Effective access retrieved successfully.");
     }
 }

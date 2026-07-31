@@ -86,7 +86,7 @@ is the cross-module index; do not duplicate that matrix in every document.
 Include keywords that a team member or AI agent is likely to ask for:
 
 - domain names: `Order`, `PaymentTransaction`, `RobotArtifact`, `EdgeCommand`
-- route names: `/api/v1/authentication/login`, `/management/accounts`
+- route names: `/api/v1/authentication/login`, `/management/organizations/{organizationId}/accounts`
 - workflow phrases: `forgot password`, `edge command pull`, `payment callback`
 - common synonyms: `auth`, `authentication`, `login`, `external login`
 - policy names: `scoped RBAC`, `soft delete unique index`, `jsonb`

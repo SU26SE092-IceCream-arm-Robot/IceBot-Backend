@@ -1,4 +1,5 @@
 using Application.Identity.Access.Results;
+using Application.Identity.InternalAccounts;
 using Application.Identity.Tokens.Claims;
 using Domain.Identity.Entities;
 
@@ -6,10 +7,11 @@ namespace Application.Identity.Access.Mapping;
 
 internal static class AccountAccessResultMapper
 {
-    public static AccountAccessResult FromAccount(Account account)
+    public static AccountAccessResult FromAccount(Account account, Guid? organizationId = null)
     {
         var activeRoles = account.AccountRoles
-            .Where(accountRole => accountRole.IsActive)
+            .Where(accountRole => accountRole.IsActive &&
+                (!organizationId.HasValue || AccountManagementAccessRules.BelongsToOrganization(accountRole, organizationId.Value)))
             .ToList();
 
         var roleScopes = activeRoles

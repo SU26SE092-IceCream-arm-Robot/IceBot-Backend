@@ -12,7 +12,7 @@ namespace WebAPI.Controllers.Identity
 {
     [ApiController]
     [ApiVersion("1.0")]
-    [Route("api/v{version:apiVersion}/management/accounts")]
+    [Route("api/v{version:apiVersion}/management/organizations/{organizationId:guid}/accounts")]
     [Authorize]
     public class ManagementAccountsController : ControllerBase
     {
@@ -54,6 +54,7 @@ namespace WebAPI.Controllers.Identity
         [HttpGet]
         [Authorize(Policy = "accounts.read")]
         public async Task<IActionResult> ListInternalAccounts(
+            Guid organizationId,
             [FromQuery] string? search,
             [FromQuery] string? status,
             [FromQuery] int pageNumber = 1,
@@ -63,6 +64,7 @@ namespace WebAPI.Controllers.Identity
             var query = new ListInternalAccountsQuery
             {
                 UserContext = User.GetUserContext(),
+                OrganizationId = organizationId,
                 Search = search,
                 Status = status,
                 PageNumber = pageNumber,
@@ -75,12 +77,14 @@ namespace WebAPI.Controllers.Identity
         [HttpGet("{accountId:guid}")]
         [Authorize(Policy = "accounts.read")]
         public async Task<IActionResult> GetInternalAccount(
+            Guid organizationId,
             Guid accountId,
             CancellationToken cancellationToken)
         {
             var query = new GetInternalAccountQuery
             {
                 AccountId = accountId,
+                OrganizationId = organizationId,
                 UserContext = User.GetUserContext()
             };
             var result = await _getInternalAccount.HandleAsync(query, cancellationToken);
@@ -90,6 +94,7 @@ namespace WebAPI.Controllers.Identity
         [HttpPost]
         [Authorize(Policy = "accounts.manage")]
         public async Task<IActionResult> CreateInternalAccount(
+            Guid organizationId,
             [FromBody] CreateInternalAccountRequest request,
             CancellationToken cancellationToken)
         {
@@ -97,7 +102,10 @@ namespace WebAPI.Controllers.Identity
             var command = new CreateInternalAccountCommand
             {
                 Request = request,
-                CreatedByAccountId = createdByAccountId
+                OrganizationId = organizationId,
+                CreatedByAccountId = createdByAccountId,
+                UserContext = User.GetUserContext(),
+                UserRoles = User.FindAll(ClaimTypes.Role).Select(claim => claim.Value).ToList()
             };
             var result = await _createInternalAccount.HandleAsync(command, cancellationToken);
             return StatusCode(result.StatusCode, result);
@@ -106,6 +114,7 @@ namespace WebAPI.Controllers.Identity
         [HttpPut("{accountId:guid}")]
         [Authorize(Policy = "accounts.manage")]
         public async Task<IActionResult> UpdateInternalAccount(
+            Guid organizationId,
             Guid accountId,
             [FromBody] UpdateInternalAccountRequest request,
             CancellationToken cancellationToken)
@@ -113,8 +122,10 @@ namespace WebAPI.Controllers.Identity
             var command = new UpdateInternalAccountCommand
             {
                 AccountId = accountId,
+                OrganizationId = organizationId,
                 Request = request,
-                UpdatedByAccountId = GetCurrentAccountId()
+                UpdatedByAccountId = GetCurrentAccountId(),
+                UserContext = User.GetUserContext()
             };
             var result = await _updateInternalAccount.HandleAsync(command, cancellationToken);
             return StatusCode(result.StatusCode, result);
@@ -123,13 +134,16 @@ namespace WebAPI.Controllers.Identity
         [HttpPatch("{accountId:guid}/disable")]
         [Authorize(Policy = "accounts.manage")]
         public async Task<IActionResult> DisableInternalAccount(
+            Guid organizationId,
             Guid accountId,
             CancellationToken cancellationToken)
         {
             var command = new DisableInternalAccountCommand
             {
                 AccountId = accountId,
-                UpdatedByAccountId = GetCurrentAccountId()
+                OrganizationId = organizationId,
+                UpdatedByAccountId = GetCurrentAccountId(),
+                UserContext = User.GetUserContext()
             };
             var result = await _disableInternalAccount.HandleAsync(command, cancellationToken);
             return StatusCode(result.StatusCode, result);
@@ -138,6 +152,7 @@ namespace WebAPI.Controllers.Identity
         [HttpPut("{accountId:guid}/password")]
         [Authorize(Policy = "accounts.manage")]
         public async Task<IActionResult> SetPassword(
+            Guid organizationId,
             Guid accountId,
             [FromBody] SetInternalAccountPasswordRequest request,
             CancellationToken cancellationToken)
@@ -145,8 +160,10 @@ namespace WebAPI.Controllers.Identity
             var command = new SetInternalAccountPasswordCommand
             {
                 AccountId = accountId,
+                OrganizationId = organizationId,
                 Request = request,
-                UpdatedByAccountId = GetCurrentAccountId()
+                UpdatedByAccountId = GetCurrentAccountId(),
+                UserContext = User.GetUserContext()
             };
             var result = await _setPassword.HandleAsync(command, cancellationToken);
             return StatusCode(result.StatusCode, result);
@@ -155,6 +172,7 @@ namespace WebAPI.Controllers.Identity
         [HttpPost("{accountId:guid}/roles")]
         [Authorize(Policy = "accounts.manage")]
         public async Task<IActionResult> AssignRole(
+            Guid organizationId,
             Guid accountId,
             [FromBody] AccountRoleScopeRequest request,
             CancellationToken cancellationToken)
@@ -162,6 +180,7 @@ namespace WebAPI.Controllers.Identity
             var command = new AssignInternalAccountRoleCommand
             {
                 AccountId = accountId,
+                OrganizationId = organizationId,
                 Request = request,
                 AssignedByAccountId = GetCurrentAccountId(),
                 UserContext = User.GetUserContext(),
@@ -174,6 +193,7 @@ namespace WebAPI.Controllers.Identity
         [HttpPut("{accountId:guid}/roles")]
         [Authorize(Policy = "accounts.manage")]
         public async Task<IActionResult> UpdateRoles(
+            Guid organizationId,
             Guid accountId,
             [FromBody] UpdateAccountRolesRequest request,
             CancellationToken cancellationToken)
@@ -181,6 +201,7 @@ namespace WebAPI.Controllers.Identity
             var command = new UpdateInternalAccountRolesCommand
             {
                 AccountId = accountId,
+                OrganizationId = organizationId,
                 Request = request,
                 UpdatedByAccountId = GetCurrentAccountId(),
                 UserContext = User.GetUserContext(),
@@ -193,12 +214,14 @@ namespace WebAPI.Controllers.Identity
         [HttpGet("{accountId:guid}/effective-access")]
         [Authorize(Policy = "accounts.read")]
         public async Task<IActionResult> GetEffectiveAccess(
+            Guid organizationId,
             Guid accountId,
             CancellationToken cancellationToken)
         {
             var query = new GetInternalAccountEffectiveAccessQuery
             {
                 AccountId = accountId,
+                OrganizationId = organizationId,
                 UserContext = User.GetUserContext()
             };
             var result = await _getEffectiveAccess.HandleAsync(query, cancellationToken);
@@ -208,6 +231,7 @@ namespace WebAPI.Controllers.Identity
         [HttpPost("{accountId:guid}/invitation")]
         [Authorize(Policy = "accounts.manage")]
         public async Task<IActionResult> CreateInvitation(
+            Guid organizationId,
             Guid accountId,
             [FromBody] CreateAccountInvitationRequest? request,
             CancellationToken cancellationToken)
@@ -215,8 +239,10 @@ namespace WebAPI.Controllers.Identity
             var command = new CreateInternalAccountInvitationCommand
             {
                 AccountId = accountId,
+                OrganizationId = organizationId,
                 InvitedByAccountId = GetCurrentAccountId(),
-                SendEmail = request?.SendEmail ?? true
+                SendEmail = request?.SendEmail ?? true,
+                UserContext = User.GetUserContext()
             };
             var result = await _createInvitation.HandleAsync(command, cancellationToken);
             return StatusCode(result.StatusCode, result);

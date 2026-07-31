@@ -6,8 +6,8 @@ public static class AuthorizationPolicyExtensions
 {
     public static AuthorizationOptions AddIceBotAuthorizationPolicies(this AuthorizationOptions options)
     {
-        options.AddScopedRolePolicy("accounts.manage", "SystemAdmin");
-        options.AddScopedRolePolicy("accounts.read", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("accounts.manage", "SystemAdmin", "OrgAdmin");
+        options.AddScopedRolePolicy("accounts.read", "SystemAdmin", "OrgAdmin");
 
         options.AddScopedRolePolicy("payments.manage", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("payment-methods.manage", "SystemAdmin");
