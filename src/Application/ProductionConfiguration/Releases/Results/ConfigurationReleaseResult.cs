@@ -6,6 +6,9 @@ using Application.RobotConfiguration.Programs.Commands;
 using Domain.RobotConfiguration.Programs.Manifests;
 using Domain.RobotConfiguration.Programs;
 using Domain.ProductionConfiguration.Entities;
+using Application.ProductionConfiguration.Routes.Contracts;
+using Application.ProductionConfiguration.Routes.Support;
+using Application.ProductionConfiguration.Releases.Support;
 
 namespace Application.ProductionConfiguration.Releases.Results;
 
@@ -14,6 +17,7 @@ public sealed class ConfigurationReleaseResult
     public Guid Id { get; init; }
     public Guid OrganizationId { get; init; }
     public long ReleaseNumber { get; init; }
+    public string Revision { get; init; } = string.Empty;
     public string Status { get; init; } = null!;
     public string? ReleaseChecksum { get; init; }
     public DateTimeOffset? PublishedAt { get; init; }
@@ -28,6 +32,7 @@ public sealed class ConfigurationReleaseResult
             Id = release.Id,
             OrganizationId = release.OrganizationId,
             ReleaseNumber = release.ReleaseNumber,
+            Revision = ConfigurationReleaseRevisionToken.Create(release),
             Status = release.Status.ToString(),
             ReleaseChecksum = release.ReleaseChecksum,
             PublishedAt = release.PublishedAt,
@@ -45,7 +50,11 @@ public sealed class ConfigurationReleaseResult
                     RecipeCode = route.Recipe?.Code,
                     RouteCode = route.RouteCode,
                     Priority = route.Priority,
-                    RequiredCapabilitiesJson = route.RequiredCapabilitiesJson,
+                    RequiredCapabilities = ExecutionRouteRequiredCapabilitiesContract.ParseValidated(route.RequiredCapabilitiesJson)
+                        .Select(requirement => new ExecutionRouteCapabilityRequirementContract(
+                            requirement.Code,
+                            requirement.Required))
+                        .ToArray(),
                     SupportedOptionCodes = route.GetSupportedOptionCodes(),
                     ProductionDefinitionChecksum = route.ProductionDefinitionChecksum,
                     RobotBindings = route.RobotBindings
@@ -74,7 +83,7 @@ public sealed class ExecutionRouteResult
     public string? RecipeCode { get; init; }
     public string RouteCode { get; init; } = string.Empty;
     public int Priority { get; init; }
-    public string? RequiredCapabilitiesJson { get; init; }
+    public IReadOnlyCollection<ExecutionRouteCapabilityRequirementContract> RequiredCapabilities { get; init; } = [];
     public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
     public string? ProductionDefinitionChecksum { get; init; }
     public IReadOnlyCollection<ExecutionRouteRobotBindingResult> RobotBindings { get; init; } = Array.Empty<ExecutionRouteRobotBindingResult>();

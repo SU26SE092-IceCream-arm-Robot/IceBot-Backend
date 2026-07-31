@@ -4,6 +4,7 @@ using Application.Devices.Connectivity.Contracts;
 using Application.Devices.Telemetry.Commands;
 using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Reports.Commands;
+using Application.Inventory.Observations;
 using Application.Shared.Wrappers;
 using Application.Sync.Ingestion.Commands;
 
@@ -25,7 +26,8 @@ public sealed class EdgeUplinkMessageDispatcher(
     IngestExecutionReadinessCommandHandler readinessHandler,
     IngestExecutionReportCommandHandler executionReportHandler,
     IngestProductionEventsBatchCommandHandler productionEventsHandler,
-    IngestEdgeStateSummariesCommandHandler stateSummariesHandler) : IEdgeUplinkMessageDispatcher
+    IngestEdgeStateSummariesCommandHandler stateSummariesHandler,
+    IngestInventorySensorObservationsCommandHandler inventoryObservationsHandler) : IEdgeUplinkMessageDispatcher
 {
     public async Task<EdgeUplinkResult> DispatchAsync(
         Guid endpointId,
@@ -79,6 +81,11 @@ public sealed class EdgeUplinkMessageDispatcher(
                     endpointId, messageType, envelope.MessageId,
                     await stateSummariesHandler.HandleAsync(
                         MapStateSummaries(endpoint.KioskId, endpointId, Deserialize<EdgeStateSummariesUplink>(envelope)),
+                        cancellationToken)),
+                EdgeUplinkMessageTypes.InventoryObservations => FromApiResult(
+                    endpointId, messageType, envelope.MessageId,
+                    await inventoryObservationsHandler.HandleAsync(
+                        MapInventoryObservations(endpoint.KioskId, endpointId, Deserialize<EdgeInventoryObservationsUplink>(envelope)),
                         cancellationToken)),
                 _ => Rejected(endpointId, messageType, envelope.MessageId, 404, "Unknown MQTT uplink message type.")
             };
@@ -325,6 +332,26 @@ public sealed class EdgeUplinkMessageDispatcher(
                 SummarySchemaVersion = item.SummarySchemaVersion,
                 EdgeCreatedAt = item.EdgeCreatedAt,
                 PayloadJson = item.Payload.GetRawText()
+            }).ToArray()
+        };
+
+    private static IngestInventorySensorObservationsCommand MapInventoryObservations(
+        Guid kioskId,
+        Guid endpointId,
+        EdgeInventoryObservationsUplink payload) => new()
+        {
+            KioskId = kioskId,
+            EndpointId = endpointId,
+            SourceExecutorId = payload.SourceExecutorId,
+            Observations = payload.Observations.Select(item => new InventorySensorObservationInput
+            {
+                SourceEventId = item.SourceEventId,
+                IngredientDispenserStateId = item.IngredientDispenserStateId,
+                DeviceId = item.DeviceId,
+                ObservationSequence = item.ObservationSequence,
+                ObservedLevelStatus = item.ObservedLevelStatus,
+                ObservedAt = item.ObservedAt,
+                SensorPayload = item.SensorPayload
             }).ToArray()
         };
 }

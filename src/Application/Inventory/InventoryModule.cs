@@ -1,6 +1,7 @@
 using Application.Inventory.Commands;
 using Application.Inventory.Queries;
 using Application.Inventory.Abstractions;
+using Application.Inventory.Observations;
 using Application.Inventory.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -24,6 +25,7 @@ public static class InventoryModule
         services.AddScoped<SetDispenserStateStatusCommandHandler>();
         services.AddScoped<DeleteDispenserStateCommandHandler>();
         services.AddScoped<RebindDispenserStateCommandHandler>();
+        services.AddScoped<IngestInventorySensorObservationsCommandHandler>();
 
         return services;
     }

@@ -94,3 +94,23 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
 
     }
 }
+
+internal sealed class InventorySensorObservationConfiguration : IEntityTypeConfiguration<InventorySensorObservation>
+{
+    public void Configure(EntityTypeBuilder<InventorySensorObservation> entity)
+    {
+        entity.ToTable("InventorySensorObservations");
+        entity.HasIndex(x => new { x.SourceExecutorId, x.SourceEventId }).IsUnique();
+        entity.HasIndex(x => new { x.IngredientDispenserStateId, x.CloudReceivedAt });
+        entity.HasIndex(x => new { x.SourceExecutorId, x.IngredientDispenserStateId, x.ObservationSequence });
+        entity.HasOne<IngredientDispenserState>()
+            .WithMany()
+            .HasForeignKey(x => x.IngredientDispenserStateId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<KioskExecutionEndpoint>()
+            .WithMany()
+            .HasForeignKey(x => x.KioskExecutionEndpointId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.Property(x => x.SensorPayloadJson).HasMaxLength(16_384);
+    }
+}

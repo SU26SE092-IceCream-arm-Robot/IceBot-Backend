@@ -4,6 +4,8 @@ using Application.ProductionConfiguration.Releases.Abstractions;
 using Application.ProductionConfiguration.Releases.Commands;
 using Application.ProductionConfiguration.Releases.Results;
 using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Routes.Contracts;
+using Application.ProductionConfiguration.Routes.Support;
 using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.Shared.Wrappers;
 using Domain.Common;
@@ -141,13 +143,18 @@ public sealed class CreateRobotAuthoringReleaseDraftCommandHandler(
                 UserContext = command.UserContext,
                 OrganizationId = command.OrganizationId,
                 ReleaseId = createResult.Data.Id,
+                ExpectedRevision = createResult.Data.Revision,
                 Routes =
                 [
                     new ConfigurationReleaseRouteInput(
                         command.RecipeId,
                         routeCode,
                         0,
-                        requiredCapabilitiesJson,
+                        ExecutionRouteRequiredCapabilitiesContract.ParseValidated(requiredCapabilitiesJson)
+                            .Select(requirement => new ExecutionRouteCapabilityRequirementContract(
+                                requirement.Code,
+                                requirement.Required))
+                            .ToArray(),
                         optionCodes,
                         [new ConfigurationReleaseRobotBindingInput(
                             importSession.AppliedRobotProgramId.Value,

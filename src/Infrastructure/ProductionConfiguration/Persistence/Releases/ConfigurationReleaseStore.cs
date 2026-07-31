@@ -105,11 +105,62 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         var recipes = await recipeQuery.OrderBy(recipe => recipe.ProductVariantId).ThenByDescending(recipe => recipe.IsDefault).ThenByDescending(recipe => recipe.Version).Take(limit)
             .Select(recipe => new ConfigurationAuthoringRecipeOption
             {
-                Id = recipe.Id, ProductVariantId = recipe.ProductVariantId, ProductVariantCode = recipe.ProductVariant.Code,
+                Id = recipe.Id, ProductId = recipe.ProductVariant.ProductId, ProductVariantId = recipe.ProductVariantId, ProductVariantCode = recipe.ProductVariant.Code,
                 ProductVariantName = recipe.ProductVariant.Name, Code = recipe.Code, Name = recipe.Name, Version = recipe.Version,
                 Status = recipe.Status.ToString(), IsDefault = recipe.IsDefault, OrganizationId = recipe.OrganizationId,
                 StoreId = recipe.StoreId, KioskId = recipe.KioskId
             }).ToListAsync(cancellationToken);
+
+        var productIds = recipes.Select(recipe => recipe.ProductId).Distinct().ToArray();
+        var productionOptions = await _dbContext.ProductOptions.AsNoTracking()
+            .Where(option => option.DeletedAt == null &&
+                productIds.Contains(option.OptionGroup.ProductId) &&
+                option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting)
+            .Select(option => new
+            {
+                ProductId = option.OptionGroup.ProductId,
+                option.Id,
+                option.Code,
+                option.Name,
+                OptionGroupCode = option.OptionGroup.Code,
+                OptionGroupName = option.OptionGroup.Name,
+                GroupIsRequired = option.OptionGroup.IsRequired,
+                IsAvailable = option.IsAvailable && option.OptionGroup.IsActive
+            })
+            .OrderBy(option => option.OptionGroupCode).ThenBy(option => option.Code)
+            .ToListAsync(cancellationToken);
+        var productionOptionsByProductId = productionOptions
+            .GroupBy(option => option.ProductId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<ConfigurationAuthoringProductionOption>)group.Select(option =>
+                    new ConfigurationAuthoringProductionOption
+                    {
+                        Id = option.Id,
+                        Code = option.Code,
+                        Name = option.Name,
+                        OptionGroupCode = option.OptionGroupCode,
+                        OptionGroupName = option.OptionGroupName,
+                        GroupIsRequired = option.GroupIsRequired,
+                        IsAvailable = option.IsAvailable
+                    }).ToArray());
+        recipes = recipes.Select(recipe => new ConfigurationAuthoringRecipeOption
+        {
+            Id = recipe.Id,
+            ProductId = recipe.ProductId,
+            ProductVariantId = recipe.ProductVariantId,
+            ProductVariantCode = recipe.ProductVariantCode,
+            ProductVariantName = recipe.ProductVariantName,
+            Code = recipe.Code,
+            Name = recipe.Name,
+            Version = recipe.Version,
+            Status = recipe.Status,
+            IsDefault = recipe.IsDefault,
+            OrganizationId = recipe.OrganizationId,
+            StoreId = recipe.StoreId,
+            KioskId = recipe.KioskId,
+            ProductionOptionCandidates = productionOptionsByProductId.GetValueOrDefault(recipe.ProductId, [])
+        }).ToList();
 
         var programQuery = _dbContext.RobotPrograms.AsNoTracking().Where(program =>
             program.DeletedAt == null && program.Status == RobotProgramStatus.Published &&
@@ -122,7 +173,53 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
                 OrganizationId = program.OrganizationId, StoreId = program.StoreId, KioskId = program.KioskId, DeviceId = program.DeviceId,
                 ProgramManifestChecksum = program.ProgramManifestChecksum!, ArtifactCount = program.RobotProgramArtifacts.Count
             }).ToListAsync(cancellationToken);
-        return new ConfigurationReleaseAuthoringOptionsReadModel { ProductVariants = variants, Recipes = recipes, RobotPrograms = programs };
+
+        var programIds = programs.Select(program => program.Id).ToArray();
+        var programCapabilityRows = await (
+            from membership in _dbContext.RobotProgramArtifacts.AsNoTracking()
+            join artifact in _dbContext.RobotArtifacts.AsNoTracking() on membership.RobotArtifactId equals artifact.Id
+            join effect in _dbContext.RobotArtifactDeclaredEffects.AsNoTracking() on artifact.TechnicalContractId equals effect.TechnicalContractId
+            where programIds.Contains(membership.RobotProgramId) &&
+                effect.RequiredWorkcellCapabilityCode != null && effect.RequiredWorkcellCapabilityCode != ""
+            select new { membership.RobotProgramId, effect.RequiredWorkcellCapabilityCode })
+            .ToListAsync(cancellationToken);
+        var capabilitiesByProgramId = programCapabilityRows
+            .GroupBy(row => row.RobotProgramId)
+            .ToDictionary(
+                group => group.Key,
+                group => (IReadOnlyList<string>)group.Select(row => row.RequiredWorkcellCapabilityCode!.Trim().ToUpperInvariant())
+                    .Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.Ordinal).ToArray());
+        programs = programs.Select(program => new ConfigurationAuthoringRobotProgramOption
+        {
+            Id = program.Id,
+            Code = program.Code,
+            Name = program.Name,
+            ScopeType = program.ScopeType,
+            OrganizationId = program.OrganizationId,
+            StoreId = program.StoreId,
+            KioskId = program.KioskId,
+            DeviceId = program.DeviceId,
+            ProgramManifestChecksum = program.ProgramManifestChecksum,
+            ArtifactCount = program.ArtifactCount,
+            WorkcellCapabilityCodes = capabilitiesByProgramId.GetValueOrDefault(program.Id, [])
+        }).ToList();
+        var workcellCapabilities = programCapabilityRows
+            .Where(row => !string.IsNullOrWhiteSpace(row.RequiredWorkcellCapabilityCode))
+            .GroupBy(row => row.RequiredWorkcellCapabilityCode!.Trim().ToUpperInvariant(), StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new ConfigurationAuthoringWorkcellCapabilityOption
+            {
+                Code = group.Key,
+                RobotProgramIds = group.Select(row => row.RobotProgramId).Distinct().Order().ToArray()
+            })
+            .ToArray();
+        return new ConfigurationReleaseAuthoringOptionsReadModel
+        {
+            ProductVariants = variants,
+            Recipes = recipes,
+            RobotPrograms = programs,
+            WorkcellCapabilities = workcellCapabilities
+        };
     }
 
     public async Task<ConfigurationReleaseDiscardOutcome> DiscardDraftReleaseAsync(ConfigurationRelease release, CancellationToken cancellationToken = default)

@@ -1,6 +1,7 @@
 using Application.ProductionConfiguration.Releases.Commands;
 using Application.ProductionConfiguration.Deployments.Commands;
 using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Routes.Contracts;
 using Application.ProductionConfiguration.Releases.Queries;
 using Application.ProductionConfiguration.Deployments.Queries;
 using Application.ProductionConfiguration.Readiness.Queries;
@@ -127,11 +128,14 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
             UserContext = User.GetUserContext(),
             OrganizationId = organizationId,
             ReleaseId = releaseId,
+            ExpectedRevision = request.ExpectedRevision,
             Routes = request.Routes.Select(route => new ConfigurationReleaseRouteInput(
                 route.RecipeId,
                 route.RouteCode,
                 route.Priority,
-                route.RequiredCapabilitiesJson,
+                route.RequiredCapabilities.Select(requirement => new ExecutionRouteCapabilityRequirementContract(
+                    requirement.Code,
+                    requirement.Required)).ToArray(),
                 route.SupportedOptionCodes,
                 route.RobotBindings.Select(binding => new ConfigurationReleaseRobotBindingInput(
                     binding.RobotProgramId,
@@ -191,6 +195,9 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
 
 public sealed class ReplaceConfigurationReleaseRoutesRequest
 {
+    [Required, StringLength(64, MinimumLength = 64)]
+    public string ExpectedRevision { get; init; } = string.Empty;
+
     [Required, MinLength(1)]
     public IReadOnlyCollection<ConfigurationReleaseRouteRequest> Routes { get; init; } = Array.Empty<ConfigurationReleaseRouteRequest>();
 }
@@ -205,13 +212,21 @@ public sealed class ConfigurationReleaseRouteRequest
     [Range(0, int.MaxValue)]
     public int Priority { get; init; }
 
-    public string? RequiredCapabilitiesJson { get; init; }
+    public IReadOnlyCollection<ConfigurationReleaseCapabilityRequirementRequest> RequiredCapabilities { get; init; } = [];
 
     [Required]
     public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
 
     [Required, MinLength(1)]
     public IReadOnlyCollection<ConfigurationReleaseRobotBindingRequest> RobotBindings { get; init; } = Array.Empty<ConfigurationReleaseRobotBindingRequest>();
+}
+
+public sealed class ConfigurationReleaseCapabilityRequirementRequest
+{
+    [Required, StringLength(100)]
+    public string Code { get; init; } = string.Empty;
+
+    public bool Required { get; init; } = true;
 }
 
 public sealed class ConfigurationReleaseRobotBindingRequest

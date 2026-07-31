@@ -110,6 +110,12 @@ public sealed class FrontendContractTests
         Assert.Null(typeof(PlaceOrderItemRequest).GetProperty("OptionsJson"));
         Assert.NotNull(typeof(PlaceOrderItemRequest).GetProperty("SelectedOptions"));
         Assert.NotNull(typeof(UpdateMenuItemRequest).GetProperty("ClearRecipe"));
+        Assert.Null(typeof(ConfigurationReleaseRouteInput).GetProperty("RequiredCapabilitiesJson"));
+        Assert.NotNull(typeof(ConfigurationReleaseRouteInput).GetProperty("RequiredCapabilities"));
+        Assert.NotNull(typeof(ReplaceConfigurationReleaseRoutesCommand).GetProperty("ExpectedRevision"));
+        Assert.Null(typeof(ExecutionRouteResult).GetProperty("RequiredCapabilitiesJson"));
+        Assert.NotNull(typeof(ExecutionRouteResult).GetProperty("RequiredCapabilities"));
+        Assert.NotNull(typeof(ConfigurationReleaseResult).GetProperty("Revision"));
     }
 
     [Fact]

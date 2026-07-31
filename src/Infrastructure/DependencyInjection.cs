@@ -108,6 +108,7 @@ namespace Infrastructure
             services.AddSalesCatalogInfrastructure();
             services.AddTenantsInfrastructure();
             services.AddScoped<IInventoryStore, InventoryStore>();
+            services.AddScoped<IInventorySensorObservationStore, InventorySensorObservationStore>();
             services.AddOptions<Persistence.Jobs.DataRetentionOptions>()
                 .Bind(config.GetSection(Persistence.Jobs.DataRetentionOptions.SectionName))
                 .Validate(options =>

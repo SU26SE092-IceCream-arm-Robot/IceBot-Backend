@@ -107,6 +107,7 @@ The `IceBot.Payments.PayOS` meter adds provider-specific failure classification 
 | `icebot.mqtt.credentials.revocation.retry.attempts` | Counter | Automatic stale revocation retries | `outcome` |
 | `icebot.mqtt.credentials.stale.candidates` | Observable gauge | Stale credential operations selected by the latest scan | none |
 | `icebot.payos.request.failures` | Counter | Final PayOS timeout, open-circuit, or transient failures | `provider`, `operation`, `failure.kind` |
+| `icebot.payment.webhook.verified_unmatched` | Counter | Verified provider callbacks acknowledged without a matching local payment transaction | none |
 | `icebot.payment_session.reconciliation.outcomes` | Counter | Recovery outcomes for incomplete provider-session creation responses | `outcome` |
 | `icebot.payment_session.interventions` | Counter | Sessions requiring operator investigation after terminal reconciliation outcomes | `intervention` |
 | `icebot.payment_session.reconciliation.pending_age` | Histogram (seconds) | Age of an incomplete session when a reconciliation attempt starts | none |

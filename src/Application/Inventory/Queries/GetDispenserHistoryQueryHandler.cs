@@ -40,11 +40,15 @@ public sealed class GetDispenserHistoryQueryHandler(IInventoryStore inventory)
         var take = checked(pageNumber * pageSize);
         var movements = await inventory.ListStockMovementsForDispenserAsync(
             query.DispenserStateId, take, cancellationToken);
+        var observations = await inventory.ListSensorObservationsForDispenserAsync(
+            query.DispenserStateId, take, cancellationToken);
         var changes = await inventory.ListTopologyChangeRecordsAsync(
             query.DispenserStateId, take, cancellationToken);
         var rebinds = await inventory.ListTopologyRebindRecordsAsync(
             query.DispenserStateId, take, cancellationToken);
         var movementCount = await inventory.CountStockMovementsForDispenserAsync(
+            query.DispenserStateId, cancellationToken);
+        var observationCount = await inventory.CountSensorObservationsForDispenserAsync(
             query.DispenserStateId, cancellationToken);
         var changeCount = await inventory.CountTopologyChangeRecordsAsync(
             query.DispenserStateId, cancellationToken);
@@ -102,6 +106,26 @@ public sealed class GetDispenserHistoryQueryHandler(IInventoryStore inventory)
                 change.CreatedByAccountId,
                 change.CreatedAt,
                 actors)))
+            .Concat(observations.Select(observation => Entry(
+                observation.Id,
+                "SensorObservation",
+                observation.ObservedLevelStatus.ToString(),
+                observation.IngredientDispenserStateId,
+                null,
+                observation.Disposition.ToString(),
+                null,
+                null,
+                observation.DerivedEstimatedQuantity,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                "ExecutionEndpoint",
+                observation.KioskExecutionEndpointId,
+                observation.ObservedAt,
+                actors)))
             .Concat(rebinds.Select(rebind => Entry(
                 rebind.Id,
                 "TopologyRebind",
@@ -132,7 +156,7 @@ public sealed class GetDispenserHistoryQueryHandler(IInventoryStore inventory)
             .Take(pageSize)
             .ToArray();
 
-        var total = movementCount + changeCount + rebindCount;
+        var total = movementCount + observationCount + changeCount + rebindCount;
         return PagedResult<DispenserHistoryResult>.Success(
             timeline,
             total,

@@ -144,6 +144,7 @@ public class IceBotDbContext : DbContext
     public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<IngredientDispenserState> IngredientDispenserStates => Set<IngredientDispenserState>();
+    public DbSet<InventorySensorObservation> InventorySensorObservations => Set<InventorySensorObservation>();
     public DbSet<InventoryTopologyRebindRecord> InventoryTopologyRebindRecords => Set<InventoryTopologyRebindRecord>();
     public DbSet<InventoryTopologyChangeRecord> InventoryTopologyChangeRecords => Set<InventoryTopologyChangeRecord>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();

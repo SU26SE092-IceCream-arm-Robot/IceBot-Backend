@@ -10,6 +10,9 @@ using Application.ProductionConfiguration.Routes.Abstractions;
 using Application.ProductionConfiguration.Releases.Results;
 using Application.ProductionConfiguration.Deployments.Results;
 using Application.ProductionConfiguration.Routes.Support;
+using Application.ProductionConfiguration.Routes.Contracts;
+using Application.ProductionConfiguration.Releases.Support;
+using Application.Shared.Concurrency;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Common;
@@ -24,15 +27,18 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
     private readonly IConfigurationReleaseStore _releaseStore;
     private readonly IConfigurationRouteStore _routeStore;
     private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
     public ReplaceConfigurationReleaseRoutesCommandHandler(
         IConfigurationReleaseStore releaseStore,
         IConfigurationRouteStore routeStore,
-        ITechnicalResourceMutationPolicy technicalOwnership)
+        ITechnicalResourceMutationPolicy technicalOwnership,
+        ITechnicalResourceMutationCoordinator mutations)
     {
         _releaseStore = releaseStore;
         _routeStore = routeStore;
         _technicalOwnership = technicalOwnership;
+        _mutations = mutations;
     }
 
     public async Task<ApiResult<ConfigurationReleaseResult>> HandleAsync(
@@ -45,10 +51,27 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
             return ApiResult<ConfigurationReleaseResult>.Fail(requestError, 400);
         }
 
+        return await _mutations.ExecuteAsync(
+            [TechnicalResourceMutationIdentity.ConfigurationRelease(command.ReleaseId)],
+            ct => HandleLockedAsync(command, ct),
+            cancellationToken);
+    }
+
+    private async Task<ApiResult<ConfigurationReleaseResult>> HandleLockedAsync(
+        ReplaceConfigurationReleaseRoutesCommand command,
+        CancellationToken cancellationToken)
+    {
+
         var release = await _releaseStore.GetReleaseForEditAsync(command.ReleaseId, cancellationToken);
         if (release is null || release.OrganizationId != command.OrganizationId)
         {
             return ApiResult<ConfigurationReleaseResult>.Fail("Configuration release not found.", 404);
+        }
+
+        if (!ConfigurationReleaseRevisionToken.Matches(release, command.ExpectedRevision))
+        {
+            return ApiResult<ConfigurationReleaseResult>.Fail(
+                "Configuration release was changed by another editor. Refresh and retry.", 409);
         }
 
         if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ReleasePublish, command.UserContext, release.OrganizationId, null, null))
@@ -137,7 +160,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
                     route.RecipeId,
                     route.RouteCode.Trim().ToUpperInvariant(),
                     route.Priority,
-                    string.IsNullOrWhiteSpace(route.RequiredCapabilitiesJson) ? null : route.RequiredCapabilitiesJson.Trim(),
+                    ExecutionRouteCapabilityRequirementContractCodec.ToStorageJson(route.RequiredCapabilities),
                     (IReadOnlyCollection<string>)route.SupportedOptionCodes.ToArray(),
                     (IReadOnlyCollection<(Guid, int, string)>)route.RobotBindings
                         .OrderBy(binding => binding.BindingOrder)
@@ -192,7 +215,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
             }
 
             var requiredCapabilitiesError = ExecutionRouteRequiredCapabilitiesContract.Validate(
-                route.RequiredCapabilitiesJson,
+                ExecutionRouteCapabilityRequirementContractCodec.ToStorageJson(route.RequiredCapabilities),
                 route.RobotBindings.Select(binding => binding.RequiredWorkcellCapabilityCode).ToArray());
             if (requiredCapabilitiesError is not null)
             {
