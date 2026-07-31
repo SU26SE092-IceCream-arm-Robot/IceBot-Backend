@@ -87,8 +87,8 @@ GET /api/v1/management/permission-matrix
 These account-specific access APIs are implemented:
 
 ```http
-PUT /api/v1/management/accounts/{accountId}/roles
-GET /api/v1/management/accounts/{accountId}/effective-access
+PUT /api/v1/management/organizations/{organizationId}/accounts/{accountId}/roles
+GET /api/v1/management/organizations/{organizationId}/accounts/{accountId}/effective-access
 GET /api/v1/me/access
 ```
 
@@ -131,8 +131,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `roles.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View roles catalog and static permission matrix |
 | `role-scope-options.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View valid organizational scope options for a target role |
 | `dashboard.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View management dashboard metrics within assigned scope |
-| `accounts.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read internal accounts. SystemAdmin can read all accounts; OrgAdmin and Manager are scope-filtered |
-| `accounts.manage` | `SystemAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for internal accounts |
+| `accounts.read` | `SystemAdmin`, `OrgAdmin` | Read internal accounts through an organization-owned route. Results contain only role scopes belonging to that organization. |
+| `accounts.manage` | `SystemAdmin`, `OrgAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for organization-owned internal accounts. `OrgAdmin` is limited to accounts with assignable roles and scopes inside the actor's assigned organization; it cannot grant `SystemAdmin` or access another organization. Global `SystemAdmin` provisioning is bootstrap-only. |
 | `organizations.manage` | `SystemAdmin` | Platform-level organization management: create, activate, disable organizations |
 | `organizations.view` | `SystemAdmin`, `OrgAdmin` | View organizations. OrgAdmin can view/read only their assigned organization(s) |
 | `organizations.update` | `SystemAdmin`, `OrgAdmin` | Update organizations. OrgAdmin can update only basic profile/contact info for assigned organization(s); SystemAdmin can update platform-managed fields |
@@ -195,12 +195,12 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 - Scoped authorization evaluates role and resource scope from the same `UserRoleScope`. A privileged role in one tenant cannot borrow organization, store, or kiosk ids assigned to another role.
 - Management list queries pass role-specific effective scope sets into persistence filters. Sensitive read-by-id and mutation queries should include the same scope predicate and return `404` when the resource is outside that scope.
 - Route/resource authorization must validate requested scope before returning scoped tenant data or applying a state transition.
-- Account read APIs use `accounts.read` and must remain scope-filtered for non-`SystemAdmin` callers. Account mutation APIs use `accounts.manage` and remain `SystemAdmin` only.
-- `GET /management/accounts/{accountId}/effective-access` uses `accounts.read` and returns the target account's active role scopes plus the effective ids used by current scoped authorization rules.
+- Account read APIs use `accounts.read` and must remain scope-filtered for non-`SystemAdmin` callers. Account mutation APIs use `accounts.manage`; `OrgAdmin` can mutate only an account whose every active role is inside the caller's own organization scope. This prevents a shared or cross-organization account from being modified through one matching role.
+- `GET /management/organizations/{organizationId}/accounts/{accountId}/effective-access` uses `accounts.read` and returns only the target account's active role scopes and effective ids for that organization.
 - Effective access does not expand organization scope into store/kiosk ids. Use GraphQL `tenantTree` or REST `role-scope-options` for UI tree display.
 - `GET /me/access` is a self-inspection endpoint based on the current access token claims. Refresh the token after role changes to see updated access.
 - `/me/notification-devices` is authenticated self-service only; callers can register, inspect, or invalidate only their own FCM installations.
-- `PUT /management/accounts/{accountId}/roles` replaces active role assignments for the target account. `POST /management/accounts/{accountId}/roles` remains an add/upsert single-role operation.
+- `PUT /management/organizations/{organizationId}/accounts/{accountId}/roles` replaces active role assignments for the target account. `POST /management/organizations/{organizationId}/accounts/{accountId}/roles` remains an add/upsert single-role operation. Every submitted role must carry the same `OrganizationId` as the route, including Store/Kiosk-scoped roles.
 - Do not add `Staff` or `Technician` to product/menu pricing policies unless the business explicitly gives them that responsibility.
 
 ## Related Docs

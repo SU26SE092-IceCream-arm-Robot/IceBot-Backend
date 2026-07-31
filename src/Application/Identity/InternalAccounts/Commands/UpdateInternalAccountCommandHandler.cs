@@ -27,6 +27,11 @@ public sealed class UpdateInternalAccountCommandHandler
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
         }
 
+        if (!AccountManagementAccessRules.CanManageAccount(command.UserContext, command.OrganizationId, account))
+        {
+            return ApiResult<InternalAccountResult>.Fail("Account is outside the current organization's management scope.", 403);
+        }
+
         if (!string.IsNullOrWhiteSpace(request.Email))
         {
             var email = InternalAccountNormalizer.NormalizeEmail(request.Email);
@@ -83,6 +88,8 @@ public sealed class UpdateInternalAccountCommandHandler
         account.UpdatedByAccountId = updatedByAccountId;
         await _accounts.SaveChangesAsync(cancellationToken);
 
-        return ApiResult<InternalAccountResult>.Success(InternalAccountResultMapper.ToResult(account), "Internal account updated.");
+        return ApiResult<InternalAccountResult>.Success(
+            InternalAccountResultMapper.ToResult(account, organizationId: command.OrganizationId),
+            "Internal account updated.");
     }
 }

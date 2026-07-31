@@ -13,6 +13,7 @@ namespace Application.Identity.Abstractions
         Task<List<Account>> ListAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
@@ -24,6 +25,7 @@ namespace Application.Identity.Abstractions
         Task<int> CountAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,

@@ -34,9 +34,9 @@ GET /api/v1/management/organizations/{organizationId}/menus
 ### Identity, Payments, And Tenant Routes
 
 ```text
-GET /api/v1/management/accounts
-GET /api/v1/management/accounts/{accountId}/effective-access
-PUT /api/v1/management/accounts/{accountId}/roles
+GET /api/v1/management/organizations/{organizationId}/accounts
+GET /api/v1/management/organizations/{organizationId}/accounts/{accountId}/effective-access
+PUT /api/v1/management/organizations/{organizationId}/accounts/{accountId}/roles
 GET /api/v1/management/payment-methods
 GET /api/v1/management/organizations
 GET /api/v1/management/organizations/{organizationId}

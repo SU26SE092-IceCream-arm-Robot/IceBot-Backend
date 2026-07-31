@@ -27,10 +27,21 @@ public sealed class AssignInternalAccountRoleCommandHandler
             return ApiResult<InternalAccountResult>.Fail("Role code is required.", 400);
         }
 
+        if (request.OrganizationId != command.OrganizationId)
+        {
+            return ApiResult<InternalAccountResult>.Fail(
+                "Every account role must belong to the organization in the request route.", 403);
+        }
+
         var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
         if (account is null)
         {
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
+        }
+
+        if (!AccountManagementAccessRules.CanManageAccount(command.UserContext, command.OrganizationId, account))
+        {
+            return ApiResult<InternalAccountResult>.Fail("Account is outside the current organization's management scope.", 403);
         }
 
         var role = await _accounts.GetRoleByCodeAsync(request.RoleCode.Trim(), cancellationToken);
@@ -85,6 +96,8 @@ public sealed class AssignInternalAccountRoleCommandHandler
         account.UpdatedByAccountId = assignedByAccountId;
         await _accounts.SaveChangesAsync(cancellationToken);
 
-        return ApiResult<InternalAccountResult>.Success(InternalAccountResultMapper.ToResult(account), "Role assigned.");
+        return ApiResult<InternalAccountResult>.Success(
+            InternalAccountResultMapper.ToResult(account, organizationId: command.OrganizationId),
+            "Role assigned.");
     }
 }

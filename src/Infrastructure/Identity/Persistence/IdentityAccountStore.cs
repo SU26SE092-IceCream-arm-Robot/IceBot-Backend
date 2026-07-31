@@ -79,6 +79,7 @@ namespace Infrastructure.Identity.Persistence
         public Task<List<Account>> ListAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
@@ -91,6 +92,7 @@ namespace Infrastructure.Identity.Persistence
                     BuildAccountQuery(asNoTracking: true),
                     search,
                     status,
+                    organizationId,
                     isSystemAdmin,
                     allowedOrganizationIds,
                     allowedStoreIds,
@@ -104,6 +106,7 @@ namespace Infrastructure.Identity.Persistence
         public Task<int> CountAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
@@ -114,6 +117,7 @@ namespace Infrastructure.Identity.Persistence
                     _dbContext.Accounts.WhereNotDeleted().AsNoTracking(),
                     search,
                     status,
+                    organizationId,
                     isSystemAdmin,
                     allowedOrganizationIds,
                     allowedStoreIds,
@@ -157,6 +161,10 @@ namespace Infrastructure.Identity.Persistence
             var query = _dbContext.Accounts.WhereNotDeleted()
                 .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Role)
+                .Include(account => account.AccountRoles)
+                    .ThenInclude(accountRole => accountRole.Store)
+                .Include(account => account.AccountRoles)
+                    .ThenInclude(accountRole => accountRole.Kiosk)
                 .AsQueryable();
 
             return asNoTracking ? query.AsNoTracking() : query;
@@ -166,11 +174,18 @@ namespace Infrastructure.Identity.Persistence
             IQueryable<Account> query,
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
             IReadOnlySet<Guid> allowedKioskIds)
         {
+            query = query.Where(account => account.AccountRoles.Any(role =>
+                role.IsActive &&
+                (role.OrganizationId == organizationId ||
+                    (role.Store != null && role.Store.OrganizationId == organizationId) ||
+                    (role.Kiosk != null && role.Kiosk.OrganizationId == organizationId))));
+
             if (!isSystemAdmin)
             {
                 var allowedOrgIds = allowedOrganizationIds.ToArray();

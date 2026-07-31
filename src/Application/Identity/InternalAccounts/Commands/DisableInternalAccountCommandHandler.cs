@@ -32,12 +32,19 @@ public sealed class DisableInternalAccountCommandHandler
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
         }
 
+        if (!AccountManagementAccessRules.CanManageAccount(command.UserContext, command.OrganizationId, account))
+        {
+            return ApiResult<InternalAccountResult>.Fail("Account is outside the current organization's management scope.", 403);
+        }
+
         account.Status = AccountStatus.Disabled;
         account.UpdatedAt = DateTimeOffset.UtcNow;
         account.UpdatedByAccountId = updatedByAccountId;
         await _accounts.SaveChangesAsync(cancellationToken);
         await _refreshTokens.RevokeAllForAccountAsync(account.Id, "Account disabled by admin", null);
 
-        return ApiResult<InternalAccountResult>.Success(InternalAccountResultMapper.ToResult(account), "Internal account disabled.");
+        return ApiResult<InternalAccountResult>.Success(
+            InternalAccountResultMapper.ToResult(account, organizationId: command.OrganizationId),
+            "Internal account disabled.");
     }
 }

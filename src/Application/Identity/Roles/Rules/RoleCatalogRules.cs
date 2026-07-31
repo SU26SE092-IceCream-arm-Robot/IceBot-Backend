@@ -27,7 +27,8 @@ internal static class RoleCatalogRules
 
         if (string.Equals(userRoleCode, "OrgAdmin", StringComparison.OrdinalIgnoreCase))
         {
-            return string.Equals(targetRoleCode, "Manager", StringComparison.OrdinalIgnoreCase) ||
+            return string.Equals(targetRoleCode, "OrgAdmin", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(targetRoleCode, "Manager", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(targetRoleCode, "Staff", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(targetRoleCode, "Technician", StringComparison.OrdinalIgnoreCase);
         }

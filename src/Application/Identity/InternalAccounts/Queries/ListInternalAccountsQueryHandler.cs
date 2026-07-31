@@ -20,11 +20,22 @@ public sealed class ListInternalAccountsQueryHandler
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
+        if (!ScopeAccessRules.CanAccessScopedRow(
+                ScopeRoleSets.AccountsRead,
+                query.UserContext,
+                query.OrganizationId,
+                null,
+                null))
+        {
+            return PagedResult<InternalAccountResult>.Forbidden("Access denied.", pageNumber, pageSize);
+        }
+
         var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AccountsRead, query.UserContext);
 
         var totalCount = await _accounts.CountAsync(
             query.Search,
             query.Status,
+            query.OrganizationId,
             query.UserContext.IsSystemAdmin,
             scope.OrganizationIds,
             scope.StoreIds,
@@ -34,6 +45,7 @@ public sealed class ListInternalAccountsQueryHandler
         var accounts = await _accounts.ListAsync(
             query.Search,
             query.Status,
+            query.OrganizationId,
             query.UserContext.IsSystemAdmin,
             scope.OrganizationIds,
             scope.StoreIds,
@@ -42,7 +54,7 @@ public sealed class ListInternalAccountsQueryHandler
             pageSize,
             cancellationToken);
         return PagedResult<InternalAccountResult>.Success(
-            accounts.Select(account => InternalAccountResultMapper.ToResult(account)),
+            accounts.Select(account => InternalAccountResultMapper.ToResult(account, organizationId: query.OrganizationId)),
             totalCount,
             pageNumber,
             pageSize);

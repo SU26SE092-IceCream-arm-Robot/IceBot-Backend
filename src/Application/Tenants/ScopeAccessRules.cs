@@ -84,7 +84,7 @@ public sealed record EffectiveScope(
 
 public static class ScopeRoleSets
 {
-    public static readonly string[] AccountsRead = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] AccountsRead = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OrganizationsView = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OrganizationsUpdate = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] StoresView = ["SystemAdmin", "OrgAdmin", "Manager"];
