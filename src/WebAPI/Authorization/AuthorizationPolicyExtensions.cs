@@ -11,14 +11,14 @@ public static class AuthorizationPolicyExtensions
 
         options.AddScopedRolePolicy("payments.manage", "SystemAdmin", "Manager");
         options.AddScopedRolePolicy("payment-methods.manage", "SystemAdmin");
-        options.AddScopedRolePolicy("products.manage", "SystemAdmin", "Manager");
-        options.AddScopedRolePolicy("product-categories.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("products.manage", "SystemAdmin", "OrgAdmin", "Manager");
+        options.AddScopedRolePolicy("product-categories.read", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("product-categories.manage", "SystemAdmin");
-        options.AddScopedRolePolicy("ingredients.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("ingredients.read", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("ingredients.manage", "SystemAdmin");
-        options.AddScopedRolePolicy("product-templates.read", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("product-templates.read", "SystemAdmin", "OrgAdmin", "Manager");
         options.AddScopedRolePolicy("product-templates.manage", "SystemAdmin");
-        options.AddScopedRolePolicy("menus.manage", "SystemAdmin", "Manager");
+        options.AddScopedRolePolicy("menus.manage", "SystemAdmin", "OrgAdmin", "Manager");
 
         options.AddScopedRolePolicy("organizations.manage", "SystemAdmin");
         options.AddScopedRolePolicy("organizations.view", "SystemAdmin", "OrgAdmin");

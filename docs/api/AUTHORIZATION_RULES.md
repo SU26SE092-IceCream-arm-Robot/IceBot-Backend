@@ -162,14 +162,14 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `package.fork` | `SystemAdmin`, `OrgAdmin` | Convert package-managed technical configuration into an explicit organization fork |
 | `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request a new deployment from a previously Active Full Edge release or low-cost artifact set within assigned scope |
 | `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |
-| `product-templates.read` | `SystemAdmin`, `Manager` | Browse global product templates for cloning into an assigned organization |
+| `product-templates.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Browse global product templates for cloning into an assigned organization |
 | `product-templates.manage` | `SystemAdmin` | Manage global product templates; tenant roles cannot author or mutate global catalog rows |
-| `products.manage` | `SystemAdmin`, `Manager` | Manage organization-owned products and variants within assigned organization/store/kiosk scope |
-| `product-categories.read` | `SystemAdmin`, `Manager` | Browse the global flat ProductCategory catalog used by product authoring |
+| `products.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Manage organization-owned products and variants within assigned organization/store/kiosk scope |
+| `product-categories.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Browse the global flat ProductCategory catalog used by product authoring |
 | `product-categories.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ProductCategory definitions |
-| `ingredients.read` | `SystemAdmin`, `Manager` | Browse the global ingredient reference catalog used by recipe authoring |
+| `ingredients.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Browse the global ingredient reference catalog used by recipe authoring |
 | `ingredients.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ingredient definitions |
-| `menus.manage` | `SystemAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
+| `menus.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
 | `payments.manage` | `SystemAdmin`, `Manager` | Tenant payment operations and intervention workflows |
 | `payment-methods.manage` | `SystemAdmin` | Global payment-method catalog status management |
 | `refunds.manage` | `SystemAdmin`, `Manager`, `Staff` | Manual support/refund workflow. Auto provider refund is future work |

@@ -102,14 +102,14 @@ internal static class PermissionMatrixRules
         {
             Policy = "products.manage",
             Description = "Manage organization-owned products and variants within assigned scope.",
-            Roles = new[] { "SystemAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
         {
             Policy = "product-categories.read",
             Description = "Browse the global flat ProductCategory catalog used by product authoring.",
-            Roles = new[] { "SystemAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = false
         },
         new()
@@ -123,7 +123,7 @@ internal static class PermissionMatrixRules
         {
             Policy = "ingredients.read",
             Description = "Browse the global ingredient reference catalog used by recipe authoring.",
-            Roles = new[] { "SystemAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = false
         },
         new()
@@ -137,7 +137,7 @@ internal static class PermissionMatrixRules
         {
             Policy = "product-templates.read",
             Description = "Browse global product templates for tenant cloning.",
-            Roles = new[] { "SystemAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = false
         },
         new()
@@ -151,7 +151,7 @@ internal static class PermissionMatrixRules
         {
             Policy = "menus.manage",
             Description = "Manage organization-owned menus and menu items within assigned scope.",
-            Roles = new[] { "SystemAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()

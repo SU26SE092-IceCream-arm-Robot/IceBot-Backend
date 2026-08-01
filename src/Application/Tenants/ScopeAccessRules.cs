@@ -94,9 +94,9 @@ public static class ScopeRoleSets
     public static readonly string[] KiosksManage = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] TenantTreeView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] RoleScopeOptionsView = ["SystemAdmin", "OrgAdmin", "Manager"];
-    public static readonly string[] ProductsManage = ["SystemAdmin", "Manager"];
-    public static readonly string[] ProductTemplatesRead = ["SystemAdmin", "Manager"];
-    public static readonly string[] MenusManage = ["SystemAdmin", "Manager"];
+    public static readonly string[] ProductsManage = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] ProductTemplatesRead = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] MenusManage = ["SystemAdmin", "OrgAdmin", "Manager"];
     public static readonly string[] InventoryManage = ["SystemAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] InventoryView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] InventoryConfigure = ["SystemAdmin", "Manager", "Technician"];
