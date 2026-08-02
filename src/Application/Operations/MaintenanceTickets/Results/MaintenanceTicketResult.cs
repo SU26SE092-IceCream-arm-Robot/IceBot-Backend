@@ -1,5 +1,12 @@
 namespace Application.Operations.MaintenanceTickets.Results;
 
+public sealed class MaintenanceAssigneeOptionResult
+{
+    public Guid AccountId { get; init; }
+    public string DisplayName { get; init; } = string.Empty;
+    public List<string> RoleCodes { get; init; } = [];
+}
+
 public sealed class MaintenanceTicketResult
 {
     public Guid Id { get; init; }

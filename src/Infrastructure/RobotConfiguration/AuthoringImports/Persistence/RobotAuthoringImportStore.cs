@@ -74,7 +74,11 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
                 importSession.AppliedAt,
                 importSession.PublishedAt,
                 importSession.FailureCode,
-                importSession.FailureMessage))
+                importSession.FailureMessage,
+                dbContext.Accounts
+                    .Where(account => account.Id == importSession.CreatedByAccountId)
+                    .Select(account => account.FullName ?? account.UserName)
+                    .FirstOrDefault()))
             .ToListAsync(cancellationToken);
     }
 
@@ -254,6 +258,10 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
                 EF.Functions.ILike(importSession.ProposedProgramCode, $"%{term}%") ||
                 EF.Functions.ILike(importSession.ProposedProgramName, $"%{term}%"));
         }
+        if (criteria.CreatedFrom.HasValue)
+            query = query.Where(importSession => importSession.CreatedAt >= criteria.CreatedFrom.Value);
+        if (criteria.CreatedTo.HasValue)
+            query = query.Where(importSession => importSession.CreatedAt <= criteria.CreatedTo.Value);
 
         return criteria.Status switch
         {

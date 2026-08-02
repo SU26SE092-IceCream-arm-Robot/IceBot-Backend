@@ -7,6 +7,7 @@ public static class MaintenanceTicketAccessRules
 {
     private static readonly string[] AssignmentRoles = ["SystemAdmin", "OrgAdmin", "Manager"];
     private static readonly string[] WorkRoles = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
+    public static readonly string[] AssigneeRoles = ["Technician", "Manager"];
 
     public static bool CanView(CurrentUserContext user, Guid orgId, Guid storeId, Guid kioskId, Guid? assignedToAccountId)
         => ScopeAccessRules.CanAccessScopedRow(

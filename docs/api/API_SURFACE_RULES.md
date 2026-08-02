@@ -36,7 +36,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Area | Main routes | Read when asking about |
 | --- | --- | --- |
 | Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password, accept invitation |
-| Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password`, `/api/v1/me/access`, `/api/v1/me/notification-devices` | own profile, edit profile, change password, inspect current token access, and manage the caller's FCM registrations |
+| Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password`, `/api/v1/me/access`, `/api/v1/me/notification-devices` | own profile, edit profile, change password, inspect current token access and permission codes, and manage the caller's FCM registrations |
 | Account management | `/api/v1/management/organizations/{organizationId}/accounts/*` | create internal account, invitation link generation, assign/update roles, effective access, disable account, set password |
 | Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
@@ -44,7 +44,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Device management | global index: `/api/v1/management/devices`; kiosk-owned operations: `/api/v1/management/kiosks/{kioskId}/devices/*` | create/update/set management status/retire devices, list and view devices |
 | Device catalog | `/api/v1/management/device-types/*`, `/api/v1/management/device-models/*` | lookup device type/model IDs; SystemAdmin authors the global hardware catalog |
 | Execution endpoint management | global index: `/api/v1/management/execution-endpoints`; kiosk-owned operations: `/api/v1/management/kiosks/{kioskId}/execution-endpoints/*` | create, provision, inspect, configure compatibility, disable/reactivate, rotate credentials, and retire Full Edge or low-cost execution endpoints |
-| Tenant scope lookup | GraphQL `tenantTree`, `/api/v1/management/role-scope-options` | select valid organization/store/kiosk scopes for RBAC and management navigation |
+| Account role assignment lookup | `/api/v1/management/accounts/assignable-role-options`, `/api/v1/management/role-scope-options`, GraphQL `tenantTree` | choose roles the current account-management actor may assign, then select valid organization/store/kiosk scope options |
 | Global product templates | `/api/v1/management/product-templates/*` | SystemAdmin-only platform template authoring |
 | Organization product and menu management | `/api/v1/management/organizations/{organizationId}/products/*`, `/api/v1/management/organizations/{organizationId}/menus/*` | tenant-scoped catalog/menu/pricing operations |
 | Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-authoring-imports/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/organizations/{organizationId}/robot-programs/*`, `/api/v1/management/organizations/{organizationId}/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments/*` | stage and validate one Fairino authoring bundle, materialize Draft artifacts/programs, publish immutable robot configuration, and request/read/rollback Full Edge or low-cost controller deployment |
@@ -53,7 +53,7 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Inventory management | `/api/v1/management/inventory/*`, `/api/v1/management/kiosks/{kioskId}/inventory/*`, `/api/v1/management/kiosks/{kioskId}/configuration-releases/{releaseId}/inventory-readiness` | dispenser topology, release readiness, state, stock movement history, refill, estimate adjustment |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/device-events`, `/api/v1/management/kiosks/{kioskId}/operation-logs` | kiosk connectivity history, device warnings/errors, and Edge local operation logs |
 | Sync dead-letter operations | `/api/v1/management/sync-dead-letters` | SystemAdmin inspection, typed retry, retry audit, resolve, and ignore |
-| Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues |
+| Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues; ticket-scoped assignee lookup returns only eligible active maintenance operators |
 | Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, execution reports, event replay, heartbeat, configuration sync |
 | Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
@@ -134,7 +134,7 @@ Rules:
 
 - Do not use `/me` for business resources such as orders, kiosks, reports, or maintenance tickets.
 - Password recovery is not `/me` because the user may be logged out.
-- `/me/access` reports the caller's current token roles and effective scoped ids. It is not a fresh database authorization recalculation.
+- `/me/access` reports the caller's current token roles, permission codes, and effective scoped ids. `permissionCodes` is the UI capability contract; clients must not infer a permission from a role name. It is not a fresh database authorization recalculation.
 - Notification-device routes are self-service FCM registration only. They never accept `AccountId`, expose a push token/hash, or grant trusted-session behavior. Registration is serialized by both account installation and token identity. Reassigning or invalidating a registration removes the stored raw provider token while retaining its hash as audit correlation. Delivery selects registrations only while their owning account is Active.
 
 ## Authentication And Password Recovery APIs

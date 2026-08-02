@@ -28,6 +28,7 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     private readonly FullEdgeReleaseBundleService _bundleService;
     private readonly DeploymentValidationService? _deploymentValidation;
     private readonly IConfigurationDeploymentPreviewService? _deploymentPreview;
+    private readonly DeploymentOperationAuditWriter? _operationAudit;
 
     public DeployFullEdgeConfigurationCommandHandler(
         IConfigurationDeploymentStore deploymentStore,
@@ -73,6 +74,22 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         _deploymentPreview = deploymentPreview;
     }
 
+    public DeployFullEdgeConfigurationCommandHandler(
+        IConfigurationDeploymentStore deploymentStore,
+        IConfigurationReleaseStore releaseStore,
+        IEdgeCommandStore edgeCommandStore,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        FullEdgeReleaseBundleService bundleService,
+        DeploymentValidationService deploymentValidation,
+        IConfigurationDeploymentPreviewService deploymentPreview,
+        DeploymentOperationAuditWriter operationAudit)
+        : this(deploymentStore, releaseStore, edgeCommandStore, wakeUpPublisher, inventoryReadiness,
+            bundleService, deploymentValidation, deploymentPreview)
+    {
+        _operationAudit = operationAudit;
+    }
+
     public async Task<ApiResult<KioskConfigurationDeploymentResult>> HandleAsync(
         DeployFullEdgeConfigurationCommand command,
         CancellationToken cancellationToken = default)
@@ -83,6 +100,12 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             string.IsNullOrWhiteSpace(command.IdempotencyKey) || command.IdempotencyKey.Trim().Length > 200)
         {
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Kiosk, configuration release, and execution endpoint are required.", 400);
+        }
+
+        var reason = command.Reason?.Trim();
+        if (reason is null or { Length: < 3 or > 500 })
+        {
+            return ApiResult<KioskConfigurationDeploymentResult>.Fail("Deployment reason is required and must be between 3 and 500 characters.", 400);
         }
 
         var release = await _releaseStore.GetPublishedReleaseForDeploymentAsync(
@@ -278,6 +301,26 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
 
                     await _deploymentStore.AddFullEdgeDeploymentAsync(deployment, ct);
                     await _edgeCommandStore.AddAsync(edgeCommand, ct);
+                    if (_operationAudit is not null)
+                    {
+                        await _operationAudit.WriteRequestedAsync(
+                            command.UserContext,
+                            command.IsRollback ? ScopeRoleSets.ReleaseRollback : ScopeRoleSets.ReleaseDeploy,
+                            command.IsRollback ? "ConfigurationRollbackRequested" : "ConfigurationDeploymentRequested",
+                            reason,
+                            endpoint.Kiosk.OrganizationId,
+                            endpoint.Kiosk.StoreId,
+                            deployment.KioskId,
+                            deployment.KioskExecutionEndpointId,
+                            deployment.Id,
+                            edgeCommand.Id,
+                            deployment.ConfigurationReleaseId,
+                            deployment.ReleaseChecksum,
+                            endpoint.ActiveConfigurationDeploymentId,
+                            command.RollbackTargetDeploymentId,
+                            now,
+                            ct);
+                    }
                     await _deploymentStore.SaveChangesAsync(ct);
 
                     return ApiResult<KioskConfigurationDeploymentResult>.Success(

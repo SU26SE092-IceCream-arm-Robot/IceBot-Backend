@@ -36,6 +36,19 @@ public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurati
         RollbackConfigurationDeploymentCommand command,
         CancellationToken cancellationToken = default)
     {
+        var reason = command.Reason?.Trim();
+        if (reason is null or { Length: < 3 or > 500 })
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail(
+                "Rollback reason is required and must be between 3 and 500 characters.", 400);
+        }
+
+        if (command.ExpectedActiveDeploymentId == Guid.Empty)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail(
+                "Expected active deployment id is required.", 400);
+        }
+
         var target = await _store.GetConfigurationDeploymentAsync(command.TargetDeploymentId, cancellationToken);
         if (target is null)
         {
@@ -66,14 +79,15 @@ public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurati
 
         return target.Profile switch
         {
-            ConfigurationDeploymentProfile.FullEdge => await RollbackFullEdgeAsync(command, target, endpoint, cancellationToken),
-            ConfigurationDeploymentProfile.LowCostController => await RollbackLowCostAsync(command, target, endpoint, cancellationToken),
+            ConfigurationDeploymentProfile.FullEdge => await RollbackFullEdgeAsync(command, reason, target, endpoint, cancellationToken),
+            ConfigurationDeploymentProfile.LowCostController => await RollbackLowCostAsync(command, reason, target, endpoint, cancellationToken),
             _ => ApiResult<ConfigurationDeploymentRollbackResult>.Fail("Rollback target profile is not supported.", 400)
         };
     }
 
     private async Task<ApiResult<ConfigurationDeploymentRollbackResult>> RollbackFullEdgeAsync(
         RollbackConfigurationDeploymentCommand command,
+        string reason,
         ConfigurationDeploymentReadModel target,
         Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         CancellationToken cancellationToken)
@@ -88,6 +102,12 @@ public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurati
             return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("The selected deployment is already active.", 409);
         }
 
+        if (endpoint.ActiveConfigurationDeploymentId != command.ExpectedActiveDeploymentId)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail(
+                "The endpoint active deployment changed. Refresh deployment history before retrying rollback.", 409);
+        }
+
         var result = await _fullEdgeDeployHandler.HandleAsync(
             new DeployFullEdgeConfigurationCommand
             {
@@ -96,6 +116,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurati
                 ConfigurationReleaseId = target.ConfigurationReleaseId,
                 KioskExecutionEndpointId = target.KioskExecutionEndpointId,
                 IdempotencyKey = command.IdempotencyKey,
+                Reason = reason,
                 CommandExpiryAt = command.CommandExpiryAt,
                 RollbackTargetDeploymentId = target.Id
             },
@@ -126,6 +147,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurati
 
     private async Task<ApiResult<ConfigurationDeploymentRollbackResult>> RollbackLowCostAsync(
         RollbackConfigurationDeploymentCommand command,
+        string reason,
         ConfigurationDeploymentReadModel target,
         Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint endpoint,
         CancellationToken cancellationToken)
@@ -138,6 +160,12 @@ public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurati
         if (endpoint.ActiveArtifactSetDeploymentId == target.Id)
         {
             return ApiResult<ConfigurationDeploymentRollbackResult>.Fail("The selected artifact set is already active.", 409);
+        }
+
+        if (endpoint.ActiveArtifactSetDeploymentId != command.ExpectedActiveDeploymentId)
+        {
+            return ApiResult<ConfigurationDeploymentRollbackResult>.Fail(
+                "The endpoint active deployment changed. Refresh deployment history before retrying rollback.", 409);
         }
 
         var source = await _store.GetControllerArtifactSetDeploymentForRollbackAsync(target.Id, cancellationToken);
@@ -154,6 +182,7 @@ public sealed class RollbackConfigurationDeploymentCommandHandler : IConfigurati
                 ConfigurationReleaseId = target.ConfigurationReleaseId,
                 KioskExecutionEndpointId = target.KioskExecutionEndpointId,
                 IdempotencyKey = command.IdempotencyKey,
+                Reason = reason,
                 Selections = source.Items
                     .Select(item => new DeployLowCostArtifactSelection(item.ExecutionRouteId, item.RobotProgramId))
                     .Distinct()

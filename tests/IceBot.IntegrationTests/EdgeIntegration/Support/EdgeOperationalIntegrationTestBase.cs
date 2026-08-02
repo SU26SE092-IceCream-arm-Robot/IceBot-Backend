@@ -888,7 +888,8 @@ public abstract class EdgeOperationalIntegrationTestBase
                     KioskId = graph.KioskId,
                     ConfigurationReleaseId = releaseId,
                     KioskExecutionEndpointId = graph.EndpointId,
-                    IdempotencyKey = Guid.NewGuid().ToString("N")
+                    IdempotencyKey = Guid.NewGuid().ToString("N"),
+                    Reason = "Edge operational integration deployment"
                 });
             Assert.True(deployed.Succeeded, deployed.Message);
             deploymentId = deployed.Data!.Id;

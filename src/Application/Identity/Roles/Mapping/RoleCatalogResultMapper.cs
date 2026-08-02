@@ -6,7 +6,7 @@ namespace Application.Identity.Roles.Mapping;
 
 internal static class RoleCatalogResultMapper
 {
-    public static ManagementRoleResult ToResult(Role role, bool isAssignable)
+    public static ManagementRoleResult ToResult(Role role)
     {
         var description = role.Description;
         var allowedScopes = new List<string>();
@@ -29,7 +29,6 @@ internal static class RoleCatalogResultMapper
             Name = role.Name,
             Description = description,
             IsSystemRole = role.IsSystemRole,
-            IsAssignable = isAssignable,
             AllowedScopeTypes = allowedScopes,
             RequiresScope = requiresScope
         };

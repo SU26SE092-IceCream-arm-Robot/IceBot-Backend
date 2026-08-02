@@ -29,18 +29,18 @@ public sealed class ListManagementRolesQueryHandler
         {
             if (isSystemAdmin)
             {
-                results.Add(RoleCatalogResultMapper.ToResult(role, isAssignable: true));
+                results.Add(RoleCatalogResultMapper.ToResult(role));
             }
             else
             {
                 var canAssign = callerRoles.Any(callerRole => RoleCatalogRules.CanAssignRole(callerRole, role.Code));
                 if (canAssign)
                 {
-                    results.Add(RoleCatalogResultMapper.ToResult(role, isAssignable: true));
+                    results.Add(RoleCatalogResultMapper.ToResult(role));
                 }
             }
         }
 
-        return ApiResult<IEnumerable<ManagementRoleResult>>.Success(results, "Roles catalog retrieved successfully.");
+        return ApiResult<IEnumerable<ManagementRoleResult>>.Success(results, "Assignable account role options retrieved successfully.");
     }
 }

@@ -34,10 +34,13 @@ public sealed class ManagementRobotAuthoringImportsController(
         [FromQuery] string? search,
         [FromQuery] int pageNumber = 1,
         [FromQuery] int pageSize = 20,
+        [FromQuery] DateTimeOffset? createdFrom = null,
+        [FromQuery] DateTimeOffset? createdTo = null,
         CancellationToken cancellationToken = default)
     {
         var result = await listHandler.HandleAsync(new ListRobotAuthoringImportsQuery(
-            User.GetUserContext(), organizationId, status, storeId, kioskId, deviceId, search, pageNumber, pageSize),
+            User.GetUserContext(), organizationId, status, storeId, kioskId, deviceId, search, pageNumber, pageSize,
+            createdFrom, createdTo),
             cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

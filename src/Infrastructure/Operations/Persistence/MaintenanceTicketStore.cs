@@ -1,5 +1,7 @@
 using Domain.Devices.Telemetry;
 using Application.Operations.Abstractions;
+using Application.Operations.MaintenanceTickets.Results;
+using Application.Operations.MaintenanceTickets.Rules;
 using Domain.Operations.Entities;
 using Domain.Operations.Enums;
 using Infrastructure.Data;
@@ -226,18 +228,62 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
             return Task.FromResult(false);
         }
 
-        return _dbContext.AccountRoles.AsNoTracking().AnyAsync(accountRole =>
-            accountRole.AccountId == accountId &&
+        return QueryAssignableAccountRoles(organizationId, storeId, kioskId)
+            .AnyAsync(accountRole => accountRole.AccountId == accountId, cancellationToken);
+    }
+
+    public async Task<List<MaintenanceAssigneeOptionResult>> ListAssignableAccountsAsync(
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default)
+    {
+        var rows = await QueryAssignableAccountRoles(organizationId, storeId, kioskId)
+            .Select(accountRole => new
+            {
+                accountRole.AccountId,
+                DisplayName = accountRole.Account.FullName ?? accountRole.Account.UserName,
+                RoleCode = accountRole.Role.Code
+            })
+            .ToListAsync(cancellationToken);
+
+        return rows
+            .GroupBy(row => new
+            {
+                row.AccountId,
+                row.DisplayName
+            })
+            .Select(group => new MaintenanceAssigneeOptionResult
+            {
+                AccountId = group.Key.AccountId,
+                DisplayName = group.Key.DisplayName,
+                RoleCodes = group
+                    .Select(row => row.RoleCode)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(roleCode => roleCode, StringComparer.Ordinal)
+                    .ToList()
+            })
+            .OrderBy(option => option.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private IQueryable<Domain.Identity.Entities.AccountRole> QueryAssignableAccountRoles(
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId)
+    {
+        return _dbContext.AccountRoles.AsNoTracking().Where(accountRole =>
             accountRole.IsActive &&
             accountRole.Account.DeletedAt == null &&
             accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
-            (accountRole.Role.Code == "Technician" ||
-             accountRole.Role.Code == "Manager" ||
-             accountRole.Role.Code == "OrgAdmin") &&
-            (accountRole.KioskId == kioskId ||
-             accountRole.StoreId == storeId ||
-             accountRole.OrganizationId == organizationId),
-            cancellationToken);
+            (
+                (MaintenanceTicketAccessRules.AssigneeRoles.Contains(accountRole.Role.Code) &&
+                 (accountRole.KioskId == kioskId ||
+                  (!accountRole.KioskId.HasValue && accountRole.StoreId == storeId) ||
+                  (!accountRole.KioskId.HasValue &&
+                   !accountRole.StoreId.HasValue &&
+                   accountRole.OrganizationId == organizationId)))
+            ));
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

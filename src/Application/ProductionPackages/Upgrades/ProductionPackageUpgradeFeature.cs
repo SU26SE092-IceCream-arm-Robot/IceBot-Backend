@@ -376,6 +376,8 @@ public sealed class ProductionPackageUpgradeService(
                 KioskId = endpoint.KioskId,
                 TargetDeploymentId = endpoint.SourceDeploymentId,
                 IdempotencyKey = $"package-upgrade-rollback:{upgradeId:N}:{endpoint.KioskExecutionEndpointId:N}:{attemptNo}",
+                Reason = $"Production package upgrade rollback: {reason.Trim()}",
+                ExpectedActiveDeploymentId = endpoint.TargetDeploymentId,
                 CommandExpiryAt = commandExpiryAt
             }, cancellationToken);
             if (!result.Succeeded || result.Data is null)

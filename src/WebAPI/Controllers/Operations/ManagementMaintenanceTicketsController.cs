@@ -22,6 +22,7 @@ public class ManagementMaintenanceTicketsController : ControllerBase
     private readonly CancelMaintenanceTicketCommandHandler _cancelHandler;
     private readonly GetMaintenanceTicketQueryHandler _getHandler;
     private readonly ListMaintenanceTicketsQueryHandler _listHandler;
+    private readonly ListMaintenanceTicketAssigneeOptionsQueryHandler _assigneeOptionsHandler;
 
     public ManagementMaintenanceTicketsController(
         CreateMaintenanceTicketCommandHandler createHandler,
@@ -32,7 +33,8 @@ public class ManagementMaintenanceTicketsController : ControllerBase
         CloseMaintenanceTicketCommandHandler closeHandler,
         CancelMaintenanceTicketCommandHandler cancelHandler,
         GetMaintenanceTicketQueryHandler getHandler,
-        ListMaintenanceTicketsQueryHandler listHandler)
+        ListMaintenanceTicketsQueryHandler listHandler,
+        ListMaintenanceTicketAssigneeOptionsQueryHandler assigneeOptionsHandler)
     {
         _createHandler = createHandler;
         _updateHandler = updateHandler;
@@ -43,6 +45,7 @@ public class ManagementMaintenanceTicketsController : ControllerBase
         _cancelHandler = cancelHandler;
         _getHandler = getHandler;
         _listHandler = listHandler;
+        _assigneeOptionsHandler = assigneeOptionsHandler;
     }
 
     [HttpGet("maintenance-tickets")]
@@ -96,6 +99,22 @@ public class ManagementMaintenanceTicketsController : ControllerBase
         };
 
         var result = await _getHandler.HandleAsync(query, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("maintenance-tickets/{id:guid}/assignee-options")]
+    [Authorize(Policy = "maintenance.manage")]
+    public async Task<IActionResult> ListAssigneeOptions(
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await _assigneeOptionsHandler.HandleAsync(
+            new ListMaintenanceTicketAssigneeOptionsQuery
+            {
+                TicketId = id,
+                UserContext = User.GetUserContext()
+            },
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

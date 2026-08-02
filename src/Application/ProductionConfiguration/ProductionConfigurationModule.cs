@@ -22,6 +22,7 @@ public static class ProductionConfigurationModule
         services.AddScoped<ProductionDefinitionPublicationService>();
         services.AddScoped<DeploymentValidationService>();
         services.AddScoped<ConfigurationDeploymentPreviewHandler>();
+        services.AddScoped<DeploymentOperationAuditWriter>();
         services.AddScoped<IConfigurationDeploymentPreviewService>(provider =>
             provider.GetRequiredService<ConfigurationDeploymentPreviewHandler>());
         services.AddScoped<RetireConfigurationReleaseCommandHandler>();
