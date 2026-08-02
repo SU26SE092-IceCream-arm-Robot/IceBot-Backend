@@ -131,6 +131,9 @@ The `IceBot.Payments.PayOS` meter adds provider-specific failure classification 
 | `icebot.edge.execution.observation.transitions` | Counter | Transitions to stale/unreachable customer observations | `observation.status`, `customer.status` |
 | `icebot.edge.execution.stale.age` | Histogram (seconds) | Age of the last executor report at stale/unreachable transition | `observation.status` |
 | `icebot.edge.execution.observed` | Observable gauge | Current active execution projections that are Stale or Unreachable | `observation.status` |
+| `icebot.runtime_menu.cache.requests` | Counter | Runtime-menu cache outcome | `cache.outcome` (`disabled`, `hit`, `miss`, `fallback`) |
+| `icebot.runtime_menu.cache.failures` | Counter | Redis/HybridCache failures that triggered database fallback | none |
+| `icebot.runtime_menu.cache.build.duration` | Histogram (ms) | Time to resolve a sellable menu projection from the source path | none |
 
 Rules:
 
@@ -146,6 +149,7 @@ Rules:
 - Payment-session reconciliation uses the persisted provider order code. `AwaitingWebhook` means provider lookup reported paid while Cloud is still waiting for the signed webhook; it must be investigated through order-scoped payment diagnostics rather than treated as fulfillment success.
 - Alert on any sustained increase of `icebot.payment_session.interventions`, especially `AwaitingWebhook`, `IdentityMismatch`, and `AmountMismatch`. Use the tenant-scoped intervention queue to identify affected orders; metric tags intentionally contain no payment or order IDs.
 - MQTT disabled is an explicit outcome, not a publish failure. Alert only on `outcome=failed` when MQTT is expected to be enabled.
+- Alert on sustained `icebot.runtime_menu.cache.failures` only when `RuntimeMenuCache__Enabled=true`; fallback preserves availability, but repeated failures indicate an unhealthy Redis dependency.
 - Alert on sustained MQTT uplink `retryable`, `malformed`, or `invalid_size`
   outcomes. Broker ACL rejection and disconnected clients require broker-side
   metrics because those messages never reach the application consumer.

@@ -25,3 +25,7 @@ public sealed record MenuItemProductOptionReadModel(
 public sealed record ActiveProductionRouteOptionPolicy(
     Guid ExecutionRouteId,
     IReadOnlySet<string> SupportedOptionCodes);
+
+public readonly record struct ActiveProductionRouteOptionPolicyKey(
+    Guid ProductVariantId,
+    Guid RecipeId);

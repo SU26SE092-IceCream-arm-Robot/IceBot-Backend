@@ -1,6 +1,9 @@
 using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.ReadModels;
 using Application.SalesCatalog.RuntimeMenus.Queries;
+using Application.SalesCatalog.RuntimeMenus.Abstractions;
+using Application.SalesCatalog.RuntimeMenus.Results;
+using Application.SalesCatalog.RuntimeMenus.Services;
 using Domain.Common.Enums;
 using Domain.Devices.Connectivity;
 using Domain.SalesCatalog.Entities;
@@ -34,7 +37,10 @@ public sealed class RuntimeMenuRevisionTests
         store.ListMenuItemOptionGroupsAsync(
                 Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<MenuItemOptionGroupReadModel>());
-        var handler = new GetKioskRuntimeMenuQueryHandler(store);
+        var handler = new GetKioskRuntimeMenuQueryHandler(
+            store,
+            new RuntimeMenuProjectionBuilder(store),
+            new PassthroughRuntimeMenuCache());
 
         var first = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
         var second = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
@@ -43,6 +49,32 @@ public sealed class RuntimeMenuRevisionTests
         Assert.True(second.Succeeded, second.Message);
         Assert.NotEqual(first.Data!.SnapshotId, second.Data!.SnapshotId);
         Assert.Equal(first.Data.Revision, second.Data.Revision);
+    }
+
+    [Fact]
+    public async Task OfflineKiosk_DoesNotReadCachedProjection()
+    {
+        var kiosk = ActiveKiosk();
+        var connectivity = KioskConnectivityProjection.Create(kiosk.Id, DateTimeOffset.UtcNow);
+        connectivity.Observe(
+            KioskConnectivityStatus.Unreachable,
+            Guid.NewGuid(),
+            1,
+            DateTimeOffset.UtcNow);
+        var store = Substitute.For<IMenuStore>();
+        store.GetKioskByIdAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(kiosk);
+        store.GetKioskConnectivityAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(connectivity);
+        var cache = new RecordingRuntimeMenuCache();
+        var handler = new GetKioskRuntimeMenuQueryHandler(
+            store,
+            new RuntimeMenuProjectionBuilder(store),
+            cache);
+
+        var result = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
+        Assert.Equal(0, cache.ReadCount);
     }
 
     private static Kiosk ActiveKiosk()
@@ -74,5 +106,38 @@ public sealed class RuntimeMenuRevisionTests
             Organization = organization,
             Store = store
         };
+    }
+
+    private sealed class PassthroughRuntimeMenuCache : IRuntimeMenuProjectionCache
+    {
+        public async Task<RuntimeMenuCachedProjection> GetOrCreateAsync(
+            Guid kioskId,
+            Func<CancellationToken, Task<RuntimeMenuProjection>> factory,
+            CancellationToken cancellationToken = default)
+        {
+            var projection = await factory(cancellationToken);
+            return new RuntimeMenuCachedProjection(
+                projection.Revision,
+                projection.Items,
+                DateTimeOffset.UtcNow.AddSeconds(15));
+        }
+    }
+
+    private sealed class RecordingRuntimeMenuCache : IRuntimeMenuProjectionCache
+    {
+        public int ReadCount { get; private set; }
+
+        public async Task<RuntimeMenuCachedProjection> GetOrCreateAsync(
+            Guid kioskId,
+            Func<CancellationToken, Task<RuntimeMenuProjection>> factory,
+            CancellationToken cancellationToken = default)
+        {
+            ReadCount++;
+            var projection = await factory(cancellationToken);
+            return new RuntimeMenuCachedProjection(
+                projection.Revision,
+                projection.Items,
+                DateTimeOffset.UtcNow.AddSeconds(15));
+        }
     }
 }
