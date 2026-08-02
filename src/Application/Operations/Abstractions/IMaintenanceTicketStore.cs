@@ -1,5 +1,6 @@
 using Domain.Operations.Entities;
 using Domain.Operations.Enums;
+using Application.Operations.MaintenanceTickets.Results;
 
 namespace Application.Operations.Abstractions;
 
@@ -55,6 +56,12 @@ public interface IMaintenanceTicketStore
 
     Task<bool> CanAssignAccountAsync(
         Guid accountId,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
+
+    Task<List<MaintenanceAssigneeOptionResult>> ListAssignableAccountsAsync(
         Guid organizationId,
         Guid storeId,
         Guid kioskId,

@@ -106,6 +106,67 @@ public sealed class MaintenanceAssignmentScopeIntegrationTests(IntegrationTestFi
             account.Id, Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()));
     }
 
+    [IntegrationFact]
+    public async Task KioskScopedAssignee_CannotBeAssignedOutsideThatKiosk()
+    {
+        await using var db = fixture.CreateDbContext();
+        var organization = new Organization
+        {
+            Code = $"ORG-{Guid.NewGuid():N}",
+            Name = "Kiosk scoped maintenance organization"
+        };
+        var store = new Store
+        {
+            OrganizationId = organization.Id,
+            Code = $"STORE-{Guid.NewGuid():N}",
+            Name = "Kiosk scoped maintenance store",
+            TimeZone = "Asia/Bangkok"
+        };
+        var assignedKiosk = new Kiosk
+        {
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            Code = $"KIOSK-{Guid.NewGuid():N}",
+            Name = "Assigned kiosk"
+        };
+        var otherKiosk = new Kiosk
+        {
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            Code = $"KIOSK-{Guid.NewGuid():N}",
+            Name = "Other kiosk"
+        };
+        var account = new Account
+        {
+            UserName = $"kiosk-technician-{Guid.NewGuid():N}",
+            Email = $"kiosk-technician-{Guid.NewGuid():N}@example.test",
+            Status = AccountStatus.Active
+        };
+        var technician = await db.Roles.SingleOrDefaultAsync(role => role.Code == "Technician");
+        if (technician is null)
+        {
+            technician = new Role { Code = "Technician", Name = "Technician", IsSystemRole = true };
+            db.Roles.Add(technician);
+        }
+
+        db.AddRange(organization, store, assignedKiosk, otherKiosk, account);
+        await db.SaveChangesAsync();
+        db.AccountRoles.Add(new AccountRole
+        {
+            AccountId = account.Id,
+            RoleId = technician.Id,
+            KioskId = assignedKiosk.Id,
+            AssignedAt = DateTimeOffset.UtcNow
+        });
+        await db.SaveChangesAsync();
+
+        var subject = new MaintenanceTicketStore(db);
+        Assert.True(await subject.CanAssignAccountAsync(
+            account.Id, organization.Id, store.Id, assignedKiosk.Id));
+        Assert.False(await subject.CanAssignAccountAsync(
+            account.Id, organization.Id, store.Id, otherKiosk.Id));
+    }
+
     private static MaintenanceTicket NewTicket(
         Guid organizationId,
         Guid storeId,

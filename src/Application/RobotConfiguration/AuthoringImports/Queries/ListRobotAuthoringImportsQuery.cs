@@ -24,7 +24,9 @@ public sealed record RobotAuthoringImportListCriteria(
     Guid? DeviceId,
     string? Search,
     int PageNumber,
-    int PageSize);
+    int PageSize,
+    DateTimeOffset? CreatedFrom = null,
+    DateTimeOffset? CreatedTo = null);
 
 public sealed record RobotAuthoringImportListRow(
     Guid Id,
@@ -46,7 +48,8 @@ public sealed record RobotAuthoringImportListRow(
     DateTimeOffset? MaterializedAt,
     DateTimeOffset? PublishedAt,
     string? FailureCode,
-    string? FailureMessage);
+    string? FailureMessage,
+    string? CreatedByDisplayName = null);
 
 public sealed record RobotAuthoringImportValidationSummary(
     bool CanMaterialize,
@@ -74,7 +77,8 @@ public sealed record RobotAuthoringImportListItemResult(
     DateTimeOffset? MaterializedAt,
     DateTimeOffset? PublishedAt,
     string? FailureCode,
-    string? FailureMessage)
+    string? FailureMessage,
+    string? CreatedByDisplayName)
 {
     private static readonly JsonSerializerOptions ValidationJsonOptions = new()
     {
@@ -109,7 +113,8 @@ public sealed record RobotAuthoringImportListItemResult(
             row.MaterializedAt,
             row.PublishedAt,
             row.FailureCode,
-            row.FailureMessage);
+            row.FailureMessage,
+            row.CreatedByDisplayName);
     }
 
     private static RobotAuthoringImportValidationSummary? ToValidationSummary(string? value)
@@ -142,7 +147,9 @@ public sealed record ListRobotAuthoringImportsQuery(
     Guid? DeviceId,
     string? Search,
     int PageNumber = 1,
-    int PageSize = 20);
+    int PageSize = 20,
+    DateTimeOffset? CreatedFrom = null,
+    DateTimeOffset? CreatedTo = null);
 
 public sealed class ListRobotAuthoringImportsQueryHandler(IRobotAuthoringImportStore store)
 {
@@ -177,6 +184,12 @@ public sealed class ListRobotAuthoringImportsQueryHandler(IRobotAuthoringImportS
                 "Unsupported robot authoring import status.", 400, pageNumber, pageSize);
         }
 
+        if (query.CreatedFrom.HasValue && query.CreatedTo.HasValue && query.CreatedFrom > query.CreatedTo)
+        {
+            return PagedResult<RobotAuthoringImportListItemResult>.Fail(
+                "createdFrom must be earlier than or equal to createdTo.", 400, pageNumber, pageSize);
+        }
+
         var criteria = new RobotAuthoringImportListCriteria(
             query.OrganizationId,
             status,
@@ -185,7 +198,9 @@ public sealed class ListRobotAuthoringImportsQueryHandler(IRobotAuthoringImportS
             query.DeviceId,
             search,
             pageNumber,
-            pageSize);
+            pageSize,
+            query.CreatedFrom,
+            query.CreatedTo);
         var count = await store.CountImportsAsync(criteria, cancellationToken);
         var imports = await store.ListImportsAsync(criteria, cancellationToken);
         return PagedResult<RobotAuthoringImportListItemResult>.Success(

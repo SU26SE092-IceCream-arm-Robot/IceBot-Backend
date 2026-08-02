@@ -43,6 +43,8 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
     {
         var organizationId = Guid.NewGuid();
         var importId = Guid.NewGuid();
+        var createdFrom = DateTimeOffset.UtcNow.AddDays(-7);
+        var createdTo = DateTimeOffset.UtcNow;
         var store = Substitute.For<IRobotAuthoringImportStore>();
         store.CountImportsAsync(Arg.Any<RobotAuthoringImportListCriteria>(), Arg.Any<CancellationToken>()).Returns(1);
         store.ListImportsAsync(Arg.Any<RobotAuthoringImportListCriteria>(), Arg.Any<CancellationToken>()).Returns(
@@ -67,12 +69,14 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
                 DateTimeOffset.UtcNow,
                 null,
                 null,
-                null)
+                null,
+                "Org Admin")
         ]);
         var handler = new ListRobotAuthoringImportsQueryHandler(store);
 
         var result = await handler.HandleAsync(new ListRobotAuthoringImportsQuery(
-            OrganizationAdmin(organizationId), organizationId, "materialized", null, null, null, "ice", 0, 500));
+            OrganizationAdmin(organizationId), organizationId, "materialized", null, null, null, "ice", 0, 500,
+            createdFrom, createdTo));
 
         Assert.True(result.Succeeded);
         Assert.Equal(1, result.Pagination.Page);
@@ -81,13 +85,40 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
         Assert.Equal(importId, item.Id);
         Assert.Equal("Materialized", item.Status);
         Assert.Equal(2, item.ItemCount);
+        Assert.Equal("Org Admin", item.CreatedByDisplayName);
         Assert.Contains("PublishImportResources", item.NextActions);
         Assert.NotNull(item.Validation);
         Assert.True(item.Validation!.CanMaterialize);
         await store.Received(1).CountImportsAsync(
             Arg.Is<RobotAuthoringImportListCriteria>(criteria =>
-                criteria.Status == RobotAuthoringImportPublicStatus.Materialized && criteria.Search == "ice"),
+                criteria.Status == RobotAuthoringImportPublicStatus.Materialized &&
+                criteria.Search == "ice" &&
+                criteria.CreatedFrom == createdFrom &&
+                criteria.CreatedTo == createdTo),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RejectsInvertedCreatedRangeBeforeQueryingStore()
+    {
+        var organizationId = Guid.NewGuid();
+        var store = Substitute.For<IRobotAuthoringImportStore>();
+        var handler = new ListRobotAuthoringImportsQueryHandler(store);
+
+        var result = await handler.HandleAsync(new ListRobotAuthoringImportsQuery(
+            OrganizationAdmin(organizationId),
+            organizationId,
+            null,
+            null,
+            null,
+            null,
+            null,
+            CreatedFrom: DateTimeOffset.UtcNow,
+            CreatedTo: DateTimeOffset.UtcNow.AddMinutes(-1)));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        await store.DidNotReceive().CountImportsAsync(Arg.Any<RobotAuthoringImportListCriteria>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

@@ -230,7 +230,7 @@ public sealed class ConfigurationDeploymentStore : IConfigurationDeploymentStore
         {
             Id = deployment.Id, Profile = ConfigurationDeploymentProfile.FullEdge, OrganizationId = deployment.KioskExecutionEndpoint.Kiosk.OrganizationId,
             StoreId = deployment.KioskExecutionEndpoint.Kiosk.StoreId, KioskId = deployment.KioskId, KioskExecutionEndpointId = deployment.KioskExecutionEndpointId,
-            EndpointCode = deployment.KioskExecutionEndpoint.EndpointCode, ConfigurationReleaseId = deployment.ConfigurationReleaseId,
+            EndpointCode = deployment.KioskExecutionEndpoint.EndpointCode, ObservedActiveDeploymentId = deployment.KioskExecutionEndpoint.ActiveConfigurationDeploymentId, ConfigurationReleaseId = deployment.ConfigurationReleaseId,
             ReleaseNumber = deployment.ConfigurationRelease.ReleaseNumber, ReleaseChecksum = deployment.ReleaseChecksum, Status = (ConfigurationDeploymentReadStatus)deployment.Status,
             RequestedAt = deployment.RequestedAt, RequestedByAccountId = deployment.RequestedByAccountId, ExecutorReportedAt = deployment.EdgeReportedAt,
             CloudReceivedAt = deployment.CloudReceivedAt, LastReportId = deployment.LastEdgeDeploymentEventId, FailureCode = deployment.FailureCode,
@@ -244,7 +244,7 @@ public sealed class ConfigurationDeploymentStore : IConfigurationDeploymentStore
         {
             Id = deployment.Id, Profile = ConfigurationDeploymentProfile.LowCostController, OrganizationId = deployment.KioskExecutionEndpoint.Kiosk.OrganizationId,
             StoreId = deployment.KioskExecutionEndpoint.Kiosk.StoreId, KioskId = deployment.KioskId, KioskExecutionEndpointId = deployment.KioskExecutionEndpointId,
-            EndpointCode = deployment.KioskExecutionEndpoint.EndpointCode, ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
+            EndpointCode = deployment.KioskExecutionEndpoint.EndpointCode, ObservedActiveDeploymentId = deployment.KioskExecutionEndpoint.ActiveArtifactSetDeploymentId, ConfigurationReleaseId = deployment.SourceConfigurationReleaseId,
             ReleaseNumber = deployment.SourceConfigurationRelease.ReleaseNumber, ReleaseChecksum = deployment.ReleaseChecksum, Status = (ConfigurationDeploymentReadStatus)deployment.Status,
             RequestedAt = deployment.RequestedAt, RequestedByAccountId = deployment.RequestedByAccountId, ExecutorReportedAt = deployment.ControllerReportedAt,
             CloudReceivedAt = deployment.CloudReceivedAt, LastReportId = deployment.LastControllerReportId, FailureCode = deployment.FailureCode,

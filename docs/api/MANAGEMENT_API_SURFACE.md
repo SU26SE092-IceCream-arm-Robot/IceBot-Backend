@@ -80,7 +80,7 @@ POST /api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/provis
 PATCH /api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/disable
 PATCH /api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/reactivate
 PATCH /api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/retire
-GET /api/v1/management/roles
+GET /api/v1/management/accounts/assignable-role-options
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 ```
@@ -132,6 +132,7 @@ POST /api/v1/management/kiosks/{kioskId}/configuration-deployments/low-cost
 POST /api/v1/management/kiosks/{kioskId}/configuration-deployments/preview
 POST /api/v1/management/organizations/{organizationId}/robot-programs
 PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/artifacts
+GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports
 POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports
 GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}
 GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/workspace
@@ -210,6 +211,7 @@ GET /api/v1/management/alerts/{alertId}
 PATCH /api/v1/management/alerts/{alertId}/acknowledge
 PATCH /api/v1/management/alerts/{alertId}/resolve
 GET /api/v1/management/maintenance-tickets
+GET /api/v1/management/maintenance-tickets/{ticketId}/assignee-options
 GET /api/v1/management/maintenance-tickets/{ticketId}
 POST /api/v1/management/maintenance-tickets
 PUT /api/v1/management/maintenance-tickets/{ticketId}
@@ -403,7 +405,8 @@ registration is not an assignment prerequisite.
 - `GET /management/configuration-deployments` is a read-only global management index for scoped deployment search. Deployment detail and rollback are kiosk-owned routes under `/management/kiosks/{kioskId}/configuration-deployments/...` because deployment affects a physical kiosk execution endpoint.
 - Configuration deployment reads unify Full Edge and Low-cost histories behind tenant-scoped, paged management surfaces. Filters include organization, store, kiosk, release, profile, and status for the global index; kiosk-owned reads bind `kioskId` from the route. Profile-specific provenance remains nullable rather than being discarded.
 - Deployment preview is kiosk-owned and read-only. Full Edge preview always includes the complete release and rejects route/program selections because the Full Edge command installs the whole release. Low-cost preview may accept route/program selections; otherwise it derives the only binding for each route and reports `ProgramSelectionRequired` for ambiguous routes. It evaluates active endpoint identity, readiness, safety/activity, reported capabilities, robot target compatibility, inventory policy, low-cost capacity, immutable artifact totals, installation modes, risk acknowledgement, and a deterministic preview checksum. It never creates a deployment, Edge command, presigned URL, or Full Edge bundle.
-- Configuration rollback selects a previously Active deployment, then creates a new profile-matching deployment and durable command. It does not mutate or reactivate the historical deployment row. Retired releases are eligible only through this validated rollback path.
+- Configuration deploy requests require an operator `reason` of 3-500 characters. Backend derives the actor's matching authorization scope and writes the requested action, reason, scope snapshot, release/checksum, kiosk, endpoint, command, and initial deployment status to the kiosk operation log in the same persistence transaction as the deployment command.
+- Configuration rollback selects a previously Active deployment, then creates a new profile-matching deployment and durable command. It does not mutate or reactivate the historical deployment row. The request body requires `reason` and `expectedActiveDeploymentId`; the latter must still match the endpoint's observed active deployment or the backend returns `409` and requires the client to refresh history. Retired releases are eligible only through this validated rollback path.
 - The complete Fairino export-to-deployment sequence is owned by [Robot Lua Artifact Flow](../flows/ROBOT_LUA_ARTIFACT_FLOW.md); keep this document focused on route and client boundaries.
 - Production package installation is the default simplified franchise contract. It materializes organization-owned Catalog, artifact, program, route, and Draft release resources without accepting technical IDs or ordering fields from normal FE. Existing artifact/program/release authoring endpoints remain an advanced technical surface. See [Production Package Installation Flow](../flows/PRODUCTION_PACKAGE_INSTALLATION_FLOW.md).
 - Option-specific robot artifacts use `RequiredOptionCode` in program/release/Edge manifests. The Edge runtime skips the artifact when the order line does not select that option; this is file selection, not parameter injection into Lua.

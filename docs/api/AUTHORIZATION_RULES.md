@@ -77,7 +77,7 @@ Add `Permission` and `RolePermission` entities only when there is a concrete nee
 These APIs are implemented to make RBAC and tenant scope selection easier to manage in FE/admin screens:
 
 ```http
-GET /api/v1/management/roles
+GET /api/v1/management/accounts/assignable-role-options
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 ```
@@ -96,6 +96,7 @@ Tenant scope/resource lookup lets admins choose valid assignment scopes:
 
 ```http
 GraphQL tenantTree
+GET /api/v1/management/accounts/assignable-role-options
 GET /api/v1/management/role-scope-options
 ```
 
@@ -128,8 +129,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 
 | Policy | Allowed roles | Notes |
 | --- | --- | --- |
-| `roles.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View roles catalog and static permission matrix |
-| `role-scope-options.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View valid organizational scope options for a target role |
+| `permission-matrix.view` | `SystemAdmin` | View the platform-wide static permission matrix. This policy does not authorize account role assignment. |
 | `dashboard.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View management dashboard metrics within assigned scope |
 | `accounts.read` | `SystemAdmin`, `OrgAdmin` | Read internal accounts through an organization-owned route. Results contain only role scopes belonging to that organization. |
 | `accounts.manage` | `SystemAdmin`, `OrgAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for organization-owned internal accounts. `OrgAdmin` is limited to accounts with assignable roles and scopes inside the actor's assigned organization; it cannot grant `SystemAdmin` or access another organization. Global `SystemAdmin` provisioning is bootstrap-only. |
@@ -155,12 +155,12 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `release.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read production configuration releases and authoring options within the actor's matching organization scope |
 | `release.publish` | `SystemAdmin`, `OrgAdmin` | Author, publish, and retire organization-owned production configuration releases |
 | `deployment.read` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Monitor configuration deployment state and failure details within assigned kiosk scope |
-| `release.deploy` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request configuration deployment to assigned kiosks |
+| `release.deploy` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request configuration deployment to assigned kiosks. The request requires an operator reason and backend records actor plus matching authorization scope in the kiosk operation log. |
 | `package.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read published package catalog and installation state within tenant scope |
 | `package.manage` | `SystemAdmin` | Author and publish global production package versions |
 | `package.install` | `SystemAdmin`, `OrgAdmin`, `Manager` | Preview and install published packages within tenant scope |
 | `package.fork` | `SystemAdmin`, `OrgAdmin` | Convert package-managed technical configuration into an explicit organization fork |
-| `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request a new deployment from a previously Active Full Edge release or low-cost artifact set within assigned scope |
+| `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request a new deployment from a previously Active Full Edge release or low-cost artifact set within assigned scope. The request requires a reason and the client-observed active deployment id; backend rejects a stale observation and audits the request. |
 | `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |
 | `product-templates.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Browse global product templates for cloning into an assigned organization |
 | `product-templates.manage` | `SystemAdmin` | Manage global product templates; tenant roles cannot author or mutate global catalog rows |
@@ -197,8 +197,10 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 - Route/resource authorization must validate requested scope before returning scoped tenant data or applying a state transition.
 - Account read APIs use `accounts.read` and must remain scope-filtered for non-`SystemAdmin` callers. Account mutation APIs use `accounts.manage`; `OrgAdmin` can mutate only an account whose every active role is inside the caller's own organization scope. This prevents a shared or cross-organization account from being modified through one matching role.
 - `GET /management/organizations/{organizationId}/accounts/{accountId}/effective-access` uses `accounts.read` and returns only the target account's active role scopes and effective ids for that organization.
-- Effective access does not expand organization scope into store/kiosk ids. Use GraphQL `tenantTree` or REST `role-scope-options` for UI tree display.
-- `GET /me/access` is a self-inspection endpoint based on the current access token claims. Refresh the token after role changes to see updated access.
+- `GET /management/accounts/assignable-role-options` is account-authoring input, not a global role-management surface. It returns only roles the current `accounts.manage` actor may assign, with required scope metadata. `GET /management/role-scope-options` is the second step after selecting one of those roles; mutation handlers still validate the assignment.
+- Effective access does not expand organization scope into store/kiosk ids. Use GraphQL `tenantTree` or the account-authoring scope lookup for UI tree display.
+- `GET /me/access` is a self-inspection endpoint based on the current access token claims. It returns `permissionCodes` for UI capability checks; clients must not infer permissions from role names. Refresh the token after role changes to see updated access.
+- `GET /management/maintenance-tickets/{ticketId}/assignee-options` requires `maintenance.manage`, derives organization/store/kiosk from the ticket, and does not grant account-directory access. It returns only Active `Technician` or `Manager` accounts with a role scope matching that ticket. Assignment revalidates the same eligibility at submit time.
 - `/me/notification-devices` is authenticated self-service only; callers can register, inspect, or invalidate only their own FCM installations.
 - `PUT /management/organizations/{organizationId}/accounts/{accountId}/roles` replaces active role assignments for the target account. `POST /management/organizations/{organizationId}/accounts/{accountId}/roles` remains an add/upsert single-role operation. Every submitted role must carry the same `OrganizationId` as the route, including Store/Kiosk-scoped roles.
 - Do not add `Staff` or `Technician` to product/menu pricing policies unless the business explicitly gives them that responsibility.

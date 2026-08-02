@@ -29,7 +29,7 @@ public sealed class GetRoleScopeOptionsQueryHandler
         }
 
         var userContext = query.UserContext;
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.RoleScopeOptionsView, userContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AccountsManage, userContext);
         if (!CanRequestRoleScopeOptions(userContext, query.UserRoles, roleCode))
         {
             return ApiResult<RoleScopeOptionsResult>.Fail(

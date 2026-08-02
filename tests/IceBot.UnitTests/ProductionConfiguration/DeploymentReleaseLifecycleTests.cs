@@ -88,6 +88,7 @@ public sealed class DeploymentReleaseLifecycleTests
         ConfigurationReleaseId = releaseId,
         KioskExecutionEndpointId = Guid.NewGuid(),
         IdempotencyKey = Guid.NewGuid().ToString("N"),
+        Reason = "Test deployment request",
         Selections = [new DeployLowCostArtifactSelection(Guid.NewGuid(), Guid.NewGuid())],
         RollbackTargetDeploymentId = rollbackTargetId
     };

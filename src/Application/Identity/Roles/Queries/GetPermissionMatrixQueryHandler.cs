@@ -10,7 +10,7 @@ public sealed class PermissionMatrixItem
     public bool ScopeRequired { get; init; }
 }
 
-internal static class PermissionMatrixRules
+public static class PermissionCatalog
 {
     public static readonly IReadOnlyList<PermissionMatrixItem> Matrix = new List<PermissionMatrixItem>
     {
@@ -18,14 +18,14 @@ internal static class PermissionMatrixRules
         {
             Policy = "accounts.manage",
             Description = "Create, update, disable, assign roles, set password, and send invitations for internal accounts.",
-            Roles = new[] { "SystemAdmin" },
-            ScopeRequired = false
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
+            ScopeRequired = true
         },
         new()
         {
             Policy = "accounts.read",
             Description = "View internal accounts within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },
         new()
@@ -170,16 +170,9 @@ internal static class PermissionMatrixRules
         },
         new()
         {
-            Policy = "roles.view",
-            Description = "View roles catalog and static permission matrix.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
-            ScopeRequired = false
-        },
-        new()
-        {
-            Policy = "role-scope-options.view",
-            Description = "View valid organizational scope options for a target role.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Policy = "permission-matrix.view",
+            Description = "View the platform permission matrix.",
+            Roles = new[] { "SystemAdmin" },
             ScopeRequired = false
         },
         new()
@@ -434,6 +427,19 @@ internal static class PermissionMatrixRules
             ScopeRequired = true
         }
     };
+
+    public static List<string> ResolvePermissionCodes(IEnumerable<string> roleCodes)
+    {
+        var roles = roleCodes
+            .Where(roleCode => !string.IsNullOrWhiteSpace(roleCode))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return Matrix
+            .Where(permission => permission.Roles.Any(roles.Contains))
+            .Select(permission => permission.Policy)
+            .OrderBy(code => code, StringComparer.Ordinal)
+            .ToList();
+    }
 }
 
 public sealed class GetPermissionMatrixQueryHandler
@@ -443,7 +449,7 @@ public sealed class GetPermissionMatrixQueryHandler
         CancellationToken cancellationToken = default)
     {
         return Task.FromResult(ApiResult<IEnumerable<PermissionMatrixItem>>.Success(
-            PermissionMatrixRules.Matrix,
+            PermissionCatalog.Matrix,
             "Permission matrix retrieved successfully."));
     }
 }

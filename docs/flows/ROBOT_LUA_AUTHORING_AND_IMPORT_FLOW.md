@@ -36,7 +36,7 @@ On initial page load or after losing a local `importId`, read
 `GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports`
 first. It is the durable organization-scoped inbox; use its selected `importId`
 to open the workspace. It accepts `status`, `storeId`, `kioskId`, `deviceId`,
-`search`, `pageNumber`, and `pageSize`. `status` uses the public lifecycle
+`search`, `createdFrom`, `createdTo`, `pageNumber`, and `pageSize`. `status` uses the public lifecycle
 names `Uploaded`, `Validated`, `Materialized`, `ResourcesPublished`, `Failed`,
 or `Discarded`. The inbox returns safe operational summaries only, not staged
 bundle/object-storage data or item checksums.
