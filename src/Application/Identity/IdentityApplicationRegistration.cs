@@ -34,6 +34,7 @@ public static class IdentityApplicationRegistration
         services.AddScoped<ListCurrentAccountSessionsQueryHandler>();
         services.AddScoped<UpdateCurrentAccountProfileCommandHandler>();
         services.AddScoped<ChangeCurrentAccountPasswordCommandHandler>();
+        services.AddScoped<RevokeCurrentAccountSessionCommandHandler>();
         services.AddScoped<RegisterCurrentAccountNotificationDeviceCommandHandler>();
         services.AddScoped<UnregisterCurrentAccountNotificationDeviceCommandHandler>();
         services.AddScoped<ListCurrentAccountNotificationDevicesQueryHandler>();

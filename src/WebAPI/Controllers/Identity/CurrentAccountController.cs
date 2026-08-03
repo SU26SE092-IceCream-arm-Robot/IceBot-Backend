@@ -21,6 +21,7 @@ public sealed class CurrentAccountController : ControllerBase
     private readonly GetCurrentAccountQueryHandler _getCurrentAccount;
     private readonly GetCurrentAccountAccessQueryHandler _getCurrentAccountAccess;
     private readonly ListCurrentAccountSessionsQueryHandler _listSessions;
+    private readonly RevokeCurrentAccountSessionCommandHandler _revokeSession;
     private readonly UpdateCurrentAccountProfileCommandHandler _updateProfile;
     private readonly ChangeCurrentAccountPasswordCommandHandler _changePassword;
     private readonly RegisterCurrentAccountNotificationDeviceCommandHandler _registerNotificationDevice;
@@ -31,6 +32,7 @@ public sealed class CurrentAccountController : ControllerBase
         GetCurrentAccountQueryHandler getCurrentAccount,
         GetCurrentAccountAccessQueryHandler getCurrentAccountAccess,
         ListCurrentAccountSessionsQueryHandler listSessions,
+        RevokeCurrentAccountSessionCommandHandler revokeSession,
         UpdateCurrentAccountProfileCommandHandler updateProfile,
         ChangeCurrentAccountPasswordCommandHandler changePassword,
         RegisterCurrentAccountNotificationDeviceCommandHandler registerNotificationDevice,
@@ -40,6 +42,7 @@ public sealed class CurrentAccountController : ControllerBase
         _getCurrentAccount = getCurrentAccount;
         _getCurrentAccountAccess = getCurrentAccountAccess;
         _listSessions = listSessions;
+        _revokeSession = revokeSession;
         _updateProfile = updateProfile;
         _changePassword = changePassword;
         _registerNotificationDevice = registerNotificationDevice;
@@ -109,9 +112,20 @@ public sealed class CurrentAccountController : ControllerBase
     public async Task<IActionResult> ListSessions(CancellationToken cancellationToken)
     {
         var result = await _listSessions.HandleAsync(
-            new ListCurrentAccountSessionsQuery(GetCurrentAccountId()),
+            new ListCurrentAccountSessionsQuery(GetCurrentAccountId(), GetCurrentSessionId()),
             cancellationToken);
         return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("sessions/{sessionId:guid}")]
+    public async Task<IActionResult> RevokeSession(Guid sessionId, CancellationToken cancellationToken)
+    {
+        var result = await _revokeSession.HandleAsync(new RevokeCurrentAccountSessionCommand(
+            GetCurrentAccountId(),
+            sessionId,
+            HttpContext.Connection.RemoteIpAddress?.ToString(),
+            Request.Headers.UserAgent.ToString()), cancellationToken);
+        return result.Succeeded ? NoContent() : StatusCode(result.StatusCode, result);
     }
 
     [HttpGet("notification-devices")]
@@ -160,6 +174,12 @@ public sealed class CurrentAccountController : ControllerBase
         }
 
         throw new UnauthorizedAccessException("Current account id claim is missing or invalid.");
+    }
+
+    private Guid? GetCurrentSessionId()
+    {
+        var sessionId = User.FindFirstValue("session_id");
+        return Guid.TryParse(sessionId, out var parsedSessionId) ? parsedSessionId : null;
     }
 
 }

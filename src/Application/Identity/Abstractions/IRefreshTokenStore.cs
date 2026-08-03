@@ -6,6 +6,7 @@ namespace Application.Identity.Abstractions
     public interface IRefreshTokenStore
     {
         Task<RefreshToken?> GetByTokenHashAsync(string tokenHash, bool asNoTracking = true, CancellationToken cancellationToken = default);
+        Task<RefreshToken?> GetActiveByAccountAndIdAsync(Guid accountId, Guid sessionId, CancellationToken cancellationToken = default);
         Task<List<RefreshToken>> ListActiveByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default);
         Task AddAsync(RefreshToken refreshToken, CancellationToken cancellationToken = default);
         Task<AccountStatus?> GetAccountStatusAsync(Guid accountId, CancellationToken cancellationToken = default);

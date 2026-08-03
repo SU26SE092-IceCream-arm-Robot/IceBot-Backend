@@ -63,7 +63,7 @@ public sealed class CurrentAccountSessionSecurityTests
     }
 
     [Fact]
-    public async Task ListSessions_ReturnsOnlyActiveSessionsWithoutRefreshTokenSecret()
+    public async Task ListSessions_ReturnsOnlyActiveSessionsWithCurrentSessionAndBackendDeviceName()
     {
         var accountId = Guid.NewGuid();
         var newest = new RefreshToken
@@ -73,7 +73,7 @@ public sealed class CurrentAccountSessionSecurityTests
             CreatedAt = DateTimeOffset.UtcNow,
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
             CreatedByIp = "10.0.0.2",
-            CreatedByUserAgent = "Browser B"
+            CreatedByUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
         };
         var oldest = new RefreshToken
         {
@@ -82,23 +82,54 @@ public sealed class CurrentAccountSessionSecurityTests
             CreatedAt = DateTimeOffset.UtcNow.AddMinutes(-10),
             ExpiresAt = DateTimeOffset.UtcNow.AddDays(7),
             CreatedByIp = "10.0.0.1",
-            CreatedByUserAgent = "Browser A"
+            CreatedByUserAgent = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/120.0 Safari/537.36"
         };
         var refreshTokens = Substitute.For<IRefreshTokenStore>();
         refreshTokens.ListActiveByAccountIdAsync(accountId, Arg.Any<CancellationToken>())
             .Returns([oldest, newest]);
         var handler = new ListCurrentAccountSessionsQueryHandler(refreshTokens);
 
-        var result = await handler.HandleAsync(new ListCurrentAccountSessionsQuery(accountId));
+        var result = await handler.HandleAsync(new ListCurrentAccountSessionsQuery(accountId, newest.Id));
 
         Assert.True(result.Succeeded, result.Message);
-        Assert.Collection(result.Data!,
+        Assert.Equal(newest.Id, result.Data!.CurrentSessionId);
+        Assert.Collection(result.Data.Sessions,
             session =>
             {
                 Assert.Equal(newest.Id, session.SessionId);
+                Assert.True(session.IsCurrentSession);
                 Assert.Equal("10.0.0.2", session.IpAddress);
-                Assert.Equal("Browser B", session.UserAgent);
+                Assert.Equal("Chrome on Windows", session.DeviceName);
             },
-            session => Assert.Equal(oldest.Id, session.SessionId));
+            session =>
+            {
+                Assert.Equal(oldest.Id, session.SessionId);
+                Assert.False(session.IsCurrentSession);
+                Assert.Equal("Chrome on Android", session.DeviceName);
+            });
+    }
+
+    [Fact]
+    public async Task RevokeSession_UsesAccountScopedLookupAndIsIdempotentWhenSessionIsGone()
+    {
+        var accountId = Guid.NewGuid();
+        var sessionId = Guid.NewGuid();
+        var refreshTokens = Substitute.For<IRefreshTokenStore>();
+        refreshTokens.ExecuteInTransactionAsync(Arg.Any<Func<Task<int>>>(), Arg.Any<CancellationToken>())
+            .Returns(call => call.ArgAt<Func<Task<int>>>(0)());
+        refreshTokens.GetActiveByAccountAndIdAsync(accountId, sessionId, Arg.Any<CancellationToken>())
+            .Returns((RefreshToken?)null);
+        var handler = new RevokeCurrentAccountSessionCommandHandler(new RefreshTokenService(refreshTokens));
+
+        var result = await handler.HandleAsync(new RevokeCurrentAccountSessionCommand(
+            accountId,
+            sessionId,
+            "127.0.0.1",
+            "unit-test"));
+
+        Assert.True(result.Succeeded, result.Message);
+        await refreshTokens.Received(1).AcquireAccountSessionLockAsync(accountId, Arg.Any<CancellationToken>());
+        await refreshTokens.Received(1).GetActiveByAccountAndIdAsync(accountId, sessionId, Arg.Any<CancellationToken>());
+        await refreshTokens.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 }

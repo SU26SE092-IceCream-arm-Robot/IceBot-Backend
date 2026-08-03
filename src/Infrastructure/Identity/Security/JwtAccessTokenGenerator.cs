@@ -26,6 +26,7 @@ namespace Infrastructure.Identity.Security
 
         public ApiResult<string> GenerateAccessToken(
             Guid accountId,
+            Guid sessionId,
             string accountUserName,
             IReadOnlyCollection<AccountRoleClaim> roles,
             AccountStatus accountStatus)
@@ -53,6 +54,7 @@ namespace Infrastructure.Identity.Security
                 new(JwtRegisteredClaimNames.Sub, accountId.ToString()),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
                 new(ClaimTypes.NameIdentifier, accountId.ToString()),
+                new("session_id", sessionId.ToString()),
                 new(ClaimTypes.Name, accountUserName),
                 new("account_status", accountStatus.ToString())
             };

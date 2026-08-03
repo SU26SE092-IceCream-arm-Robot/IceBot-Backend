@@ -133,6 +133,31 @@ namespace Application.Identity.Tokens.Services
             });
         }
 
+        public async Task RevokeSessionForAccountAsync(
+            Guid accountId,
+            Guid sessionId,
+            string? reason,
+            string? ipAddress,
+            string? userAgent = null)
+        {
+            await _refreshTokens.ExecuteInTransactionAsync(async () =>
+            {
+                await _refreshTokens.AcquireAccountSessionLockAsync(accountId);
+                var session = await _refreshTokens.GetActiveByAccountAndIdAsync(accountId, sessionId);
+                if (session is null)
+                {
+                    return 0;
+                }
+
+                session.RevokedAt = DateTimeOffset.UtcNow;
+                session.RevokedByIp = ipAddress;
+                session.RevokedByUserAgent = userAgent;
+                session.RevokeReason = reason;
+                await _refreshTokens.SaveChangesAsync();
+                return 1;
+            });
+        }
+
         public async Task<int> RevokeAllForAccountAsync(Guid accountId, string? reason, string? ipAddress, string? userAgent = null)
         {
             return await _refreshTokens.ExecuteInTransactionAsync(async () =>

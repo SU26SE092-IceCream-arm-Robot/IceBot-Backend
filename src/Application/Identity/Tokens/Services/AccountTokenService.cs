@@ -29,13 +29,23 @@ namespace Application.Identity.Tokens.Services
             string? userAgent = null)
         {
             var roles = ResolveRoleClaims(account);
-            var accessToken = _accessTokenGenerator.GenerateAccessToken(account.Id, account.UserName, roles, account.Status);
+            var refreshToken = await _refreshTokens.CreateAsync(account.Id, ipAddress, userAgent);
+            var accessToken = _accessTokenGenerator.GenerateAccessToken(
+                account.Id,
+                refreshToken.Entity.Id,
+                account.UserName,
+                roles,
+                account.Status);
             if (!accessToken.Succeeded)
             {
+                await _refreshTokens.RevokeByTokenAsync(
+                    refreshToken.Token,
+                    "Access token generation failed",
+                    ipAddress,
+                    userAgent);
                 return ApiResult<AuthenticatedAccountResult>.Fail(accessToken.Message ?? "Failed to create access token.");
             }
 
-            var refreshToken = await _refreshTokens.CreateAsync(account.Id, ipAddress, userAgent);
             return ApiResult<AuthenticatedAccountResult>.Success(ToAuthenticatedUser(account, roles, accessToken.Data!, refreshToken.Token));
         }
 
@@ -63,7 +73,12 @@ namespace Application.Identity.Tokens.Services
             }
 
             var roles = ResolveRoleClaims(account);
-            var accessToken = _accessTokenGenerator.GenerateAccessToken(account.Id, account.UserName, roles, account.Status);
+            var accessToken = _accessTokenGenerator.GenerateAccessToken(
+                account.Id,
+                rotation.NewToken.Entity.Id,
+                account.UserName,
+                roles,
+                account.Status);
             if (!accessToken.Succeeded)
             {
                 return ApiResult<AuthenticatedAccountResult>.Fail(accessToken.Message ?? "Failed to create access token.");
