@@ -339,6 +339,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
 
         recipe.RecipeItems.Add(new RecipeItem
         {
+            IngredientId = ingredients["FRESH-MILK"].Id,
             Ingredient = ingredients["FRESH-MILK"],
             Quantity = 13.333333m,
             Unit = "gram",
@@ -348,6 +349,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
         });
         recipe.RecipeItems.Add(new RecipeItem
         {
+            IngredientId = ingredients["COMPRITAL-SOFT-PREMIUM"].Id,
             Ingredient = ingredients["COMPRITAL-SOFT-PREMIUM"],
             Quantity = 21.333333m,
             Unit = "gram",
@@ -357,6 +359,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
         });
         recipe.RecipeItems.Add(new RecipeItem
         {
+            IngredientId = ingredients["PURIFIED-WATER"].Id,
             Ingredient = ingredients["PURIFIED-WATER"],
             Quantity = 46.666667m,
             Unit = "gram",
