@@ -37,5 +37,6 @@ namespace Application.Identity.Abstractions
         Task<bool> UserNameExistsAsync(string userName, CancellationToken cancellationToken = default);
         Task AddAsync(Account account, CancellationToken cancellationToken = default);
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+        Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default);
     }
 }

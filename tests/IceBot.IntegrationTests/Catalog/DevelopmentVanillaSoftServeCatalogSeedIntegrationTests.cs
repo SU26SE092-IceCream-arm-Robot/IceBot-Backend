@@ -1,6 +1,7 @@
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Domain.Common.Enums;
+using Domain.Catalog.Entities;
 using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.Catalog.Bootstrap;
 using Infrastructure.Data;
@@ -49,8 +50,16 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedIntegrationTests(Integ
                 .ThenInclude(item => item.Ingredient)
             .Where(recipe => recipe.Code == "KEM-TUOI-VANI-80G-V1")
             .ToListAsync();
+        var category = await assertion.ProductCategories
+            .SingleAsync(candidate => candidate.Code == "SOFT-SERVE");
+        var products = await assertion.Products
+            .Where(product => product.Code == "KEM-TUOI-VANI")
+            .ToListAsync();
 
         Assert.Equal(3, ingredients.Count);
+        Assert.Equal("Kem tuoi", category.Name);
+        Assert.Equal(2, products.Count);
+        Assert.All(products, product => Assert.Equal(category.Id, product.CategoryId));
         Assert.Equal(2, recipes.Count);
         Assert.Contains(recipes, recipe => recipe.OrganizationId is null);
         Assert.Contains(recipes, recipe => recipe.OrganizationId == Guid.Parse("11111111-1111-1111-1111-111111111111"));

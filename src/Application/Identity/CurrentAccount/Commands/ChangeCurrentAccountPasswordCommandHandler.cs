@@ -41,36 +41,42 @@ public sealed class ChangeCurrentAccountPasswordCommandHandler
             return ApiResult<bool>.Fail("New password is required.");
         }
 
-        var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
-        if (account is null)
+        return await _accounts.ExecuteInTransactionAsync(async () =>
         {
-            return ApiResult<bool>.Fail("Account not found.", 404);
-        }
+            var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
+            if (account is null)
+            {
+                return ApiResult<bool>.Fail("Account not found.", 404);
+            }
 
-        if (account.Status != AccountStatus.Active)
-        {
-            return ApiResult<bool>.Fail("Account is not active.", 403);
-        }
+            if (account.Status != AccountStatus.Active)
+            {
+                return ApiResult<bool>.Fail("Account is not active.", 403);
+            }
 
-        if (!account.LocalLoginEnabled || account.Password is null)
-        {
-            return ApiResult<bool>.Fail("Local password login is not enabled for this account.", 403);
-        }
+            if (!account.LocalLoginEnabled || account.Password is null)
+            {
+                return ApiResult<bool>.Fail("Local password login is not enabled for this account.", 403);
+            }
 
-        if (!_passwordHasher.VerifyPassword(request.CurrentPassword, account.Password.Value))
-        {
-            return ApiResult<bool>.Fail("Current password is incorrect.", 400);
-        }
+            if (!_passwordHasher.VerifyPassword(request.CurrentPassword, account.Password.Value))
+            {
+                return ApiResult<bool>.Fail("Current password is incorrect.", 400);
+            }
 
-        account.Password = HashedPassword.From(_passwordHasher.HashPassword(request.NewPassword));
-        account.FailedLoginCount = 0;
-        account.LockedUntil = null;
-        account.UpdatedAt = DateTimeOffset.UtcNow;
-        account.UpdatedByAccountId = account.Id;
+            account.Password = HashedPassword.From(_passwordHasher.HashPassword(request.NewPassword));
+            account.FailedLoginCount = 0;
+            account.LockedUntil = null;
+            account.UpdatedAt = DateTimeOffset.UtcNow;
+            account.UpdatedByAccountId = account.Id;
 
-        await _accounts.SaveChangesAsync(cancellationToken);
-        await _refreshTokens.RevokeAllForAccountAsync(account.Id, "Password changed by account owner", ipAddress, userAgent);
+            await _refreshTokens.RevokeAllForAccountAsync(
+                account.Id,
+                "Password changed by account owner",
+                ipAddress,
+                userAgent);
 
-        return ApiResult<bool>.Success(true, "Password changed.");
+            return ApiResult<bool>.Success(true, "Password changed.");
+        }, cancellationToken);
     }
 }

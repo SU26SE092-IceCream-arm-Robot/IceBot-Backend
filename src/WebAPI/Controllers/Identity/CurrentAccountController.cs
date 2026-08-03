@@ -20,6 +20,7 @@ public sealed class CurrentAccountController : ControllerBase
 {
     private readonly GetCurrentAccountQueryHandler _getCurrentAccount;
     private readonly GetCurrentAccountAccessQueryHandler _getCurrentAccountAccess;
+    private readonly ListCurrentAccountSessionsQueryHandler _listSessions;
     private readonly UpdateCurrentAccountProfileCommandHandler _updateProfile;
     private readonly ChangeCurrentAccountPasswordCommandHandler _changePassword;
     private readonly RegisterCurrentAccountNotificationDeviceCommandHandler _registerNotificationDevice;
@@ -29,6 +30,7 @@ public sealed class CurrentAccountController : ControllerBase
     public CurrentAccountController(
         GetCurrentAccountQueryHandler getCurrentAccount,
         GetCurrentAccountAccessQueryHandler getCurrentAccountAccess,
+        ListCurrentAccountSessionsQueryHandler listSessions,
         UpdateCurrentAccountProfileCommandHandler updateProfile,
         ChangeCurrentAccountPasswordCommandHandler changePassword,
         RegisterCurrentAccountNotificationDeviceCommandHandler registerNotificationDevice,
@@ -37,6 +39,7 @@ public sealed class CurrentAccountController : ControllerBase
     {
         _getCurrentAccount = getCurrentAccount;
         _getCurrentAccountAccess = getCurrentAccountAccess;
+        _listSessions = listSessions;
         _updateProfile = updateProfile;
         _changePassword = changePassword;
         _registerNotificationDevice = registerNotificationDevice;
@@ -99,6 +102,15 @@ public sealed class CurrentAccountController : ControllerBase
         };
         var result = await _changePassword.HandleAsync(command, cancellationToken);
 
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpGet("sessions")]
+    public async Task<IActionResult> ListSessions(CancellationToken cancellationToken)
+    {
+        var result = await _listSessions.HandleAsync(
+            new ListCurrentAccountSessionsQuery(GetCurrentAccountId()),
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

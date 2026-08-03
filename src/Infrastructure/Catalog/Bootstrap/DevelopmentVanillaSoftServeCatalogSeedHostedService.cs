@@ -15,6 +15,7 @@ namespace Infrastructure.Catalog.Bootstrap;
 public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHostedService
 {
     private const string DevelopmentOrganizationCode = "ICEBOT-DEMO";
+    private const string CategoryCode = "SOFT-SERVE";
     private const string ProductCode = "KEM-TUOI-VANI";
     private const string VariantCode = "80G";
     private const string RecipeCode = "KEM-TUOI-VANI-80G-V1";
@@ -41,6 +42,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
         using var scope = _scopeFactory.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<IceBotDbContext>();
         var now = DateTimeOffset.UtcNow;
+        var category = await EnsureSoftServeCategoryAsync(dbContext, now, cancellationToken);
         var ingredients = await EnsureIngredientsAsync(dbContext, now, cancellationToken);
         var template = await dbContext.Products
             .WhereNotDeleted()
@@ -60,6 +62,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
             template = new Product
             {
                 ScopeType = TenantScopeType.Global,
+                CategoryId = category.Id,
                 Code = ProductCode,
                 Name = "Kem tuoi vi vani",
                 DisplayName = "Kem tuoi vi vani",
@@ -82,6 +85,10 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
                 CreatedAt = now
             };
             dbContext.Products.Add(template);
+        }
+        else if (template.CategoryId != category.Id)
+        {
+            template.CategoryId = category.Id;
         }
 
         var variant = template.ProductVariants.SingleOrDefault(candidate => candidate.Code == VariantCode);
@@ -124,7 +131,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
         if (_hostEnvironment.IsDevelopment() &&
             _configuration.GetValue<bool>("DevelopmentCatalogSeed:VanillaSoftServeEnabled"))
         {
-            await EnsureDevelopmentProductAsync(dbContext, template, now, cancellationToken);
+            await EnsureDevelopmentProductAsync(dbContext, template, category.Id, now, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -135,6 +142,33 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    private static async Task<ProductCategory> EnsureSoftServeCategoryAsync(
+        IceBotDbContext dbContext,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var category = await dbContext.ProductCategories
+            .SingleOrDefaultAsync(candidate => candidate.Code == CategoryCode, cancellationToken);
+        if (category is not null)
+        {
+            return category;
+        }
+
+        category = new ProductCategory
+        {
+            Code = CategoryCode,
+            Name = "Kem tuoi",
+            Description = "Kem tuoi va cac san pham soft serve.",
+            ProductType = "IceCream",
+            DisplayOrder = 1,
+            IsActive = true,
+            CreatedAt = now
+        };
+        dbContext.ProductCategories.Add(category);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return category;
+    }
 
     private static async Task<Dictionary<string, Ingredient>> EnsureIngredientsAsync(
         IceBotDbContext dbContext,
@@ -183,6 +217,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
     private static async Task EnsureDevelopmentProductAsync(
         IceBotDbContext dbContext,
         Product template,
+        long categoryId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -204,6 +239,11 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
                 cancellationToken);
         if (existing is not null)
         {
+            if (existing.CategoryId != categoryId)
+            {
+                existing.CategoryId = categoryId;
+            }
+
             return;
         }
 
@@ -212,6 +252,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
             OrganizationId = organization.Id,
             TemplateProductId = template.Id,
             ScopeType = TenantScopeType.Organization,
+            CategoryId = categoryId,
             Code = template.Code,
             Name = template.Name,
             DisplayName = template.DisplayName,
