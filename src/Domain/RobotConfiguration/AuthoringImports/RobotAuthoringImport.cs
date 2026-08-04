@@ -137,6 +137,8 @@ public sealed class RobotAuthoringImport : BusinessEntity
     {
         if (Status != RobotAuthoringImportStatus.Applied || !AppliedRobotProgramId.HasValue)
             throw new DomainRuleException("Only an applied import can complete publication.");
+        if (!ComposedRecipeId.HasValue || !CompositionConfirmedAt.HasValue)
+            throw new DomainRuleException("Confirm the recipe composition before publishing import resources.");
         PublishedAt = now;
         Touch(now, actorId);
     }
@@ -145,6 +147,8 @@ public sealed class RobotAuthoringImport : BusinessEntity
     {
         if (!PublishedAt.HasValue || Status != RobotAuthoringImportStatus.Applied)
             throw new DomainRuleException("Only an import with published resources can be linked to a configuration release.");
+        if (!ComposedRecipeId.HasValue || !CompositionConfirmedAt.HasValue)
+            throw new DomainRuleException("Only an import with confirmed recipe composition can be linked to a configuration release.");
         if (configurationReleaseId == Guid.Empty)
             throw new DomainRuleException("Linked configuration release id is required.");
         if (LinkedConfigurationReleaseId.HasValue && LinkedConfigurationReleaseId != configurationReleaseId)

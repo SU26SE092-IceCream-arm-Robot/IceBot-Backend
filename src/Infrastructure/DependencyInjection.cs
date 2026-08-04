@@ -30,6 +30,7 @@ using Application.RobotConfiguration.Artifacts.Queries;
 using Application.RobotConfiguration.Programs.Abstractions;
 using Infrastructure.Catalog;
 using Infrastructure.Catalog.Bootstrap;
+using Infrastructure.Devices.Bootstrap;
 using Infrastructure.Dashboard.Persistence;
 using Infrastructure.Data;
 using Infrastructure.Devices.Catalog.Persistence;
@@ -98,7 +99,9 @@ namespace Infrastructure
             services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure(config);
+            services.AddScoped<DevelopmentRobotAuthoringAutomationReset>();
             services.AddHostedService<DevelopmentVanillaSoftServeCatalogSeedHostedService>();
+            services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
             services.AddOrdersInfrastructure();
             services.AddOptions<Application.Orders.Management.Automation.FulfillmentReminderOptions>()
                 .Bind(config.GetSection(Application.Orders.Management.Automation.FulfillmentReminderOptions.SectionName))

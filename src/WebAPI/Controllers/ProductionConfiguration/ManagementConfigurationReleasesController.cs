@@ -84,6 +84,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         Guid organizationId,
         [FromQuery] Guid? productVariantId,
         [FromQuery] string? search,
+        [FromQuery] bool includeGlobalTemplates = false,
         [FromQuery] int limit = 50,
         CancellationToken cancellationToken = default)
     {
@@ -94,6 +95,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
                 OrganizationId = organizationId,
                 ProductVariantId = productVariantId,
                 Search = search,
+                IncludeGlobalTemplates = includeGlobalTemplates,
                 Limit = limit
             },
             cancellationToken);

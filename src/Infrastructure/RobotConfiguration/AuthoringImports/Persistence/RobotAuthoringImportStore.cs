@@ -69,6 +69,7 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
                 importSession.Items.Count,
                 importSession.AppliedRobotProgramId,
                 importSession.LinkedConfigurationReleaseId,
+                importSession.ComposedRecipeId,
                 importSession.CreatedAt,
                 importSession.ValidatedAt,
                 importSession.AppliedAt,

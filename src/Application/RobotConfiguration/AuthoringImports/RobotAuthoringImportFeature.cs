@@ -97,7 +97,8 @@ public sealed record RobotAuthoringImportResult(Guid Id, Guid OrganizationId, Gu
             value.Status,
             validation?.CanMaterialize == true,
             value.LinkedConfigurationReleaseId,
-            value.PublishedAt);
+            value.PublishedAt,
+            value.ComposedRecipeId.HasValue);
         var publicStatus = RobotAuthoringImportLifecycleProjection.GetPublicStatus(value.Status, value.PublishedAt);
         return new RobotAuthoringImportResult(value.Id, value.OrganizationId, value.StoreId, value.KioskId,
             value.DeviceId, value.ClientExportId, value.ImportChecksum, value.SchemaVersion, publicStatus,
@@ -150,7 +151,9 @@ public sealed class RobotAuthoringImportHandlers(
             if (existing.ImportChecksum != checksum || existing.ClientExportId != bundle.Manifest.ExportId ||
                 existing.StoreId != command.StoreId || existing.KioskId != command.KioskId || existing.DeviceId != command.DeviceId)
                 return ApiResult<RobotAuthoringImportResult>.Fail("Idempotency key was already used with a different bundle or scope.", 409);
-            return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(existing), "Existing import returned.");
+            var resumed = await ResumeAutomaticProcessingAsync(command.UserContext, command.OrganizationId,
+                existing.Id, cancellationToken);
+            return ApiResult<RobotAuthoringImportResult>.Success(resumed, AutomationMessage(resumed));
         }
 
         var importId = Guid.NewGuid();
@@ -185,12 +188,14 @@ public sealed class RobotAuthoringImportHandlers(
                     insert.Import.StoreId != command.StoreId || insert.Import.KioskId != command.KioskId ||
                     insert.Import.DeviceId != command.DeviceId)
                     return ApiResult<RobotAuthoringImportResult>.Fail("Idempotency key was concurrently used with a different bundle or scope.", 409);
-                return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(insert.Import),
-                    "Concurrent retry resolved to the existing import.");
+                var resumed = await ResumeAutomaticProcessingAsync(command.UserContext, command.OrganizationId,
+                    insert.Import.Id, cancellationToken);
+                return ApiResult<RobotAuthoringImportResult>.Success(resumed, AutomationMessage(resumed));
             }
             RobotAuthoringImportObservability.Uploaded(bundle.Items.Count);
-            return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(insert.Import),
-                "Robot authoring bundle staged.", 201);
+            var processed = await ResumeAutomaticProcessingAsync(command.UserContext, command.OrganizationId,
+                insert.Import.Id, cancellationToken);
+            return ApiResult<RobotAuthoringImportResult>.Success(processed, AutomationMessage(processed), 201);
         }
         catch
         {
@@ -209,6 +214,63 @@ public sealed class RobotAuthoringImportHandlers(
             ? ApiResult<RobotAuthoringImportResult>.Fail("Robot authoring import not found.", 404)
             : ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(session));
     }
+
+    private async Task<RobotAuthoringImportResult> ResumeAutomaticProcessingAsync(
+        CurrentUserContext userContext,
+        Guid organizationId,
+        Guid importId,
+        CancellationToken cancellationToken)
+    {
+        var current = await store.GetAsync(organizationId, importId, false, cancellationToken)
+            ?? throw new InvalidOperationException("The persisted robot authoring import was not found.");
+
+        if (current.Status == RobotAuthoringImportStatus.Uploaded)
+        {
+            var validation = await ValidateAsync(new ValidateRobotAuthoringImportCommand(
+                userContext, organizationId, importId), cancellationToken);
+            if (!validation.Succeeded || validation.Data is null)
+                return RobotAuthoringImportResult.From(current);
+            current = await store.GetAsync(organizationId, importId, false, cancellationToken) ?? current;
+        }
+
+        if (current.Status == RobotAuthoringImportStatus.Validated &&
+            CanMaterialize(current) &&
+            CanManageProgram(userContext, organizationId))
+        {
+            var materialization = await MaterializeAsync(new MaterializeRobotAuthoringImportCommand(
+                userContext, organizationId, importId), cancellationToken);
+            if (materialization.Succeeded && materialization.Data is not null)
+                current = await store.GetAsync(organizationId, importId, false, cancellationToken) ?? current;
+        }
+
+        var latest = await store.GetAsync(organizationId, importId, false, cancellationToken);
+        return RobotAuthoringImportResult.From(latest ?? current);
+    }
+
+    private static bool CanMaterialize(RobotAuthoringImport import)
+    {
+        if (string.IsNullOrWhiteSpace(import.ValidationReportJson))
+            return false;
+
+        try
+        {
+            return JsonSerializer.Deserialize<RobotAuthoringImportValidationReport>(import.ValidationReportJson)
+                ?.CanMaterialize == true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string AutomationMessage(RobotAuthoringImportResult import) => import.Status switch
+    {
+        "Materialized" => "Bundle validated and Draft technical resources materialized. Select or confirm a Recipe before publication.",
+        "Validated" when import.Validation?.CanMaterialize == false =>
+            "Bundle staged and validated with blockers. Resolve the reported conflicts before materialization.",
+        "Validated" => "Bundle validated. Draft resource materialization requires program.manage access.",
+        _ => "Robot authoring bundle staged."
+    };
 
     public async Task<ApiResult<RobotAuthoringImportResult>> ValidateAsync(ValidateRobotAuthoringImportCommand command,
         CancellationToken cancellationToken)
@@ -525,6 +587,10 @@ public sealed class RobotAuthoringImportHandlers(
                 return await RollbackPublicationFailureAsync(
                     "IMPORT_NOT_MATERIALIZED",
                     "Import must be materialized before publication.");
+            if (!session.ComposedRecipeId.HasValue || !session.CompositionConfirmedAt.HasValue)
+                return await RollbackPublicationFailureAsync(
+                    "IMPORT_COMPOSITION_NOT_CONFIRMED",
+                    "Confirm the Recipe composition before publishing import resources.");
             if (session.PublishedAt.HasValue)
             {
                 await store.RollbackMutationAsync(CancellationToken.None);

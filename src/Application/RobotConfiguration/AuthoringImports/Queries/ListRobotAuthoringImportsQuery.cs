@@ -43,6 +43,7 @@ public sealed record RobotAuthoringImportListRow(
     int ItemCount,
     Guid? MaterializedRobotProgramId,
     Guid? LinkedConfigurationReleaseId,
+    Guid? ComposedRecipeId,
     DateTimeOffset CreatedAt,
     DateTimeOffset? ValidatedAt,
     DateTimeOffset? MaterializedAt,
@@ -107,7 +108,8 @@ public sealed record RobotAuthoringImportListItemResult(
                 row.Status,
                 validation?.CanMaterialize == true,
                 row.LinkedConfigurationReleaseId,
-                row.PublishedAt),
+                row.PublishedAt,
+                row.ComposedRecipeId.HasValue),
             row.CreatedAt,
             row.ValidatedAt,
             row.MaterializedAt,
@@ -244,16 +246,20 @@ public static class RobotAuthoringImportLifecycleProjection
         RobotAuthoringImportStatus status,
         bool canMaterialize,
         Guid? linkedConfigurationReleaseId,
-        DateTimeOffset? publishedAt) => status switch
+        DateTimeOffset? publishedAt,
+        bool compositionConfirmed) => status switch
     {
         RobotAuthoringImportStatus.Uploaded => ["ValidateImport", "DiscardImport"],
         RobotAuthoringImportStatus.Validated when canMaterialize => ["MaterializeImport", "DiscardImport"],
         RobotAuthoringImportStatus.Validated => ["ResolveArtifactRevisionConflict", "DiscardImport"],
         RobotAuthoringImportStatus.Applied when linkedConfigurationReleaseId.HasValue =>
             ["ReviewConfigurationReleaseDraft", "PublishConfigurationRelease"],
-        RobotAuthoringImportStatus.Applied when publishedAt.HasValue => ["CreateConfigurationReleaseDraft"],
+        RobotAuthoringImportStatus.Applied when publishedAt.HasValue && compositionConfirmed => ["CreateConfigurationReleaseDraft"],
+        RobotAuthoringImportStatus.Applied when publishedAt.HasValue => ["ResolvePublishedCompositionGap"],
+        RobotAuthoringImportStatus.Applied when compositionConfirmed =>
+            ["ReviewTechnicalContracts", "PublishImportResources"],
         RobotAuthoringImportStatus.Applied =>
-            ["PreviewSemanticComposition", "ReviewTechnicalContracts", "PublishImportResources"],
+            ["PreviewSemanticComposition", "ReviewTechnicalContracts"],
         RobotAuthoringImportStatus.Failed => ["ValidateImport", "DiscardImport"],
         _ => []
     };

@@ -32,6 +32,7 @@ public static class RobotConfigurationModule
         services.AddScoped<DiscardDraftRobotProgramCommandHandler>();
         services.AddScoped<CreateRobotProgramCommandHandler>();
         services.AddScoped<ReplaceRobotProgramArtifactsCommandHandler>();
+        services.AddScoped<ImportRawLuaRobotProgramArtifactsCommandHandler>();
         services.AddScoped<UpdateRobotProgramCommandHandler>();
         services.AddScoped<ListRobotArtifactsQueryHandler>();
         services.AddScoped<GetRobotArtifactQueryHandler>();
@@ -55,6 +56,7 @@ public static class RobotConfigurationModule
         services.AddScoped<RobotAuthoringImportValidator>();
         services.AddScoped<CreateRobotAuthoringReleaseDraftCommandHandler>();
         services.AddScoped<RobotAuthoringCompositionHandlers>();
+        services.AddScoped<RobotAuthoringRecipeResolver>();
         services.AddScoped<RobotAuthoringWorkspaceHandler>();
 
         return services;

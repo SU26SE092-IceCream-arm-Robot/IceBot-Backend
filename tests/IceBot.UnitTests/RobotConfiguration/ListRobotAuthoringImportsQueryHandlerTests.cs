@@ -64,6 +64,7 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
                 2,
                 Guid.NewGuid(),
                 null,
+                null,
                 DateTimeOffset.UtcNow,
                 DateTimeOffset.UtcNow,
                 DateTimeOffset.UtcNow,
@@ -86,7 +87,8 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
         Assert.Equal("Materialized", item.Status);
         Assert.Equal(2, item.ItemCount);
         Assert.Equal("Org Admin", item.CreatedByDisplayName);
-        Assert.Contains("PublishImportResources", item.NextActions);
+        Assert.Contains("PreviewSemanticComposition", item.NextActions);
+        Assert.DoesNotContain("PublishImportResources", item.NextActions);
         Assert.NotNull(item.Validation);
         Assert.True(item.Validation!.CanMaterialize);
         await store.Received(1).CountImportsAsync(
@@ -137,6 +139,7 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
             "FR5",
             "{not-json}",
             1,
+            null,
             null,
             null,
             DateTimeOffset.UtcNow,

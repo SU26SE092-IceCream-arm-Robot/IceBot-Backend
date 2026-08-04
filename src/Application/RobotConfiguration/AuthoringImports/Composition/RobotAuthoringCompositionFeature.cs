@@ -19,6 +19,7 @@ namespace Application.RobotConfiguration.AuthoringImports.Composition;
 public interface IRobotAuthoringCompositionStore
 {
     Task<Recipe?> GetRecipeAsync(Guid organizationId, Guid recipeId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<Recipe>> ListEligibleRecipesAsync(Guid organizationId, CancellationToken cancellationToken);
     Task<RobotProgram?> GetProgramAsync(Guid organizationId, Guid programId, CancellationToken cancellationToken);
     Task<IReadOnlyList<RobotArtifact>> GetArtifactsAsync(Guid organizationId, IReadOnlyCollection<Guid> artifactIds,
         CancellationToken cancellationToken);
@@ -39,7 +40,7 @@ public sealed record RobotCompositionRequirement(string Kind, string Code, strin
 public sealed record RobotCompositionArtifactProposal(Guid RobotArtifactId, string ArtifactCode, int RunOrder,
     string? RequiredOptionCode, IReadOnlyCollection<string> EffectCodes);
 public sealed record RobotAuthoringCompositionPreview(Guid ImportId, Guid RobotProgramId, Guid RecipeId,
-    IReadOnlyCollection<string> SelectedOptionCodes, bool CanConfirm, string PreviewChecksum,
+    DateTimeOffset ProgramLastModifiedAt, IReadOnlyCollection<string> SelectedOptionCodes, bool CanConfirm, string PreviewChecksum,
     IReadOnlyCollection<RobotCompositionRequirement> Requirements,
     IReadOnlyCollection<RobotCompositionArtifactProposal> ProposedArtifacts,
     IReadOnlyCollection<string> SuggestedCapabilityCodes,
@@ -100,6 +101,7 @@ public sealed class RobotAuthoringCompositionHandlers(
                 UserContext = command.UserContext,
                 OrganizationId = command.OrganizationId,
                 ProgramId = preview.RobotProgramId,
+                ExpectedLastModifiedAt = preview.ProgramLastModifiedAt,
                 Artifacts = preview.ProposedArtifacts.Select(item => new RobotProgramArtifactInput(
                     item.RobotArtifactId, item.RunOrder, 1, null, item.RequiredOptionCode)).ToArray()
             }, cancellationToken);
@@ -152,6 +154,18 @@ public sealed class RobotAuthoringCompositionHandlers(
         if (program.Status != RobotProgramStatus.Draft)
             blockers.Add(new("PROGRAM_NOT_DRAFT", "Only a Draft robot program can accept a composition proposal.", program.Code));
 
+        var importedArtifactIds = importSession.Items.Where(item => item.RobotArtifactId.HasValue)
+            .Select(item => item.RobotArtifactId!.Value).ToHashSet();
+        var programRunOrders = program.RobotProgramArtifacts
+            .GroupBy(item => item.RobotArtifactId)
+            .ToDictionary(group => group.Key, group => group.Single().RunOrder);
+        if (programRunOrders.Count != importedArtifactIds.Count ||
+            !importedArtifactIds.All(programRunOrders.ContainsKey))
+        {
+            blockers.Add(new("PROGRAM_ARTIFACT_SET_MISMATCH",
+                "The Draft robot program no longer contains exactly the artifacts materialized by this import.", program.Code));
+        }
+
         var normalizedOptions = selectedOptionCodes.Select(Normalize).Where(code => code.Length > 0).ToArray();
         if (normalizedOptions.Length != selectedOptionCodes.Count ||
             normalizedOptions.Distinct(StringComparer.Ordinal).Count() != normalizedOptions.Length)
@@ -180,7 +194,10 @@ public sealed class RobotAuthoringCompositionHandlers(
         {
             artifactsById.TryGetValue(item.RobotArtifactId ?? Guid.Empty, out var artifact);
             contractsById.TryGetValue(item.TechnicalContractId ?? Guid.Empty, out var contract);
-            return new Candidate(item, artifact, contract);
+            return new Candidate(item, artifact, contract,
+                item.RobotArtifactId.HasValue && programRunOrders.TryGetValue(item.RobotArtifactId.Value, out var runOrder)
+                    ? runOrder
+                    : item.RunOrder);
         }).ToArray();
         foreach (var candidate in candidates.Where(candidate => candidate.Artifact is null || candidate.Contract is null))
             blockers.Add(new("IMPORT_RESOURCE_MISSING", "Resolved import resource no longer exists.", candidate.Item.ArtifactCode));
@@ -247,7 +264,8 @@ public sealed class RobotAuthoringCompositionHandlers(
         };
         var checksumJson = JsonSerializer.Serialize(checksumDocument);
         var checksum = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(checksumJson))).ToLowerInvariant();
-        return (new RobotAuthoringCompositionPreview(importId, program.Id, recipeId, normalizedOptions,
+        return (new RobotAuthoringCompositionPreview(importId, program.Id, recipeId,
+            program.UpdatedAt ?? program.CreatedAt, normalizedOptions,
             blockers.Count == 0, checksum, requirementResults, proposal, capabilityCodes, blockers, warnings), null);
     }
 
@@ -320,12 +338,12 @@ public sealed class RobotAuthoringCompositionHandlers(
         while (ordered.Count < candidates.Count)
         {
             var next = candidates.Where(candidate => !ordered.Contains(candidate) && indegree[candidate.Item.Id] == 0)
-                .OrderBy(PhaseRank).ThenBy(SortHint).ThenBy(candidate => candidate.Item.RunOrder)
+                .OrderBy(PhaseRank).ThenBy(SortHint).ThenBy(candidate => candidate.ProgramRunOrder)
                 .ThenBy(candidate => candidate.Item.ArtifactCode, StringComparer.Ordinal).FirstOrDefault();
             if (next is null)
             {
                 blockers.Add(new("ORDERING_CYCLE", "Artifact ordering constraints contain a cycle."));
-                return candidates.OrderBy(candidate => candidate.Item.RunOrder).ToArray();
+                return candidates.OrderBy(candidate => candidate.ProgramRunOrder).ToArray();
             }
             ordered.Add(next);
             foreach (var target in edges[next.Item.Id]) indegree[target]--;
@@ -340,7 +358,7 @@ public sealed class RobotAuthoringCompositionHandlers(
         .DefaultIfEmpty(1).Min();
     private static int SortHint(Candidate candidate) => candidate.Contract!.OrderingConstraints
         .Where(constraint => constraint.ConstraintType == RobotArtifactOrderingConstraintType.Phase)
-        .Select(constraint => constraint.SortHint).DefaultIfEmpty(candidate.Item.RunOrder).Min();
+        .Select(constraint => constraint.SortHint).DefaultIfEmpty(candidate.ProgramRunOrder).Min();
     private static string? ResolveRequiredOptionCode(RobotArtifactTechnicalContract contract, IReadOnlySet<string> selectedOptions)
     {
         var values = contract.Effects.Select(effect => NormalizeOptional(effect.OptionCode)).Where(code => code is not null)
@@ -358,5 +376,5 @@ public sealed class RobotAuthoringCompositionHandlers(
     private sealed record RequiredEffect(string Kind, string Code, string? IngredientCode, string? OptionCode,
         decimal? Quantity, string? Unit, string? RequiredWorkcellCapabilityCode);
     private sealed record Candidate(RobotAuthoringImportItem Item, RobotArtifact? Artifact,
-        RobotArtifactTechnicalContract? Contract);
+        RobotArtifactTechnicalContract? Contract, int ProgramRunOrder);
 }

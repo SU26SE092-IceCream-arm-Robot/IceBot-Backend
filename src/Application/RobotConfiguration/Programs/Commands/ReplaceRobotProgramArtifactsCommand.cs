@@ -8,6 +8,7 @@ public sealed class ReplaceRobotProgramArtifactsCommand
     public required CurrentUserContext UserContext { get; init; }
     public Guid OrganizationId { get; init; }
     public Guid ProgramId { get; init; }
+    public DateTimeOffset? ExpectedLastModifiedAt { get; init; }
     public IReadOnlyCollection<RobotProgramArtifactInput> Artifacts { get; init; } = Array.Empty<RobotProgramArtifactInput>();
 }
 

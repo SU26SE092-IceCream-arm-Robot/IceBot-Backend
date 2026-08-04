@@ -74,13 +74,15 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
             }).ToListAsync(cancellationToken);
 
     public async Task<ConfigurationReleaseAuthoringOptionsReadModel> GetAuthoringOptionsAsync(
-        Guid organizationId, Guid? productVariantId, string? search, int limit, CancellationToken cancellationToken = default)
+        Guid organizationId, Guid? productVariantId, string? search, bool includeGlobalTemplates, int limit,
+        CancellationToken cancellationToken = default)
     {
         var term = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
         var variantQuery = _dbContext.ProductVariants.AsNoTracking().Where(variant =>
             variant.DeletedAt == null && variant.Product.DeletedAt == null &&
             variant.FulfillmentType == FulfillmentType.MachineProduced &&
-            (!variant.Product.OrganizationId.HasValue || variant.Product.OrganizationId == organizationId));
+            (variant.Product.OrganizationId == organizationId ||
+             (includeGlobalTemplates && !variant.Product.OrganizationId.HasValue)));
         if (productVariantId.HasValue) variantQuery = variantQuery.Where(variant => variant.Id == productVariantId.Value);
         if (term is not null) variantQuery = variantQuery.Where(variant =>
             EF.Functions.ILike(variant.Code, $"%{term}%") || EF.Functions.ILike(variant.Name, $"%{term}%") ||
@@ -98,8 +100,10 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
             recipe.DeletedAt == null && recipe.ProductVariant.DeletedAt == null && recipe.ProductVariant.Product.DeletedAt == null &&
             recipe.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced &&
             (recipe.Status == RecipeStatus.Published || recipe.Status == RecipeStatus.Active) &&
-            (!recipe.OrganizationId.HasValue || recipe.OrganizationId == organizationId) &&
-            (!recipe.ProductVariant.Product.OrganizationId.HasValue || recipe.ProductVariant.Product.OrganizationId == organizationId));
+            (recipe.OrganizationId == organizationId ||
+             (includeGlobalTemplates && !recipe.OrganizationId.HasValue)) &&
+            (recipe.ProductVariant.Product.OrganizationId == organizationId ||
+             (includeGlobalTemplates && !recipe.ProductVariant.Product.OrganizationId.HasValue)));
         if (productVariantId.HasValue) recipeQuery = recipeQuery.Where(recipe => recipe.ProductVariantId == productVariantId.Value);
         if (term is not null) recipeQuery = recipeQuery.Where(recipe => EF.Functions.ILike(recipe.Code, $"%{term}%") || EF.Functions.ILike(recipe.Name, $"%{term}%"));
         var recipes = await recipeQuery.OrderBy(recipe => recipe.ProductVariantId).ThenByDescending(recipe => recipe.IsDefault).ThenByDescending(recipe => recipe.Version).Take(limit)

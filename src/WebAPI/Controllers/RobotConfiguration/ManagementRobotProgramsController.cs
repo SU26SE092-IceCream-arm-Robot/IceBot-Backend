@@ -27,6 +27,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
     private readonly CreateRobotProgramCommandHandler _createHandler;
     private readonly UpdateRobotProgramCommandHandler _updateHandler;
     private readonly ReplaceRobotProgramArtifactsCommandHandler _replaceArtifactsHandler;
+    private readonly ImportRawLuaRobotProgramArtifactsCommandHandler _importRawLuaArtifactsHandler;
     private readonly PublishRobotProgramCommandHandler _publishHandler;
     private readonly RetireRobotProgramCommandHandler _retireHandler;
     private readonly DiscardDraftRobotProgramCommandHandler _discardHandler;
@@ -37,6 +38,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         CreateRobotProgramCommandHandler createHandler,
         UpdateRobotProgramCommandHandler updateHandler,
         ReplaceRobotProgramArtifactsCommandHandler replaceArtifactsHandler,
+        ImportRawLuaRobotProgramArtifactsCommandHandler importRawLuaArtifactsHandler,
         PublishRobotProgramCommandHandler publishHandler,
         RetireRobotProgramCommandHandler retireHandler,
         DiscardDraftRobotProgramCommandHandler discardHandler)
@@ -46,6 +48,7 @@ public sealed class ManagementRobotProgramsController : ControllerBase
         _createHandler = createHandler;
         _updateHandler = updateHandler;
         _replaceArtifactsHandler = replaceArtifactsHandler;
+        _importRawLuaArtifactsHandler = importRawLuaArtifactsHandler;
         _publishHandler = publishHandler;
         _retireHandler = retireHandler;
         _discardHandler = discardHandler;
@@ -139,11 +142,56 @@ public sealed class ManagementRobotProgramsController : ControllerBase
             UserContext = User.GetUserContext(),
             OrganizationId = organizationId,
             ProgramId = programId,
+            ExpectedLastModifiedAt = request.ExpectedLastModifiedAt,
             Artifacts = request.Artifacts.Select(item => new RobotProgramArtifactInput(
                 item.RobotArtifactId, item.RunOrder, 1, item.ParametersJson, item.RequiredOptionCode)).ToArray()
         };
         var result = await _replaceArtifactsHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("organizations/{organizationId:guid}/robot-programs/{programId:guid}/raw-lua-artifacts")]
+    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "program.manage")]
+    [Consumes("multipart/form-data")]
+    [RequestFormLimits(MultipartBodyLengthLimit = RawLuaRobotProgramImportParser.MaximumTotalExtractedBytes)]
+    public async Task<IActionResult> ImportRawLuaArtifacts(
+        Guid organizationId,
+        Guid programId,
+        [FromForm] ImportRawLuaRobotProgramArtifactsRequest request,
+        CancellationToken cancellationToken)
+    {
+        var parsed = await RawLuaRobotProgramImportParser.ParseAsync(request.Files, request.Archive, cancellationToken);
+        if (!parsed.Succeeded)
+            return BadRequest(Application.Shared.Wrappers.ApiResult<object>.Fail(parsed.Error!, 400));
+
+        try
+        {
+            var command = new ImportRawLuaRobotProgramArtifactsCommand
+            {
+                UserContext = User.GetUserContext(),
+                OrganizationId = organizationId,
+                ProgramId = programId,
+                RuntimeTargetCode = request.RuntimeTargetCode,
+                MachineModelCode = request.MachineModelCode,
+                Description = request.Description,
+                Artifacts = parsed.Items.Select((item, index) => new RawLuaRobotProgramArtifactInput
+                {
+                    FileName = item.FileName,
+                    ArtifactCode = RawLuaRobotProgramImportParser.CreateArtifactCode(item.FileName, index + 1),
+                    ArtifactName = RawLuaRobotProgramImportParser.CreateArtifactName(item.FileName),
+                    ContentType = item.ContentType,
+                    ContentLengthBytes = item.Content.Length,
+                    Content = item.Content
+                }).ToArray()
+            };
+            var result = await _importRawLuaArtifactsHandler.HandleAsync(command, cancellationToken);
+            return StatusCode(result.StatusCode, result);
+        }
+        finally
+        {
+            await RawLuaRobotProgramImportParser.DisposeAsync(parsed.Items);
+        }
     }
 
     [HttpPatch("organizations/{organizationId:guid}/robot-programs/{programId:guid}/publish")]
@@ -217,8 +265,25 @@ public sealed class UpdateRobotProgramRequest
 
 public sealed class ReplaceRobotProgramArtifactsRequest
 {
+    public DateTimeOffset? ExpectedLastModifiedAt { get; init; }
+
     [Required, MinLength(1)]
     public IReadOnlyCollection<RobotProgramArtifactRequest> Artifacts { get; init; } = Array.Empty<RobotProgramArtifactRequest>();
+}
+
+public sealed class ImportRawLuaRobotProgramArtifactsRequest
+{
+    public IFormFile[] Files { get; init; } = [];
+    public IFormFile? Archive { get; init; }
+
+    [Required, StringLength(100)]
+    public string RuntimeTargetCode { get; init; } = string.Empty;
+
+    [Required, StringLength(100)]
+    public string MachineModelCode { get; init; } = string.Empty;
+
+    [StringLength(500)]
+    public string? Description { get; init; }
 }
 
 public sealed class RobotProgramArtifactRequest

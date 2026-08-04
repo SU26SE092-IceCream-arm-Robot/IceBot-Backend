@@ -24,6 +24,7 @@ public sealed class RobotProgramResult
     public string? Description { get; init; }
     public string? ProgramManifestChecksum { get; init; }
     public DateTimeOffset? PublishedAt { get; init; }
+    public DateTimeOffset LastModifiedAt { get; init; }
     public IReadOnlyCollection<RobotProgramArtifactResult> Artifacts { get; init; } = Array.Empty<RobotProgramArtifactResult>();
 
     public static RobotProgramResult FromEntity(
@@ -50,6 +51,7 @@ public sealed class RobotProgramResult
             Description = program.Description,
             ProgramManifestChecksum = program.ProgramManifestChecksum,
             PublishedAt = program.PublishedAt,
+            LastModifiedAt = program.UpdatedAt ?? program.CreatedAt,
             Artifacts = program.RobotProgramArtifacts
                 .OrderBy(artifact => artifact.RunOrder)
                 .Select(artifact =>
@@ -66,7 +68,9 @@ public sealed class RobotProgramResult
                         ArtifactName = snapshot?.ArtifactName,
                         FileName = snapshot?.FileName,
                         Checksum = snapshot?.Checksum,
-                        ArtifactStatus = snapshot?.Status.ToString()
+                        ArtifactStatus = snapshot?.Status.ToString(),
+                        RuntimeTargetCode = snapshot?.RuntimeTargetCode,
+                        MachineModelCode = snapshot?.MachineModelCode
                     };
                 })
                 .ToArray()
@@ -86,4 +90,6 @@ public sealed class RobotProgramArtifactResult
     public string? FileName { get; init; }
     public string? Checksum { get; init; }
     public string? ArtifactStatus { get; init; }
+    public string? RuntimeTargetCode { get; init; }
+    public string? MachineModelCode { get; init; }
 }

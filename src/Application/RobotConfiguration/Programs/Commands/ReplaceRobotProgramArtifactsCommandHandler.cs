@@ -54,6 +54,17 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
             return ApiResult<RobotProgramResult>.Fail("Robot program artifact run orders must be unique.", 400);
         }
 
+        if (command.Artifacts.GroupBy(item => item.RobotArtifactId).Any(group => group.Count() > 1))
+        {
+            return ApiResult<RobotProgramResult>.Fail("A robot artifact can appear only once in a robot program.", 400);
+        }
+
+        var expectedOrders = Enumerable.Range(1, command.Artifacts.Count).ToHashSet();
+        if (!command.Artifacts.Select(item => item.RunOrder).ToHashSet().SetEquals(expectedOrders))
+        {
+            return ApiResult<RobotProgramResult>.Fail("Robot program artifact run orders must be contiguous, starting at one.", 400);
+        }
+
         if (command.Artifacts.Any(item => !IsValidOptionalJson(item.ParametersJson)))
         {
             return ApiResult<RobotProgramResult>.Fail("Robot program artifact parameters must be valid JSON.", 400);
@@ -89,6 +100,13 @@ public sealed class ReplaceRobotProgramArtifactsCommandHandler
         if (!program.OrganizationId.HasValue)
         {
             return ApiResult<RobotProgramResult>.Fail("Robot program must belong to an organization before artifacts can be assigned.", 400);
+        }
+
+        if (command.ExpectedLastModifiedAt.HasValue &&
+            (program.UpdatedAt ?? program.CreatedAt) != command.ExpectedLastModifiedAt.Value)
+        {
+            return ApiResult<RobotProgramResult>.Fail(
+                "Robot program changed since it was loaded. Reload it before saving the artifact order.", 409);
         }
 
         var artifactIds = command.Artifacts.Select(item => item.RobotArtifactId).Distinct().ToArray();

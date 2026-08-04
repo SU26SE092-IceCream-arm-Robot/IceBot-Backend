@@ -67,10 +67,14 @@ public sealed class CreateRobotAuthoringReleaseDraftCommandHandler(
                     "Import contracts, artifacts, and robot program must be published before release authoring.",
                     409,
                     cancellationToken);
-            if (importSession.ComposedRecipeId.HasValue &&
-                (importSession.ComposedRecipeId.Value != command.RecipeId ||
-                 !importSession.GetComposedOptionCodes().Order(StringComparer.Ordinal)
-                     .SequenceEqual(optionCodes.Order(StringComparer.Ordinal), StringComparer.Ordinal)))
+            if (!importSession.ComposedRecipeId.HasValue || !importSession.CompositionConfirmedAt.HasValue)
+                return await RollbackAndFailAsync(
+                    "Confirm the Recipe composition before creating a configuration release draft.",
+                    409,
+                    cancellationToken);
+            if (importSession.ComposedRecipeId.Value != command.RecipeId ||
+                !importSession.GetComposedOptionCodes().Order(StringComparer.Ordinal)
+                    .SequenceEqual(optionCodes.Order(StringComparer.Ordinal), StringComparer.Ordinal))
             {
                 return await RollbackAndFailAsync(
                     "Release recipe and supported option selection must match the confirmed robot composition.",
