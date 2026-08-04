@@ -587,10 +587,6 @@ public sealed class RobotAuthoringImportHandlers(
                 return await RollbackPublicationFailureAsync(
                     "IMPORT_NOT_MATERIALIZED",
                     "Import must be materialized before publication.");
-            if (!session.ComposedRecipeId.HasValue || !session.CompositionConfirmedAt.HasValue)
-                return await RollbackPublicationFailureAsync(
-                    "IMPORT_COMPOSITION_NOT_CONFIRMED",
-                    "Confirm the Recipe composition before publishing import resources.");
             if (session.PublishedAt.HasValue)
             {
                 await store.RollbackMutationAsync(CancellationToken.None);

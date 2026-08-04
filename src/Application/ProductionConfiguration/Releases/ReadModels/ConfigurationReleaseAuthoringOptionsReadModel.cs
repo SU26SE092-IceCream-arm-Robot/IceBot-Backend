@@ -27,6 +27,8 @@ public sealed class ConfigurationAuthoringRecipeOption
 {
     public Guid Id { get; init; }
     public Guid ProductId { get; init; }
+    public string ProductCode { get; init; } = null!;
+    public string ProductName { get; init; } = null!;
     public Guid ProductVariantId { get; init; }
     public string ProductVariantCode { get; init; } = null!;
     public string ProductVariantName { get; init; } = null!;

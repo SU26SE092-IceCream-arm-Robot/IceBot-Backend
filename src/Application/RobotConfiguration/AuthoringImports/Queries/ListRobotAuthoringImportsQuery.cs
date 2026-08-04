@@ -255,11 +255,9 @@ public static class RobotAuthoringImportLifecycleProjection
         RobotAuthoringImportStatus.Applied when linkedConfigurationReleaseId.HasValue =>
             ["ReviewConfigurationReleaseDraft", "PublishConfigurationRelease"],
         RobotAuthoringImportStatus.Applied when publishedAt.HasValue && compositionConfirmed => ["CreateConfigurationReleaseDraft"],
-        RobotAuthoringImportStatus.Applied when publishedAt.HasValue => ["ResolvePublishedCompositionGap"],
-        RobotAuthoringImportStatus.Applied when compositionConfirmed =>
-            ["ReviewTechnicalContracts", "PublishImportResources"],
+        RobotAuthoringImportStatus.Applied when publishedAt.HasValue => ["CreateProductionBinding"],
         RobotAuthoringImportStatus.Applied =>
-            ["PreviewSemanticComposition", "ReviewTechnicalContracts"],
+            ["PreviewSemanticComposition", "ReviewTechnicalContracts", "PublishImportResources"],
         RobotAuthoringImportStatus.Failed => ["ValidateImport", "DiscardImport"],
         _ => []
     };

@@ -20,7 +20,16 @@ public sealed record ConfigurationReleaseRouteInput(
     IReadOnlyCollection<string> SupportedOptionCodes,
     IReadOnlyCollection<ConfigurationReleaseRobotBindingInput> RobotBindings);
 
-public sealed record ConfigurationReleaseRobotBindingInput(
-    Guid RobotProgramId,
-    int BindingOrder,
-    string RequiredWorkcellCapabilityCode);
+public sealed record ConfigurationReleaseRobotBindingInput
+{
+    public Guid ProductionProgramBindingId { get; init; }
+    public Guid RobotProgramId { get; init; }
+    public int BindingOrder { get; init; }
+    public string RequiredWorkcellCapabilityCode { get; init; } = string.Empty;
+
+    public ConfigurationReleaseRobotBindingInput(Guid productionProgramBindingId, int bindingOrder) =>
+        (ProductionProgramBindingId, BindingOrder) = (productionProgramBindingId, bindingOrder);
+
+    public ConfigurationReleaseRobotBindingInput(Guid robotProgramId, int bindingOrder, string requiredWorkcellCapabilityCode) =>
+        (RobotProgramId, BindingOrder, RequiredWorkcellCapabilityCode) = (robotProgramId, bindingOrder, requiredWorkcellCapabilityCode);
+}

@@ -137,8 +137,6 @@ public sealed class RobotAuthoringImport : BusinessEntity
     {
         if (Status != RobotAuthoringImportStatus.Applied || !AppliedRobotProgramId.HasValue)
             throw new DomainRuleException("Only an applied import can complete publication.");
-        if (!ComposedRecipeId.HasValue || !CompositionConfirmedAt.HasValue)
-            throw new DomainRuleException("Confirm the recipe composition before publishing import resources.");
         PublishedAt = now;
         Touch(now, actorId);
     }
@@ -162,8 +160,8 @@ public sealed class RobotAuthoringImport : BusinessEntity
     public void ConfirmComposition(Guid recipeId, IReadOnlyCollection<string> optionCodes, string previewChecksum,
         DateTimeOffset now, Guid actorId)
     {
-        if (Status != RobotAuthoringImportStatus.Applied || !AppliedRobotProgramId.HasValue || PublishedAt.HasValue)
-            throw new DomainRuleException("Composition can only be confirmed for an applied, unpublished import.");
+        if (Status != RobotAuthoringImportStatus.Applied || !AppliedRobotProgramId.HasValue)
+            throw new DomainRuleException("Composition can only be confirmed for an applied import.");
         if (recipeId == Guid.Empty || string.IsNullOrWhiteSpace(previewChecksum))
             throw new DomainRuleException("Composition recipe and preview checksum are required.");
         var normalizedOptions = optionCodes.Select(NormalizeCode).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();

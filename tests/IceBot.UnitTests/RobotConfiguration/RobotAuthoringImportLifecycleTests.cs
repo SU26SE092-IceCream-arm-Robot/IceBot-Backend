@@ -42,7 +42,7 @@ public sealed class RobotAuthoringImportLifecycleTests
         Assert.Equal("Materialized", materialized.Status);
         Assert.Equal(programId, materialized.MaterializedRobotProgramId);
         Assert.Equal(now, materialized.MaterializedAt);
-        Assert.DoesNotContain("PublishImportResources", materialized.NextActions);
+        Assert.Contains("PublishImportResources", materialized.NextActions);
 
         importSession.ConfirmComposition(Guid.NewGuid(), [], "preview-checksum", now.AddSeconds(30), Guid.NewGuid());
         Assert.Contains("PublishImportResources", RobotAuthoringImportResult.From(importSession).NextActions);
@@ -64,17 +64,17 @@ public sealed class RobotAuthoringImportLifecycleTests
     }
 
     [Fact]
-    public void PublishingRequiresConfirmedRecipeComposition()
+    public void PublishingTechnicalResources_DoesNotCreateOrRequireRecipeComposition()
     {
         var importSession = CreateImport();
         var now = DateTimeOffset.UtcNow;
         importSession.MarkValidated("{}", now, Guid.NewGuid());
         importSession.MarkApplied(Guid.NewGuid(), now, Guid.NewGuid());
 
-        var exception = Assert.Throws<DomainRuleException>(() =>
-            importSession.MarkPublished(now.AddMinutes(1), Guid.NewGuid()));
+        importSession.MarkPublished(now.AddMinutes(1), Guid.NewGuid());
 
-        Assert.Contains("recipe composition", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(importSession.ComposedRecipeId);
+        Assert.NotNull(importSession.PublishedAt);
     }
 
     [Fact]

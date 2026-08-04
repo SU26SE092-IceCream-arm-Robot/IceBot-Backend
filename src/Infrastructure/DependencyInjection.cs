@@ -45,6 +45,7 @@ using Infrastructure.Payments;
 using Infrastructure.ProductionConfiguration.Persistence.Deployments;
 using Infrastructure.ProductionConfiguration.Persistence.Releases;
 using Infrastructure.ProductionConfiguration.Persistence.Routes;
+using Infrastructure.ProductionConfiguration.Persistence.Bindings;
 using Infrastructure.ProductionConfiguration.ObjectStorage;
 using Infrastructure.ProductionPackages;
 using Application.ProductionPackages;
@@ -223,7 +224,9 @@ namespace Infrastructure
             services.AddScoped<Application.Shared.Concurrency.ITechnicalResourceMutationCoordinator,
                 Concurrency.PostgresTechnicalResourceMutationCoordinator>();
             services.AddScoped<IConfigurationReleaseStore, ConfigurationReleaseStore>();
-            services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
+              services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
+              services.AddScoped<Application.ProductionConfiguration.Bindings.IProductionProgramBindingStore,
+                  ProductionProgramBindingStore>();
             services.AddScoped<ConfigurationDeploymentStore>();
             services.AddScoped<IConfigurationDeploymentStore>(provider =>
                 provider.GetRequiredService<ConfigurationDeploymentStore>());

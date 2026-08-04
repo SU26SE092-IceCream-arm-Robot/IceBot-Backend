@@ -35,6 +35,8 @@ public static class ConfigurationReleaseRevisionToken
                         .Select(binding => new
                         {
                             binding.Id,
+                            binding.ProductionProgramBindingId,
+                            binding.ProductionProgramBindingChecksum,
                             binding.RobotProgramId,
                             binding.BindingOrder,
                             binding.RequiredWorkcellCapabilityCode

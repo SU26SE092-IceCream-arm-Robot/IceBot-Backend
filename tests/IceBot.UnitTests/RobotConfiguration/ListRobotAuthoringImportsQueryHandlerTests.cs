@@ -88,7 +88,7 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
         Assert.Equal(2, item.ItemCount);
         Assert.Equal("Org Admin", item.CreatedByDisplayName);
         Assert.Contains("PreviewSemanticComposition", item.NextActions);
-        Assert.DoesNotContain("PublishImportResources", item.NextActions);
+        Assert.Contains("PublishImportResources", item.NextActions);
         Assert.NotNull(item.Validation);
         Assert.True(item.Validation!.CanMaterialize);
         await store.Received(1).CountImportsAsync(

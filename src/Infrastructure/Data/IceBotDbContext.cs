@@ -192,6 +192,7 @@ public class IceBotDbContext : DbContext
     public DbSet<ProductionPackageUpgradeAvailabilityChange> ProductionPackageUpgradeAvailabilityChanges => Set<ProductionPackageUpgradeAvailabilityChange>();
     public DbSet<ProductionComposition> ProductionCompositions => Set<ProductionComposition>();
     public DbSet<ConfigurationRelease> ConfigurationReleases => Set<ConfigurationRelease>();
+    public DbSet<ProductionProgramBinding> ProductionProgramBindings => Set<ProductionProgramBinding>();
     public DbSet<ExecutionRoute> ExecutionRoutes => Set<ExecutionRoute>();
     public DbSet<ExecutionRouteRobotBinding> ExecutionRouteRobotBindings => Set<ExecutionRouteRobotBinding>();
     public DbSet<KioskConfigurationDeployment> KioskConfigurationDeployments => Set<KioskConfigurationDeployment>();

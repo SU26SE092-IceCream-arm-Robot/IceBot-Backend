@@ -109,7 +109,8 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         var recipes = await recipeQuery.OrderBy(recipe => recipe.ProductVariantId).ThenByDescending(recipe => recipe.IsDefault).ThenByDescending(recipe => recipe.Version).Take(limit)
             .Select(recipe => new ConfigurationAuthoringRecipeOption
             {
-                Id = recipe.Id, ProductId = recipe.ProductVariant.ProductId, ProductVariantId = recipe.ProductVariantId, ProductVariantCode = recipe.ProductVariant.Code,
+                Id = recipe.Id, ProductId = recipe.ProductVariant.ProductId, ProductCode = recipe.ProductVariant.Product.Code,
+                ProductName = recipe.ProductVariant.Product.Name, ProductVariantId = recipe.ProductVariantId, ProductVariantCode = recipe.ProductVariant.Code,
                 ProductVariantName = recipe.ProductVariant.Name, Code = recipe.Code, Name = recipe.Name, Version = recipe.Version,
                 Status = recipe.Status.ToString(), IsDefault = recipe.IsDefault, OrganizationId = recipe.OrganizationId,
                 StoreId = recipe.StoreId, KioskId = recipe.KioskId

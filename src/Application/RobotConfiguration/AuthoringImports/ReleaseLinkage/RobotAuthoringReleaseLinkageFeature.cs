@@ -6,6 +6,7 @@ using Application.ProductionConfiguration.Releases.Results;
 using Application.ProductionConfiguration.Routes.Commands;
 using Application.ProductionConfiguration.Routes.Contracts;
 using Application.ProductionConfiguration.Routes.Support;
+using Application.ProductionConfiguration.Bindings;
 using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.Shared.Wrappers;
 using Domain.Common;
@@ -28,6 +29,7 @@ public sealed class CreateRobotAuthoringReleaseDraftCommandHandler(
     IRobotAuthoringImportStore importStore,
     IRobotAuthoringCompositionStore compositionStore,
     IConfigurationReleaseStore releaseStore,
+    ProductionProgramBindingHandlers productionBindingHandlers,
     CreateConfigurationReleaseCommandHandler createReleaseHandler,
     ReplaceConfigurationReleaseRoutesCommandHandler replaceRoutesHandler)
 {
@@ -141,6 +143,16 @@ public sealed class CreateRobotAuthoringReleaseDraftCommandHandler(
                     createResult.StatusCode,
                     cancellationToken);
 
+            var productionBinding = await productionBindingHandlers.CreateAsync(
+                new CreateProductionProgramBindingCommand(command.UserContext, command.OrganizationId,
+                    command.RecipeId, importSession.AppliedRobotProgramId.Value, capabilityCode, optionCodes),
+                cancellationToken);
+            if (!productionBinding.Succeeded || productionBinding.Data is null)
+                return await RollbackAndFailAsync(
+                    productionBinding.Message ?? "Production binding could not be created.",
+                    productionBinding.StatusCode,
+                    cancellationToken);
+
             var routeCode = BuildRouteCode(importSession.ProposedProgramCode);
             var replaceResult = await replaceRoutesHandler.HandleAsync(new ReplaceConfigurationReleaseRoutesCommand
             {
@@ -161,9 +173,8 @@ public sealed class CreateRobotAuthoringReleaseDraftCommandHandler(
                             .ToArray(),
                         optionCodes,
                         [new ConfigurationReleaseRobotBindingInput(
-                            importSession.AppliedRobotProgramId.Value,
-                            1,
-                            capabilityCode)])
+                            productionBinding.Data.Id,
+                            1)])
                 ]
             }, cancellationToken);
             if (!replaceResult.Succeeded || replaceResult.Data is null)

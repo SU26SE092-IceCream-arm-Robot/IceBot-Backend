@@ -62,6 +62,8 @@ public sealed class ConfigurationReleaseResult
                         .Select(binding => new ExecutionRouteRobotBindingResult
                         {
                             Id = binding.Id,
+                            ProductionProgramBindingId = binding.ProductionProgramBindingId,
+                            ProductionProgramBindingChecksum = binding.ProductionProgramBindingChecksum,
                             RobotProgramId = binding.RobotProgramId,
                             RobotProgramCode = binding.RobotProgram?.Code,
                             BindingOrder = binding.BindingOrder,
@@ -92,6 +94,8 @@ public sealed class ExecutionRouteResult
 public sealed class ExecutionRouteRobotBindingResult
 {
     public Guid Id { get; init; }
+    public Guid? ProductionProgramBindingId { get; init; }
+    public string? ProductionProgramBindingChecksum { get; init; }
     public Guid RobotProgramId { get; init; }
     public string? RobotProgramCode { get; init; }
     public int BindingOrder { get; init; }
