@@ -2,6 +2,7 @@ using Domain.RobotConfiguration.Programs.Manifests;
 using Domain.RobotConfiguration.Programs;
 using Domain.Common;
 using Domain.RobotConfiguration.Artifacts;
+using System.Text.Json;
 
 namespace Domain.ProductionConfiguration.Entities;
 
@@ -11,7 +12,11 @@ public class ExecutionRouteRobotBinding : BusinessEntity
 
     public int BindingOrder { get; private set; }
 
-    public string RequiredWorkcellCapabilityCode { get; private set; } = null!;
+    public string RequiredCapabilityCodesJson { get; private set; } = "[]";
+
+    // Retained as a SQL-filterable primary capability projection for existing runtime-readiness queries.
+    // The immutable capability set above is authoritative for release and dispatch contracts.
+    public string RequiredWorkcellCapabilityCode { get; private set; } = string.Empty;
 
     public Guid RobotProgramId { get; private set; }
 
@@ -32,7 +37,7 @@ public class ExecutionRouteRobotBinding : BusinessEntity
         string? productionProgramBindingChecksum,
         Guid robotProgramId,
         int bindingOrder,
-        string requiredWorkcellCapabilityCode)
+        IReadOnlyCollection<string> requiredCapabilityCodes)
     {
         if ((productionProgramBindingId.HasValue && productionProgramBindingId == Guid.Empty) || robotProgramId == Guid.Empty)
         {
@@ -44,10 +49,7 @@ public class ExecutionRouteRobotBinding : BusinessEntity
             throw new DomainRuleException("Execution route robot binding order must be greater than zero.");
         }
 
-        if (string.IsNullOrWhiteSpace(requiredWorkcellCapabilityCode))
-        {
-            throw new DomainRuleException("Required workcell capability code is required.");
-        }
+        var normalizedCapabilityCodes = NormalizeCapabilityCodes(requiredCapabilityCodes);
 
         return new ExecutionRouteRobotBinding
         {
@@ -56,9 +58,22 @@ public class ExecutionRouteRobotBinding : BusinessEntity
                 ? RequireChecksum(productionProgramBindingChecksum!) : null,
             RobotProgramId = robotProgramId,
             BindingOrder = bindingOrder,
-            RequiredWorkcellCapabilityCode = requiredWorkcellCapabilityCode.Trim()
+            RequiredCapabilityCodesJson = JsonSerializer.Serialize(normalizedCapabilityCodes),
+            RequiredWorkcellCapabilityCode = normalizedCapabilityCodes.FirstOrDefault() ?? string.Empty
         };
     }
+
+    public IReadOnlyCollection<string> GetRequiredCapabilityCodes() =>
+        JsonSerializer.Deserialize<string[]>(RequiredCapabilityCodesJson) ?? [];
+
+    private static string[] NormalizeCapabilityCodes(IReadOnlyCollection<string> codes) =>
+        codes.Select(code =>
+            string.IsNullOrWhiteSpace(code)
+                ? throw new DomainRuleException("Required capability code cannot be empty.")
+                : code.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
 
     private static string RequireChecksum(string value)
     {

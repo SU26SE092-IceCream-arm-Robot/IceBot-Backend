@@ -45,24 +45,20 @@ public sealed class RobotAuthoringRecipeResolver(
             .Select(item => item.TechnicalContractId!.Value)
             .Distinct()
             .ToArray();
-        if (contractIds.Length != importSession.Items.Count)
-            return new("NotReady", "Every imported artifact must have a resolved technical contract before matching a Recipe.", []);
-
         var contracts = await store.GetContractsAsync(importSession.OrganizationId, contractIds, cancellationToken);
-        if (contracts.Count != contractIds.Length)
-            return new("NotReady", "One or more materialized technical contracts are no longer available.", []);
-
         var effects = contracts.Where(contract => contract.SchemaVersion >= 2)
             .SelectMany(contract => contract.Effects).ToArray();
         if (effects.Any(effect => !string.IsNullOrWhiteSpace(effect.OptionCode)))
-            return new("OptionSelectionRequired", "The bundle declares option-specific effects. Select production options before confirming a Recipe binding.", []);
+            return new("OptionSelectionRequired",
+                "Operator-declared metadata mentions production options. Select the intended Recipe and options explicitly.", []);
 
         var artifactRequirements = effects
             .Where(effect => effect.EffectKind == RobotArtifactEffectKind.Ingredient)
             .Select(effect => Requirement.From(effect.IngredientCode, effect.QuantityMode, effect.FixedQuantity, effect.Unit))
             .ToArray();
         if (artifactRequirements.Length == 0 || artifactRequirements.Any(requirement => requirement is null))
-            return new("NoMatch", "The bundle does not declare fixed ingredient quantities that can be matched to a Recipe.", []);
+            return new("NoMatch",
+                "No Recipe suggestion can be matched from operator-declared metadata. Select the intended Recipe explicitly.", []);
 
         var required = artifactRequirements.Cast<Requirement>().OrderBy(requirement => requirement.Code)
             .ThenBy(requirement => requirement.Quantity).ThenBy(requirement => requirement.Unit).ToArray();
@@ -78,9 +74,9 @@ public sealed class RobotAuthoringRecipeResolver(
 
         return candidates.Length switch
         {
-            0 => new("NoMatch", "No active machine-produced Recipe exactly matches the bundle's declared ingredient quantities.", []),
-            1 => new("SingleMatch", "One Recipe matches the bundle. Confirm it before publishing resources or creating a release draft.", candidates),
-            _ => new("MultipleMatches", "Multiple Recipes match the bundle. Choose the intended Recipe before confirming composition.", candidates)
+            0 => new("NoMatch", "No Recipe matches the operator-declared metadata. Select the intended Recipe explicitly.", []),
+            1 => new("SingleMatch", "One Recipe matches the operator-declared metadata. Operator confirmation is still required.", candidates),
+            _ => new("MultipleMatches", "Multiple Recipes match the operator-declared metadata. Choose the intended Recipe explicitly.", candidates)
         };
     }
 

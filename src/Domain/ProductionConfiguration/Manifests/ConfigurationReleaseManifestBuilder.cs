@@ -106,7 +106,7 @@ public static class ConfigurationReleaseManifestBuilder
             binding.ProductionProgramBindingId,
             binding.ProductionProgramBindingChecksum,
             binding.BindingOrder,
-            binding.RequiredWorkcellCapabilityCode,
+            RequiredCapabilityCodes = binding.GetRequiredCapabilityCodes(),
             RobotProgram = new
             {
                 program.Id,

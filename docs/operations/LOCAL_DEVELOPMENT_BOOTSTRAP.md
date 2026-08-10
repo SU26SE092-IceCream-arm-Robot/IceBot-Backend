@@ -86,11 +86,14 @@ The command is available only with `ASPNETCORE_ENVIRONMENT=Development`. It:
   assignment for that organization when the account exists;
 - deletes that tenant's authoring imports, Draft/Published test programs,
   artifacts, technical contracts, and their object-storage bytes;
+- deletes that tenant's operator-confirmed bindings, configuration releases,
+  routes, and menu items that reference the reset product;
 - rebuilds the organization-owned Vanilla soft-serve product, variant, and
   active Recipe from the global template.
 
-The command refuses to run once the test tenant has a menu or configuration
-release. Do not use it as an operational rollback or against production data.
+The command may run after authoring and publication, but refuses to erase the
+fixture when it has order, deployment, execution, active-release, or production
+package evidence. Do not use it as an operational rollback or against production data.
 If object storage is unavailable after the database reset, metadata remains
 reset and the command logs retained orphaned object keys for normal orphan
 cleanup.

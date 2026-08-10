@@ -17,8 +17,6 @@ public sealed class ArtifactPublicationValidator(
             artifact.OrganizationId,
             artifact.TechnicalContractId,
             artifact.TechnicalContractChecksum,
-            artifact.RuntimeTargetCode,
-            artifact.MachineModelCode,
             artifact.StorageKey,
             artifact.ContentLengthBytes,
             artifact.Checksum,
@@ -29,8 +27,6 @@ public sealed class ArtifactPublicationValidator(
             organizationId: null,
             template.TechnicalContractId,
             template.TechnicalContractChecksum,
-            template.RuntimeTargetCode,
-            template.MachineModelCode,
             template.StorageKey,
             template.ContentLengthBytes,
             template.Checksum,
@@ -40,26 +36,29 @@ public sealed class ArtifactPublicationValidator(
         Guid? organizationId,
         Guid? technicalContractId,
         string? technicalContractChecksum,
-        string runtimeTargetCode,
-        string machineModelCode,
         string storageKey,
         long expectedLength,
         string expectedChecksum,
         CancellationToken cancellationToken)
     {
-        if (!technicalContractId.HasValue || string.IsNullOrWhiteSpace(technicalContractChecksum))
-            throw new DomainRuleException("A published technical contract is required before publication.");
-
-        var contract = await technicalContracts.GetAsync(technicalContractId.Value, false, cancellationToken);
-        if (contract is null ||
-            contract.Status != RobotArtifactContractStatus.Published ||
-            string.IsNullOrWhiteSpace(contract.ContractChecksum) ||
-            !string.Equals(contract.ContractChecksum, technicalContractChecksum, StringComparison.Ordinal) ||
-            (contract.OrganizationId.HasValue && contract.OrganizationId != organizationId) ||
-            !string.Equals(contract.RuntimeTargetCode, runtimeTargetCode, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(contract.MachineModelCode, machineModelCode, StringComparison.OrdinalIgnoreCase))
+        if (technicalContractId.HasValue != !string.IsNullOrWhiteSpace(technicalContractChecksum))
         {
-            throw new DomainRuleException("The assigned technical contract is not published, compatible, or checksum-consistent.");
+            throw new DomainRuleException(
+                "Technical contract identity and declaration checksum must either both be assigned or both be absent.");
+        }
+
+        if (technicalContractId.HasValue)
+        {
+            var contract = await technicalContracts.GetAsync(technicalContractId.Value, false, cancellationToken);
+            if (contract is null ||
+                contract.Status != RobotArtifactContractStatus.Published ||
+                string.IsNullOrWhiteSpace(contract.ContractChecksum) ||
+                !string.Equals(contract.ContractChecksum, technicalContractChecksum, StringComparison.Ordinal) ||
+                (contract.OrganizationId.HasValue && contract.OrganizationId != organizationId))
+            {
+                throw new DomainRuleException(
+                    "The assigned technical declaration is not published, in scope, or checksum-consistent.");
+            }
         }
 
         byte[] bytes;

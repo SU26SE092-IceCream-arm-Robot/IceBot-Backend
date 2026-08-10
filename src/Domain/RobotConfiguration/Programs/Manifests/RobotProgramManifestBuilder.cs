@@ -85,12 +85,6 @@ public static class RobotProgramManifestBuilder
             throw new DomainRuleException("Robot program publication requires published robot artifact snapshots.");
         }
 
-        if (!artifact.TechnicalContractId.HasValue || string.IsNullOrWhiteSpace(artifact.TechnicalContractChecksum))
-        {
-            throw new DomainRuleException(
-                "Robot program publication requires technical-contract provenance for every artifact.");
-        }
-
         return new RobotProgramManifestItem(
             membership.Id,
             membership.RunOrder,

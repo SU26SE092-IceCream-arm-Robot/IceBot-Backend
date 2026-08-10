@@ -73,7 +73,7 @@ public sealed class RobotArtifactTechnicalContractTests
     }
 
     [Fact]
-    public void Publish_RejectsParameterizedQuantityWhenRuntimeDoesNotSupportIt()
+    public void Publish_StoresParameterizedQuantityAsOperatorDeclaration()
     {
         var contract = RobotArtifactTechnicalContract.CreateDraft(
             "DISPENSE_BASE", 1, "FAIRINO_LUA_V1", "FR5");
@@ -84,9 +84,8 @@ public sealed class RobotArtifactTechnicalContractTests
                 RobotArtifactQuantityMode.Parameterized, null, "g", "DISPENSER")
         ], []);
 
-        var exception = Assert.Throws<DomainRuleException>(() =>
-            contract.Publish(DateTimeOffset.UtcNow, null, parameterizedRuntimeSupported: false));
+        contract.Publish(DateTimeOffset.UtcNow, null, parameterizedRuntimeSupported: false);
 
-        Assert.Contains("not supported", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(RobotArtifactContractStatus.Published, contract.Status);
     }
 }

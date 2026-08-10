@@ -109,14 +109,23 @@ public sealed class RobotAuthoringBundleCodecTests
     }
 
     [Fact]
-    public void Parse_ParameterizedQuantity_RejectsFairinoRuntimeDuringBundleValidation()
+    public void Parse_ParameterizedQuantity_IsAnOperatorDeclarationNotRuntimeProof()
     {
         var bytes = CreateSingleSemanticBundle(2, null, "gram", quantityMode: "Parameterized");
 
-        var exception = Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
+        var bundle = RobotAuthoringBundleCodec.Parse(bytes);
 
-        Assert.Contains("cannot use parameterized quantities for FAIRINO_LUA_V1", exception.Message,
-            StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Parameterized", Assert.Single(Assert.Single(bundle.Items).Sidecar.Effects).QuantityMode.ToString());
+    }
+
+    [Fact]
+    public void Parse_EmptyEffects_AllowsBlackBoxArtifact()
+    {
+        var bytes = CreateSingleSemanticBundle(1, null, null, emptyEffects: true);
+
+        var bundle = RobotAuthoringBundleCodec.Parse(bytes);
+
+        Assert.Empty(Assert.Single(bundle.Items).Sidecar.Effects);
     }
 
     [Fact]
@@ -240,7 +249,7 @@ public sealed class RobotAuthoringBundleCodecTests
     private static byte[] CreateSingleSemanticBundle(int schemaVersion, decimal? fixedQuantity, string? unit,
         object? effectKind = null, string? ingredientCode = "ICE_CREAM_BASE", string? optionCode = null,
         object? quantityMode = null, object? constraintType = null,
-        bool nullEffects = false, bool nullOrderingConstraints = false)
+        bool nullEffects = false, bool nullOrderingConstraints = false, bool emptyEffects = false)
     {
         effectKind ??= "Ingredient";
         quantityMode ??= "FixedInArtifact";
@@ -259,7 +268,7 @@ public sealed class RobotAuthoringBundleCodecTests
                 }
             }));
             Write(archive, "artifacts/dispense.lua", "-- generated\nreturn 0");
-            object? effects = nullEffects ? null : new object[]
+            object? effects = nullEffects ? null : emptyEffects ? Array.Empty<object>() : new object[]
             {
                 new { effectCode = "DISPENSE_BASE", effectKind, ingredientCode, optionCode,
                     quantityMode, fixedQuantity, unit, requiredWorkcellCapabilityCode = "DISPENSER" }

@@ -6,7 +6,7 @@ namespace Application.EdgeIntegration.Dispatch.Contracts;
 
 public sealed record ExecuteOrderCommandPayload
 {
-    public int SchemaVersion { get; init; } = 4;
+    public int SchemaVersion { get; init; } = 5;
     public string ExecutionIntent { get; init; } = "Initial";
     public Guid? RemakeOfSourceCommandId { get; init; }
     public Guid CommandId { get; init; }
@@ -71,7 +71,7 @@ public sealed record ExecuteOrderOptionIngredientRequirementPayload
 public sealed record ExecuteOrderRobotProgramPayload
 {
     public int BindingOrder { get; init; }
-    public string RequiredWorkcellCapabilityCode { get; init; } = string.Empty;
+    public IReadOnlyCollection<string> RequiredCapabilityCodes { get; init; } = [];
     public Guid RobotProgramId { get; init; }
     public int ProgramManifestSchemaVersion { get; init; }
     public string ProgramManifestChecksum { get; init; } = string.Empty;
@@ -143,7 +143,7 @@ public static class ExecuteOrderCommandPayloadCodec
 
     private static void ValidateFull(ExecuteOrderCommandPayload payload)
     {
-        if (payload.SchemaVersion is not 3 and not 4)
+        if (payload.SchemaVersion is not 3 and not 4 and not 5)
             throw new DomainRuleException("Execute-order command payload schema version is unsupported.");
         var isInitial = string.Equals(payload.ExecutionIntent, "Initial", StringComparison.Ordinal);
         var isRemake = string.Equals(payload.ExecutionIntent, "Remake", StringComparison.Ordinal);
@@ -174,6 +174,7 @@ public static class ExecuteOrderCommandPayloadCodec
                         string.IsNullOrWhiteSpace(requirement.RequiredWorkcellCapabilityCode))) ||
                 line.RobotPrograms.Count == 0 || line.RobotPrograms.Any(program =>
                     program.RobotProgramId == Guid.Empty || program.BindingOrder <= 0 || program.Artifacts.Count == 0 ||
+                    program.RequiredCapabilityCodes.Any(code => string.IsNullOrWhiteSpace(code)) ||
                     !Enum.IsDefined(program.RestartPolicy) ||
                     program.RestartPolicy != RobotProgramRestartPolicy.ManualOnly ||
                     program.Artifacts.Any(artifact => artifact.RobotArtifactId == Guid.Empty || artifact.RunOrder <= 0 ||

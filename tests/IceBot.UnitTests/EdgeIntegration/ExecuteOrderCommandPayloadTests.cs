@@ -69,7 +69,7 @@ public sealed class ExecuteOrderCommandPayloadTests
                         new ExecuteOrderRobotProgramPayload
                         {
                             BindingOrder = 1,
-                            RequiredWorkcellCapabilityCode = "ICE_CREAM",
+                            RequiredCapabilityCodes = ["ICE_CREAM"],
                             RobotProgramId = Guid.NewGuid(),
                             ProgramManifestSchemaVersion = 1,
                             ProgramManifestChecksum = "program-checksum",
@@ -94,7 +94,7 @@ public sealed class ExecuteOrderCommandPayloadTests
         var json = ExecuteOrderCommandPayloadCodec.Serialize(payload);
         var restored = ExecuteOrderCommandPayloadCodec.DeserializeAndValidateFull(json);
 
-        Assert.Equal(4, restored.SchemaVersion);
+        Assert.Equal(5, restored.SchemaVersion);
         Assert.Equal(payload.CommandId, restored.CommandId);
         Assert.Single(restored.OrderLines);
         Assert.All(restored.OrderLines.SelectMany(line => line.RobotPrograms),

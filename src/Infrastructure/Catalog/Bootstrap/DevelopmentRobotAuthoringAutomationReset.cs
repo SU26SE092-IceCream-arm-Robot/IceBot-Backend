@@ -15,12 +15,15 @@ public sealed record DevelopmentRobotAuthoringAutomationResetResult(
     int DeletedArtifactCount,
     int DeletedProgramCount,
     int DeletedContractCount,
+    int DeletedBindingCount,
+    int DeletedReleaseCount,
+    int DeletedMenuItemCount,
     int DeletedObjectCount,
     int RetainedObjectCount);
 
 /// <summary>
 /// Destructive local-only fixture reset for the isolated robot authoring tenant.
-/// It deliberately refuses to delete data once the tenant has a release or menu.
+/// It removes authoring and publication data, but refuses to erase runtime or commercial evidence.
 /// </summary>
 public sealed class DevelopmentRobotAuthoringAutomationReset(
     IceBotDbContext dbContext,
@@ -49,8 +52,17 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
             .Where(recipe => recipe.OrganizationId == organization.Id && variantIds.Contains(recipe.ProductVariantId))
             .Select(recipe => recipe.Id)
             .ToArrayAsync(cancellationToken);
+        var releaseIds = await dbContext.ConfigurationReleases.IgnoreQueryFilters()
+            .Where(release => release.OrganizationId == organization.Id)
+            .Select(release => release.Id)
+            .ToArrayAsync(cancellationToken);
+        var menuItemIds = await dbContext.MenuItems.IgnoreQueryFilters()
+            .Where(item => variantIds.Contains(item.ProductVariantId) ||
+                           (item.RecipeId.HasValue && recipeIds.Contains(item.RecipeId.Value)))
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
 
-        await EnsureNoOperationalReferencesAsync(organization.Id, variantIds, recipeIds, cancellationToken);
+        await EnsureNoRuntimeEvidenceAsync(organization.Id, releaseIds, menuItemIds, cancellationToken);
 
         var importKeys = await dbContext.RobotAuthoringImports.IgnoreQueryFilters()
             .Where(importSession => importSession.OrganizationId == organization.Id)
@@ -76,6 +88,8 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
             .CountAsync(program => program.OrganizationId == organization.Id, cancellationToken);
         var contractCount = await dbContext.RobotArtifactTechnicalContracts.IgnoreQueryFilters()
             .CountAsync(contract => contract.OrganizationId == organization.Id, cancellationToken);
+        var bindingCount = await dbContext.ProductionProgramBindings.IgnoreQueryFilters()
+            .CountAsync(binding => binding.OrganizationId == organization.Id, cancellationToken);
 
         await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
         {
@@ -86,6 +100,27 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
             await dbContext.RobotAuthoringImports.IgnoreQueryFilters()
                 .Where(importSession => importSession.OrganizationId == organization.Id)
                 .ExecuteDeleteAsync(cancellationToken);
+
+            await dbContext.MenuItemProductOptions.IgnoreQueryFilters()
+                .Where(option => menuItemIds.Contains(option.MenuItemId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.MenuItems.IgnoreQueryFilters()
+                .Where(item => menuItemIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+
+            await dbContext.ExecutionRouteRobotBindings.IgnoreQueryFilters()
+                .Where(binding => releaseIds.Contains(binding.ExecutionRoute.ConfigurationReleaseId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ExecutionRoutes.IgnoreQueryFilters()
+                .Where(route => releaseIds.Contains(route.ConfigurationReleaseId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductionProgramBindings.IgnoreQueryFilters()
+                .Where(binding => binding.OrganizationId == organization.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ConfigurationReleases.IgnoreQueryFilters()
+                .Where(release => releaseIds.Contains(release.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+
             await dbContext.RobotProgramArtifacts.IgnoreQueryFilters()
                 .Where(item => item.RobotProgram.OrganizationId == organization.Id)
                 .ExecuteDeleteAsync(cancellationToken);
@@ -140,11 +175,13 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
         }
 
         logger.LogInformation(
-            "Reset local robot authoring automation fixture {OrganizationCode}: {Imports} imports, {Artifacts} artifacts, {Programs} programs, and {Contracts} contracts removed.",
-            OrganizationCode, importCount, artifactCount, programCount, contractCount);
+            "Reset local robot authoring automation fixture {OrganizationCode}: {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, and {MenuItems} menu items removed.",
+            OrganizationCode, importCount, artifactCount, programCount, contractCount, bindingCount,
+            releaseIds.Length, menuItemIds.Length);
 
         return new DevelopmentRobotAuthoringAutomationResetResult(
-            organization.Id, importCount, artifactCount, programCount, contractCount, deletedObjects, retainedObjects);
+            organization.Id, importCount, artifactCount, programCount, contractCount, bindingCount,
+            releaseIds.Length, menuItemIds.Length, deletedObjects, retainedObjects);
     }
 
     private async Task<Organization> EnsureOrganizationAsync(DateTimeOffset now, CancellationToken cancellationToken)
@@ -195,20 +232,37 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    private async Task EnsureNoOperationalReferencesAsync(
+    private async Task EnsureNoRuntimeEvidenceAsync(
         Guid organizationId,
-        IReadOnlyCollection<Guid> variantIds,
-        IReadOnlyCollection<Guid> recipeIds,
+        IReadOnlyCollection<Guid> releaseIds,
+        IReadOnlyCollection<Guid> menuItemIds,
         CancellationToken cancellationToken)
     {
-        if (await dbContext.ConfigurationReleases.IgnoreQueryFilters()
-                .AnyAsync(release => release.OrganizationId == organizationId, cancellationToken) ||
-            await dbContext.MenuItems.IgnoreQueryFilters()
-                .AnyAsync(item => variantIds.Contains(item.ProductVariantId) ||
-                                  (item.RecipeId.HasValue && recipeIds.Contains(item.RecipeId.Value)), cancellationToken))
+        var hasRuntimeEvidence =
+            await dbContext.Orders.IgnoreQueryFilters()
+                .AnyAsync(order => order.OrganizationId == organizationId, cancellationToken) ||
+            await dbContext.KioskConfigurationDeployments.IgnoreQueryFilters()
+                .AnyAsync(deployment => releaseIds.Contains(deployment.ConfigurationReleaseId), cancellationToken) ||
+            await dbContext.ControllerArtifactSetDeployments.IgnoreQueryFilters()
+                .AnyAsync(deployment => releaseIds.Contains(deployment.SourceConfigurationReleaseId), cancellationToken) ||
+            await dbContext.OrderExecutionRecords.IgnoreQueryFilters()
+                .AnyAsync(record => releaseIds.Contains(record.SourceConfigurationReleaseId), cancellationToken) ||
+            await dbContext.KioskExecutionEndpoints.IgnoreQueryFilters()
+                .AnyAsync(endpoint => endpoint.ActiveConfigurationReleaseId.HasValue &&
+                                      releaseIds.Contains(endpoint.ActiveConfigurationReleaseId.Value), cancellationToken) ||
+            await dbContext.ProductionPackageInstallations.IgnoreQueryFilters()
+                .AnyAsync(installation => installation.DraftConfigurationReleaseId.HasValue &&
+                                          releaseIds.Contains(installation.DraftConfigurationReleaseId.Value), cancellationToken) ||
+            await dbContext.ProductionPackageUpgradeEndpointTargets.IgnoreQueryFilters()
+                .AnyAsync(target => releaseIds.Contains(target.SourceConfigurationReleaseId), cancellationToken) ||
+            await dbContext.ProductionPackageUpgradeMenuChanges.IgnoreQueryFilters()
+                .AnyAsync(change => menuItemIds.Contains(change.MenuItemId), cancellationToken);
+
+        if (hasRuntimeEvidence)
         {
             throw new InvalidOperationException(
-                $"{OrganizationCode} has release or menu references. Reset is allowed only before publication or operational use.");
+                $"{OrganizationCode} has order, deployment, execution, active-release, or package evidence. " +
+                "Reset refuses to erase runtime or commercial history.");
         }
     }
 

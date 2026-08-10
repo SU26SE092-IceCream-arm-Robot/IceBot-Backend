@@ -39,7 +39,7 @@ public static class ConfigurationReleaseRevisionToken
                             binding.ProductionProgramBindingChecksum,
                             binding.RobotProgramId,
                             binding.BindingOrder,
-                            binding.RequiredWorkcellCapabilityCode
+                            RequiredCapabilityCodes = binding.GetRequiredCapabilityCodes()
                         })
                 })
         };

@@ -267,9 +267,6 @@ public sealed class RobotArtifactTechnicalContractHandlers(
 
         if (command.Effects.Any(effect => effect.EffectKind == RobotArtifactEffectKind.Composite))
             return "Composite effects are not supported by authoring schema version 2.";
-        if (string.Equals(command.RuntimeTargetCode.Trim(), "FAIRINO_LUA_V1", StringComparison.OrdinalIgnoreCase) &&
-            command.Effects.Any(effect => effect.QuantityMode == RobotArtifactQuantityMode.Parameterized))
-            return "Parameterized quantities are not supported by FAIRINO_LUA_V1 authoring sidecars.";
         return null;
     }
 
@@ -434,9 +431,6 @@ public sealed class AssignRobotArtifactTechnicalContractHandler(
                 if (contract is null || template is null || contract.OrganizationId.HasValue ||
                     contract.Status != RobotArtifactContractStatus.Published || string.IsNullOrWhiteSpace(contract.ContractChecksum))
                     return ApiResult<object>.Fail("Published global technical contract or template not found.", 404);
-                if (!string.Equals(contract.RuntimeTargetCode, template.RuntimeTargetCode, StringComparison.Ordinal) ||
-                    !string.Equals(contract.MachineModelCode, template.MachineModelCode, StringComparison.Ordinal))
-                    return ApiResult<object>.Fail("Technical contract target does not match artifact template.", 400);
                 try
                 {
                     template.AssignTechnicalContract(contract.Id, contract.ContractChecksum);
@@ -466,9 +460,6 @@ public sealed class AssignRobotArtifactTechnicalContractHandler(
                     TechnicalResourceKind.RobotArtifact, artifact.Id, ct);
                 if (ownershipError is not null)
                     return ApiResult<object>.Fail(ownershipError, 409);
-                if (!string.Equals(contract.RuntimeTargetCode, artifact.RuntimeTargetCode, StringComparison.Ordinal) ||
-                    !string.Equals(contract.MachineModelCode, artifact.MachineModelCode, StringComparison.Ordinal))
-                    return ApiResult<object>.Fail("Technical contract target does not match artifact.", 400);
                 try
                 {
                     artifact.AssignTechnicalContract(contract.Id, contract.ContractChecksum);

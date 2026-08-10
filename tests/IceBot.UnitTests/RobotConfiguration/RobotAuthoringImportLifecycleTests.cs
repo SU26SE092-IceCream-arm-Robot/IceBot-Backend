@@ -75,6 +75,7 @@ public sealed class RobotAuthoringImportLifecycleTests
 
         Assert.Null(importSession.ComposedRecipeId);
         Assert.NotNull(importSession.PublishedAt);
+        Assert.Contains("CreateProductionBinding", RobotAuthoringImportResult.From(importSession).NextActions);
     }
 
     [Fact]

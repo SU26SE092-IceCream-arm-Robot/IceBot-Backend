@@ -179,7 +179,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
             var requiredCapabilitiesError = ExecutionRouteRequiredCapabilitiesContract.Validate(
                 ExecutionRouteCapabilityRequirementContractCodec.ToStorageJson(route.RequiredCapabilities),
                 route.RobotBindings.Select(binding => ResolveProductionBinding(binding, route, productionBindingsById)
-                    ?.RequiredWorkcellCapabilityCode ?? string.Empty).ToArray());
+                    ?.GetRequiredCapabilityCodes() ?? []).SelectMany(codes => codes).ToArray());
             if (requiredCapabilitiesError is not null)
                 return ApiResult<ConfigurationReleaseResult>.Fail(requiredCapabilitiesError, 400);
         }
@@ -195,14 +195,14 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
                     route.Priority,
                     ExecutionRouteCapabilityRequirementContractCodec.ToStorageJson(route.RequiredCapabilities),
                     (IReadOnlyCollection<string>)route.SupportedOptionCodes.ToArray(),
-                    (IReadOnlyCollection<(Guid, string, Guid, int, string)>)route.RobotBindings
+                    (IReadOnlyCollection<(Guid, string, Guid, int, IReadOnlyCollection<string>)>)route.RobotBindings
                         .OrderBy(binding => binding.BindingOrder)
                         .Select(binding =>
                         {
                             var productionBinding = ResolveProductionBinding(binding, route, productionBindingsById)
                                 ?? throw new DomainRuleException("Production binding was not found.");
                             return (productionBinding.Id, productionBinding.BindingChecksum, productionBinding.RobotProgramId,
-                                binding.BindingOrder, productionBinding.RequiredWorkcellCapabilityCode);
+                                binding.BindingOrder, productionBinding.GetRequiredCapabilityCodes());
                         })
                         .ToArray())));
 
@@ -268,7 +268,6 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
         var options = route.SupportedOptionCodes.Select(code => code.Trim().ToUpperInvariant()).Order(StringComparer.Ordinal);
         return bindings.Values.SingleOrDefault(binding => binding.RecipeId == route.RecipeId &&
             binding.RobotProgramId == input.RobotProgramId &&
-            string.Equals(binding.RequiredWorkcellCapabilityCode, input.RequiredWorkcellCapabilityCode.Trim().ToUpperInvariant(), StringComparison.Ordinal) &&
             binding.GetSupportedOptionCodes().Order(StringComparer.Ordinal).SequenceEqual(options, StringComparer.Ordinal));
     }
 }

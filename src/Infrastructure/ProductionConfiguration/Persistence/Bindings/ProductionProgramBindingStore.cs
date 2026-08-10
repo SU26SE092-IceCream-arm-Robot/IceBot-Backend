@@ -1,7 +1,10 @@
 using Application.ProductionConfiguration.Bindings;
 using Domain.Catalog.Entities;
+using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
+using Domain.RobotConfiguration.ArtifactContracts;
 using Domain.RobotConfiguration.Programs;
+using Domain.RobotConfiguration.Programs.Manifests;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
@@ -18,14 +21,62 @@ public sealed class ProductionProgramBindingStore(IceBotDbContext db) : IProduct
     public Task<RobotProgram?> GetRobotProgramAsync(Guid robotProgramId, CancellationToken cancellationToken) =>
         db.RobotPrograms.SingleOrDefaultAsync(program => program.Id == robotProgramId && program.DeletedAt == null, cancellationToken);
 
-    public async Task<ProductionProgramBinding?> FindActiveEquivalentAsync(Guid organizationId, Guid recipeId, Guid robotProgramId,
-        string requiredWorkcellCapabilityCode, IReadOnlyCollection<string> supportedOptionCodes, CancellationToken cancellationToken)
+    public async Task<ProductionProgramCapabilityProposal> GetProgramCapabilityProposalAsync(
+        RobotProgram program, CancellationToken cancellationToken)
     {
+        var document = RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!);
+        var references = document.Artifacts
+            .Select(item => item.RobotArtifact)
+            .Where(item => item.TechnicalContractId.HasValue && !string.IsNullOrWhiteSpace(item.TechnicalContractChecksum))
+            .Select(item => new { Id = item.TechnicalContractId!.Value, Checksum = item.TechnicalContractChecksum!.Trim().ToLowerInvariant() })
+            .Distinct()
+            .ToArray();
+        if (references.Length == 0)
+            return new ProductionProgramCapabilityProposal([], ProductionProgramBindingCapabilityEvidenceStatus.Missing);
+
+        var contractIds = references.Select(reference => reference.Id).ToArray();
+        var contracts = await db.RobotArtifactTechnicalContracts
+            .Include(contract => contract.Effects)
+            .Where(contract => contractIds.Contains(contract.Id) && contract.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+        if (contracts.Count != contractIds.Length || contracts.Any(contract =>
+                contract.Status != RobotArtifactContractStatus.Published ||
+                (contract.OrganizationId.HasValue && contract.OrganizationId != program.OrganizationId) ||
+                !references.Any(reference => reference.Id == contract.Id &&
+                    string.Equals(reference.Checksum, contract.ContractChecksum, StringComparison.OrdinalIgnoreCase))))
+        {
+            throw new DomainRuleException(
+                "A technical declaration referenced by the published program is missing, out of scope, unpublished, or checksum-inconsistent.");
+        }
+
+        var codes = contracts.SelectMany(contract => contract.Effects)
+            .Select(effect => effect.RequiredWorkcellCapabilityCode)
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code!.Trim().ToUpperInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        return new ProductionProgramCapabilityProposal(codes,
+            codes.Length == 0
+                ? ProductionProgramBindingCapabilityEvidenceStatus.Missing
+                : ProductionProgramBindingCapabilityEvidenceStatus.Declared);
+    }
+
+    public async Task<ProductionProgramBinding?> FindActiveEquivalentAsync(Guid organizationId, Guid recipeId, Guid robotProgramId,
+        IReadOnlyCollection<string> requiredCapabilityCodes,
+        ProductionProgramBindingCapabilityEvidenceStatus capabilityEvidenceStatus,
+        ProductionProgramBindingAssurance assurance,
+        IReadOnlyCollection<string> supportedOptionCodes, CancellationToken cancellationToken)
+    {
+        var capabilityJson = JsonSerializer.Serialize(requiredCapabilityCodes.Select(code => code.Trim().ToUpperInvariant())
+            .Order(StringComparer.Ordinal).ToArray());
         var requestedJson = JsonSerializer.Serialize(supportedOptionCodes.Select(code => code.Trim().ToUpperInvariant())
             .Order(StringComparer.Ordinal).ToArray());
         return await db.ProductionProgramBindings.SingleOrDefaultAsync(binding =>
             binding.OrganizationId == organizationId && binding.RecipeId == recipeId && binding.RobotProgramId == robotProgramId &&
-            binding.RequiredWorkcellCapabilityCode == requiredWorkcellCapabilityCode && binding.SupportedOptionCodesJson == requestedJson &&
+            binding.RequiredCapabilityCodesJson == capabilityJson && binding.CapabilityEvidenceStatus == capabilityEvidenceStatus &&
+            binding.Assurance == assurance &&
+            binding.SupportedOptionCodesJson == requestedJson &&
             binding.Status == ProductionProgramBindingStatus.Active && binding.DeletedAt == null, cancellationToken);
     }
 

@@ -3,6 +3,7 @@ using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
+using Domain.Common;
 using Domain.ProductionConfiguration.Entities;
 using Domain.RobotConfiguration.Programs;
 
@@ -12,8 +13,13 @@ public interface IProductionProgramBindingStore
 {
     Task<Recipe?> GetRecipeAsync(Guid recipeId, CancellationToken cancellationToken);
     Task<RobotProgram?> GetRobotProgramAsync(Guid robotProgramId, CancellationToken cancellationToken);
+    Task<ProductionProgramCapabilityProposal> GetProgramCapabilityProposalAsync(
+        RobotProgram program, CancellationToken cancellationToken);
     Task<ProductionProgramBinding?> FindActiveEquivalentAsync(Guid organizationId, Guid recipeId, Guid robotProgramId,
-        string requiredWorkcellCapabilityCode, IReadOnlyCollection<string> supportedOptionCodes,
+        IReadOnlyCollection<string> requiredCapabilityCodes,
+        ProductionProgramBindingCapabilityEvidenceStatus capabilityEvidenceStatus,
+        ProductionProgramBindingAssurance assurance,
+        IReadOnlyCollection<string> supportedOptionCodes,
         CancellationToken cancellationToken);
     Task<ProductionProgramBinding?> GetAsync(Guid organizationId, Guid bindingId, CancellationToken cancellationToken);
     Task<IReadOnlyList<ProductionProgramBinding>> ListAsync(Guid organizationId, ProductionProgramBindingStatus? status,
@@ -22,12 +28,15 @@ public interface IProductionProgramBindingStore
     Task SaveChangesAsync(CancellationToken cancellationToken);
 }
 
+public sealed record ProductionProgramCapabilityProposal(
+    IReadOnlyCollection<string> DeclaredRequiredCapabilityCodes,
+    ProductionProgramBindingCapabilityEvidenceStatus Status);
+
 public sealed record CreateProductionProgramBindingCommand(
     CurrentUserContext UserContext,
     Guid OrganizationId,
     Guid RecipeId,
     Guid RobotProgramId,
-    string RequiredWorkcellCapabilityCode,
     IReadOnlyCollection<string> SupportedOptionCodes);
 
 public sealed record RetireProductionProgramBindingCommand(CurrentUserContext UserContext, Guid OrganizationId, Guid BindingId);
@@ -40,7 +49,9 @@ public sealed record ProductionProgramBindingResult(
     int RecipeVersion,
     Guid RobotProgramId,
     string ProgramManifestChecksum,
-    string RequiredWorkcellCapabilityCode,
+    IReadOnlyCollection<string> RequiredCapabilityCodes,
+    string CapabilityEvidenceStatus,
+    string Assurance,
     IReadOnlyCollection<string> SupportedOptionCodes,
     string BindingChecksum,
     string Status,
@@ -49,7 +60,9 @@ public sealed record ProductionProgramBindingResult(
 {
     public static ProductionProgramBindingResult From(ProductionProgramBinding binding) => new(
         binding.Id, binding.OrganizationId, binding.ProductVariantId, binding.RecipeId, binding.RecipeVersion,
-        binding.RobotProgramId, binding.ProgramManifestChecksum, binding.RequiredWorkcellCapabilityCode,
+        binding.RobotProgramId, binding.ProgramManifestChecksum, binding.GetRequiredCapabilityCodes(),
+        binding.CapabilityEvidenceStatus.ToString(),
+        binding.Assurance.ToString(),
         binding.GetSupportedOptionCodes(), binding.BindingChecksum, binding.Status.ToString(), binding.CreatedAt,
         binding.RetiredAt);
 }
@@ -97,18 +110,26 @@ public sealed class ProductionProgramBindingHandlers(IProductionProgramBindingSt
             requestedOptions.Any(code => !validOptionCodes.Contains(code)))
             return ApiResult<ProductionProgramBindingResult>.Fail("Supported option codes must be unique production-affecting options of the recipe product.", 400);
 
-        var capability = command.RequiredWorkcellCapabilityCode?.Trim().ToUpperInvariant() ?? string.Empty;
-        if (capability.Length is 0 or > 100)
-            return ApiResult<ProductionProgramBindingResult>.Fail("Required workcell capability code is invalid.", 400);
-
-        var existing = await store.FindActiveEquivalentAsync(command.OrganizationId, recipe.Id, program.Id, capability,
-            requestedOptions, cancellationToken);
+        ProductionProgramCapabilityProposal capabilityProposal;
+        try
+        {
+            capabilityProposal = await store.GetProgramCapabilityProposalAsync(program, cancellationToken);
+        }
+        catch (DomainRuleException exception)
+        {
+            return ApiResult<ProductionProgramBindingResult>.Fail(exception.Message, 400);
+        }
+        var existing = await store.FindActiveEquivalentAsync(command.OrganizationId, recipe.Id, program.Id,
+            capabilityProposal.DeclaredRequiredCapabilityCodes, capabilityProposal.Status,
+            ProductionProgramBindingAssurance.OperatorDeclared, requestedOptions, cancellationToken);
         if (existing is not null)
             return ApiResult<ProductionProgramBindingResult>.Success(ProductionProgramBindingResult.From(existing),
                 "Equivalent production binding already exists.");
 
         var binding = ProductionProgramBinding.Create(command.OrganizationId, recipe.ProductVariantId, recipe.Id,
-            recipe.Version, program.Id, program.ProgramManifestChecksum, capability, requestedOptions, command.UserContext.AccountId);
+            recipe.Version, program.Id, program.ProgramManifestChecksum, capabilityProposal.DeclaredRequiredCapabilityCodes,
+            capabilityProposal.Status, ProductionProgramBindingAssurance.OperatorDeclared,
+            requestedOptions, command.UserContext.AccountId);
         await store.AddAsync(binding, cancellationToken);
         await store.SaveChangesAsync(cancellationToken);
         return ApiResult<ProductionProgramBindingResult>.Success(ProductionProgramBindingResult.From(binding),

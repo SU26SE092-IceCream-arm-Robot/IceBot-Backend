@@ -29,7 +29,7 @@ public sealed class ManagementProductionProgramBindingsController(ProductionProg
         CancellationToken cancellationToken)
     {
         var result = await handlers.CreateAsync(new CreateProductionProgramBindingCommand(User.GetUserContext(), organizationId,
-            request.RecipeId, request.RobotProgramId, request.RequiredWorkcellCapabilityCode, request.SupportedOptionCodes), cancellationToken);
+            request.RecipeId, request.RobotProgramId, request.SupportedOptionCodes), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -46,6 +46,5 @@ public sealed class CreateProductionProgramBindingRequest
 {
     public Guid RecipeId { get; init; }
     public Guid RobotProgramId { get; init; }
-    public string RequiredWorkcellCapabilityCode { get; init; } = string.Empty;
     public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
 }

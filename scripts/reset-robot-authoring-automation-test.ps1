@@ -12,6 +12,9 @@ $env:ASPNETCORE_ENVIRONMENT = "Development"
 Push-Location $projectRoot
 try {
     dotnet run --project .\src\WebAPI\WebAPI.csproj -- --reset-robot-authoring-automation-test
+    if ($LASTEXITCODE -ne 0) {
+        exit $LASTEXITCODE
+    }
 }
 finally {
     Pop-Location

@@ -67,7 +67,7 @@ public sealed class ConfigurationReleaseResult
                             RobotProgramId = binding.RobotProgramId,
                             RobotProgramCode = binding.RobotProgram?.Code,
                             BindingOrder = binding.BindingOrder,
-                            RequiredWorkcellCapabilityCode = binding.RequiredWorkcellCapabilityCode
+                            RequiredCapabilityCodes = binding.GetRequiredCapabilityCodes()
                         })
                         .ToArray()
                 })
@@ -99,5 +99,5 @@ public sealed class ExecutionRouteRobotBindingResult
     public Guid RobotProgramId { get; init; }
     public string? RobotProgramCode { get; init; }
     public int BindingOrder { get; init; }
-    public string RequiredWorkcellCapabilityCode { get; init; } = string.Empty;
+    public IReadOnlyCollection<string> RequiredCapabilityCodes { get; init; } = [];
 }

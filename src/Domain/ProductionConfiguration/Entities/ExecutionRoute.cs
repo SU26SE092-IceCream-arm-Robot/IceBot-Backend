@@ -101,7 +101,7 @@ public class ExecutionRoute : BusinessEntity
         string? productionProgramBindingChecksum,
         Guid robotProgramId,
         int bindingOrder,
-        string requiredWorkcellCapabilityCode)
+        IReadOnlyCollection<string> requiredCapabilityCodes)
     {
         if (_robotBindings.Any(binding => binding.BindingOrder == bindingOrder))
         {
@@ -113,7 +113,7 @@ public class ExecutionRoute : BusinessEntity
             productionProgramBindingChecksum,
             robotProgramId,
             bindingOrder,
-            requiredWorkcellCapabilityCode);
+            requiredCapabilityCodes);
         _robotBindings.Add(binding);
         return binding;
     }
@@ -122,7 +122,7 @@ public class ExecutionRoute : BusinessEntity
         Guid robotProgramId,
         int bindingOrder,
         string requiredWorkcellCapabilityCode) =>
-        AddRobotBinding(null, null, robotProgramId, bindingOrder, requiredWorkcellCapabilityCode);
+        AddRobotBinding(null, null, robotProgramId, bindingOrder, [requiredWorkcellCapabilityCode]);
 
     public void SetPublishedProductionDefinition(int schemaVersion, string definitionJson, string checksum)
     {

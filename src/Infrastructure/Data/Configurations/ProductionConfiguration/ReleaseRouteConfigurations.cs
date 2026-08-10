@@ -83,7 +83,8 @@ internal sealed class ProductionProgramBindingConfiguration : IEntityTypeConfigu
         entity.HasIndex(x => x.BindingChecksum).IsUnique();
         entity.Property(x => x.ProgramManifestChecksum).HasMaxLength(64);
         entity.Property(x => x.BindingChecksum).HasMaxLength(64);
-        entity.Property(x => x.RequiredWorkcellCapabilityCode).HasMaxLength(100);
+        entity.Property(x => x.RequiredCapabilityCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
+            .HasDefaultValueSql("'[]'::jsonb");
         entity.Property(x => x.SupportedOptionCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
             .HasDefaultValueSql("'[]'::jsonb");
         entity.HasOne<Domain.Tenants.Entities.Organization>().WithMany().HasForeignKey(x => x.OrganizationId)
@@ -108,6 +109,9 @@ internal sealed class ExecutionRouteRobotBindingConfiguration : IEntityTypeConfi
         entity.HasIndex(x => x.RobotProgramId);
         entity.HasIndex(x => x.ProductionProgramBindingId);
         entity.Property(x => x.ProductionProgramBindingChecksum).HasMaxLength(64);
+        entity.Property(x => x.RequiredWorkcellCapabilityCode).HasMaxLength(500);
+        entity.Property(x => x.RequiredCapabilityCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
+            .HasDefaultValueSql("'[]'::jsonb");
         entity.HasOne(x => x.ExecutionRoute)
             .WithMany(x => x.RobotBindings)
             .HasForeignKey(x => x.ExecutionRouteId)

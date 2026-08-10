@@ -245,7 +245,7 @@ public sealed class RobotAuthoringImportItem : BusinessEntity
         };
     }
 
-    public void MarkResolved(Guid artifactId, Guid technicalContractId, bool created)
+    public void MarkResolved(Guid artifactId, Guid? technicalContractId, bool created)
     {
         RobotArtifactId = artifactId;
         TechnicalContractId = technicalContractId;

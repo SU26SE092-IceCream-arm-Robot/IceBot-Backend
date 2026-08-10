@@ -11,7 +11,18 @@ public enum ProductionProgramBindingStatus
     Retired = 1
 }
 
-// Immutable technical/business compatibility evidence. Changing any input creates a new binding.
+public enum ProductionProgramBindingCapabilityEvidenceStatus
+{
+    Declared = 0,
+    Missing = 1
+}
+
+public enum ProductionProgramBindingAssurance
+{
+    OperatorDeclared = 0
+}
+
+// Immutable operator-confirmed binding. Capability codes are declarations, not proof of Lua behavior.
 public sealed class ProductionProgramBinding : BusinessEntity
 {
     public Guid OrganizationId { get; private set; }
@@ -20,7 +31,9 @@ public sealed class ProductionProgramBinding : BusinessEntity
     public int RecipeVersion { get; private set; }
     public Guid RobotProgramId { get; private set; }
     public string ProgramManifestChecksum { get; private set; } = null!;
-    public string RequiredWorkcellCapabilityCode { get; private set; } = null!;
+    public string RequiredCapabilityCodesJson { get; private set; } = "[]";
+    public ProductionProgramBindingCapabilityEvidenceStatus CapabilityEvidenceStatus { get; private set; }
+    public ProductionProgramBindingAssurance Assurance { get; private set; }
     public string SupportedOptionCodesJson { get; private set; } = "[]";
     public string BindingChecksum { get; private set; } = null!;
     public ProductionProgramBindingStatus Status { get; private set; }
@@ -35,7 +48,9 @@ public sealed class ProductionProgramBinding : BusinessEntity
         int recipeVersion,
         Guid robotProgramId,
         string programManifestChecksum,
-        string requiredWorkcellCapabilityCode,
+        IReadOnlyCollection<string> requiredCapabilityCodes,
+        ProductionProgramBindingCapabilityEvidenceStatus capabilityEvidenceStatus,
+        ProductionProgramBindingAssurance assurance,
         IReadOnlyCollection<string> supportedOptionCodes,
         Guid actorId)
     {
@@ -46,7 +61,7 @@ public sealed class ProductionProgramBinding : BusinessEntity
 
         var normalizedOptions = NormalizeCodes(supportedOptionCodes);
         var normalizedManifestChecksum = RequireChecksum(programManifestChecksum, "Program manifest checksum");
-        var capabilityCode = NormalizeCode(requiredWorkcellCapabilityCode, "Required workcell capability code");
+        var normalizedCapabilityCodes = NormalizeOptionalCodes(requiredCapabilityCodes, "Required capability code");
         var binding = new ProductionProgramBinding
         {
             OrganizationId = organizationId,
@@ -55,7 +70,9 @@ public sealed class ProductionProgramBinding : BusinessEntity
             RecipeVersion = recipeVersion,
             RobotProgramId = robotProgramId,
             ProgramManifestChecksum = normalizedManifestChecksum,
-            RequiredWorkcellCapabilityCode = capabilityCode,
+            RequiredCapabilityCodesJson = JsonSerializer.Serialize(normalizedCapabilityCodes),
+            CapabilityEvidenceStatus = capabilityEvidenceStatus,
+            Assurance = assurance,
             SupportedOptionCodesJson = JsonSerializer.Serialize(normalizedOptions),
             Status = ProductionProgramBindingStatus.Active,
             CreatedByAccountId = actorId
@@ -66,6 +83,9 @@ public sealed class ProductionProgramBinding : BusinessEntity
 
     public IReadOnlyCollection<string> GetSupportedOptionCodes() =>
         JsonSerializer.Deserialize<string[]>(SupportedOptionCodesJson) ?? [];
+
+    public IReadOnlyCollection<string> GetRequiredCapabilityCodes() =>
+        JsonSerializer.Deserialize<string[]>(RequiredCapabilityCodesJson) ?? [];
 
     public void Retire(DateTimeOffset now, Guid actorId)
     {
@@ -85,11 +105,18 @@ public sealed class ProductionProgramBinding : BusinessEntity
         return normalized;
     }
 
+    private static string[] NormalizeOptionalCodes(IReadOnlyCollection<string> codes, string name) =>
+        codes.Select(code => NormalizeCode(code, name))
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+
     private static string CreateChecksum(ProductionProgramBinding binding)
     {
         var payload = string.Join("|", binding.OrganizationId, binding.ProductVariantId, binding.RecipeId,
             binding.RecipeVersion, binding.RobotProgramId, binding.ProgramManifestChecksum,
-            binding.RequiredWorkcellCapabilityCode, binding.SupportedOptionCodesJson);
+            binding.RequiredCapabilityCodesJson, binding.CapabilityEvidenceStatus, binding.Assurance,
+            binding.SupportedOptionCodesJson);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload))).ToLowerInvariant();
     }
 

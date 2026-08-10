@@ -96,8 +96,8 @@ public sealed class RobotAuthoringCompositionTests
 
     [Theory]
     [InlineData(2, true)]
-    [InlineData(1, false)]
-    public async Task Preview_TypedIngredientEffect_RequiresV2Contract(int schemaVersion, bool canConfirm)
+    [InlineData(1, true)]
+    public async Task Preview_TechnicalDeclarationNeverBlocksOperatorConfirmation(int schemaVersion, bool canConfirm)
     {
         var organizationId = Guid.NewGuid();
         var program = RobotProgram.CreateDraft("MAKE_ICE_CREAM", "Make ice cream",
@@ -162,13 +162,12 @@ public sealed class RobotAuthoringCompositionTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(canConfirm, result.Data!.CanConfirm);
-        if (canConfirm)
-            Assert.Empty(result.Data.Blockers);
-        else
-            Assert.Contains(result.Data.Blockers, blocker => blocker.Code == "REQUIRED_EFFECT_MISSING");
+        Assert.Empty(result.Data.Blockers);
         Assert.Equal("DISPENSE", Assert.Single(result.Data.ProposedArtifacts).ArtifactCode);
-        if (canConfirm)
+        if (schemaVersion >= 2)
             Assert.Equal("DISPENSER", Assert.Single(result.Data.SuggestedCapabilityCodes));
+        else
+            Assert.Contains(result.Data.Warnings, warning => warning.Code == "BLACK_BOX_ARTIFACT_INCLUDED");
     }
 
     [Fact]

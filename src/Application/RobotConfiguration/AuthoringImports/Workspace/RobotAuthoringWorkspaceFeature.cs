@@ -59,23 +59,6 @@ public sealed class RobotAuthoringWorkspaceHandler(
         var recipeResolution = await recipeResolver.ResolveAsync(
             organizationId, importId, cancellationToken);
         var blockers = new List<RobotAuthoringWorkspaceBlocker>();
-        switch (recipeResolution.Status)
-        {
-            case "NoMatch":
-                blockers.Add(new("RecipeNoExactMatch", recipeResolution.Message));
-                break;
-            case "MultipleMatches":
-                blockers.Add(new("RecipeSelectionRequired", recipeResolution.Message));
-                break;
-            case "OptionSelectionRequired":
-                blockers.Add(new("ProductionOptionSelectionRequired", recipeResolution.Message));
-                break;
-        }
-        if (import.PublishedAt.HasValue && !import.ComposedRecipeId.HasValue)
-        {
-            blockers.Add(new("PublishedBeforeComposition",
-                "This import was published before its Recipe composition was confirmed. It cannot create a configuration release; create a new import and confirm the composition before publication."));
-        }
         ConfigurationRelease? release = null;
         if (import.LinkedConfigurationReleaseId.HasValue)
         {

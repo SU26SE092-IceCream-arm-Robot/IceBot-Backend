@@ -62,6 +62,26 @@ public sealed class RobotAuthoringRecipeResolverTests
         Assert.Null(import.LinkedConfigurationReleaseId);
     }
 
+    [Fact]
+    public async Task ResolveAsync_BlackBoxArtifact_AllowsManualRecipeSelectionWithoutSuggestion()
+    {
+        var organizationId = Guid.NewGuid();
+        var import = RobotAuthoringImport.Create(organizationId, null, null, null, Guid.NewGuid(),
+            new string('a', 64), "black-box-import", 1, "BLACK_BOX", "Black box", "FAIRINO_LUA_V1", "FR5",
+            "robot-authoring-imports/black-box.zip", Guid.NewGuid());
+        import.AddItem("BLACK_BOX", "black-box.lua", "black-box.icebot.json", 1,
+            new string('b', 64), new string('c', 64));
+        import.Items.Single().MarkResolved(Guid.NewGuid(), null, true);
+        import.MarkValidated("{}", DateTimeOffset.UtcNow, Guid.NewGuid());
+        import.MarkApplied(Guid.NewGuid(), DateTimeOffset.UtcNow, Guid.NewGuid());
+        var resolver = Resolver(import, [], []);
+
+        var result = await resolver.ResolveAsync(organizationId, import.Id, CancellationToken.None);
+
+        Assert.Equal("NoMatch", result.Status);
+        Assert.Contains("Select the intended Recipe explicitly", result.Message);
+    }
+
     private static RobotAuthoringRecipeResolver Resolver(
         RobotAuthoringImport import,
         IReadOnlyCollection<RobotArtifactTechnicalContract> contracts,

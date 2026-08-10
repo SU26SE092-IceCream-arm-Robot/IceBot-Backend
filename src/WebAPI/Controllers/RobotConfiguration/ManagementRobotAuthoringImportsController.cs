@@ -97,6 +97,19 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPost("{importId:guid}/resume")]
+    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "program.manage")]
+    public async Task<IActionResult> Resume(
+        Guid organizationId,
+        Guid importId,
+        CancellationToken cancellationToken)
+    {
+        var result = await handlers.ResumeAsync(new ResumeRobotAuthoringImportCommand(
+            User.GetUserContext(), organizationId, importId), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("{importId:guid}/materialize")]
     [Authorize(Policy = "artifact.upload")]
     [Authorize(Policy = "program.manage")]
@@ -146,7 +159,6 @@ public sealed class ManagementRobotAuthoringImportsController(
                 organizationId,
                 importId,
                 request.RecipeId,
-                request.RequiredWorkcellCapabilityCode,
                 request.SupportedOptionCodes),
             cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -188,8 +200,6 @@ public sealed class UploadRobotAuthoringImportRequest
 public sealed class CreateRobotAuthoringReleaseDraftRequest
 {
     public Guid RecipeId { get; init; }
-    [StringLength(100)]
-    public string? RequiredWorkcellCapabilityCode { get; init; }
     public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
 }
 

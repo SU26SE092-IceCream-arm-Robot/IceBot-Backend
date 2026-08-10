@@ -320,9 +320,6 @@ public sealed class ConfigurationDeploymentPreviewHandler(
         else if (!endpoint.ControllerId.HasValue)
             blockers.Add(new("ExecutionIdentityMissing", "Low-cost controller identity is missing."));
 
-        if (artifacts.Any(artifact => !endpoint.SupportsRobotTarget(
-                artifact.RuntimeTargetCode, artifact.MachineModelCode, artifact.DeviceId)))
-            blockers.Add(new("RobotTargetMismatch", "Execution endpoint does not support every selected artifact target."));
     }
 
     private static void ValidateCapabilities(
@@ -337,9 +334,15 @@ public sealed class ConfigurationDeploymentPreviewHandler(
         {
             var route = release.ExecutionRoutes.SingleOrDefault(item => item.Id == selection.ExecutionRouteId);
             var binding = route?.RobotBindings.SingleOrDefault(item => item.RobotProgramId == selection.RobotProgramId);
-            if (binding is not null && !available.Contains(binding.RequiredWorkcellCapabilityCode))
-                blockers.Add(new("CapabilityMissing",
-                    $"Required capability '{binding.RequiredWorkcellCapabilityCode}' is unavailable."));
+            if (binding is not null)
+            {
+                foreach (var capabilityCode in binding.GetRequiredCapabilityCodes())
+                {
+                    if (!available.Contains(capabilityCode))
+                        blockers.Add(new("CapabilityMissing",
+                            $"Required capability '{capabilityCode}' is unavailable."));
+                }
+            }
             if (route is null || string.IsNullOrWhiteSpace(route.RequiredCapabilitiesJson)) continue;
             try
             {

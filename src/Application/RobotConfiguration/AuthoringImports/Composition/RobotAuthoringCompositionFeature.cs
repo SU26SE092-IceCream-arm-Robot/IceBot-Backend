@@ -183,8 +183,8 @@ public sealed class RobotAuthoringCompositionHandlers(
             .Select(item => item.RobotArtifactId!.Value).Distinct().ToArray();
         var contractIds = importSession.Items.Where(item => item.TechnicalContractId.HasValue)
             .Select(item => item.TechnicalContractId!.Value).Distinct().ToArray();
-        if (artifactIds.Length != importSession.Items.Count || contractIds.Length != importSession.Items.Count)
-            blockers.Add(new("IMPORT_RESOURCE_INCOMPLETE", "Every import item requires resolved artifact and technical contract identities."));
+        if (artifactIds.Length != importSession.Items.Count)
+            blockers.Add(new("IMPORT_RESOURCE_INCOMPLETE", "Every import item requires a resolved artifact identity."));
 
         var artifacts = await compositionStore.GetArtifactsAsync(organizationId, artifactIds, cancellationToken);
         var contracts = await compositionStore.GetContractsAsync(organizationId, contractIds, cancellationToken);
@@ -199,8 +199,12 @@ public sealed class RobotAuthoringCompositionHandlers(
                     ? runOrder
                     : item.RunOrder);
         }).ToArray();
-        foreach (var candidate in candidates.Where(candidate => candidate.Artifact is null || candidate.Contract is null))
+        foreach (var candidate in candidates.Where(candidate => candidate.Artifact is null))
             blockers.Add(new("IMPORT_RESOURCE_MISSING", "Resolved import resource no longer exists.", candidate.Item.ArtifactCode));
+        foreach (var candidate in candidates.Where(candidate => candidate.Artifact is not null && candidate.Contract is null))
+            warnings.Add(new("DECLARATION_NOT_AVAILABLE",
+                "No technical declaration is attached. Recipe compatibility remains an operator decision.",
+                candidate.Item.ArtifactCode));
 
         var requirements = BuildRequirements(recipe, normalizedOptions, availableOptions);
         var requirementResults = new List<RobotCompositionRequirement>();
@@ -214,40 +218,44 @@ public sealed class RobotAuthoringCompositionHandlers(
                 requirement.RequiredWorkcellCapabilityCode, status,
                 matches.Select(match => match.Item.ArtifactCode).ToArray()));
             if (matches.Length == 0)
-                blockers.Add(new("REQUIRED_EFFECT_MISSING", $"No imported artifact satisfies {requirement.Code}.", requirement.Code));
+                warnings.Add(new("DECLARED_EFFECT_NOT_MATCHED",
+                    $"Uploaded metadata does not declare a match for {requirement.Code}.", requirement.Code));
             else if (matches.Length > 1)
-                blockers.Add(new("ARTIFACT_CANDIDATE_AMBIGUOUS", $"Multiple imported artifacts satisfy {requirement.Code}.", requirement.Code));
+                warnings.Add(new("DECLARED_EFFECT_AMBIGUOUS",
+                    $"Multiple uploaded declarations match {requirement.Code}.", requirement.Code));
             else
-                ValidateQuantity(requirement, matches[0].Contract!.Effects.Where(effect => Matches(requirement, effect)), blockers);
+                ValidateQuantity(requirement, matches[0].Contract!.Effects.Where(effect => Matches(requirement, effect)), warnings);
         }
 
         var selectedOptionSet = normalizedOptions.ToHashSet(StringComparer.Ordinal);
         var included = new List<Candidate>();
-        foreach (var candidate in candidates.Where(candidate => candidate.Artifact is not null && candidate.Contract is not null))
+        foreach (var candidate in candidates.Where(candidate => candidate.Artifact is not null))
         {
-            var optionCodes = candidate.Contract!.SchemaVersion >= 2
+            var optionCodes = candidate.Contract is { SchemaVersion: >= 2 }
                 ? candidate.Contract.Effects.Select(effect => NormalizeOptional(effect.OptionCode))
                     .Where(code => code is not null).Cast<string>().Distinct(StringComparer.Ordinal).ToArray()
                 : [];
-            if (optionCodes.Length > 0 && optionCodes.All(code => !selectedOptionSet.Contains(code))) continue;
             if (optionCodes.Any(code => !selectedOptionSet.Contains(code)))
-                blockers.Add(new("ARTIFACT_INCLUDES_UNSELECTED_OPTION", "Artifact mixes selected and unselected option effects.", candidate.Item.ArtifactCode));
-            if (candidate.Contract.SchemaVersion == 1 || candidate.Contract.Effects.All(effect =>
+                warnings.Add(new("DECLARED_OPTION_NOT_SELECTED",
+                    "Uploaded metadata mentions an option that was not selected; the artifact remains in manifest order.",
+                    candidate.Item.ArtifactCode));
+            if (candidate.Contract is null || candidate.Contract.SchemaVersion == 1 || candidate.Contract.Effects.All(effect =>
                     effect.EffectKind is RobotArtifactEffectKind.System or RobotArtifactEffectKind.Motion))
-                warnings.Add(new("OPAQUE_ARTIFACT_INCLUDED", "Artifact has no ingredient or option semantics and remains in the proposal.", candidate.Item.ArtifactCode));
+                warnings.Add(new("BLACK_BOX_ARTIFACT_INCLUDED",
+                    "Artifact behavior is not proven by Cloud and remains in manifest order.", candidate.Item.ArtifactCode));
             included.Add(candidate);
         }
 
-        var ordered = OrderCandidates(included, blockers);
+        var ordered = included.OrderBy(candidate => candidate.ProgramRunOrder).ToArray();
         var proposal = ordered.Select((candidate, index) => new RobotCompositionArtifactProposal(
             candidate.Artifact!.Id,
             candidate.Artifact.ArtifactCode,
             index + 1,
-            candidate.Contract!.SchemaVersion >= 2
+            candidate.Contract is { SchemaVersion: >= 2 }
                 ? ResolveRequiredOptionCode(candidate.Contract, selectedOptionSet)
                 : null,
-            candidate.Contract!.Effects.Select(effect => effect.EffectCode).Order(StringComparer.Ordinal).ToArray())).ToArray();
-        var capabilityCodes = included.Where(candidate => candidate.Contract!.SchemaVersion >= 2)
+            candidate.Contract?.Effects.Select(effect => effect.EffectCode).Order(StringComparer.Ordinal).ToArray() ?? [])).ToArray();
+        var capabilityCodes = included.Where(candidate => candidate.Contract is { SchemaVersion: >= 2 })
             .SelectMany(candidate => candidate.Contract!.Effects)
             .Select(effect => NormalizeOptional(effect.RequiredWorkcellCapabilityCode))
             .Where(code => code is not null).Cast<string>().Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
@@ -301,17 +309,17 @@ public sealed class RobotAuthoringCompositionHandlers(
          NormalizeOptional(effect.RequiredWorkcellCapabilityCode) == requirement.RequiredWorkcellCapabilityCode);
 
     private static void ValidateQuantity(RequiredEffect requirement, IEnumerable<RobotArtifactDeclaredEffect> effects,
-        ICollection<RobotCompositionIssue> blockers)
+        ICollection<RobotCompositionIssue> warnings)
     {
         if (!requirement.Quantity.HasValue) return;
         var matching = effects.ToArray();
         if (matching.Any(effect => effect.QuantityMode == RobotArtifactQuantityMode.Parameterized))
-            blockers.Add(new("PARAMETERIZED_QUANTITY_UNSUPPORTED", "Current Fairino runtime does not prove parameterized quantity support.", requirement.Code));
+            warnings.Add(new("DECLARED_PARAMETERIZED_QUANTITY", "Uploaded metadata declares a parameterized quantity; Cloud does not verify Lua behavior.", requirement.Code));
         else if (matching.All(effect => effect.QuantityMode == RobotArtifactQuantityMode.None))
-            blockers.Add(new("QUANTITY_AUTHORITY_UNPROVEN", "Ingredient quantity is not declared by the artifact contract.", requirement.Code));
+            warnings.Add(new("DECLARED_QUANTITY_MISSING", "Uploaded metadata does not declare an ingredient quantity.", requirement.Code));
         else if (!matching.Any(effect => effect.QuantityMode == RobotArtifactQuantityMode.FixedInArtifact &&
-                     effect.FixedQuantity == requirement.Quantity && NormalizeUnit(effect.Unit) == requirement.Unit))
-            blockers.Add(new("FIXED_QUANTITY_MISMATCH", "Fixed artifact quantity or unit does not match the Recipe/Option requirement.", requirement.Code));
+                      effect.FixedQuantity == requirement.Quantity && NormalizeUnit(effect.Unit) == requirement.Unit))
+            warnings.Add(new("DECLARED_QUANTITY_MISMATCH", "Uploaded metadata quantity differs from the Recipe expectation.", requirement.Code));
     }
 
     private static IReadOnlyList<Candidate> OrderCandidates(IReadOnlyCollection<Candidate> candidates,

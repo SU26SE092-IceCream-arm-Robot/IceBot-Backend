@@ -87,7 +87,7 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
         Assert.Equal("Materialized", item.Status);
         Assert.Equal(2, item.ItemCount);
         Assert.Equal("Org Admin", item.CreatedByDisplayName);
-        Assert.Contains("PreviewSemanticComposition", item.NextActions);
+        Assert.DoesNotContain("PreviewSemanticComposition", item.NextActions);
         Assert.Contains("PublishImportResources", item.NextActions);
         Assert.NotNull(item.Validation);
         Assert.True(item.Validation!.CanMaterialize);

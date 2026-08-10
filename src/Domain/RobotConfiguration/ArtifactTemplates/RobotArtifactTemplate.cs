@@ -76,8 +76,6 @@ public sealed class RobotArtifactTemplate : BusinessEntity
     public void Publish()
     {
         if (Status != RobotArtifactStatus.Draft) throw new DomainRuleException("Only draft robot artifact templates can be published.");
-        if (!TechnicalContractId.HasValue || string.IsNullOrWhiteSpace(TechnicalContractChecksum))
-            throw new DomainRuleException("A published technical contract is required before publishing a robot artifact template.");
         Status = RobotArtifactStatus.Published;
     }
 

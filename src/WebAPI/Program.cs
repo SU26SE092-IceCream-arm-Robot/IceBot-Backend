@@ -64,10 +64,11 @@ try
         var reset = scope.ServiceProvider.GetRequiredService<DevelopmentRobotAuthoringAutomationReset>();
         var result = await reset.ResetAsync(CancellationToken.None);
         Log.Information(
-            "Reset {OrganizationCode} ({OrganizationId}): {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Objects} objects deleted, {RetainedObjects} objects retained.",
+            "Reset {OrganizationCode} ({OrganizationId}): {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, {MenuItems} menu items, {Objects} objects deleted, {RetainedObjects} objects retained.",
             DevelopmentRobotAuthoringAutomationReset.OrganizationCode, result.OrganizationId,
             result.DeletedImportCount, result.DeletedArtifactCount, result.DeletedProgramCount,
-            result.DeletedContractCount, result.DeletedObjectCount, result.RetainedObjectCount);
+            result.DeletedContractCount, result.DeletedBindingCount, result.DeletedReleaseCount,
+            result.DeletedMenuItemCount, result.DeletedObjectCount, result.RetainedObjectCount);
         return;
     }
 
