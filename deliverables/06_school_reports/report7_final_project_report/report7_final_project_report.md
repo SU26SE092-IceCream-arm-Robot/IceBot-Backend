@@ -299,6 +299,8 @@ No unsupported performance, availability, recovery, security-certification, phys
 
 `[Consolidation Required]` Import NFR-001–NFR-025 individually with their exact compound statuses and evidence. A general disclaimer does not replace row-level `[Inferred]`, `[Unclear]`, or known-gap qualifiers.
 
+`[Consolidation Blocker — NFR-013]` Do not import an obsolete fixed cache duration. Consolidate NFR-013 only after Report 3 and Report 5 use the same optional bounded-cache contract and planned variants for admission-before-cache, disabled/hit/miss/expiry/invalidation, database fallback, ETag/304, and request-specific metadata. Exact cache profile, TTL, invalidation settings, performance thresholds, and alert thresholds remain `[Needs Team Review]`.
+
 ## 5. Other Requirements
 
 ### 5.1 Business Rules

@@ -201,7 +201,7 @@ Keys follow two principal strategies. `GuidEntity` identifiers are assigned by t
 
 ### Database Relationship Diagram
 
-The complete evidence-qualified ERD is maintained in `deliverables/03_uml/erd.md`. The following SDD view retains only the principal design chain used by the detailed flows:
+The following compact SDD ERD is the current corrected summary for the principal design chain used by the detailed flows. The fuller baseline ERD remains a supporting draft and is not authoritative where its cardinalities conflict with the qualifications below.
 
 ```mermaid
 erDiagram
@@ -233,7 +233,9 @@ erDiagram
     EDGE_COMMAND ||--o{ ORDER_EXECUTION_RECORD : evidenced_by
 ```
 
-`Menu.KioskId` is nullable; a menu may instead use broader organization/store scope. The optional Kiosk association above therefore does not assert exclusive Kiosk ownership. The mapped physical model permits zero-to-many `ProductionIncident` rows per `OrderItem` because no unique constraint on `ProductionIncident.OrderItemId` was identified. `[Open Question]` The intended business maximum—one per item, one per produced unit, or multiple—must be confirmed and the baseline ERD aligned. The diagram does not assert that a command always has execution evidence or that evidence proves a physical outcome. Unless otherwise stated, this compact ERD is a relationship overview; exact FK nullability and optionality remain governed by `logical_database_design.md` and `physical_database_design.md`.
+`Menu.KioskId` is nullable; a menu may instead use broader organization/store scope. The optional Kiosk association above therefore does not assert exclusive Kiosk ownership. The mapped physical model permits zero-to-many `ProductionIncident` rows per `OrderItem` because no unique constraint on `ProductionIncident.OrderItemId` was identified. An `ExecutionRouteRobotBinding` may reference zero-or-one `ProductionProgramBinding`; one Production Program Binding may be snapshotted by zero-to-many route bindings. `[Open Question]` The intended ProductionIncident business maximum must be confirmed. The diagram does not assert that a command always has execution evidence or that evidence proves a physical outcome.
+
+`[Needs Team Review]` Upstream blockers remain in the full baseline artifacts: the full ERD still overstates Production Program Binding optionality, ProductionIncident multiplicity, and Kiosk/Menu scope, while the logical `ExecutionRouteRobotBinding` catalogue row remains stale. Until those items are corrected, this compact view and the qualifications in this section take precedence for Report 4; exact physical columns and constraints still require the corrected logical/physical database designs.
 
 ### Conceptual, Logical, and Physical Design Summary
 
