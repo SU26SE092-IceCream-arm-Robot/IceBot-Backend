@@ -4,7 +4,7 @@
 
 **Source basis**: `deliverables/00_repo_evidence/repo_truth_map.md` §3 (actors), `functional_inventory.md` (per-row Actor/Feature columns), `deliverables/01_project_introduction/project_introduction.md` §6/§9, `deliverables/02_srs/srs.md` §4 (FR Actor fields). No `src/` or `docs/` files were read beyond what these evidence documents already cite, and none were modified; `srs.md`/`project_introduction.md` were not modified.
 
-**Readability note**: This diagram groups the 133 SRS functional requirements (derived from 260 `functional_inventory.md` rows) into ~35 representative use cases at the bounded-context level, not one use case per FR. Where several internal roles share access to a use case per `functional_inventory.md`'s Actor column, only the primary/most restrictive actor is connected by an edge, with a `+` note; the full role list for any use case is in the cited SRS FR.
+**Readability note**: This diagram groups the 135 SRS functional requirements into representative use cases at the bounded-context level, not one use case per FR. FR-134 and FR-135 are post-sync additions evidenced by `backend_update_impact_2026-08-11.md`; the pre-sync functional inventory requires regeneration.
 
 ---
 
@@ -55,10 +55,11 @@ flowchart LR
         UC_RuntimeMenu(["Fetch kiosk runtime menu"])
     end
 
-    subgraph INV["Inventory (FR-048..FR-056)"]
+    subgraph INV["Inventory (FR-048..FR-056, FR-134)"]
         UC_Dispensers(["Provision and configure dispensers"])
         UC_Stock(["Refill, adjust, and rebind stock"])
         UC_Readiness(["View topology and inventory readiness"])
+        UC_InventoryObservations(["Report inventory sensor observations"])
     end
 
     subgraph ORD["Orders (FR-057..FR-067)"]
@@ -81,10 +82,11 @@ flowchart LR
         UC_Import(["Run authoring import pipeline"])
     end
 
-    subgraph PC["Production Configuration (FR-102..FR-110)"]
+    subgraph PC["Production Configuration (FR-102..FR-110, FR-135)"]
         UC_Release(["Author configuration release and routes"])
         UC_Deploy(["Deploy configuration to kiosk"])
         UC_Rollback(["Roll back deployment"])
+        UC_ProductionBinding(["Confirm Recipe-to-Program binding"])
     end
 
     subgraph PP["Production Packages (FR-111..FR-119)"]
@@ -119,8 +121,10 @@ flowchart LR
     Tablet --> UC_TrackOrder
     Tablet --> UC_PaySession
     Tablet -.-> UC_Realtime
+    Edge --> UC_InventoryObservations
 
     SystemAdmin --> UC_ManageAccounts
+    OrgAdmin --> UC_ProductionBinding
     SystemAdmin --> UC_AssignRoles
     SystemAdmin --> UC_Orgs
     SystemAdmin --> UC_DeviceCatalog

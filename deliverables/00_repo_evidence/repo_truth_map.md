@@ -51,11 +51,11 @@ Per `docs/architecture/BOUNDARY_CONTEXTS.md:16-32` (namespace `Domain.<Context>`
 | Orders | order lifecycle, order items, historical snapshots, production incidents |
 | Payments | payment transactions, callbacks, refunds, payment methods |
 | Robot Configuration | robot Lua artifacts, reusable robot manifests (`RobotProgram`, `RobotArtifact`) |
-| Production Configuration | configuration releases, routes, robot bindings, deployment records |
+| Production Configuration | immutable production-program bindings, configuration releases, routes, route snapshots, deployment records |
 | Production Packages | reusable package/version manifests, deterministic installation provenance |
 | Production Execution | Cloud execution/audit projections from executor evidence |
 | Devices | device catalog, telemetry, heartbeats, kiosk execution endpoints |
-| Inventory | dispenser state, stock movements |
+| Inventory | dispenser state, stock movements, persisted Edge sensor observations |
 | Operations | alerts, maintenance tickets, operation logs |
 | Sync | edge-cloud inbox/dead-letters, dispatch-only edge commands |
 | Common | base entities, shared abstractions/primitives |
@@ -75,6 +75,8 @@ Flow index: `docs/flows/SYSTEM_FLOWS.md`. Key flows:
 5. **Production incident resolution** — inspection/discard/exact-unit remake/refund-or-voucher when output is defective or outcome unknown (`docs/flows/PRODUCTION_INCIDENT_RESOLUTION_FLOW.md`, routed).
 6. **Production Package installation/upgrade** — franchise-oriented deterministic package composition, preview/materialize/cutover/rollback (`docs/flows/PRODUCTION_PACKAGE_INSTALLATION_FLOW.md`, `PRODUCTION_PACKAGE_UPGRADE_FLOW.md`, routed).
 7. **Operations support** — telemetry, heartbeat, device events, inventory reporting, manual support/maintenance tickets (`docs/flows/OPERATIONS_SUPPORT_FLOW.md`, `MAINTENANCE_TICKET_FLOW.md`, routed).
+8. **Inventory sensor-observation evidence** — authenticated MQTT `inventory-observations` batches are validated and persisted; only newer accepted observations may update the current dispenser projection and publish a post-commit inventory notification. They create no stock movement, prove no recipe consumption, and do not gate v1 runtime-menu or checkout sellability. Evidence: `backend_update_impact_2026-08-11.md` §§3–6; `InventorySensorObservation`; current observation handler/tests.
+9. **Production Program Binding** — an authorized organization-scoped author records an immutable Recipe/version-to-Published-RobotProgram decision with supported options and optional declared-capability evidence; configuration-route bindings may snapshot that decision. Missing declarations create no capability claim, and neither the binding nor its snapshot certifies Lua behavior or physical safety. Evidence: `backend_update_impact_2026-08-11.md` §§3–6; `ProductionProgramBinding`; current management controller/feature/tests.
 
 ## 6. API Surface Summary
 
@@ -102,7 +104,7 @@ Controller inventory (by folder, `src/WebAPI/Controllers/`):
 - **Operations**: ManagementAlerts, ManagementKioskOperationLogs, ManagementMaintenanceTickets, ManagementNotificationDeliveries, ManagementSyncDeadLetters
 - **Orders**: ManagementExecutionAttempts, ManagementOrders, ManagementProductionIncidents, Orders (tablet-facing)
 - **Payments**: ManagementPaymentDiagnostics, ManagementPaymentMethods, ManagementPaymentOperations, ManagementRefunds, PayOsWebhook
-- **ProductionConfiguration**: ManagementConfigurationDeployments, ManagementConfigurationInventoryReadiness, ManagementConfigurationReleases
+- **ProductionConfiguration**: ManagementConfigurationDeployments, ManagementConfigurationInventoryReadiness, ManagementConfigurationReleases, ManagementProductionProgramBindings
 - **ProductionPackages**: ManagementProductionPackageInstallations, ManagementProductionPackages
 - **RobotConfiguration**: ManagementRobotArtifacts, ManagementRobotArtifactTechnicalContracts, ManagementRobotArtifactTemplates, ManagementRobotAuthoringImports, ManagementRobotPrograms
 - **SalesCatalog**: KioskRuntimeMenus (tablet), ManagementMenus
@@ -115,16 +117,16 @@ IoT/Edge concrete routes (`docs/api/API_SURFACE_RULES.md:183-192`): commands pul
 Detailed entity inventory is in `deliverables/00_repo_evidence/database_inventory.md`. Summary:
 
 - PostgreSQL via EF Core `IceBotDbContext` (`ARCHITECTURE.md:88-90`), `src/Infrastructure/Data/`, migrations at `src/Infrastructure/Migrations/`.
-- One Domain assembly, one database; entities are namespace-grouped by bounded context (`src/Domain/{Identity,Tenants,Catalog,SalesCatalog,Orders,Payments,RobotConfiguration,ProductionConfiguration,ProductionExecution,ProductionPackages,Devices,Inventory,Operations,Sync,Common}`).
+- One Domain assembly, one database; entities are namespace-grouped by bounded context (`src/Domain/{Identity,Tenants,Catalog,SalesCatalog,Orders,Payments,RobotConfiguration,ProductionConfiguration,ProductionExecution,ProductionPackages,Devices,Inventory,Operations,Sync,Common}`). Post-sync additions include `InventorySensorObservation` and `ProductionProgramBinding`.
 - Multi-tenancy root: `Organization` → `Store` → `Kiosk`; `TenantScopeType` hierarchy `Device > Kiosk > Store > Organization > Global` (`ARCHITECTURE.md:182-194`).
 - JSON fields permitted for robot SDK payloads, provider payloads, snapshots, metadata; workflow-critical values must be typed columns (`ARCHITECTURE.md:176-180`, `docs/data/JSON_FIELD_RULES.md`).
 - Cross-context references are intentional and documented (Orders→Tenants/SalesCatalog/Catalog, Payments→Orders, Production Configuration→Catalog/RobotConfiguration, Inventory→Devices/Tenants/Catalog, Operations→Accounts/Devices/Orders/Tenants). Evidence: `docs/architecture/BOUNDARY_CONTEXTS.md:283-293`.
 
 ## 8. IoT / Robot / Payment / Sync Responsibilities
 
-- **IoT / Edge contract** (`docs/iot/IOT_CONTRACT.md`): Tablet owns transient UX only; Local Edge Backend owns runtime menu projection, inventory/device/robot availability, local execution queue, telemetry; Cloud owns `Order`, `PaymentTransaction`, payment verification, executable-order command creation, final state/analytics/audit. MQTT is notification-only (no large payloads, not source of truth); Edge must still pull commands via API and poll periodically. Security: Full Edge = mTLS cert pinned by SHA-256 fingerprint; low-cost controller = ECDSA P-256 signed request + nonce dedup over TLS.
+- **IoT / Edge contract**: Tablet owns transient UX only; Local Edge Backend owns local runtime execution and telemetry capture; Cloud owns orders, payments, command creation, analytics, and audit. Durable commands remain pull-based and MQTT command availability remains best-effort, while current source also consumes typed MQTT uplinks including `inventory-observations`. MQTT evidence is not independent proof of physical consumption or execution. External Edge rollout/recovery compatibility remains `[Needs Team Review]`. Evidence: `backend_update_impact_2026-08-11.md` §§3, 5–6; current MQTT consumer and observation handler.
 - **Robot Configuration**: immutable exported Lua artifacts (`RobotArtifact`) and reusable manifests (`RobotProgram`, child `RobotProgramArtifact`); configuration-time only, does not own runtime execution state (`docs/architecture/BOUNDARY_CONTEXTS.md:144-160`).
-- **Production Configuration/Execution**: `ConfigurationRelease` binds catalog variant/recipe to robot programs via `ExecutionRoute`/`ExecutionRouteRobotBinding`; Cloud-side execution projections (`OrderExecutionRecord`, `ProductionExecutionRecord`) are audit/read models built from accepted executor evidence — Cloud has no live `RobotJob`/scheduler (`docs/architecture/BOUNDARY_CONTEXTS.md:162-187`, `docs/iot/IOT_CONTRACT.md:112-116`).
+- **Production Configuration/Execution**: `ProductionProgramBinding` records the organization-owned Recipe/program decision and optional declared-capability evidence; `ConfigurationRelease` routes may snapshot it through `ExecutionRouteRobotBinding`. Cloud-side execution projections remain audit/read models built from accepted executor evidence—Cloud has no live robot scheduler and does not independently certify physical output. Evidence: `backend_update_impact_2026-08-11.md` §§2, 4–6; current entities/controllers/features.
 - **Payments**: `PaymentMethod`, `PaymentTransaction`, `PaymentCallback`, `Refund` in `Domain.Payments`; PayOS is the current provider (`PayOsWebhookController`); current refund phase is manual cash refund only — no automatic provider refund/payout assumed (`docs/architecture/BOUNDARY_CONTEXTS.md:125-142`). Payment webhook verification is decoupled from Edge dispatch (`docs/flows/CHECKOUT_EXECUTION_FLOW.md:105-113`).
 - **Sync**: `SyncEventInbox`, `SyncDeadLetter`, `EdgeCommand`, `EdgeCommandDeliveryAttempt` in `Domain.Sync`; business contexts must not depend on Sync entities directly, only expose idempotency/correlation/causation/version/origin-node fields for sync infrastructure (`docs/architecture/BOUNDARY_CONTEXTS.md:235-248`).
 

@@ -4,7 +4,7 @@
 
 **Source basis**: `deliverables/00_repo_evidence/database_inventory.md` §1–§3, §6 (entity list, attributes, relationships, multi-tenancy fields) and `deliverables/00_repo_evidence/functional_inventory.md`/`srs.md` §6 (Data Requirements) for cross-checking which relationships are actively used by a requirement. No `src/` or `docs/` files were modified; `srs.md`/`project_introduction.md` were not modified.
 
-**Readability note**: `database_inventory.md` §1 lists 98 `DbSet<T>` entities across 14 bounded contexts. Showing all of them in one diagram would not be readable, so this diagram keeps one class per bounded-context **aggregate root** plus its most business-meaningful direct children, and omits: append-only history/log tables (`OrderStatusHistory`, `OperationLog`, etc. — mentioned in Notes instead), the full `ProductionPackage` upgrade sub-family (10 child entities), and pure read-model/projection rows (`KioskConnectivityProjection`, `ExecutionEndpointReadinessProjection`, etc.). The full entity list remains authoritative in `database_inventory.md` §1.
+**Readability note**: The merged context exposes 100 `DbSet<T>` declarations. The primary diagram remains intentionally selective; the post-sync additions below document `InventorySensorObservation` and `ProductionProgramBinding`. Evidence: `backend_update_impact_2026-08-11.md` §4. No live-schema count is asserted.
 
 ---
 
@@ -357,6 +357,39 @@ classDiagram
 ```
 
 ## Explanation
+
+### Post-sync class additions
+
+```mermaid
+classDiagram
+    class InventorySensorObservation {
+        +Guid SourceExecutorId
+        +Guid SourceEventId
+        +Guid IngredientDispenserStateId
+        +long ObservationSequence
+        +IngredientLevelStatus ObservedLevelStatus
+        +decimal DerivedEstimatedQuantity
+        +InventorySensorObservationDisposition Disposition
+    }
+    class ProductionProgramBinding {
+        +Guid OrganizationId
+        +Guid ProductVariantId
+        +Guid RecipeId
+        +int RecipeVersion
+        +Guid RobotProgramId
+        +string RequiredCapabilityCodesJson
+        +CapabilityEvidenceStatus CapabilityEvidenceStatus
+        +ProductionProgramBindingAssurance Assurance
+        +ProductionProgramBindingStatus Status
+    }
+    IngredientDispenserState "1" --> "0..*" InventorySensorObservation
+    KioskExecutionEndpoint "1" --> "0..*" InventorySensorObservation
+    Recipe "1" --> "0..*" ProductionProgramBinding
+    RobotProgram "1" --> "0..*" ProductionProgramBinding
+    ProductionProgramBinding "0..1" --> "0..*" ExecutionRouteRobotBinding
+```
+
+`InventorySensorObservation` is persisted Edge evidence; out-of-order rows do not overwrite the dispenser projection and do not create stock movements. `ProductionProgramBinding` is operator-confirmed and immutable except retirement; capability declarations do not certify Lua behavior. `[Needs Review]` External Edge schema-v5 rollout compatibility.
 
 - **Tenants** (`Organization → Store → Kiosk`) is the multi-tenancy root; every FK in this chain is non-nullable at the type level, so a Kiosk cannot exist without a Store and Organization.
 - **Catalog** shows the template/lineage pattern (`Product.TemplateProductId`, `Recipe.TemplateRecipeId`) used to clone global templates into tenant-scoped products/recipes, plus the Draft→Published→Active→Retired recipe lifecycle referenced from `RecipeItem`.

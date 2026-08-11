@@ -16,7 +16,7 @@
 
 - **Database engine**: PostgreSQL 17 (`docker/docker-compose.yml`, `image: postgres:17`), database name `IceBotDB`. `[Assumption]` — this is the current deployment configuration, not independently confirmed as a binding "must be PostgreSQL 17" product requirement (`srs.md` §2.4).
 - **Driver/ORM**: Entity Framework Core via the Npgsql provider (`UseNpgsql`), registered both at runtime (`src/Infrastructure/DependencyInjection.cs:85`) and at design time (`src/Infrastructure/AppDbContextFactory.cs:31-35`, which also enables `EnableRetryOnFailure(5, TimeSpan.FromSeconds(10), null)`). `[Supported]`.
-- **DbContext**: `IceBotDbContext` (`src/Infrastructure/Data/IceBotDbContext.cs`), exposing **98** `DbSet<T>` properties — a direct count against source lines 109–214, correcting `database_inventory.md`'s own stated "~130" (per `srs.md` §6.1 and `requirements_traceability_matrix.md` DR-16). `[Supported]`. `[Unclear]` **This is a count of mapped entity types (DbSets), not a count of physical database tables**, and the two are not interchangeable here: `database_inventory.md` §1 also lists `AccountStores` as a physical join table with no corresponding `DbSet`/domain class (it is reached only via EF's many-to-many mapping between `Account` and `Store`). Under a physical-table counting rule, the table count is therefore **at least 99**, not 98. This document uses "98" only to mean "mapped entity types" and does not equate it with the physical table count — see §3.
+- **DbContext**: the merged `IceBotDbContext` exposes **100** `DbSet<T>` declarations. This is not a physical-table count. `[Supported]` by current source; `[Needs Review]` live-schema reconciliation.
 - **Connection configuration**: runtime resolves the connection string from configuration key `CONNECTIONSTRING`; the design-time factory (used by `dotnet ef migrations`) resolves it from `ConnectionStrings:IceBot_DB` / environment variable `ConnectionStrings__IceBot_DB`. These are two different keys for the same physical database — `[Unclear]`/flagged risk for anyone debugging an environment-specific connection issue, not independently resolved here. `[Supported]` as an observed fact; `[Unclear]` whether this divergence is intentional.
 
 ---
@@ -42,24 +42,24 @@
 
 ## 3. Table Inventory (Physical Names)
 
-`[Unclear]` Three different counting rules appear across the evidence base, and this document does not treat them as equivalent: **98** is the count of `DbSet<T>` properties/mapped entity types (§1); the table list below, following `database_inventory.md` §1, additionally includes `AccountStores` as a physical join table without its own `DbSet`, making the physical table count **at least 99** under a table-counting rule; separately, §6 below cites a cumulative migration `CreateTable` count of approximately 99, which is a count of creation events across migration history, not an independently-verified current live-schema count — the two "99" figures are not necessarily the same number for a different reason (one is a name-level table count, the other is a historical creation-event count) even though they happen to be close. None of these three counts has been reconciled against a live `IceBotDbContextModelSnapshot` or an actual running database in this evidence pass. Tables with attribute-level evidence in `database_inventory.md` §2 are detailed in §4 below; the remaining tables are listed here by name only (per §1 of the source) to avoid inventing column-level detail not present in the evidence.
+`[Needs Review]` The merged source contains 100 `DbSet<T>` declarations, eight non-designer migrations, and 101 cumulative `CreateTable` operations. These static counts are not a verified live-schema count. Evidence: `backend_update_impact_2026-08-11.md` §4 and current migrations.
 
 | Bounded context (EF configuration folder) | Physical tables |
 |---|---|
 | Tenants | `Organizations`, `Stores`, `Kiosks`, `KioskOperationalStateTransitions`, `FranchiseOnboardings` |
 | Identity | `Accounts`, `AccountRoles`, `AccountNotificationDevices`, `AccountInvitations`, `PasswordResetRequests`, `RefreshTokens`, `Roles`, `AccountStores` (join, no domain class) |
 | Catalog | `ProductCategories`, `Products`, `ProductVariants`, `OptionGroups`, `ProductOptions`, `ProductOptionIngredientRequirements`, `Recipes`, `RecipeItems`, `Ingredients` |
-| Inventory | `IngredientDispenserStates`, `InventoryTopologyChangeRecords`, `InventoryTopologyRebindRecords`, `StockMovements` |
+| Inventory | `IngredientDispenserStates`, `InventoryTopologyChangeRecords`, `InventoryTopologyRebindRecords`, `StockMovements`, `InventorySensorObservations` |
 | SalesCatalog | `Menus`, `MenuItems`, `MenuItemProductOptions` |
 | Orders | `Orders`, `OrderItems`, `OrderItemOptions`, `OrderItemOptionIngredientRequirements`, `OrderStatusHistories`, `OrderItemStatusHistories`, `ProductionIncidents`, `ProductionIncidentHistories` |
 | Payments | `PaymentMethods`, `PaymentTransactions`, `PaymentCallbacks`, `Refunds` |
 | Devices | `DeviceTypes`, `DeviceModels`, `Devices`, `DeviceEvents`, `KioskHeartbeats`, `KioskConnectivityProjections`, `KioskExecutionEndpoints`, `ExecutionEndpointCredentialBindings`, `ExecutionEndpointMqttCredentials`, `ExecutionEndpointReadinessProjections`, `ExecutionEndpointCapabilityProjections`, `ExecutionEndpointRequestNonces`, `ExecutionEndpointSupportedRobotTargets` |
 | RobotConfiguration | `RobotPrograms`, `RobotProgramArtifacts`, `RobotArtifacts`, `RobotArtifactTemplates`, `RobotArtifactTechnicalContracts`, `RobotArtifactDeclaredEffects`, `RobotArtifactOrderingConstraints`, `RobotAuthoringImports`, `RobotAuthoringImportItems` |
-| ProductionConfiguration / ProductionExecution / ProductionPackages | `ConfigurationReleases`, `ExecutionRoutes`, `ExecutionRouteRobotBindings`, `KioskConfigurationDeployments`, `ControllerArtifactSetDeployments`, `ControllerArtifactSetItems`, `OrderExecutionRecords`, `ProductionExecutionRecords`, `ProductionPackages`, `ProductionPackageVersions`, `ProductionPackageProductDefinitions`, `ProductionPackageArtifactDefinitions`, `ProductionPackageProgramBlueprints`, `ProductionPackageProgramSlots`, `ProductionPackageRouteBlueprints`, `ProductionPackageInstallations`, `ProductionPackageMaterializations`, `ProductionCompositions`, `ProductionPackageUpgrades`, `ProductionPackageUpgradeMenuChanges`, `ProductionPackageUpgradeMenuOptionChanges`, `ProductionPackageUpgradeEndpointTargets`, `ProductionPackageUpgradeRollbackAttempts`, `ProductionPackageUpgradeCatalogIdentityChanges`, `ProductionPackageUpgradeAvailabilityChanges` |
+| ProductionConfiguration / ProductionExecution / ProductionPackages | `ConfigurationReleases`, `ExecutionRoutes`, `ExecutionRouteRobotBindings`, `ProductionProgramBindings`, `KioskConfigurationDeployments`, `ControllerArtifactSetDeployments`, `ControllerArtifactSetItems`, `OrderExecutionRecords`, `ProductionExecutionRecords`, `ProductionPackages`, `ProductionPackageVersions`, `ProductionPackageProductDefinitions`, `ProductionPackageArtifactDefinitions`, `ProductionPackageProgramBlueprints`, `ProductionPackageProgramSlots`, `ProductionPackageRouteBlueprints`, `ProductionPackageInstallations`, `ProductionPackageMaterializations`, `ProductionCompositions`, `ProductionPackageUpgrades`, `ProductionPackageUpgradeMenuChanges`, `ProductionPackageUpgradeMenuOptionChanges`, `ProductionPackageUpgradeEndpointTargets`, `ProductionPackageUpgradeRollbackAttempts`, `ProductionPackageUpgradeCatalogIdentityChanges`, `ProductionPackageUpgradeAvailabilityChanges` |
 | Operations | `Alerts`, `MaintenanceTickets`, `OperationLogs`, `NotificationDeliveries` |
 | Sync | `SyncEventInbox` (singular table name, note the exception), `ProductionEventCheckpoints`, `EdgeStateSummaries`, `SyncDeadLetters`, `SyncDeadLetterRetryAttempts`, `EdgeCommands`, `EdgeCommandDeliveryAttempts` |
 
-`[Supported]` — `database_inventory.md` §1; migration table names cross-confirmed via `migrationBuilder.CreateTable` calls across the 5 migrations listed in §6 below.
+`[Supported]` for the post-sync additions — backend update impact §4 and current migrations. Other table names retain their prior evidence basis.
 
 ---
 
@@ -76,6 +76,14 @@ Only tables with attribute/constraint-level evidence in `database_inventory.md` 
 ### 4.2 Unfiltered (evidence/retry-critical) unique indexes
 
 `[Supported]` — deliberately **not** filtered by `DeletedAt`, so uniqueness holds even across soft-deleted rows: `PaymentTransaction.TransactionNumber`; `Refund.RefundNumber`; `Order.OrderNumber`; `FranchiseOnboarding.RequestChecksum`/`IdempotencyKey` (the composite idempotency key is filtered by active status; the checksum alone is not).
+
+Post-sync additions:
+
+- `InventorySensorObservations.(SourceExecutorId, SourceEventId)` is unique for Edge idempotency; additional indexes cover dispenser receive time, executor/dispenser sequence, endpoint, and origin/version.
+- `ProductionProgramBindings.BindingChecksum` is unique; supporting indexes cover organization/recipe/program/status and the referenced ProductVariant/Recipe/RobotProgram.
+- `ExecutionRouteRobotBindings` gains optional `ProductionProgramBindingId`, `ProductionProgramBindingChecksum`, and required-capability JSON snapshot fields.
+
+`[Supported]` — migrations `20260731040709`, `20260804031725`, and `20260809035315`. Existing Production Program Bindings migrate to `CapabilityEvidenceStatus.Missing`; historical route scalar capabilities are preserved as zero/one-item JSON arrays. No live migration execution is asserted.
 
 ### 4.3 Partial/filtered unique indexes enforcing a business invariant
 
@@ -134,6 +142,7 @@ Only tables with attribute/constraint-level evidence in `database_inventory.md` 
 | `EdgeCommandDeliveryAttempts` | only unique `(EdgeCommandId, DeliveryAttemptNo)` — **no `SentAt`-bearing index** | `[Unclear]`/gap vs. documented intent |
 | `ProductionExecutionRecords` | `(KioskExecutionEndpointId, Status, LastExecutorReportedAt)` — time column only trailing in a composite | partial |
 | `ProductionEventCheckpoints`, `EdgeStateSummaries` | none — unique-per-executor upsert tables, not growing logs | `[Unclear]` whether grouping with high-volume tables in `docs/data/DATA_MODELING_RULES.md` is intentional |
+| `InventorySensorObservations` | `(IngredientDispenserStateId, CloudReceivedAt)` plus executor/dispenser sequence and origin/version indexes | present; retention policy `[Needs Review]` |
 
 No PostgreSQL native table partitioning is configured for any table. `[Supported]`.
 
@@ -147,7 +156,7 @@ No PostgreSQL native table partitioning is configured for any table. `[Supported
 |---|---|
 | Source-of-truth configuration (mutable pre-publish, versioned) | `Store.OpeningHoursJson`, `Kiosk.SettingsJson`, `Recipe.InstructionsJson`, `RobotProgram.ProgramManifestJson`, `ConfigurationRelease.ManifestJson`, `RobotArtifactTechnicalContract.ContractJson`, `IngredientDispenserState.LevelToQuantityProfileJson`, `ProductionPackageVersion.ManifestJson` |
 | Immutable order/execution-time snapshot | `OrderItem.RecipeSnapshotJson`, `PaymentTransaction.RawRequestJson`/`RawResponseJson`, `ProductionPackageProductDefinition.ProductSnapshotJson` |
-| Append-only external evidence / debug payload | `PaymentCallback.PayloadJson`, `SyncEventInbox.PayloadJson`/`HeadersJson`, `DeviceEvent.PayloadJson`, `EdgeCommand.PayloadJson`, `OperationLog.PayloadJson`, `KioskHeartbeat.PayloadJson`, `IngredientDispenserState.SensorPayloadJson` |
+| Append-only external evidence / debug payload | `PaymentCallback.PayloadJson`, `SyncEventInbox.PayloadJson`/`HeadersJson`, `DeviceEvent.PayloadJson`, `EdgeCommand.PayloadJson`, `OperationLog.PayloadJson`, `KioskHeartbeat.PayloadJson`, `IngredientDispenserState.SensorPayloadJson`, `InventorySensorObservation.SensorPayloadJson` |
 | Metadata (non-critical extension data) | `Organization.MetadataJson`, `Product.MetadataJson`, `Ingredient.MetadataJson`, `Device.MetadataJson` |
 
 `[Unclear]` A few source-of-truth JSON fields lack a paired schema-version column even though most of their siblings have one: `RobotArtifact.MetadataJson`/`RobotArtifactTemplate.MetadataJson`, `ExecutionRoute.RequiredCapabilitiesJson`/`SupportedOptionCodesJson`, `Device.MetadataJson`/`DeviceModel.MetadataJson` (unlike `DeviceModel.CapabilitiesJson`, which is paired). Not confirmed whether intentional (version embedded in the JSON body itself) or a gap. `[Supported]` as an observed asymmetry; `[Unclear]` as to cause — `database_inventory.md` §9 items 8–9.
@@ -158,13 +167,13 @@ No PostgreSQL native table partitioning is configured for any table. `[Supported
 
 This section is operational/deployment context (engine configuration, migration history, retention jobs, storage topology) rather than schema-defining fact — it should not be read as an extension of the table/index/constraint definitions in §3–§5.
 
-- **Migration history**: 5 migrations, in order — `InitialCreate` (~68 tables), `CatchUpProductionPackageAndExecutionWorkflows` (+17 tables), `CompleteLocalOperationalWorkflows` (+11 tables), `CompleteLocalOperationalChanges` (+1 table), `AddProductionIncidents` (+2 tables). Total ≈ **99 tables** created cumulatively (a sum of `CreateTable` calls across migration history). `[Unclear]` This is a **cumulative creation count**, not necessarily a lower bound on the current schema: it reflects how many `CreateTable` statements have run over the project's history, and would not account for any table later dropped or renamed by a subsequent migration (none were identified in this evidence pass, but the count was not cross-checked against `IceBotDbContextModelSnapshot.cs` or a live database to confirm no such change occurred). `[Supported]` as a historical creation-event count; `[Unclear]` as an exact current-schema count.
+- **Migration history**: eight migrations. The five prior migrations are followed by `AddInventorySensorObservations`, `AddProductionProgramBindings`, and `DeriveProductionBindingCapabilitiesFromContracts`. Current source contains 101 cumulative `CreateTable` operations. `[Supported]` as static migration-history evidence; `[Needs Review]` as an exact live-schema statement.
 - **Manual migration steps**: at least one migration carries a hand-written raw-SQL pre-flight check (`CompleteLocalOperationalWorkflowsManualSteps.EnsureUniqueProviderPaymentIdentity`) that raises an exception if duplicate `(Provider, ProviderOrderCode)` pairs already exist in `PaymentTransactions` before the corresponding unique index is added — evidence that some constraint additions are treated as data-safety-gated rather than blind schema pushes. `[Supported]`.
 - **Soft delete**: `ISoftDeletable` entities get an automatic global EF query filter `DeletedAt IS NULL`, **except** a hard-coded exception list of 12 principal types (`Account`, `Organization`, `Store`, `Kiosk`, `Device`, `Product`, `Ingredient`, `IngredientDispenserState`, `Order`, `PaymentTransaction`, `ConfigurationRelease`, `KioskExecutionEndpoint`), which require an explicit `WhereNotDeleted()` extension call instead. `[Supported]`; `[Inferred]` that every query against these 12 types actually applies the filter where needed was not independently verified (developer-responsibility convention, not an audited guarantee).
 - **Advisory locking**: `PostgresAdvisoryLockManager` opens a dedicated connection and calls `pg_try_advisory_lock`/`pg_advisory_unlock` via raw SQL, used for distributed job/singleton-worker coordination outside EF Core's own transaction machinery (e.g., robot-artifact orphan cleanup). `[Supported]`.
 - **Data retention**: configurable batched deletes (`DataRetentionOptions`) — defaults `HeartbeatDays=30`, `DeviceEventDays=90`, `OperationLogDays=90`, `ProcessedSyncInboxDays=180`, `ExpiredIdentityCredentialDays=30`, `NotificationDeliveryDays=90`; deletes run in bounded batches (`BatchSize=1000`, `MaxBatchesPerRun=20`) rather than one unbounded `DELETE`. `[Supported]`. `NotificationDeliveryDays` exists in code but is not mentioned in the corresponding documentation's retention list — a minor doc/code gap, not treated as a design defect. `[Unclear]` whether this omission is intentional.
 - **Object storage split**: robot artifact binaries (`.lua` files) are **not** stored in PostgreSQL — only metadata (`StorageKey`, `Checksum`, `ContentLengthBytes`) lives in `RobotArtifacts`/`RobotArtifactTemplates`; the bytes live in MinIO, an S3-compatible object store running as a sibling container. `[Supported]`.
-- **No native partitioning**: confirmed absent from all 5 migrations; `docs/data/DATA_MODELING_RULES.md`'s partition-key plan (not re-opened here) is documentation of intent, not implemented state. `[Supported]` as an absence; `[Unclear]` timeline for future implementation.
+- **No native partitioning**: confirmed absent from all eight current migrations; `docs/data/DATA_MODELING_RULES.md`'s partition-key plan is intent, not implemented state. `[Supported]` as an absence; `[Unclear]` future timeline.
 
 ---
 
@@ -180,7 +189,7 @@ This section is operational/deployment context (engine configuration, migration 
 - High-volume/time-based index table, including the `EdgeCommandDeliveryAttempts` gap: `database_inventory.md` §4.
 - JSON field roles and schema-version pairing: `database_inventory.md` §5.
 - Migration history, manual steps, soft-delete exception list, advisory locking, data retention, object storage split, partitioning absence: `database_inventory.md` §7.
-- Cross-checked physical table trimming decisions against `erd.md`, which independently selected a readable subset of the same 98-table model from the same source.
+- Cross-checked physical table trimming decisions against `erd.md`, updated for the two post-sync entities.
 
 ---
 

@@ -80,6 +80,7 @@ flowchart TD
 - Payment-session amount/currency validation: `functional_inventory.md` PAY-01; `srs.md` FR-068.
 - Customer cancel while PendingPayment only: `functional_inventory.md` ORD-02, ORD-03; `srs.md` FR-058.
 - Webhook signature verification and atomic Paid/ReadyForFulfillment transition: `functional_inventory.md` PAY-03; `srs.md` FR-070, NFR-012.
+- `[Post-sync exception]` A signature-verified unmatched provider callback is acknowledged and observed without creating payment/order/fulfillment state; it therefore does not traverse the Paid branch (`backend_update_impact_2026-08-11.md` §5).
 - Payment/execution decoupling: `repo_truth_map.md` §5 item 4; `srs.md` BR-03.
 - Dispatch, MQTT wake-up, REST pull: `functional_inventory.md` SYNC-01, MQTT-01, IOT-05; `srs.md` FR-130, FR-125, FR-120.
 - Acknowledgement outcomes and manual redispatch with attempt limit: `functional_inventory.md` IOT-06, ORD-06; `srs.md` FR-121, FR-060.

@@ -168,17 +168,17 @@ The repository uses four physical projects/layers—`WebAPI`, `Infrastructure`, 
 
 | Physical project / package | Domain context status | Responsibility / participation | Dependency boundary |
 |---|---|---|---|
-| `Domain.Identity` | Bounded context | Owns accounts, roles, invitations, credentials, sessions, and notification-device registrations. | Depends only on permitted Domain/Common primitives. |
+| `Domain.Identity` | Bounded context | Owns accounts, roles, invitations, credentials, current-session records, and notification-device registrations. | Organization-owned account administration is enforced at the application/API boundary. |
 | `Domain.Tenants` | Bounded context | Owns organizations, stores, kiosks, operational state, onboarding state, and tenant scope. | Domain boundary; referenced by identifier/supported relationships. |
 | `Domain.Devices` | Bounded context | Owns device catalog/instances, execution endpoints/credentials, observations, and projections. | Domain boundary. |
 | `Domain.Catalog` | Bounded context | Owns ingredients, products, variants, options, recipes, templates, and lifecycle. | Domain boundary. |
 | `Domain.SalesCatalog` | Bounded context | Owns menus, menu items, and sellable offers; reads catalog/configuration data through participating use cases. | Does not own Product/Recipe. |
-| `Domain.Inventory` | Bounded context | Owns dispenser state/topology, stock movements, calibration, and readiness data. | References tenant/device/catalog identities where evidenced. |
+| `Domain.Inventory` | Bounded context | Owns dispenser state/topology, stock movements, calibration, readiness data, and persisted Edge sensor observations. | References tenant/device/catalog identities where evidenced. |
 | `Domain.Orders` | Bounded context | Owns order lifecycle, line snapshots, fulfilment history, and production incidents. | Does not own payment or Sync transport state. |
 | `Domain.Payments` | Bounded context | Owns payment methods, transactions, callbacks, refunds, and payment reconciliation state. | References Order; provider adapter resides in Infrastructure. |
 | `Domain.Operations` | Bounded context | Owns alerts, tickets, operation logs, and notification-delivery records. | Consumes supported evidence from other contexts through use cases/events. |
 | `Domain.RobotConfiguration` | Bounded context | Owns artifact metadata/contracts, ordered programs, and authoring imports. | Binary adapter resides in Infrastructure. |
-| `Domain.ProductionConfiguration` | Bounded context | Owns releases, execution routes/bindings, and deployment records. | References catalog, robot configuration, tenant, and endpoint identities as evidenced. |
+| `Domain.ProductionConfiguration` | Bounded context | Owns immutable production-program bindings, releases, execution routes/bindings, and deployment records. | References catalog, robot configuration, tenant, and endpoint identities as evidenced. |
 | `Domain.ProductionExecution` | Bounded context | Owns Cloud execution/audit projections derived from accepted executor evidence. | Does not directly control or schedule the robot. |
 | `Domain.ProductionPackages` | Bounded context | Owns versioned package definitions, installations, materializations, and upgrade provenance. | Participates in catalog/configuration materialization workflows. |
 | `Domain.Sync` | Bounded context | Owns Edge commands, delivery attempts, inbox/dead-letter records, checkpoints, and state summaries. | Owns integration state, not other contexts' business rules. |
@@ -195,7 +195,7 @@ Evidence: `repo_truth_map.md` §§2, 4; `functional_inventory.md`; `report3_srs.
 
 ### Database Overview
 
-The backend uses Entity Framework Core with the Npgsql provider and one `IceBotDbContext` against PostgreSQL. The current deployment configuration identifies PostgreSQL 17, but this version is an `[Assumption]` rather than an approved product constraint. The context exposes 98 `DbSet<T>` properties. This is not an authoritative physical-table count: the evidence additionally identifies the `AccountStores` implicit join table, and neither the current model snapshot nor a live schema was reconciled for this report.
+The backend uses Entity Framework Core with the Npgsql provider and one `IceBotDbContext` against PostgreSQL. The current deployment configuration identifies PostgreSQL 17, but this version is an `[Assumption]` rather than an approved product constraint. The merged source exposes 100 `DbSet<T>` declarations, eight non-designer migrations, and 101 cumulative `CreateTable` operations. These static counts are not an authoritative live-schema count. Evidence: `backend_update_impact_2026-08-11.md` §4.
 
 Keys follow two principal strategies. `GuidEntity` identifiers are assigned by the application (`ValueGeneratedNever`), while `LongEntity` identifiers are generated on insert. Global conventions apply `decimal(18,4)`, default string length 500, `jsonb` mapping for string properties ending in `Json`, indexes for sync origin/version and organization scope, and a global `Restrict` delete-behavior loop. `[Unclear]` The effective behavior of explicitly configured Cascade relationships after that loop remains unresolved.
 
@@ -211,6 +211,8 @@ erDiagram
     KIOSK ||--o{ DEVICE : hosts
     PRODUCT ||--o{ PRODUCT_VARIANT : has
     PRODUCT_VARIANT ||--o{ RECIPE : has
+    RECIPE ||--o{ PRODUCTION_PROGRAM_BINDING : selects
+    ROBOT_PROGRAM ||--o{ PRODUCTION_PROGRAM_BINDING : selected_by
     RECIPE ||--o{ RECIPE_ITEM : contains
     KIOSK |o--o{ MENU : may_scope
     MENU ||--o{ MENU_ITEM : contains
@@ -226,6 +228,7 @@ erDiagram
     EXECUTION_ROUTE ||--o{ EXECUTION_ROUTE_ROBOT_BINDING : binds
     ROBOT_PROGRAM ||--o{ EXECUTION_ROUTE_ROBOT_BINDING : selected_by
     KIOSK ||--o{ KIOSK_EXECUTION_ENDPOINT : exposes
+    KIOSK_EXECUTION_ENDPOINT ||--o{ INVENTORY_SENSOR_OBSERVATION : reports
     KIOSK_EXECUTION_ENDPOINT ||--o{ EDGE_COMMAND : targets
     EDGE_COMMAND ||--o{ ORDER_EXECUTION_RECORD : evidenced_by
 ```
@@ -250,12 +253,12 @@ The table groups below summarize the physical inventory without claiming unliste
 | Identity | `Accounts`, `AccountRoles`, `Roles`, `AccountNotificationDevices`, `AccountInvitations`, `PasswordResetRequests`, `RefreshTokens`, `AccountStores` | Account identity, scoped roles, credentials, sessions, and implicit account/store join. |
 | Catalog | `ProductCategories`, `Products`, `ProductVariants`, `OptionGroups`, `ProductOptions`, `ProductOptionIngredientRequirements`, `Recipes`, `RecipeItems`, `Ingredients` | Product/recipe authoring, options, ingredient requirements, and template lineage. |
 | Sales Catalog | `Menus`, `MenuItems`, `MenuItemProductOptions` | Sellable offer and option selection projection. |
-| Inventory | `IngredientDispenserStates`, `InventoryTopologyChangeRecords`, `InventoryTopologyRebindRecords`, `StockMovements` | Physical ingredient topology, estimates, audit, and stock ledger. |
+| Inventory | `IngredientDispenserStates`, `InventoryTopologyChangeRecords`, `InventoryTopologyRebindRecords`, `StockMovements`, `InventorySensorObservations` | Physical ingredient topology, estimates, audit, stock ledger, and idempotent Edge observation evidence. |
 | Orders | `Orders`, `OrderItems`, `OrderItemOptions`, `OrderItemOptionIngredientRequirements`, `OrderStatusHistories`, `OrderItemStatusHistories`, `ProductionIncidents`, `ProductionIncidentHistories` | Checkout snapshots, lifecycle history, fulfilment, and incident resolution. |
 | Payments | `PaymentMethods`, `PaymentTransactions`, `PaymentCallbacks`, `Refunds` | Provider attempts, callback evidence, settlement selection, and manual refunds. |
 | Devices | `DeviceTypes`, `DeviceModels`, `Devices`, `DeviceEvents`, `KioskHeartbeats`, connectivity/readiness/capability projections, execution endpoints, credentials, nonces, and robot targets | Device and endpoint configuration plus Edge security and observations. |
 | Robot Configuration | `RobotPrograms`, `RobotProgramArtifacts`, `RobotArtifacts`, templates, technical-contract children, authoring imports/items | Artifact metadata, ordered program composition, contracts, and import workspace. |
-| Production Configuration / Execution / Packages | Releases, routes/bindings, deployments, execution records, package/version/definition/installation/materialization/upgrade tables | Versioned production design, deployment, execution evidence, and package provenance. |
+| Production Configuration / Execution / Packages | Production-program bindings, releases, routes/bindings, deployments, execution records, package/version/definition/installation/materialization/upgrade tables | Versioned production design, declared capability evidence, deployment, execution evidence, and package provenance. |
 | Operations | `Alerts`, `MaintenanceTickets`, `OperationLogs`, `NotificationDeliveries` | Operational issue, support, diagnostic, and delivery records. |
 | Sync | `SyncEventInbox`, checkpoints, state summaries, dead letters/retries, `EdgeCommands`, delivery attempts | Durable ingestion, Edge command dispatch, retries, and failure handling. |
 
@@ -277,6 +280,8 @@ Representative key matrix for the principal entities shown in this report:
 | `ProductionIncidents` / `ProductionIncident` | `Id` | `OrderItemId → OrderItems.Id` | Physical zero-to-many is Supported; the intended business maximum is an `[Open Question]`. |
 | `RobotProgramArtifacts` / `RobotProgramArtifact` | `Id` | `RobotProgramId → RobotPrograms.Id`; `RobotArtifactId → RobotArtifacts.Id` | Explicit ordered join entity. |
 | `ExecutionRouteRobotBindings` / `ExecutionRouteRobotBinding` | `[Unclear]` exact identifier not itemized | `ExecutionRouteId → ExecutionRoutes.Id`; `RobotProgramId → RobotPrograms.Id` | Explicit route/program binding entity; key shape requires model reconciliation. |
+| `InventorySensorObservations` / `InventorySensorObservation` | `Id` | Dispenser, device, kiosk, and endpoint references as mapped | Append-only Edge observation evidence with unique source executor/event identity. Retention remains `[Needs Team Review]`. |
+| `ProductionProgramBindings` / `ProductionProgramBinding` | `Id` | Organization, ProductVariant, Recipe, and RobotProgram references as mapped | Immutable binding with unique checksum and snapshotted option/capability evidence; it does not certify Lua behavior or physical safety. |
 | `EdgeCommands` / `EdgeCommand` | `Id` | `(TargetExecutionEndpointId, KioskId) → KioskExecutionEndpoints(Id, KioskId)` | Composite FK protects the enumerated tenant relationship. |
 | `OrderExecutionRecords` / `OrderExecutionRecord` | `Id` | `OrderId → Orders.Id`; command/endpoint composite relationship described in the physical design | Accepted evidence may be absent, delayed, or repeated; physical outcome is not inferred. |
 
@@ -561,7 +566,7 @@ Evidence: FR-120–FR-132; `sequence_robot_execution.md`; `repo_truth_map.md` §
 | Sales Catalog | `Menu`, `MenuItem`, `MenuItemProductOption`, runtime-menu query/cache | Scoped sellable offers and kiosk-specific runtime projection. |
 | Inventory | `IngredientDispenserState`, `StockMovement`, topology change/rebind records, readiness evaluator | Maps ingredients to physical containers, records quantity changes, and evaluates production readiness. |
 | Robot Configuration | `RobotArtifact`, `RobotArtifactTechnicalContract`, `RobotProgram`, `RobotProgramArtifact`, authoring import entities, MinIO adapter | Validates/stores artifact metadata and binaries and composes ordered programs. |
-| Production Configuration | `ConfigurationRelease`, `ExecutionRoute`, `ExecutionRouteRobotBinding`, deployment entities | Binds catalog recipes/variants to robot programs and deploys a versioned configuration. |
+| Production Configuration | `ProductionProgramBinding`, `ConfigurationRelease`, `ExecutionRoute`, `ExecutionRouteRobotBinding`, deployment entities | Records an immutable Recipe/program decision, snapshots its evidence into routes, and deploys a versioned configuration. |
 | Production Packages | Package/version/definition/installation/materialization/upgrade entities | Produces deterministic tenant installations and upgrade provenance. |
 
 Workflow collaboration summary:
@@ -572,7 +577,7 @@ Workflow collaboration summary:
 | Menu publication and runtime projection | Management authoring; tablet runtime-menu request | Sales Catalog with Catalog and production-route reads | Stores Menu/MenuItem state and produces a bounded-cache projection with ETag. | `[Unclear]` Deployed tablet source is Edge, Cloud, or both. Runtime-menu evidence does not establish an inventory stock gate. | FR-042–FR-047 |
 | Inventory refill/adjustment/consumption | Staff/Technician request or execution-driven handler | Inventory with Device/Tenant/Catalog identities | Appends stock movement and changes dispenser estimate/topology as specified. | Rebind/retire operations are guarded during active execution; `[Inferred]` end-to-end execution-consumption completeness is unverified. | FR-048–FR-056 |
 | Artifact authoring and publication | Authorized management upload/import/publish | Robot Configuration plus MinIO adapter | Stores artifact metadata/checksum/contract/program order; binary content resides in object storage. | Publish requires compatible contract and verified object checksum/size; object-store/DB partial-failure recovery remains open. | FR-088–FR-101 |
-| Configuration release and deployment | Authorized preview/publish/deploy/rollback request | Production Configuration, Inventory readiness query, endpoint/command adapters | Records release, routes/bindings, deployment request and reported deployment state. | Readiness/route validation can reject; timeout reconciliation records failure/notification but does not prove physical deployment. | FR-102–FR-110 |
+| Production binding, release, and deployment | Authorized bind/preview/publish/deploy/rollback request | Production Configuration, Inventory readiness query, endpoint/command adapters | Records immutable binding evidence, release/routes, deployment audit request and reported deployment state. | Missing optional declarations create no capability claim; stale revision/deployment concurrency can reject; reported state does not prove physical deployment. | FR-102–FR-110, FR-135 |
 | Package install and upgrade | Authorized preview/install/upgrade/cutover/rollback request or reconciliation job | Production Packages with Catalog/Configuration materialization | Records version, installation, materialization, upgrade and rollback provenance. | Idempotency and active-upgrade constraint are supported where cited; recovery/lease/terminal semantics remain open. | FR-111–FR-119 |
 
 #### 3.3.2 Design Explanation
@@ -581,9 +586,9 @@ Catalog authoring is separated from Sales Catalog publication. A `MenuItem` refe
 
 Recipes follow a controlled Draft → Published → Active → Retired lifecycle. Order items retain order-time product, recipe, option, and price snapshots so later catalog changes do not rewrite historical meaning. Inventory links ingredients to device/container state and records refills, adjustments, consumption, and topology changes. `[Inferred]` Execution-driven consumption is supported as an integration path, but complete end-to-end inventory accuracy has not been runtime-verified.
 
-Robot artifacts and technical contracts are authored before deployment. Binary `.lua` content is stored in MinIO; relational tables store metadata, checksum, size, contracts, and program composition. `RobotProgramArtifact` and `ExecutionRouteRobotBinding` are explicit join entities carrying ordering/binding meaning and must not be flattened into ownership relationships.
+Robot artifacts and optional technical declarations are authored before deployment. Binary `.lua` content is stored in MinIO; relational tables store metadata, checksum, size, declarations, and program composition. Draft programs also support bounded raw-Lua import. A declaration is operator-provided metadata and does not certify the script's behavior. `RobotProgramArtifact`, `ProductionProgramBinding`, and `ExecutionRouteRobotBinding` carry distinct ordering, decision, and route-snapshot meaning and must not be flattened into ownership relationships.
 
-Configuration publication and deployment requests are gated by validation and inventory readiness. Full Edge and low-cost controller deployment paths differ. Package workflows retain version and materialization provenance and record reported installation/upgrade state; they do not independently prove a physical install or successful execution. Exact recovery, lease/concurrency, cutover, rollback, and one-installation-to-release cardinality remain `[Open Question]` items.
+Configuration publication and deployment requests are gated by validation and inventory readiness. Release authoring uses revision/concurrency tokens, and deployment requests record supported audit/reason/concurrency information. Full Edge and low-cost controller paths differ. Execute-order schema v5 carries required-capability arrays per robot-program binding while Cloud retains schemas 3–5 decoding. Package workflows retain version and materialization provenance and reported state; none independently proves physical installation or successful execution. Remaining recovery, lease, cutover, rollback, and installation-to-release questions stay `[Open Question]`.
 
 Evidence: FR-033–FR-056, FR-088–FR-119; `class_diagram.md`; database designs; `functional_inventory.md` Catalog/Sales Catalog/Inventory/Robot/Production rows.
 
@@ -606,9 +611,9 @@ Workflow collaboration summary:
 | Workflow | Entry point / actor | State / validation | Failure and consistency behavior | Requirements |
 |---|---|---|---|---|
 | Local/external login | Anonymous authentication request | Validates active account and local password or verified external token; issues access/refresh pair. | Failed local attempts accumulate toward lockout; external subject mismatch is rejected. | FR-001–FR-003 |
-| Session/password lifecycle | Authenticated logout/change or public reset flow | Revokes one/all refresh tokens; reset/change sets credential and revokes sessions as specified. | Forgot-password returns a generic response; token must be valid, unused, unexpired, and stored hashed. | FR-004–FR-006 |
+| Session/password lifecycle | Authenticated session-list/revoke/logout/change or public reset flow | Lists owned active sessions and revokes one/all refresh tokens; reset/change sets credentials and revokes sessions as specified. | A caller cannot revoke another account's session; UI privacy/retention presentation is `[Needs Team/UI Review]`. | FR-004–FR-006 |
 | Invitation onboarding | Authorized management invitation; invited account acceptance | Creates Invited account, single-use invitation, scoped role assignment, and acceptance transition. | At most one active invitation; temporary-password first-login lifecycle remains `[Unclear]`. | FR-009–FR-010 |
-| Account/role administration | Authorized management request | Applies role hierarchy, legal scope, and caller-scope validation before account/role changes. | Out-of-scope or unassignable role is rejected; universal endpoint coverage remains `[Unclear]`. | FR-011–FR-016 |
+| Account/role administration | Organization-owned request by SystemAdmin or authorized OrgAdmin | Applies legal organization scope, assignable-role rules, and caller-scope validation before account/role changes. | OrgAdmin cannot grant SystemAdmin or cross the route organization; universal endpoint coverage remains `[Unclear]`. | FR-009–FR-016 |
 | Tenant lifecycle/onboarding | SystemAdmin/OrgAdmin/Manager workflow as specified | Creates/updates organization/store/kiosk and advances resumable onboarding checkpoints. | Start is idempotent; resume uses claim/lease behavior; cancellation does not delete provisioned resources. | FR-017–FR-021 |
 
 #### 3.4.2 Design Explanation
@@ -636,7 +641,7 @@ Evidence: FR-001–FR-021; NFR-007, NFR-009–NFR-011; `repo_truth_map.md` §§3
 | `SyncEventInbox` | Provides durable, idempotent Edge event ingestion and retry state. | Supported |
 | `SyncDeadLetter` / retry attempts | Preserves failed events for inspection and limited replay/resolve/ignore. | Replay supports only `ExecutionReport.*`; broader replay remains `[Unclear]`/an open product decision. |
 | `EdgeCommand` / delivery attempts | Stores durable Cloud-to-Edge intent and delivery evidence. | Supported |
-| Connectivity/payment/deployment/package/order jobs | Detects and applies coded reconciliation transitions. | Supported job paths; guaranteed recovery is `[Inferred]`. |
+| Connectivity/payment/deployment/package/order jobs | Detects and applies coded reconciliation transitions. | Supported job paths; guaranteed recovery is `[Inferred]`. Verified unmatched PayOS callbacks create no payment/order/fulfilment state and increment only bounded diagnostic metrics. |
 | Retention/cleanup/notification jobs | Performs bounded deletion, orphan cleanup, and delivery retries. | Supported for cited jobs. |
 | Metrics publisher | Publishes stale/unreachable execution counts periodically. | Supported |
 | SignalR publishers | Sends order/payment/operations/dashboard invalidation deltas. | Supported for cited events. |

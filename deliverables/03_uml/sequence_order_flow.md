@@ -76,6 +76,7 @@ sequenceDiagram
 - Get order status / customer cancel: `functional_inventory.md` ORD-02, ORD-03; `srs.md` FR-058.
 - Create payment session: `functional_inventory.md` PAY-01; `srs.md` FR-068.
 - PayOS webhook ingestion, signature verification, atomic Paid+ReadyForFulfillment transition, dispatch of `ExecuteOrder` attempt 1: `functional_inventory.md` PAY-03; `srs.md` FR-070; NFR-012.
+- Post-sync exception: a signature-verified PayOS callback with no matching local provider transaction is acknowledged without creating payment/order/fulfillment state and increments bounded observability. It does not enter the normal paid/dispatch sequence: `backend_update_impact_2026-08-11.md` §5; `srs.md` FR-070.
 - MQTT wake-up (best-effort, QoS1, not retained, failure does not roll back the command): `functional_inventory.md` MQTT-01; `srs.md` FR-125.
 - Edge command pull and acknowledgement: `functional_inventory.md` IOT-05, IOT-06; `srs.md` FR-120, FR-121.
 - Execution report ingestion (idempotent by `(SourceEventId, SequenceNumber)`, provenance checksum validation): `functional_inventory.md` IOT-07; `srs.md` FR-122.

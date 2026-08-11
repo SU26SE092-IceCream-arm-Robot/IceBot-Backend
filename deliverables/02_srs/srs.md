@@ -198,13 +198,13 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Evidence**: `functional_inventory.md` IDN-03.
 - **Status**: Supported.
 
-#### FR-004 — Revoke Refresh Token (Logout) / Revoke All Sessions
-- **Description**: The system shall let a token holder revoke one specific refresh token, and let an authenticated account revoke all of its own active sessions.
+#### FR-004 — View and Revoke Active Sessions
+- **Description**: The system shall let a token holder revoke one refresh token, and let an authenticated account list its active sessions, revoke one owned session, or revoke all active sessions.
 - **Actor**: Anonymous (token holder) / logged-in account.
-- **Trigger**: `POST /api/v1/authentication/revoke`; `POST /api/v1/authentication/revoke-all`.
+- **Trigger**: `POST /api/v1/authentication/revoke`; `POST /api/v1/authentication/revoke-all`; `GET /api/v1/me/sessions`; `DELETE /api/v1/me/sessions/{sessionId}`.
 - **Preconditions**: Token exists (single-revoke) or caller is authenticated (revoke-all).
-- **Main Flow**: 1) Locate refresh token(s). 2) Mark revoked with reason.
-- **Alternative/Exception Flow**: Single revoke returns 404 if the token is not found.
+- **Main Flow**: 1) List active refresh-token sessions with current-session marker, timestamps, recorded IP/user agent, and derived device name when requested. 2) Locate the selected token/session(s). 3) Mark them revoked with reason.
+- **Alternative/Exception Flow**: Reject invalid identifiers; a caller cannot revoke another account's session. `[Needs Review]` Final UI privacy/retention rules for IP address and user-agent display.
 - **Related**: `IDN-04`, `IDN-05`.
 - **Evidence**: `functional_inventory.md` IDN-04, IDN-05.
 - **Status**: Supported.
@@ -225,7 +225,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Actor**: Logged-in account.
 - **Trigger**: `PUT /api/v1/me/password`.
 - **Preconditions**: Current password matches stored hash.
-- **Main Flow**: 1) Verify current password. 2) Set new password. 3) Revoke all refresh sessions.
+- **Main Flow**: 1) Verify current password. 2) Set new password. 3) Revoke all refresh sessions in the same database transaction.
 - **Alternative/Exception Flow**: Reject if current password is incorrect.
 - **Related**: `IDN-08`.
 - **Evidence**: `functional_inventory.md` IDN-08.
@@ -236,7 +236,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Actor**: Logged-in account.
 - **Trigger**: `GET /api/v1/me`; `PUT /api/v1/me/profile`; `GET /api/v1/me/access`.
 - **Preconditions**: Valid JWT.
-- **Main Flow**: 1) Return/update profile fields (`FullName`, `PhoneNumber`, `Address`, `Gender`, `ImageUrl`). 2) `/me/access` returns roles/scope from token claims without DB recomputation.
+- **Main Flow**: 1) Return/update profile fields (`FullName`, `PhoneNumber`, `Address`, `Gender`, `ImageUrl`). 2) `/me/access` returns roles, scope, and `permissionCodes` from token claims without DB recomputation.
 - **Alternative/Exception Flow**: None material.
 - **Related**: `IDN-09`, `IDN-10`, `IDN-11`.
 - **Evidence**: `functional_inventory.md` IDN-09, IDN-10, IDN-11.
@@ -254,9 +254,9 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Status**: Supported.
 
 #### FR-009 — Invitation-Based Internal Account Onboarding
-- **Description**: The system shall let a SystemAdmin create an internal account as `Invited` by default with a single-use invitation link, optionally emailed, or (a narrower variant) set an admin-assigned initial password without an invitation.
-- **Actor**: SystemAdmin.
-- **Trigger**: `POST /api/v1/management/accounts`.
+- **Description**: The system shall let a SystemAdmin or authorized OrgAdmin create an organization-owned internal account as `Invited` by default with a single-use invitation link, optionally emailed, or (a narrower variant) set an admin-assigned initial password without an invitation.
+- **Actor**: SystemAdmin / authorized OrgAdmin.
+- **Trigger**: `POST /api/v1/management/organizations/{organizationId}/accounts`.
 - **Preconditions**: Requested role/scope assignment is valid for the caller.
 - **Main Flow**: 1) Create account `Invited`. 2) Generate single-use invitation link. 3) Optionally send invitation email.
 - **Alternative/Exception Flow**: With `CreateInvitation=false` + `InitialPassword`, the account is created with a password set directly and no invitation — this variant's surrounding lifecycle (forced password change, restricted first login) is stated in `docs/api/IDENTITY_ONBOARDING_RULES.md` as not part of the current contract.
@@ -265,9 +265,9 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Status**: Supported (main path); Partial (temporary-password variant, IDN-15b).
 
 #### FR-010 — Accept Invitation / Regenerate Invitation
-- **Description**: The system shall activate an `Invited` account from a valid invitation token, and let a SystemAdmin regenerate an invitation.
-- **Actor**: Anonymous (invitation-token holder) / SystemAdmin.
-- **Trigger**: `POST /api/v1/authentication/accept-invitation`; `POST /api/v1/management/accounts/{accountId}/invitation`.
+- **Description**: The system shall activate an `Invited` account from a valid invitation token, and let an authorized SystemAdmin or OrgAdmin regenerate an organization-owned invitation.
+- **Actor**: Anonymous (invitation-token holder) / SystemAdmin / authorized OrgAdmin.
+- **Trigger**: `POST /api/v1/authentication/accept-invitation`; `POST /api/v1/management/organizations/{organizationId}/accounts/{accountId}/invitation`.
 - **Preconditions**: Invitation token valid, unexpired, unrevoked, unaccepted.
 - **Main Flow**: 1) Validate token. 2) Set password only if local login is enabled. 3) Mark `EmailConfirmed` only if backend-emailed. 4) Revoke prior sessions. Regeneration revokes any previously active invitation and requires `Invited` status.
 - **Alternative/Exception Flow**: At most one active invitation per account is allowed.
@@ -277,8 +277,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 
 #### FR-011 — List / View / Update / Disable Internal Accounts
 - **Description**: The system shall let authorized roles list, view, update, and disable internal accounts scoped to their organization/store/kiosk role assignment.
-- **Actor**: SystemAdmin / OrgAdmin / Manager.
-- **Trigger**: `GET /api/v1/management/accounts[/{id}]`; `PUT /api/v1/management/accounts/{accountId}`; `PATCH /api/v1/management/accounts/{accountId}/disable`.
+- **Actor**: SystemAdmin / authorized OrgAdmin.
+- **Trigger**: `GET /api/v1/management/organizations/{organizationId}/accounts[/{id}]`; `PUT /api/v1/management/organizations/{organizationId}/accounts/{accountId}`; `PATCH /api/v1/management/organizations/{organizationId}/accounts/{accountId}/disable`.
 - **Preconditions**: Caller has `accounts.read`/`accounts.manage` policy and target account is within scope (non-SystemAdmin callers).
 - **Main Flow**: 1) List/view filtered by search/status and scope. 2) Update profile/auth-method toggles (requires an existing password before enabling local login; clears `GoogleSubjectId` when `GoogleEmail` changes). 3) Disable sets `Disabled` and revokes sessions.
 - **Alternative/Exception Flow**: None material.
@@ -287,9 +287,9 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Status**: Supported.
 
 #### FR-012 — Admin Set/Reset Account Password
-- **Description**: The system shall let a SystemAdmin set an internal account's password directly.
-- **Actor**: SystemAdmin.
-- **Trigger**: `PUT /api/v1/management/accounts/{accountId}/password`.
+- **Description**: The system shall let a SystemAdmin or authorized OrgAdmin set an organization-owned internal account's password directly.
+- **Actor**: SystemAdmin / authorized OrgAdmin.
+- **Trigger**: `PUT /api/v1/management/organizations/{organizationId}/accounts/{accountId}/password`.
 - **Preconditions**: Caller has `accounts.manage` policy.
 - **Main Flow**: 1) Set new password (credential material only, not an auth-method toggle). 2) Revoke that account's refresh sessions.
 - **Alternative/Exception Flow**: None material.
@@ -299,9 +299,9 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 
 #### FR-013 — Assign / Replace Account Role Assignments
 - **Description**: The system shall let authorized roles assign one role+scope to an account, or atomically replace its full active role-assignment set.
-- **Actor**: SystemAdmin / OrgAdmin / Manager (per role hierarchy).
-- **Trigger**: `POST /api/v1/management/accounts/{accountId}/roles`; `PUT /api/v1/management/accounts/{accountId}/roles`.
-- **Preconditions**: Caller's own role can assign the target role (SystemAdmin > OrgAdmin > Manager hierarchy); requested scope is valid for that role and within the assigner's own scope.
+- **Actor**: SystemAdmin / authorized OrgAdmin.
+- **Trigger**: `POST /api/v1/management/organizations/{organizationId}/accounts/{accountId}/roles`; `PUT /api/v1/management/organizations/{organizationId}/accounts/{accountId}/roles`.
+- **Preconditions**: Caller has `accounts.manage`; requested assignments belong to the route organization and are assignable within the caller's scope. OrgAdmin cannot grant SystemAdmin or mutate an account whose active assignments escape the organization boundary.
 - **Main Flow**: 1) Validate role-assignment permission and scope. 2) Assign or atomically replace role set, rejecting duplicate role/scope entries.
 - **Alternative/Exception Flow**: Reject if the caller cannot assign the target role or the scope is invalid.
 - **Related**: `IDN-23`, `IDN-24`.
@@ -310,8 +310,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 
 #### FR-014 — View Account Effective Access
 - **Description**: The system shall return a target account's active role scopes to a caller sharing an active scope with that account.
-- **Actor**: SystemAdmin / OrgAdmin / Manager.
-- **Trigger**: `GET /api/v1/management/accounts/{accountId}/effective-access`.
+- **Actor**: SystemAdmin / authorized OrgAdmin.
+- **Trigger**: `GET /api/v1/management/organizations/{organizationId}/accounts/{accountId}/effective-access`.
 - **Preconditions**: Caller shares an active scope with the target account.
 - **Main Flow**: 1) Resolve target account's active role scopes and effective org/store/kiosk ids.
 - **Alternative/Exception Flow**: Reject if the caller has no shared scope with the target.
@@ -321,10 +321,10 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 
 #### FR-015 — List Assignable Roles / View Permission Matrix
 - **Description**: The system shall list roles the caller is permitted to assign, and expose a static read-only policy→allowed-roles matrix.
-- **Actor**: SystemAdmin / OrgAdmin / Manager.
-- **Trigger**: `GET /api/v1/management/roles`; `GET /api/v1/management/permission-matrix`.
-- **Preconditions**: Caller has `roles.view` policy.
-- **Main Flow**: 1) Filter active roles by role hierarchy. 2) Return hardcoded policy/description/allowed-roles matrix for UI display.
+- **Actor**: SystemAdmin / authorized OrgAdmin (assignable options); SystemAdmin (platform permission matrix).
+- **Trigger**: `GET /api/v1/management/accounts/assignable-role-options`; `GET /api/v1/management/permission-matrix`.
+- **Preconditions**: Caller is authorized for account management; platform permission matrix requires `permission-matrix.view`.
+- **Main Flow**: 1) Return roles the caller may assign with required scope metadata. 2) Return the platform-wide static policy matrix only to SystemAdmin.
 - **Alternative/Exception Flow**: None material.
 - **Related**: `IDN-26`, `IDN-27`.
 - **Evidence**: `functional_inventory.md` IDN-26, IDN-27.
@@ -662,8 +662,8 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Actor**: Kiosk tablet / anonymous.
 - **Trigger**: `GET /api/v1/kiosks/{kioskId}/runtime-menu`.
 - **Preconditions**: Store within opening hours and kiosk online-sales-eligible.
-- **Main Flow**: 1) Compute snapshot valid for 15 seconds. 2) Return with `SnapshotId`/`Revision`/ETag; support `If-None-Match` → 304.
-- **Alternative/Exception Flow**: Return 409 if the store is closed or the kiosk is offline for sales.
+- **Main Flow**: 1) Evaluate store/kiosk sales admission before cache access. 2) Read or build the kiosk-specific sellable projection through the optional bounded cache. 3) Create request-specific `SnapshotId`/`GeneratedAt`, return `Revision`/ETag, and support `If-None-Match` → 304.
+- **Alternative/Exception Flow**: Return 409 if the store is closed or the kiosk is offline for sales. Cache failure falls back to the database projection and records cache observability evidence.
 - **Related**: `SC-08`.
 - **Evidence**: `functional_inventory.md` SC-08.
 - **Status**: Supported.
@@ -790,6 +790,17 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Related**: `INV-15`.
 - **Evidence**: `functional_inventory.md` INV-15.
 - **Status**: Supported.
+
+#### FR-134 — Ingest Inventory Sensor Observations
+- **Description**: The system shall ingest authenticated Edge dispenser-level observations as idempotent inventory evidence and apply only newer observations to the dispenser projection.
+- **Actor**: Local Edge Backend via MQTT.
+- **Trigger**: MQTT uplink message type `inventory-observations`.
+- **Preconditions**: Active endpoint/credential; bound executor identity; batch of 1–100 observations; dispenser/device belongs to the endpoint kiosk.
+- **Main Flow**: 1) Validate source event, positive sequence, level, time skew, scope, and bounded payload. 2) Persist the observation. 3) Apply a newer observation and optionally derive quantity from the calibration profile. 4) Publish inventory-change notification after commit.
+- **Alternative/Exception Flow**: Exact duplicates do not reapply; conflicting source-event reuse is rejected; stale/out-of-order observations are retained as evidence without overwriting the projection. Observations do not create stock movements or prove recipe consumption.
+- **Related**: `backend_update_impact_2026-08-11.md` §§4–6.
+- **Evidence**: `src/Application/Inventory/Observations/IngestInventorySensorObservationsCommandHandler.cs`; `src/Domain/Inventory/Entities/InventorySensorObservation.cs`; migration `20260731040709_AddInventorySensorObservations`; `docs/iot/EDGE_SYNC_TELEMETRY_CONTRACT.md`.
+- **Status**: Supported by current source. `[Needs Review]` Replay/dead-letter and retention/operator-diagnostics policy.
 
 ### 4.7 Orders
 
@@ -944,7 +955,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Trigger**: `POST /api/v1/payments/payos/webhook`.
 - **Preconditions**: Valid `x-payos-signature`.
 - **Main Flow**: 1) Verify signature. 2) Idempotently apply notification. 3) Set `PaymentTransaction=Paid`, `Order=ReadyForFulfillment` in one transaction. 4) Dispatch `ExecuteOrder` (attempt 1).
-- **Alternative/Exception Flow**: Reject on signature mismatch; duplicate notifications are no-ops.
+- **Alternative/Exception Flow**: Reject on signature mismatch; duplicate notifications are no-ops. A signature-verified callback with no matching `(Provider, ProviderOrderCode)` is acknowledged without creating callback, payment, order, or fulfillment state and increments bounded unmatched-callback observability.
 - **Related**: `PAY-03`.
 - **Evidence**: `functional_inventory.md` PAY-03.
 - **Status**: Supported.
@@ -1077,7 +1088,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Actor**: Staff / Manager / Technician.
 - **Trigger**: `POST /api/v1/management/maintenance-tickets`; `GET [/{id}]`; `PUT /{id}`.
 - **Preconditions**: Caller holds `maintenance.create`/`.view`/`.manage`.
-- **Main Flow**: 1) Create with generated ticket number. 2) List/view filtered by tenant/priority/status/assignee/date. 3) Edit fields and evidence links.
+- **Main Flow**: 1) Create with generated ticket number. 2) List/view filtered by tenant/priority/status/assignee/date. 3) Load `GET /api/v1/management/maintenance-tickets/{id}/assignee-options`, limited to active Technician/Manager accounts whose role scope matches the ticket. 4) Edit fields/evidence links; assignment revalidates eligibility.
 - **Alternative/Exception Flow**: None material.
 - **Related**: `OPS-08`, `OPS-09`, `OPS-10`.
 - **Evidence**: `functional_inventory.md` OPS-08, OPS-09, OPS-10.
@@ -1174,7 +1185,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Status**: Supported.
 
 #### FR-091 — Publish, Bulk-Publish, Retire, and Discard Robot Artifacts
-- **Description**: The system shall publish one or many Draft robot artifacts atomically only when each has a compatible Published technical contract and verified object-storage checksum/size, retire a Published artifact, or hard-delete an unreferenced Draft.
+- **Description**: The system shall publish one or many Draft robot artifacts atomically after verified object-storage checksum/size; any referenced optional technical declaration must be Published, scope/target compatible, and checksum-consistent. The system shall also retire a Published artifact or hard-delete an unreferenced Draft.
 - **Actor**: OrgAdmin (`artifact.upload`).
 - **Trigger**: `PATCH .../{id}/publish`; `PATCH .../publish` (bulk, up to 100 ids); `PATCH .../{id}/retire`; `DELETE .../{id}`.
 - **Preconditions**: Compatible Published technical contract assigned; checksum/size verified against object storage.
@@ -1207,7 +1218,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Status**: Supported.
 
 #### FR-094 — Robot Artifact Technical Contract Authoring
-- **Description**: The system shall let authors declare, validate, publish, and retire versioned technical contracts (effects, quantity mode, ordering constraints) for a Lua artifact, at global or organization scope.
+- **Description**: The system shall let authors declare, validate, publish, and retire optional versioned technical declarations (effects, quantity mode, ordering constraints) for a Lua artifact, at global or organization scope. A declaration is operator-provided metadata, not proof or certification of Lua behavior.
 - **Actor**: SystemAdmin / OrgAdmin.
 - **Trigger**: `GET/POST/PUT/DELETE .../robot-artifact-technical-contracts[/{id}]`; `POST .../validation-preview`; `PATCH .../publish|retire`.
 - **Preconditions**: Contract compatible with the declared runtime target/machine model.
@@ -1229,7 +1240,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Status**: Supported.
 
 #### FR-096 — Assign Technical Contract to Template/Artifact
-- **Description**: The system shall bind a Published, target-compatible technical contract to a Draft artifact or global template before publication.
+- **Description**: The system shall optionally bind a Published, target-compatible technical declaration to a Draft artifact or global template. Artifacts without a declaration remain publishable after binary integrity checks.
 - **Actor**: SystemAdmin / OrgAdmin.
 - **Trigger**: `PUT .../robot-artifact-templates/{id}/technical-contract`; `PUT .../robot-artifacts/{id}/technical-contract`.
 - **Preconditions**: Contract Published and target/model-compatible.
@@ -1242,10 +1253,10 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 #### FR-097 — Robot Program CRUD and RunOrder Authoring
 - **Description**: The system shall let authors create an ordered RobotProgram, atomically replace its artifact membership with explicit unique RunOrder while Draft, and publish an immutable ordered manifest.
 - **Actor**: OrgAdmin (`program.read`/`program.manage`).
-- **Trigger**: `GET/POST .../robot-programs`; `PUT .../{id}`; `PUT .../{id}/artifacts`; `PATCH .../publish|retire`; `DELETE .../{id}`.
+- **Trigger**: `GET/POST .../robot-programs`; `PUT .../{id}`; `PUT .../{id}/artifacts`; `POST .../{id}/raw-lua-artifacts`; `PATCH .../publish|retire`; `DELETE .../{id}`.
 - **Preconditions**: Draft state for artifact-membership replacement; unique `RunOrder` per artifact.
-- **Main Flow**: 1) Create/update program. 2) Replace ordered artifact list. 3) Publish immutable manifest via `RobotProgramManifestBuilder`.
-- **Alternative/Exception Flow**: None material.
+- **Main Flow**: 1) Create/update program. 2) Replace ordered artifact list with `expectedLastModifiedAt`, or import bounded raw Lua files/archive into the Draft program. 3) Publish immutable manifest via `RobotProgramManifestBuilder`.
+- **Alternative/Exception Flow**: Reject stale `expectedLastModifiedAt` with conflict; reject invalid/oversized raw Lua input without partially updating program membership.
 - **Related**: `RC-10`.
 - **Evidence**: `functional_inventory.md` RC-10.
 - **Status**: Supported.
@@ -1275,7 +1286,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 #### FR-100 — Create Configuration Release Draft from Import; Get Import/Workspace
 - **Description**: The system shall derive a Draft ConfigurationRelease and single execution route/binding automatically from a published authoring import and recipe/option selection, and shall provide a single convergence read model reporting import status, blockers, and allowed next actions.
 - **Actor**: OrgAdmin (`release.publish` / `program.read`).
-- **Trigger**: `POST .../{importId}/create-release-draft`; `GET .../{importId}[/workspace]`.
+- **Trigger**: `GET .../robot-authoring-imports`; `POST .../{importId}/create-release-draft`; `GET .../{importId}[/workspace]`.
 - **Preconditions**: Import published/materialized as applicable.
 - **Main Flow**: 1) Derive release/route/binding. 2) Return workspace read model.
 - **Alternative/Exception Flow**: None material.
@@ -1298,13 +1309,24 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 
 ### 4.11 Production Configuration
 
+#### FR-135 — Production Program Binding Lifecycle
+- **Description**: The system shall let an authorized operator list, create, and retire an immutable organization-owned binding between a Recipe version and a Published RobotProgram for supported production option codes.
+- **Actor**: SystemAdmin / OrgAdmin with release policy and matching organization scope.
+- **Trigger**: `GET|POST /api/v1/management/organizations/{organizationId}/production-program-bindings`; `PATCH .../{bindingId}/retire`.
+- **Preconditions**: Recipe and RobotProgram are valid, scope-compatible, and publish-eligible; submitted option codes are valid.
+- **Main Flow**: 1) Validate Recipe/ProductVariant/RobotProgram and options. 2) Snapshot program checksum, option codes, optional declared capability codes, capability-evidence status, and operator-declared assurance. 3) Compute binding checksum and activate. 4) Allow idempotent retirement.
+- **Alternative/Exception Flow**: Missing optional declaration contributes no invented capability and is recorded as missing evidence. The binding does not certify Lua behavior or physical safety.
+- **Related**: `backend_update_impact_2026-08-11.md` §§4–6.
+- **Evidence**: `ManagementProductionProgramBindingsController`; `ProductionProgramBindingFeature`; `ProductionProgramBinding`; migrations `20260804031725_AddProductionProgramBindings` and `20260809035315_DeriveProductionBindingCapabilitiesFromContracts`.
+- **Status**: Supported by current source.
+
 #### FR-102 — Create Configuration Release Draft and Author Execution Routes
 - **Description**: The system shall create a Draft ConfigurationRelease with the next sequential organization release number, and atomically replace its execution routes and ordered robot-program bindings after validating product/recipe/program references.
 - **Actor**: OrgAdmin (`release.publish`).
 - **Trigger**: `POST .../organizations/{orgId}/configuration-releases`; `PUT .../{releaseId}/routes`.
 - **Preconditions**: Release in Draft for route replacement.
-- **Main Flow**: 1) Allocate release number. 2) Replace routes/bindings after reference validation.
-- **Alternative/Exception Flow**: None material.
+- **Main Flow**: 1) Allocate release number. 2) Replace routes/bindings after reference validation using the release revision token and snapshot Production Program Binding/capability evidence where selected.
+- **Alternative/Exception Flow**: Reject a stale revision token instead of overwriting concurrent authoring.
 - **Related**: `PC-01`, `PC-02`.
 - **Evidence**: `functional_inventory.md` PC-01, PC-02.
 - **Status**: Supported.
@@ -1336,7 +1358,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Actor**: OrgAdmin (`release.deploy`).
 - **Trigger**: `POST .../kiosks/{kioskId}/configuration-deployments/full-edge` (+ `Idempotency-Key`).
 - **Preconditions**: Valid, matching `deploymentPreviewChecksum`; inventory readiness passes; `acknowledgeRemainingRisk` supplied if applicable.
-- **Main Flow**: 1) Validate checksum/readiness. 2) Build/reuse ZIP bundle. 3) Create durable edge command.
+- **Main Flow**: 1) Validate checksum/readiness. 2) Require operator reason. 3) Build/reuse ZIP bundle. 4) Create durable Edge command and audit actor/matching scope/outcome.
 - **Alternative/Exception Flow**: Reject if checksum stale/missing or readiness fails.
 - **Related**: `PC-06`.
 - **Evidence**: `functional_inventory.md` PC-06.
@@ -1347,7 +1369,7 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Actor**: OrgAdmin (`release.deploy`).
 - **Trigger**: `POST .../kiosks/{kioskId}/configuration-deployments/low-cost` (+ `Idempotency-Key`).
 - **Preconditions**: Selections fit within controller capacity; matching preview checksum.
-- **Main Flow**: 1) Validate capacity/readiness. 2) Create `ControllerArtifactSetDeployment`/items.
+- **Main Flow**: 1) Validate capacity/readiness. 2) Require operator reason. 3) Create `ControllerArtifactSetDeployment`/items and audit actor/matching scope/outcome.
 - **Alternative/Exception Flow**: Reject if capacity exceeded.
 - **Related**: `PC-07`.
 - **Evidence**: `functional_inventory.md` PC-07.
@@ -1357,9 +1379,9 @@ Requirements below are grouped by bounded context, matching `functional_inventor
 - **Description**: The system shall let an operator select a previously Active deployment as an immutable rollback target and create a new deployment/command without mutating deployment/artifact history.
 - **Actor**: OrgAdmin (`release.rollback`).
 - **Trigger**: `POST .../configuration-deployments/{deploymentId}/rollback` (+ `Idempotency-Key`).
-- **Preconditions**: Target deployment was previously Active.
-- **Main Flow**: 1) Dispatch to the same Full Edge/Low-Cost deploy handler with `IsRollback=true`.
-- **Alternative/Exception Flow**: None material.
+- **Preconditions**: Target deployment was previously Active; reason and client-observed active deployment id supplied.
+- **Main Flow**: 1) Reject a stale active-deployment observation. 2) Dispatch to the same Full Edge/Low-Cost deploy handler with `IsRollback=true`. 3) Audit actor/scope/reason/outcome.
+- **Alternative/Exception Flow**: Return conflict when the client's observed active deployment no longer matches Cloud state.
 - **Related**: `PC-08`.
 - **Evidence**: `functional_inventory.md` PC-08.
 - **Status**: Supported.
@@ -1507,7 +1529,7 @@ Device event ingestion (`IOT-01`), batch telemetry (`IOT-02`), heartbeat (`IOT-0
 - **Actor**: Edge runtime.
 - **Trigger**: `POST /api/v1/iot/execution-endpoints/{endpointId}/commands/pull`.
 - **Preconditions**: Endpoint authenticated and Active.
-- **Main Flow**: 1) Fetch up to `MaxCommands` pending commands. 2) Enrich payload (e.g. artifact URL). 3) Record delivery attempt.
+- **Main Flow**: 1) Fetch up to `MaxCommands` pending commands. 2) Enrich payload (e.g. artifact URL). 3) Record delivery attempt. Execute-order schema v5 carries an array of required capability codes per robot-program binding; Cloud continues decoding schemas 3–5.
 - **Alternative/Exception Flow**: None material.
 - **Related**: `IOT-05`.
 - **Evidence**: `functional_inventory.md` IOT-05.
@@ -1569,11 +1591,11 @@ Device event ingestion (`IOT-01`), batch telemetry (`IOT-02`), heartbeat (`IOT-0
 - **Status**: Supported.
 
 #### FR-126 — MQTT Edge Uplink Consumption
-- **Description**: The system shall consume typed edge uplink messages over MQTT (heartbeat/telemetry/readiness/execution-report/production-events/state-summaries) and dispatch each to the same Application command/query handler used by the equivalent HTTPS endpoint, publishing a correlated result.
+- **Description**: The system shall consume typed Edge uplink messages over MQTT (heartbeat/telemetry/readiness/execution-report/production-events/state-summaries/inventory-observations) and dispatch each to its owning Application handler, publishing a correlated result.
 - **Actor**: Edge runtime (via MQTT broker).
-- **Trigger**: Subscription to `$share/{group}/icebot/execution-endpoints/+/uplink/{messageType}` for all 6 message types.
+- **Trigger**: Subscription to `$share/{group}/icebot/execution-endpoints/+/uplink/{messageType}` for all 7 message types.
 - **Preconditions**: Message not retained and within payload-size guard.
-- **Main Flow**: 1) Parse topic/message type. 2) Dispatch to shared Application handler (identical to FR-027–FR-030, FR-122, FR-124). 3) Publish `EdgeUplinkResult` to the `.../uplink/results` topic.
+- **Main Flow**: 1) Parse topic/message type. 2) Dispatch to the owning handler (FR-027–FR-030, FR-122, FR-124, FR-134). 3) Publish `EdgeUplinkResult` to the `.../uplink/results` topic.
 - **Alternative/Exception Flow**: See FR-127 for rejection conditions.
 - **Related**: `MQTT-02`.
 - **Evidence**: `functional_inventory.md` MQTT-02.
@@ -1707,7 +1729,7 @@ Refresh tokens, password-reset tokens, and account invitations shall be stored o
 Payment provider (PayOS) webhook payloads shall be signature-verified before being applied to any payment/order state. Evidence: `functional_inventory.md` PAY-03. Status: Supported.
 
 #### NFR-013 — Bounded Runtime-Menu Cache Freshness
-The kiosk runtime-menu projection shall be cacheable for a short, bounded interval (15 seconds) with ETag/`If-None-Match` support, so kiosks can poll cheaply without recomputation on every request. Evidence: `functional_inventory.md` SC-08. Status: Supported.
+The kiosk runtime-menu projection shall use an optional bounded cache with ETag/`If-None-Match` support. Store/kiosk admission shall be checked before cache access, request-specific snapshot identity shall not be cached, cache failure shall fall back to the database projection, and checkout shall revalidate authoritatively. Evidence: `functional_inventory.md` SC-08 plus `backend_update_impact_2026-08-11.md` §§2, 5; `docs/flows/CATALOG_RUNTIME_MENU_FLOW.md`. Status: Supported. `[Needs Review]` Approved environment profile, exact TTL/invalidation settings, and alert threshold.
 
 #### NFR-014 — Bounded-Batch Data Retention
 Scheduled data-retention deletions (heartbeats, device events, operation logs, processed sync inbox rows, expired identity credentials, notification deliveries) shall run in bounded batches (`BatchSize=1000`, `MaxBatchesPerRun=20`) rather than a single unbounded delete, to limit lock/transaction duration. Evidence: `database_inventory.md` §7. Status: Supported.
@@ -1752,7 +1774,7 @@ The system does not currently implement PostgreSQL native table partitioning for
 Full entity-level detail lives in `deliverables/00_repo_evidence/database_inventory.md`; this section summarizes it for SRS purposes.
 
 ### 6.1 Persistence Platform
-PostgreSQL 17 via Npgsql/EF Core (`IceBotDbContext`), database `IceBotDB`, per current configuration (`[Assumption]` current deployment default, not necessarily a binding version requirement). `IceBotDbContext.cs` (`src/Infrastructure/Data/IceBotDbContext.cs:109-214`) exposes **98** `DbSet<T>` properties — verified by direct count against the source file, correcting `database_inventory.md`'s own stated "~130" (see §8). At least 99 tables have been created cumulatively across 5 migrations (`InitialCreate`, `CatchUpProductionPackageAndExecutionWorkflows`, `CompleteLocalOperationalWorkflows`, `CompleteLocalOperationalChanges`, `AddProductionIncidents`) — this is a sum of `CreateTable` calls across migration history, not an independently re-verified current-schema table count from the model snapshot; treat it as a lower bound. Evidence: `database_inventory.md` §1, §7; `src/Infrastructure/Data/IceBotDbContext.cs:109-214`.
+PostgreSQL 17 via Npgsql/EF Core (`IceBotDbContext`), database `IceBotDB`, per current configuration (`[Assumption]` current deployment default, not necessarily a binding version requirement). The merged source contains **100** `DbSet<T>` declarations, **eight** non-designer migrations, and **101** `CreateTable` calls across migration history. The three added migrations create Inventory Sensor Observations and Production Program Bindings and revise capability-evidence storage. These are static source counts, not a verified live-schema table count. Evidence: `backend_update_impact_2026-08-11.md` §4; `IceBotDbContext.cs`; migrations `20260731040709`, `20260804031725`, `20260809035315`. `[Needs Review]` Reconcile against the regenerated database inventory and target database.
 
 ### 6.2 Entity Groups (by bounded context)
 Per `repo_truth_map.md` §4 and `database_inventory.md` §1, Production Configuration, Production Execution, and Production Packages are three distinct bounded-context ownership concepts (configuration-time routing/binding; Cloud-side execution/audit projections; franchise packaging), grouped together below only for brevity of listing — they remain separate contexts, not one merged context.
@@ -1796,7 +1818,7 @@ The following cross-cutting rules recur across multiple functional requirements 
 - **BR-05 — Soft-delete exceptions for principal types**: `Account`, `Organization`, `Store`, `Kiosk`, `Device`, `Product`, `Ingredient`, `IngredientDispenserState`, `Order`, `PaymentTransaction`, `ConfigurationRelease`, and `KioskExecutionEndpoint` are excluded from the automatic soft-delete query filter because they have required, non-soft-deleted evidence dependents; the codebase provides a `WhereNotDeleted()` extension for callers to use explicitly. `[Inferred]` This is a convention that creates a developer responsibility, not an enforced or audited guarantee — whether every query against these 12 types actually applies the filter where needed was not verified. Evidence: `database_inventory.md` §7.
 - **BR-06 — Activation preflight for sellable items**: A Menu or MenuItem cannot be set Active unless its referenced product/variant/recipe/options pass a full preflight (currency match, active recipe for machine-produced variants, statically satisfiable option groups). Evidence: `functional_inventory.md` SC-02, SC-05.
 - **BR-07 — Recipe lifecycle immutability**: Recipes follow a strict Draft→Published→Active→Retired lifecycle; ingredient items can only be replaced while Draft; recipes are retired, never deleted. Evidence: `functional_inventory.md` CAT-15–CAT-17.
-- **BR-08 — Robot artifact publish gating**: A Draft robot artifact can only be published when it has a compatible Published technical contract and its object-storage checksum/size has been verified. Evidence: `functional_inventory.md` RC-04.
+- **BR-08 — Robot artifact publish gating**: A Draft robot artifact requires verified object-storage checksum/size. A technical declaration is optional; when referenced it must be Published, scope/target compatible, and checksum-consistent. It does not certify behavior. Evidence: `backend_update_impact_2026-08-11.md` §5; current publication validator.
 - **BR-09 — Configuration release publish gating**: A Configuration Release can only be published after route/binding validation and a passing inventory-readiness check (the same policy used at deployment preview/deploy time). Evidence: `functional_inventory.md` PC-03, PC-05, PC-10; INV-14.
 - **BR-10 — Production package version immutability**: Once published, a `ProductionPackageVersion`'s manifest is immutable; installations/upgrades reference it by exact version rather than a mutable pointer. Evidence: `functional_inventory.md` PP-02, PP-05, PP-11.
 - **BR-11 — Refund/incident mandatory reasons**: Refund-required flagging, refund rejection, maintenance-ticket cancellation, and several other state transitions require a non-empty audit reason. Evidence: `functional_inventory.md` ORD-05, PAY-13, OPS-15.
@@ -1847,7 +1869,7 @@ The following cross-cutting rules recur across multiple functional requirements 
 ### 8.6 Carried from team review (`deliverables/05_team_review/codex_review_project_intro_srs.md`)
 - `[Open Question]` The requested path `deliverables/00_repo_evidence/evidence_review_final.md` still does not exist; the review used a differently-located file, `deliverables/05_review_checklists/evidence_review_final.md`. This path discrepancy should be corrected in the document set or explicitly explained in the final report.
 - `[Open Question]` `functional_inventory.md`'s own Summary table states 265 rows; a direct count of `ID`-prefixed rows yields 260 (Operations is short 4 rows against its stated 26; Payments is short 1 row against its stated 17). This SRS uses 260 throughout and does not correct `functional_inventory.md` itself (out of scope per the rule against modifying `00_repo_evidence/`) — whether 260 or 265 is the intended authoritative count remains open.
-- `[Open Question]` `database_inventory.md` states "~130 `DbSet<T>` properties"; a direct count against `src/Infrastructure/Data/IceBotDbContext.cs:109-214` finds 98. This SRS uses the verified 98 figure (§6.1) and does not correct `database_inventory.md` itself.
+- `[Open Question]` The pre-sync database inventory retains obsolete counts. This SRS uses current static counts (100 DbSets, eight migrations, 101 CreateTable operations); live-schema reconciliation remains outstanding.
 - `[Open Question]` This SRS consolidates 260 inventory rows into 133 FRs by narrative grouping (each FR's `Related`/`Evidence` fields now individually list every consolidated ID, per this revision). A formal, separately-maintained inventory-ID-to-FR traceability matrix (one row per `functional_inventory.md` ID, with its FR number and confidence/status) does not yet exist and would be a more rigorous artifact than in-line grouping — flagged as a follow-up deliverable, not produced here.
 - `[Open Question]` No test-execution or `tests/IceBot.UnitTests`/`tests/IceBot.IntegrationTests` coverage evidence backs any `Supported` status in this document (see the Status legend at the top of this file); "Supported" should be read as "statically code-evidenced," and no FR/NFR should be read as implying a runtime-verified guarantee until test or execution evidence is linked.
 - `[Open Question]` Whether scoped RBAC is enforced on every management endpoint, GraphQL resolver, and SignalR hub method (FR-016, NFR-007) was not established by an exhaustive authorization-coverage audit.
@@ -1858,4 +1880,3 @@ The following cross-cutting rules recur across multiple functional requirements 
 ---
 
 *End of baseline document. This file is intended to be reviewed and iterated on by the team before being adapted into the formal school/thesis SRS report structure.*
-

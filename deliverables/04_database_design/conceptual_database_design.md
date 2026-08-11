@@ -71,8 +71,9 @@ Relationships: a Menu has many Menu Items; a Menu Item references one Product Va
 - **Dispenser (Container)** — a physical ingredient-holding unit attached to a Device, tracking an estimated quantity and capacity.
 - **Stock Movement** — a recorded change in a Dispenser's estimated quantity (refill, consumption, or manual adjustment).
 - **Inventory Topology Event** — a record of a Dispenser's configuration change or hardware rebind, kept for audit history.
+- **Inventory Sensor Observation** — authenticated Edge evidence of a dispenser's observed level, retained with ordering/disposition even when too old to update the current projection.
 
-Relationships: a Device hosts many Dispensers; a Dispenser holds one Ingredient and accumulates many Stock Movements over time. `[Supported]` — `database_inventory.md` §1 (Inventory), §2 (Inventory).
+Relationships: a Device hosts many Dispensers; a Dispenser holds one Ingredient and accumulates many Stock Movements and Sensor Observations over time; an Execution Endpoint receives many observations. Observations do not themselves create Stock Movements. `[Supported]` — pre-sync `database_inventory.md` plus `backend_update_impact_2026-08-11.md` §4 and migration `20260731040709`.
 
 ### 2.6 Customer Order & Fulfillment
 - **Customer Order** — one checkout transaction placed at a Kiosk, carrying a lifecycle status (from placement through payment, execution, and completion or cancellation).
@@ -110,9 +111,10 @@ Relationships: a Robot Program is composed of many ordered Robot Artifacts; a Ro
 ### 2.10 Production Configuration & Deployment
 - **Configuration Release** — an immutable, versioned manifest for one Organization, binding Product Variants and Recipes to Robot Programs.
 - **Execution Route** — one binding rule within a Configuration Release, connecting a specific Product Variant/Recipe combination to the Robot Program(s) that produce it.
+- **Production Program Binding** — an immutable, operator-confirmed organization-owned association between a Recipe version and Published Robot Program, including supported options and declared capability evidence.
 - **Kiosk Deployment** — a record of one Configuration Release being installed onto one Kiosk's Execution Endpoint, tracking success/failure.
 
-Relationships: a Configuration Release has many Execution Routes; a Configuration Release is deployed to many Kiosks over time via Kiosk Deployments. `[Supported]` — `database_inventory.md` §1 (ProductionConfiguration/ProductionExecution/ProductionPackages), §2.
+Relationships: a Recipe and Robot Program may participate in many Production Program Bindings; an Execution Route Robot Binding may snapshot one such binding; a Configuration Release has many Execution Routes and is deployed to many Kiosks over time. Capability evidence is operator-declared metadata, not proof of Lua or physical behavior. `[Supported]` — pre-sync `database_inventory.md` plus `backend_update_impact_2026-08-11.md` §4 and migrations `20260804031725`, `20260809035315`.
 
 ### 2.11 Franchise Packaging
 - **Production Package** — a platform-level, reusable business template (a bundle of Products, Robot Artifacts, Robot Programs, and Routes) intended for repeated franchise rollout.
@@ -177,9 +179,13 @@ erDiagram
     KIOSK ||--o{ DEVICE : "contains"
     DEVICE ||--o{ DISPENSER : "hosts"
     DISPENSER }o--|| INGREDIENT : "holds"
+    DISPENSER ||--o{ INVENTORY_SENSOR_OBSERVATION : "accumulates evidence"
     KIOSK ||--o{ KIOSK_EXECUTION_ENDPOINT : "connects via"
+    KIOSK_EXECUTION_ENDPOINT ||--o{ INVENTORY_SENSOR_OBSERVATION : "receives"
 
     ROBOT_PROGRAM ||--o{ ROBOT_ARTIFACT : "orders"
+    RECIPE ||--o{ PRODUCTION_PROGRAM_BINDING : "confirmed in"
+    ROBOT_PROGRAM ||--o{ PRODUCTION_PROGRAM_BINDING : "confirmed in"
     CONFIGURATION_RELEASE ||--o{ EXECUTION_ROUTE : "defines"
     EXECUTION_ROUTE }o--|| ROBOT_PROGRAM : "runs"
     CONFIGURATION_RELEASE ||--o{ KIOSK_DEPLOYMENT : "installed as"

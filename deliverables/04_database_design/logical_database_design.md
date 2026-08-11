@@ -97,8 +97,9 @@ In addition to the surrogate primary key, most entities also carry a **business 
 | `StockMovement` | GUID (surrogate) | `IngredientDispenserStateId` (FK), `OrganizationId`/`StoreId`/`KioskId`/`DeviceId` (all optional), `MovementType`, signed `Quantity`, `BalanceBefore`/`BalanceAfter` | Append-only. |
 | `InventoryTopologyChangeRecord` | GUID (surrogate) | Before/after container-state snapshot fields | Append-only history. |
 | `InventoryTopologyRebindRecord` | GUID (surrogate) | Source/replacement device and ingredient references, `EstimateDisposition`, `TransferredQuantity` | Append-only history. |
+| `InventorySensorObservation` | GUID (surrogate) | `KioskExecutionEndpointId`, `SourceExecutorId`, `SourceEventId`, `IngredientDispenserStateId`, `DeviceId`, `IngredientId`, `ObservationSequence`, observed/received times, level, optional derived quantity, `Disposition`, `SensorPayloadJson` | Edge evidence; unique `(SourceExecutorId, SourceEventId)`. Out-of-order evidence is retained without replacing current state. |
 
-**Relationships**: `Device` (1) — (0..N) `IngredientDispenserState`, mandatory. `IngredientDispenserState` (0..N) — (1) `Ingredient`, mandatory. `IngredientDispenserState` (1) — (0..N) `StockMovement`, mandatory (a movement always references a dispenser state). `[Supported]` — `database_inventory.md` §1, §2.
+**Relationships**: `Device` (1) — (0..N) `IngredientDispenserState`, mandatory. `IngredientDispenserState` (0..N) — (1) `Ingredient`, mandatory. `IngredientDispenserState` (1) — (0..N) `StockMovement` and (0..N) `InventorySensorObservation`; `KioskExecutionEndpoint` (1) — (0..N) `InventorySensorObservation`. `[Supported]` — pre-sync `database_inventory.md` plus backend update impact §4/migration `20260731040709`.
 
 **Business constraints**: At most one active `IngredientDispenserState` container binding per device slot (i.e., per `(DeviceId, ContainerCode)`) — BR-12. A unit change is rejected once a dispenser has an estimated quantity or stock history (requires retirement and a new state instead) — `srs.md` FR-048. `[Supported]`.
 
@@ -165,7 +166,7 @@ In addition to the surrogate primary key, most entities also carry a **business 
 
 **Relationships**: `RobotProgram` (1) — (0..N) `RobotProgramArtifact`. The base relational cardinality is `(0..N)` — a Draft `RobotProgram` can have zero artifacts before authoring is complete; "at least one artifact, in RunOrder sequence" is an application-level publish-time rule (`srs.md` FR-097), not a schema-enforced minimum. `RobotProgramArtifact` (0..N) — (1) `RobotArtifact`, mandatory on the RobotProgramArtifact side. `RobotArtifact` (0..N) — (0..1) `RobotArtifactTechnicalContract`, optional. `RobotArtifactTechnicalContract` (1) — (0..N) `RobotArtifactDeclaredEffect`/`RobotArtifactOrderingConstraint`, mandatory on the child side (a contract may legitimately have zero declared effects/constraints; the FK from child to parent is what is required, not a minimum count on the parent). This child relationship is configured with an explicit `Cascade` delete-behavior override in its own configuration class, but whether that override survives `IceBotDbContext`'s later global `Restrict` convention loop is `[Unclear]` — see `physical_database_design.md` §2 and Open Questions. `RobotAuthoringImport` (1) — (0..N) `RobotAuthoringImportItem`, mandatory on the child side. `[Supported]` — `database_inventory.md` §1, §2, §3, except where marked `[Unclear]`.
 
-**Business constraints**: A Draft `RobotArtifact` can only be published when it has a compatible Published Technical Contract and its checksum/size is verified (BR-08). `[Supported]`.
+**Business constraints**: A Draft `RobotArtifact` requires verified checksum/size. A technical declaration is optional; when referenced it must be Published, scope/target compatible, and checksum-consistent. It is not behavior certification. `[Supported]` — backend update impact §5.
 
 ### 2.10 Production Configuration / Production Execution
 
@@ -174,12 +175,13 @@ In addition to the surrogate primary key, most entities also carry a **business 
 | `ConfigurationRelease` | GUID (surrogate) | `OrganizationId` (mandatory), `ReleaseNumber` (alternate key, sequential per organization), `Status`, `ManifestJson` | No Store/Kiosk/Device columns directly — see §6. |
 | `ExecutionRoute` | GUID (surrogate) | `ConfigurationReleaseId` (FK), `ProductVariantId`/`RecipeId` (FK), `RouteCode`, `Priority` | |
 | `ExecutionRouteRobotBinding` | `[Unclear]` — exact identifier not itemized beyond field names | `ExecutionRouteId`, `RobotProgramId` | |
+| `ProductionProgramBinding` | GUID (surrogate) | `OrganizationId`, `ProductVariantId`, `RecipeId`, `RecipeVersion`, `RobotProgramId`, program/binding checksums, supported-option JSON, required-capability JSON, `CapabilityEvidenceStatus`, `Assurance`, `Status`, retirement/audit/soft-delete fields | Immutable operator-confirmed binding; unique binding checksum. |
 | `KioskConfigurationDeployment` | GUID (surrogate) | `KioskId`/`OrganizationId`/`KioskExecutionEndpointId`/`ConfigurationReleaseId` (FK), `AttemptNo`, `Status` | Full-Edge deployment path. |
 | `ControllerArtifactSetDeployment`/`Item` | GUID (surrogate) | Mirrors `KioskConfigurationDeployment` with `ControllerId` | Low-cost-controller path. |
 | `OrderExecutionRecord` | GUID (surrogate) | `SourceCommandId`/`KioskExecutionEndpointId` (FK), `Status`, idempotency via `(SourceExecutorId, LastAppliedSourceEventId)` | Cloud-side audit projection, not a live scheduler. |
 | `ProductionExecutionRecord` | GUID (surrogate) | Same idempotency pattern, plus `PhysicalOutputState`, `OrderItemId`/`ProductionUnitNo` | |
 
-**Relationships**: `ConfigurationRelease` (1) — (0..N) `ExecutionRoute`, mandatory. `ExecutionRoute` (0..N) — (1) `ProductVariant`, mandatory. `ExecutionRoute` (0..N) — (1) `Recipe`, mandatory. `ExecutionRoute` (0..N) — (0..N) `RobotProgram` via `ExecutionRouteRobotBinding`. `ConfigurationRelease` (1) — (0..N) `KioskConfigurationDeployment`, optional (a release may not yet be deployed). `Order` (0..1) — (0..N) `OrderExecutionRecord`, optional. `[Supported]` — `database_inventory.md` §1, §2, §3.
+**Relationships**: `ConfigurationRelease` (1) — (0..N) `ExecutionRoute`, mandatory. `ExecutionRoute` references one ProductVariant and Recipe and links RobotPrograms through `ExecutionRouteRobotBinding`. A ProductionProgramBinding references one Organization, ProductVariant, Recipe, and RobotProgram; an ExecutionRouteRobotBinding may reference one ProductionProgramBinding and snapshot its checksum/capability array. `[Supported]` — pre-sync `database_inventory.md` plus backend update impact §4/migrations `20260804031725`, `20260809035315`.
 
 **Business constraints**: A `ConfigurationRelease` can only be published after route/binding validation and a passing inventory-readiness check (BR-09). At most one Pending/Installed `KioskConfigurationDeployment` per kiosk at a time (BR-12). `[Supported]`.
 
@@ -254,7 +256,7 @@ Everything else in the model — reference/catalog tables (`Ingredient`, `Device
 - Constraints (soft-delete-aware uniqueness, partial/filtered unique indexes, check constraints): `database_inventory.md` §4 — restated here in database-agnostic business-rule language; exact index/predicate syntax is deferred to `physical_database_design.md`.
 - Multi-tenancy scope model (`TenantScopeType`, override hierarchy, `RobotProgram`'s Global-rejection exception, lack of a blanket tenant query filter): `database_inventory.md` §6.
 - Business rules (BR-01 through BR-15): `srs.md` §7, cross-referenced against the same evidence rows.
-- Cross-checked relationship shape against `class_diagram.md` and `erd.md` (both of which independently trimmed the same 98-entity model to a readable subset using the same source).
+- Cross-checked relationship shape against `class_diagram.md` and `erd.md`, including the two post-sync entities.
 
 ---
 

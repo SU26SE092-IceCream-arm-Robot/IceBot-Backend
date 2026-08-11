@@ -261,11 +261,11 @@ Concrete UI screens, navigation, client-side authorization presentation, message
 
 ### 3.2 Feature Sections
 
-The SRS defines FR-001 through FR-133. The consolidated feature coverage is:
+The synchronized SRS defines FR-001 through FR-135. The consolidated feature coverage is:
 
 | Requirement range | Feature area | Consolidated capability |
 |---|---|---|
-| FR-001–FR-016 | Identity | Login/session, recovery/profile, push registrations, invitations, accounts, roles, effective access, and scoped RBAC. |
+| FR-001–FR-016 | Identity | Login, current-session listing/revocation, recovery/profile, push registrations, organization-owned accounts, roles, effective access, and scoped RBAC. |
 | FR-017–FR-021 | Tenants | Organization, store, kiosk, franchise-onboarding, and scope-tree functions. |
 | FR-022–FR-032 | Devices | Device/endpoint lifecycle, credentials, heartbeat, events, telemetry, readiness, reconciliation, and status reads. |
 | FR-033–FR-047 | Catalog and Sales Catalog | Ingredients, products, variants/options, recipes, menus, runtime projections, and sellability/routing evaluation. |
@@ -274,14 +274,16 @@ The SRS defines FR-001 through FR-133. The consolidated feature coverage is:
 | FR-068–FR-078 | Payments | Sessions, status, PayOS webhook, reconciliation, diagnostics, payment methods, refunds, and notifications. |
 | FR-079–FR-087 | Operations | Alerts, tickets, operation logs, delivery diagnostics, and realtime operations events. |
 | FR-088–FR-101 | Robot Configuration | Artifact/template/contract/program authoring, import/composition, review, and cleanup. |
-| FR-102–FR-110 | Production Configuration | Release authoring, readiness, deployment, rollback, monitoring, and timeout reconciliation. |
+| FR-102–FR-110 | Production Configuration | Release authoring, readiness, audited/concurrency-controlled deployment, rollback, monitoring, and timeout reconciliation. |
 | FR-111–FR-119 | Production Packages | Package authoring, installation, repair, upgrade, cutover, rollback, abandonment, and reconciliation. |
 | FR-120–FR-127 | IoT REST and MQTT | Durable pull/acknowledgement, execution evidence/checkpoints/state sync, wake-up, uplink, and endpoint authentication. |
 | FR-128–FR-133 | Realtime, GraphQL, Sync, jobs, and dashboard | SignalR group joins/deltas, GraphQL read wiring, automatic dispatch/timeout reconciliation, execution metrics, inbox/dead-letter operations, and scoped dashboard aggregation/invalidation. |
+| FR-134 | Inventory / Edge observations | Idempotent MQTT inventory sensor-observation evidence that applies only newer observations and does not create stock movements or prove consumption. |
+| FR-135 | Production Configuration | Immutable Recipe-version-to-Published-RobotProgram binding with snapshotted option and optional declared-capability evidence. |
 
 Every requirement's trigger, actor, flow, validation, related data, exceptions, status, and evidence source remain in Report 3 and the RTM. Report 7 does not replace that traceability baseline.
 
-`[Consolidation Required]` Before final submission, import the approved Report 3 feature sections and all FR-001–FR-133 details; this range table is navigation only.
+`[Consolidation Required]` Before final submission, import the approved Report 3 feature sections and all FR-001–FR-135 details; this range table is navigation only.
 
 ## 4. Non-Functional Requirements
 
@@ -351,7 +353,7 @@ The detailed package/context ownership model remains in Report 4. Bounded contex
 
 PostgreSQL with EF Core/Npgsql is the evidenced persistence platform. The model spans the bounded contexts above and uses a mix of application-assigned GUID keys (`GuidEntity`) and database-generated long identity/sequence keys (`LongEntity`), with exact strategy determined by entity base type. It also uses audit fields where applicable, restrictive relationship conventions, explicit indexes/constraints, selected JSON/JSONB for configuration, snapshots, external evidence, and metadata, and soft deletion for applicable entities. These conventions are not uniform across every evidence/history type. Robot `.lua` binary content is stored outside PostgreSQL; the database holds metadata such as object reference, checksum, and size.
 
-Conceptual, logical, and physical details are maintained in the database-design deliverables. Important unresolved matters include live-schema reconciliation, exact table/catalog completion, effective delete behavior where global conventions interact with explicit configuration, filtered/unfiltered uniqueness, nullable relationships, selected lifecycle cardinalities, retention, and migration/manual-step operation. These remain `[Needs Team Review]` or `[Unclear]` as marked in the source documents.
+Conceptual, logical, and physical details are maintained in the database-design deliverables. The synchronized static source contains 100 `DbSet<T>` declarations, eight non-designer migrations, and 101 cumulative `CreateTable` operations, including `InventorySensorObservations` and `ProductionProgramBindings`; these are not verified live-schema counts. Live-schema reconciliation, exact catalogue completion, effective delete behavior, uniqueness, nullability, lifecycle cardinalities, retention, and migration/manual-step operation remain `[Needs Team Review]` or `[Unclear]`.
 
 `[Consolidation Required]` Import the approved Report 4 database relationship diagram, table/entity catalogue, PK/FK/nullability data, constraints/indexes, soft-delete behavior, and open database questions.
 
@@ -359,7 +361,7 @@ Conceptual, logical, and physical details are maintained in the database-design 
 
 ### 3.1 Order and Payment Flow
 
-Checkout snapshots, payment session/callback handling, durable dispatch, execution observation, incident/remake/refund paths, and realtime invalidation are designed in Report 4. Exact transaction boundaries and late/conflicting callback precedence remain qualified there.
+Checkout snapshots, payment session/callback handling, durable dispatch, execution observation, incident/remake/refund paths, and realtime invalidation are designed in Report 4. A verified-unmatched PayOS callback creates no payment/order/fulfilment state and contributes only bounded diagnostic evidence. Exact transaction boundaries and late/conflicting matched-callback precedence remain qualified there.
 
 ### 3.2 Robot / Edge Execution Flow
 
@@ -367,7 +369,7 @@ Endpoint identity profiles, durable commands, MQTT wake-up, REST pull/acknowledg
 
 ### 3.3 Catalog / Inventory / Production Configuration
 
-Catalog/recipe/menu authoring, dispenser topology and readiness, robot artifacts/programs, configuration releases, deployments, and packages are summarized in Report 4. Feature-level class/sequence coverage remains incomplete until the owning SDD is approved.
+Catalog/recipe/menu authoring, bounded runtime-menu caching, dispenser topology and sensor observations, robot artifacts/programs and raw-Lua import, Production Program Bindings, configuration releases, deployments, and packages are summarized in Report 4. Optional technical declarations and bindings must not be described as certification of Lua behavior or physical safety.
 
 ### 3.4 Tenant / Identity / Authorization
 
@@ -431,9 +433,10 @@ Unit, Integration, System, and Acceptance are the planned test levels. API, data
 
 The Report 5 catalog maps high-level cases to SRS requirements and covers the major backend areas, including:
 
-- authentication, session revocation, scoped authorization, and tenant isolation;
+- authentication, owned-session listing/revocation, organization-owned account administration, scoped authorization, and tenant isolation;
 - tenant/device/catalog/inventory lifecycle and validation;
 - idempotent checkout, payment sessions, signed/duplicate/conflicting callbacks, and refund handling;
+- inventory-observation idempotency/projection ordering, Production Program Binding integrity, release/deployment concurrency, and execute-order schema v5 compatibility;
 - durable dispatch, Edge pull/acknowledgement/report, replay, reconciliation, and uncertain physical outcome;
 - incidents, redispatch/remake, alerts, maintenance, sync/dead-letter, and background jobs; and
 - database constraints, soft-delete visibility/uniqueness, external failures, and selected NFR verification.

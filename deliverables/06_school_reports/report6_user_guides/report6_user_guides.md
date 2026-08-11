@@ -39,7 +39,7 @@ No approved, versioned release-package manifest exists in the evidence set. The 
 |---:|---|---|---|
 | 1 | Source code | IceBot Backend implementation, including WebAPI, Infrastructure, Application, and Domain projects. | Available in workspace. Release commit/tag, archive name, checksum, license notice, and approved exclusions are `[Needs Team Review]`. |
 | 2 | Backend API contract artifact | Candidate packaged OpenAPI document, GraphQL schema, SignalR/IoT contract, examples, or client contract for the evidenced API surfaces. | No approved versioned API artifact is established. The SRS/evidence inventory is not itself a released client contract; artifact choice/version/location are `[Needs Team Review]`. |
-| 3 | Database scripts and migrations | EF Core model/configurations, five migrations identified by `database_inventory.md`, model snapshot, and manual migration-step classes. | Available in source. Release migration set, execution/rollback procedure, checksums, and live-schema reconciliation are `[Needs Team Review]`. Do not treat the cumulative migration table count as a verified live-table count. |
+| 3 | Database scripts and migrations | EF Core model/configurations, eight current non-designer migrations, model snapshot, and manual migration-step classes. | Available in source. Release migration set, execution/rollback procedure, checksums, and live-schema reconciliation are `[Needs Team Review]`. Static DbSet/CreateTable counts are not a verified live-table count. |
 | 4 | Configuration files | Current repository configuration includes application settings and container definitions. Runtime database configuration reads `CONNECTIONSTRING`; design-time creation reads `ConnectionStrings:IceBot_DB` / `ConnectionStrings__IceBot_DB`. | Files exist. Approved non-secret templates, environment matrix, secret injection procedure, and resolution of the two database keys are `[Needs Team Review]`. |
 | 5 | Project Introduction | Report 1 school draft and team-facing project-introduction baseline. | Available under `deliverables/01_project_introduction/` and `deliverables/06_school_reports/report1_project_introduction/`; approval/version `[Needs Team Review]`. |
 | 6 | Software Requirements Specification | Baseline SRS, RTM, and school-template Report 3. | Available. Approved baseline/revision and resolution/acceptance of open requirements are `[Needs Team Review]`. |
@@ -136,7 +136,7 @@ The sequence below is a controlled installation framework. Commands or values ar
 #### Step 2 — Obtain and Inspect the Repository
 
 1. Obtain the approved repository revision using the team-approved source-control procedure. `[Needs Team Review]`
-2. Confirm that the solution/source projects, `docker/Dockerfile`, `docker/docker-compose.yml`, WebAPI settings, EF Core migrations/model snapshot, and manual migration-step classes match the manifest.
+2. Confirm that the solution/source projects, container definitions, WebAPI settings, EF Core migrations/model snapshot, and manual migration-step classes match the manifest. The synchronized source also contains CI workflows for validation and GHCR publication; release approval, secrets, environments, and successful-run evidence remain `[Needs Team Review]`.
 3. Confirm that no secret is committed in the package and that configuration templates contain placeholders only.
 4. The release owner must triage release-blocking database, deployment, payment, Edge, and authorization questions before packaging. The installer receives the approved blocker/waiver list and must not decide unresolved product or architecture questions during installation. `[Needs Team Review]`
 
@@ -233,7 +233,7 @@ Before execution, identify which approved schema-deployment artifact is shipped.
 2. Compare the release migration list and model snapshot with the manifest.
 3. Review manual migration-step classes and execute their data-safety preflights according to an approved runbook. Their invocation is not established merely by their presence in source and remains `[Needs Team Review]`.
 4. Apply migrations using the team-approved command and operator account. The exact command, transaction/lock behavior, timeout, and rollback procedure are `[Needs Team Review]`.
-5. Reconcile tables, PKs, FKs, indexes, filters, and delete behavior against the approved model/schema. Do not use “98 DbSets” as the physical-table count.
+5. Reconcile tables, PKs, FKs, indexes, filters, and delete behavior against the approved model/schema. Do not use the current 100 `DbSet<T>` declarations or 101 cumulative `CreateTable` operations as the physical-table count.
 6. Record migration identifiers, start/end time, operator, output, backup reference, and verification result.
 
 **Expected result:** The database schema matches the approved release model, manual preflights are recorded, and no unresolved destructive/model discrepancy is silently accepted.
@@ -347,7 +347,7 @@ For every human workflow below, the final manual must complete this UI evidence 
 **Actors:** Account holder through an approved client; external identity provider where configured.
 
 1. Sign in through the supported local or external-identity path; the exact screen, session presentation, and error text are `[Needs UI/Team Review]`.
-2. Refresh or end a session through the supported token/logout contract without displaying token material.
+2. View the current account's active sessions and revoke one owned session or all sessions through the supported current-account contracts. Do not expose raw token material; display of recorded IP/user-agent metadata is `[Needs UI/Team Review]`.
 3. Use forgot-password, reset-password, or change-password flows only through their supported single-use/expiry and revocation behavior.
 4. Review/update the supported profile fields and review effective access through the approved client.
 5. Register or remove a notification device only through an approved client flow. Permission prompts, token replacement, and lost-device guidance are `[Needs UI/Team Review]`.
@@ -364,7 +364,7 @@ For every human workflow below, the final manual must complete this UI evidence 
 4. Deliver the invitation through the approved secure channel. Email/client presentation is `[Needs UI/Team Review]`.
 5. The invited user accepts the single-use, unexpired invitation and establishes the supported login credential.
 6. Update, disable, set/reset password, regenerate invitation, or replace role assignments only within the permitted scope.
-7. Verify that disabled/password-changed accounts have the documented session revocation behavior.
+7. Verify that disabled/password-changed accounts have the documented session revocation behavior. Account administration uses organization-owned routes and is limited to SystemAdmin or an authorized OrgAdmin; OrgAdmin cannot grant SystemAdmin or cross the route organization.
 
 **Expected backend outcomes:** Role hierarchy/scope is validated; duplicate role/scope entries are rejected; cross-scope access is rejected; sensitive tokens are stored hashed.
 
@@ -404,6 +404,7 @@ Exact screens, credential display-once behavior, rotation/revocation procedure, 
 4. Create a Menu and MenuItems for the intended organization/store/kiosk scope.
 5. Before activation, review currency, recipe, option-group, and production-route validation results.
 6. Publish/activate only after preflight succeeds; retrieve the runtime menu projection for the kiosk.
+7. Treat runtime-menu caching as an optional bounded backend optimization: sales admission is evaluated before cache access, cache failures fall back to the database projection, and clients continue using revision/ETag semantics.
 
 **Expected backend outcomes:** Invalid lifecycle/composition is rejected; a MenuItem references catalog data rather than owning a copy; customer order items later retain order-time snapshots.
 
@@ -419,6 +420,7 @@ Exact screens, credential display-once behavior, rotation/revocation procedure, 
 4. Do not rebind, retire, or replace protected resources while an active execution violates the documented guard.
 5. Validate level-to-quantity calibration profiles before use.
 6. Review inventory summary and production-readiness results before configuration publication/deployment where required.
+7. Monitor persisted Edge inventory sensor observations where an approved operator surface exists. These observations may update the latest dispenser projection but do not create stock movements or prove recipe consumption. The operator UI, retention, replay, and diagnostic procedures are `[Needs Team Review]`.
 
 **Expected backend outcomes:** Stock movements and topology evidence are recorded; incompatible/guarded operations are rejected. `[Inferred]` Execution-driven consumption exists as a supported integration path, but this document does not claim end-to-end physical quantity accuracy.
 
@@ -429,13 +431,13 @@ Exact screens, credential display-once behavior, rotation/revocation procedure, 
 1. Upload or clone robot `.lua` artifacts and, where applicable, import `.icebot.json` technical-contract sidecars.
 2. Validate artifact checksum/size, compatible Published technical contract, declared effects, and program composition.
 3. Compose `RobotProgram` using ordered `RobotProgramArtifact` entries.
-4. Create a Configuration Release with execution routes and robot-program bindings.
-5. Run route/binding and inventory-readiness preflight, then publish the release if valid.
-6. Preview and request Full Edge or low-cost controller deployment for the correct endpoint profile.
+4. Create or select an immutable Recipe-to-Published-RobotProgram Production Program Binding, then create a Configuration Release with execution routes that snapshot the selected evidence. Missing optional technical declarations must not be presented as proven capabilities.
+5. Run route/binding and inventory-readiness preflight, then publish the release if valid. Use revision/concurrency values supplied by the backend; stale authoring input must be refreshed rather than overwritten.
+6. Preview and request Full Edge or low-cost controller deployment for the correct endpoint profile, supplying the supported reason/audit/concurrency data.
 7. Monitor backend deployment records/reports and request rollback where supported.
 8. For reusable packages, preview/install a version, inspect materialization/workspace, repair/fork where allowed, and use preview/upgrade/cutover/rollback/abandon operations under the supported lifecycle.
 
-**Boundary:** A successful Cloud request or reported deployment/package state does not independently prove physical installation or robot execution. Recovery, lease/concurrency, cutover, rollback, and installation-to-release cardinality include `[Needs Team Review]` items.
+**Boundary:** A Production Program Binding, successful Cloud request, or reported deployment/package state does not independently prove Lua behavior, physical safety, installation, or robot execution. Execute-order schema v5 carries capability arrays; compatibility and rollout procedures for Edge consumers are `[Needs Team Review]`.
 
 ### 3.4 Order and Payment Workflow
 

@@ -4,7 +4,7 @@
 
 **Source basis**: `deliverables/00_repo_evidence/database_inventory.md` §1 (entity list), §2 (attributes), §3 (relationships, composite tenant-consistency FKs), §4 (constraints/indexes). No `src/` or `docs/` files were modified; `srs.md`/`project_introduction.md` were not modified.
 
-**Readability note**: `IceBotDbContext` exposes 98 `DbSet<T>` entities across 14 bounded contexts (`database_inventory.md` §1, corrected from that file's own "~130" figure by a direct source count — see `srs.md` §6.1 and `requirements_traceability_matrix.md` DR-16). A single ERD with all 98 tables and their exact composite/partial-unique keys would not be readable. This diagram keeps the physical (table-level) core needed to understand persistence structure, and omits: the `ProductionPackage` upgrade sub-family (10 tables), pure read-model/projection tables (`KioskConnectivityProjection`, `ExecutionEndpointReadinessProjection`, `ExecutionEndpointCapabilityProjection`), and append-only history tables beyond one representative example per context. The full 98-table list remains authoritative in `database_inventory.md` §1.
+**Readability note**: The merged `IceBotDbContext` exposes 100 `DbSet<T>` declarations. This diagram adds the two post-sync persisted concepts while retaining a readable core. Static counts and changes are evidenced by `backend_update_impact_2026-08-11.md`; the pre-sync database inventory requires regeneration, and no live schema is asserted.
 
 ---
 
@@ -40,6 +40,8 @@ erDiagram
     DEVICE ||--o{ INGREDIENT_DISPENSER_STATE : hosts
     INGREDIENT_DISPENSER_STATE }o--|| INGREDIENT : holds
     INGREDIENT_DISPENSER_STATE ||--o{ STOCK_MOVEMENT : records
+    INGREDIENT_DISPENSER_STATE ||--o{ INVENTORY_SENSOR_OBSERVATION : observes
+    KIOSK_EXECUTION_ENDPOINT ||--o{ INVENTORY_SENSOR_OBSERVATION : receives
     DEVICE ||--o{ DEVICE_EVENT : reports
     KIOSK ||--o{ KIOSK_EXECUTION_ENDPOINT : exposes
     KIOSK_EXECUTION_ENDPOINT ||--o| EXECUTION_ENDPOINT_MQTT_CREDENTIAL : "1:1"
@@ -62,6 +64,10 @@ erDiagram
     ROBOT_PROGRAM_ARTIFACT }o--|| ROBOT_ARTIFACT : references
     CONFIGURATION_RELEASE ||--o{ EXECUTION_ROUTE : defines
     EXECUTION_ROUTE }o--o{ ROBOT_PROGRAM : "ExecutionRouteRobotBinding"
+    RECIPE ||--o{ PRODUCTION_PROGRAM_BINDING : confirms
+    PRODUCT_VARIANT ||--o{ PRODUCTION_PROGRAM_BINDING : binds
+    ROBOT_PROGRAM ||--o{ PRODUCTION_PROGRAM_BINDING : binds
+    PRODUCTION_PROGRAM_BINDING ||--o{ EXECUTION_ROUTE_ROBOT_BINDING : snapshots
     CONFIGURATION_RELEASE ||--o{ KIOSK_CONFIGURATION_DEPLOYMENT : "deployed as"
     KIOSK ||--o{ KIOSK_CONFIGURATION_DEPLOYMENT : receives
     KIOSK_EXECUTION_ENDPOINT ||--o{ KIOSK_CONFIGURATION_DEPLOYMENT : targets
@@ -311,7 +317,7 @@ erDiagram
 
 ## Evidence Notes
 
-- Full entity/table list: `database_inventory.md` §1 (98 `DbSet<T>` properties, verified against `src/Infrastructure/Data/IceBotDbContext.cs:109-214`, correcting that file's own "~130" figure — see `srs.md` §6.1).
+- Full pre-sync entity list: `database_inventory.md` §1. Post-sync additions/counts: `backend_update_impact_2026-08-11.md` §4 and current migrations; the merged DbContext has 100 DbSet declarations.
 - Attribute selection (identifying keys, business-meaningful fields, status enums, money/quantity fields): `database_inventory.md` §2.
 - Relationship shapes, including composite tenant-consistency FKs, true 1:1s, self-referencing lineage FKs, and the `Account ↔ Store` many-to-many join: `database_inventory.md` §3.
 - Soft-delete-aware vs. unfiltered unique indexes: `database_inventory.md` §4 ("Soft-delete-aware uniqueness" and its following paragraph).

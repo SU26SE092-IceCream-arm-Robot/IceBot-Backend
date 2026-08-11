@@ -116,7 +116,7 @@ The current repository directly supports the Cloud backend and its contracts wit
 The following feature groups summarize the statically code-evidenced backend scope. Detailed functional requirements and evidence mappings belong to Report 3 rather than this introduction.
 
 1. **FE-01 — Identity and Scoped Access Control**  
-   Support local and Google/Firebase authentication, invitation-based internal-account onboarding, session and refresh-token management, internal roles, permissions, and organization/store/kiosk-scoped access assignments.
+   Support local and Google/Firebase authentication, invitation-based internal-account onboarding, current-session listing and revocation, refresh-token management, internal roles, permissions, and organization/store/kiosk-scoped access assignments. Organization-owned account administration is available to SystemAdmin and authorized OrgAdmin actors within the enforced organization boundary.
 
 2. **FE-02 — Organization, Store, and Kiosk Management**  
    Manage the lifecycle of organizations, stores, and kiosks; control store sales pauses and kiosk operational states; provide tenant-scope navigation; and coordinate franchise-onboarding records.
@@ -125,7 +125,7 @@ The following feature groups summarize the statically code-evidenced backend sco
    Manage ingredients, product categories, reusable product templates, tenant products and variants, options, recipes, menus, menu items, and kiosk-specific runtime-menu projections with sellability checks.
 
 4. **FE-04 — Ingredient Inventory and Production Readiness**  
-   Provision and configure dispenser/container topology; record refill, consumption, adjustment, retirement, and hardware rebind activity; calculate inventory summaries; and evaluate readiness for production and deployment.
+   Provision and configure dispenser/container topology; record refill, consumption, adjustment, retirement, and hardware rebind activity; ingest idempotent Edge inventory sensor observations without treating them as stock movements or proven consumption; calculate inventory summaries; and evaluate readiness for production and deployment.
 
 5. **FE-05 — Customer Checkout and Order Lifecycle**  
    Accept and validate tablet-originated orders, expose order-scoped status access, support permitted cancellation and management intervention, dispatch production work, record fulfilment evidence, and manage production incidents and remakes.
@@ -134,10 +134,10 @@ The following feature groups summarize the statically code-evidenced backend sco
    Create PayOS payment sessions, process signed provider callbacks, expose payment status and diagnostics, reconcile selected pending payment sessions, and manage internal refund requests and their manual lifecycle.
 
 7. **FE-07 — Robot Artifact and Program Authoring**  
-   Upload, review, validate, publish, retire, and discard Fairino Lua artifacts; manage reusable artifact templates and technical contracts; build ordered robot programs; and process authoring-import bundles.
+   Upload, review, validate, publish, retire, and discard Fairino Lua artifacts; manage reusable artifact templates and optional operator-declared technical contracts; build ordered robot programs, including bounded raw-Lua import into Draft programs; and process authoring-import bundles.
 
 8. **FE-08 — Production Configuration and Deployment**  
-   Author versioned configuration releases and execution routes, validate deployment readiness, deploy configuration to Full Edge or low-cost controller profiles, inspect deployment state, and support rollback and timeout reconciliation.
+   Author immutable Recipe-to-RobotProgram production bindings and versioned configuration releases and execution routes; validate deployment readiness; deploy configuration to Full Edge or low-cost controller profiles with concurrency/audit controls; inspect deployment state; and support rollback and timeout reconciliation. A binding or deployment record does not certify Lua behavior, physical safety, installation, or robot execution.
 
 9. **FE-09 — Reusable Production Packages**  
    Author versioned production packages, preview and install them for tenant scopes, inspect and repair installation materialization, fork package-managed resources, and coordinate upgrade, cutover, rollback, abandonment, and stale-upgrade reconciliation.
