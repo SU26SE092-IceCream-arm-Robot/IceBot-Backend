@@ -55,20 +55,33 @@ try
 
     var app = builder.Build();
 
-    if (args.Contains("--reset-robot-authoring-automation-test", StringComparer.OrdinalIgnoreCase))
+    if (args.Contains("--delete-legacy-automation-fixture", StringComparer.OrdinalIgnoreCase))
     {
         if (!app.Environment.IsDevelopment())
-            throw new InvalidOperationException("Robot authoring automation reset is available only in Development.");
+            throw new InvalidOperationException("Legacy automation fixture deletion is available only in Development.");
 
         await using var scope = app.Services.CreateAsyncScope();
-        var reset = scope.ServiceProvider.GetRequiredService<DevelopmentRobotAuthoringAutomationReset>();
+        var reset = scope.ServiceProvider.GetRequiredService<DevelopmentIceBotDemoReset>();
+        var deleted = await reset.DeleteLegacyAutomationFixtureAsync(CancellationToken.None);
+        Log.Information("Deleted legacy ICEBOT-AUTOMATION-TEST fixture organization: {Deleted}.", deleted);
+        return;
+    }
+
+    if (args.Contains("--reset-icebot-demo", StringComparer.OrdinalIgnoreCase))
+    {
+        if (!app.Environment.IsDevelopment())
+            throw new InvalidOperationException("ICEBOT-DEMO reset is available only in Development.");
+
+        await using var scope = app.Services.CreateAsyncScope();
+        var reset = scope.ServiceProvider.GetRequiredService<DevelopmentIceBotDemoReset>();
         var result = await reset.ResetAsync(CancellationToken.None);
         Log.Information(
-            "Reset {OrganizationCode} ({OrganizationId}): {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, {MenuItems} menu items, {Objects} objects deleted, {RetainedObjects} objects retained.",
-            DevelopmentRobotAuthoringAutomationReset.OrganizationCode, result.OrganizationId,
+            "Reset {OrganizationCode} ({OrganizationId}): {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, {MenuItems} menu items, {Objects} objects deleted, {RetainedObjects} objects retained. Deleted legacy automation fixture: {DeletedAutomationFixture}.",
+            DevelopmentIceBotDemoReset.OrganizationCode, result.OrganizationId,
             result.DeletedImportCount, result.DeletedArtifactCount, result.DeletedProgramCount,
             result.DeletedContractCount, result.DeletedBindingCount, result.DeletedReleaseCount,
-            result.DeletedMenuItemCount, result.DeletedObjectCount, result.RetainedObjectCount);
+            result.DeletedMenuItemCount, result.DeletedObjectCount, result.RetainedObjectCount,
+            result.DeletedAutomationFixture);
         return;
     }
 

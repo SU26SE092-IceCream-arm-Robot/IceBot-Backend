@@ -1,6 +1,5 @@
 using Application.RobotConfiguration.Storage.Abstractions;
 using Domain.Catalog.Entities;
-using Domain.Identity.Entities;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
@@ -9,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Catalog.Bootstrap;
 
-public sealed record DevelopmentRobotAuthoringAutomationResetResult(
+public sealed record DevelopmentIceBotDemoResetResult(
     Guid OrganizationId,
     int DeletedImportCount,
     int DeletedArtifactCount,
@@ -19,26 +18,31 @@ public sealed record DevelopmentRobotAuthoringAutomationResetResult(
     int DeletedReleaseCount,
     int DeletedMenuItemCount,
     int DeletedObjectCount,
-    int RetainedObjectCount);
+    int RetainedObjectCount,
+    bool DeletedAutomationFixture);
 
 /// <summary>
-/// Destructive local-only fixture reset for the isolated robot authoring tenant.
-/// It removes authoring and publication data, but refuses to erase runtime or commercial evidence.
+/// Destructive local-only reset for the ICEBOT-DEMO authoring/catalog fixture.
+/// It preserves the demo tenant boundary but refuses to erase runtime or commercial evidence.
 /// </summary>
-public sealed class DevelopmentRobotAuthoringAutomationReset(
+public sealed class DevelopmentIceBotDemoReset(
     IceBotDbContext dbContext,
     IArtifactObjectStorage objectStorage,
-    ILogger<DevelopmentRobotAuthoringAutomationReset> logger)
+    ILogger<DevelopmentIceBotDemoReset> logger)
 {
-    public const string OrganizationCode = "ICEBOT-AUTOMATION-TEST";
+    public const string OrganizationCode = "ICEBOT-DEMO";
+    private const string AutomationFixtureOrganizationCode = "ICEBOT-AUTOMATION-TEST";
     private const string ProductCode = "KEM-TUOI-VANI";
 
-    public async Task<DevelopmentRobotAuthoringAutomationResetResult> ResetAsync(
+    public async Task<DevelopmentIceBotDemoResetResult> ResetAsync(
         CancellationToken cancellationToken)
     {
         var now = DateTimeOffset.UtcNow;
-        var organization = await EnsureOrganizationAsync(now, cancellationToken);
-        await EnsureLocalOrgAdminScopeAsync(organization.Id, now, cancellationToken);
+        var deletedAutomationFixture = await DeleteAutomationFixtureAsync(cancellationToken);
+        var organization = await dbContext.Organizations.IgnoreQueryFilters()
+            .SingleOrDefaultAsync(candidate => candidate.Code == OrganizationCode, cancellationToken)
+            ?? throw new InvalidOperationException(
+                $"{OrganizationCode} is missing. Start the Development backend once to create the demo baseline.");
 
         var productIds = await dbContext.Products.IgnoreQueryFilters()
             .Where(product => product.OrganizationId == organization.Id && product.Code == ProductCode)
@@ -51,6 +55,18 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
         var recipeIds = await dbContext.Recipes.IgnoreQueryFilters()
             .Where(recipe => recipe.OrganizationId == organization.Id && variantIds.Contains(recipe.ProductVariantId))
             .Select(recipe => recipe.Id)
+            .ToArrayAsync(cancellationToken);
+        var programIds = await dbContext.RobotPrograms.IgnoreQueryFilters()
+            .Where(program => program.OrganizationId == organization.Id)
+            .Select(program => program.Id)
+            .ToArrayAsync(cancellationToken);
+        var optionGroupIds = await dbContext.OptionGroups.IgnoreQueryFilters()
+            .Where(group => productIds.Contains(group.ProductId))
+            .Select(group => group.Id)
+            .ToArrayAsync(cancellationToken);
+        var optionIds = await dbContext.ProductOptions.IgnoreQueryFilters()
+            .Where(option => optionGroupIds.Contains(option.OptionGroupId))
+            .Select(option => option.Id)
             .ToArrayAsync(cancellationToken);
         var releaseIds = await dbContext.ConfigurationReleases.IgnoreQueryFilters()
             .Where(release => release.OrganizationId == organization.Id)
@@ -121,8 +137,16 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
                 .Where(release => releaseIds.Contains(release.Id))
                 .ExecuteDeleteAsync(cancellationToken);
 
+            await dbContext.ProductionCompositions.IgnoreQueryFilters()
+                .Where(composition => composition.OrganizationId == organization.Id ||
+                                      variantIds.Contains(composition.ProductVariantId) ||
+                                      recipeIds.Contains(composition.RecipeId) ||
+                                      (composition.GeneratedRobotProgramId.HasValue &&
+                                       programIds.Contains(composition.GeneratedRobotProgramId.Value)))
+                .ExecuteDeleteAsync(cancellationToken);
+
             await dbContext.RobotProgramArtifacts.IgnoreQueryFilters()
-                .Where(item => item.RobotProgram.OrganizationId == organization.Id)
+                .Where(item => programIds.Contains(item.RobotProgramId))
                 .ExecuteDeleteAsync(cancellationToken);
             await dbContext.RobotPrograms.IgnoreQueryFilters()
                 .Where(program => program.OrganizationId == organization.Id)
@@ -140,6 +164,15 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
                 .Where(contract => contract.OrganizationId == organization.Id)
                 .ExecuteDeleteAsync(cancellationToken);
 
+            await dbContext.ProductOptionIngredientRequirements.IgnoreQueryFilters()
+                .Where(requirement => optionIds.Contains(requirement.ProductOptionId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductOptions.IgnoreQueryFilters()
+                .Where(option => optionIds.Contains(option.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.OptionGroups.IgnoreQueryFilters()
+                .Where(group => optionGroupIds.Contains(group.Id))
+                .ExecuteDeleteAsync(cancellationToken);
             await dbContext.RecipeItems.IgnoreQueryFilters()
                 .Where(item => recipeIds.Contains(item.RecipeId))
                 .ExecuteDeleteAsync(cancellationToken);
@@ -175,61 +208,192 @@ public sealed class DevelopmentRobotAuthoringAutomationReset(
         }
 
         logger.LogInformation(
-            "Reset local robot authoring automation fixture {OrganizationCode}: {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, and {MenuItems} menu items removed.",
+            "Reset local ICEBOT-DEMO authoring/catalog fixture {OrganizationCode}: {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, and {MenuItems} menu items removed.",
             OrganizationCode, importCount, artifactCount, programCount, contractCount, bindingCount,
             releaseIds.Length, menuItemIds.Length);
 
-        return new DevelopmentRobotAuthoringAutomationResetResult(
+        return new DevelopmentIceBotDemoResetResult(
             organization.Id, importCount, artifactCount, programCount, contractCount, bindingCount,
-            releaseIds.Length, menuItemIds.Length, deletedObjects, retainedObjects);
+            releaseIds.Length, menuItemIds.Length, deletedObjects, retainedObjects, deletedAutomationFixture);
     }
 
-    private async Task<Organization> EnsureOrganizationAsync(DateTimeOffset now, CancellationToken cancellationToken)
+    public Task<bool> DeleteLegacyAutomationFixtureAsync(CancellationToken cancellationToken) =>
+        DeleteAutomationFixtureAsync(cancellationToken);
+
+    private async Task<bool> DeleteAutomationFixtureAsync(CancellationToken cancellationToken)
     {
         var organization = await dbContext.Organizations.IgnoreQueryFilters()
-            .SingleOrDefaultAsync(candidate => candidate.Code == OrganizationCode, cancellationToken);
-        if (organization is not null)
+            .SingleOrDefaultAsync(candidate => candidate.Code == AutomationFixtureOrganizationCode, cancellationToken);
+        if (organization is null)
+            return false;
+
+        var hasOperationalTopology =
+            await dbContext.Stores.IgnoreQueryFilters().AnyAsync(store => store.OrganizationId == organization.Id, cancellationToken) ||
+            await dbContext.Kiosks.IgnoreQueryFilters().AnyAsync(kiosk => kiosk.OrganizationId == organization.Id, cancellationToken);
+        if (hasOperationalTopology)
         {
-            organization.DeletedAt = null;
-            organization.DeletedByAccountId = null;
-            organization.Status = Domain.Common.Enums.EntityStatus.Active;
-            await dbContext.SaveChangesAsync(cancellationToken);
-            return organization;
+            throw new InvalidOperationException(
+                $"{AutomationFixtureOrganizationCode} has Store or Kiosk data and cannot be deleted by the development reset.");
         }
 
-        organization = new Organization
-        {
-            Code = OrganizationCode,
-            Name = "IceBot Automation Test",
-            LegalName = "Local development fixture only",
-            Status = Domain.Common.Enums.EntityStatus.Active,
-            MetadataJson = "{\"purpose\":\"local-robot-authoring-automation-test\"}",
-            CreatedAt = now
-        };
-        dbContext.Organizations.Add(organization);
-        await dbContext.SaveChangesAsync(cancellationToken);
-        return organization;
-    }
+        var importIds = await dbContext.RobotAuthoringImports.IgnoreQueryFilters()
+            .Where(item => item.OrganizationId == organization.Id)
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var objectKeys = await dbContext.RobotAuthoringImports.IgnoreQueryFilters()
+            .Where(item => item.OrganizationId == organization.Id)
+            .Select(item => item.StagingStorageKey)
+            .Concat(dbContext.RobotArtifacts.IgnoreQueryFilters()
+                .Where(item => item.OrganizationId == organization.Id)
+                .Select(item => item.StorageKey))
+            .ToArrayAsync(cancellationToken);
+        var programIds = await dbContext.RobotPrograms.IgnoreQueryFilters()
+            .Where(item => item.OrganizationId == organization.Id)
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var contractIds = await dbContext.RobotArtifactTechnicalContracts.IgnoreQueryFilters()
+            .Where(item => item.OrganizationId == organization.Id)
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var releaseIds = await dbContext.ConfigurationReleases.IgnoreQueryFilters()
+            .Where(item => item.OrganizationId == organization.Id)
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var productIds = await dbContext.Products.IgnoreQueryFilters()
+            .Where(item => item.OrganizationId == organization.Id)
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var variantIds = await dbContext.ProductVariants.IgnoreQueryFilters()
+            .Where(item => productIds.Contains(item.ProductId))
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var recipeIds = await dbContext.Recipes.IgnoreQueryFilters()
+            .Where(item => item.OrganizationId == organization.Id || variantIds.Contains(item.ProductVariantId))
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var menuItemIds = await dbContext.MenuItems.IgnoreQueryFilters()
+            .Where(item => variantIds.Contains(item.ProductVariantId) ||
+                           (item.RecipeId.HasValue && recipeIds.Contains(item.RecipeId.Value)))
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var optionGroupIds = await dbContext.OptionGroups.IgnoreQueryFilters()
+            .Where(item => productIds.Contains(item.ProductId))
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
+        var optionIds = await dbContext.ProductOptions.IgnoreQueryFilters()
+            .Where(item => optionGroupIds.Contains(item.OptionGroupId))
+            .Select(item => item.Id)
+            .ToArrayAsync(cancellationToken);
 
-    private async Task EnsureLocalOrgAdminScopeAsync(Guid organizationId, DateTimeOffset now, CancellationToken cancellationToken)
-    {
-        var account = await dbContext.Accounts
-            .Include(candidate => candidate.AccountRoles)
-            .SingleOrDefaultAsync(candidate => candidate.Email == "orgadmin@icebot.local", cancellationToken);
-        var role = await dbContext.Roles.SingleOrDefaultAsync(candidate => candidate.Code == "OrgAdmin", cancellationToken);
-        if (account is null || role is null || account.AccountRoles.Any(assignment =>
-                assignment.RoleId == role.Id && assignment.OrganizationId == organizationId &&
-                assignment.StoreId is null && assignment.KioskId is null && assignment.IsActive))
-            return;
+        await EnsureNoRuntimeEvidenceAsync(organization.Id, releaseIds, menuItemIds, cancellationToken);
 
-        account.AccountRoles.Add(new AccountRole
+        var hasPackageState =
+            await dbContext.ProductionPackageInstallations.IgnoreQueryFilters()
+                .AnyAsync(item => item.OrganizationId == organization.Id, cancellationToken) ||
+            await dbContext.ProductionPackageUpgrades.IgnoreQueryFilters()
+                .AnyAsync(item => item.OrganizationId == organization.Id, cancellationToken);
+        if (hasPackageState)
         {
-            RoleId = role.Id,
-            OrganizationId = organizationId,
-            IsActive = true,
-            AssignedAt = now
-        });
-        await dbContext.SaveChangesAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"{AutomationFixtureOrganizationCode} has production package state and cannot be deleted by the development reset.");
+        }
+
+        await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+        {
+            await dbContext.RobotAuthoringImportItems.IgnoreQueryFilters()
+                .Where(item => importIds.Contains(item.RobotAuthoringImportId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RobotAuthoringImports.IgnoreQueryFilters()
+                .Where(item => item.OrganizationId == organization.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.MenuItemProductOptions.IgnoreQueryFilters()
+                .Where(item => menuItemIds.Contains(item.MenuItemId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.MenuItems.IgnoreQueryFilters()
+                .Where(item => menuItemIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ExecutionRouteRobotBindings.IgnoreQueryFilters()
+                .Where(item => releaseIds.Contains(item.ExecutionRoute.ConfigurationReleaseId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ExecutionRoutes.IgnoreQueryFilters()
+                .Where(item => releaseIds.Contains(item.ConfigurationReleaseId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductionProgramBindings.IgnoreQueryFilters()
+                .Where(item => item.OrganizationId == organization.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ConfigurationReleases.IgnoreQueryFilters()
+                .Where(item => releaseIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductionCompositions.IgnoreQueryFilters()
+                .Where(item => item.OrganizationId == organization.Id ||
+                               variantIds.Contains(item.ProductVariantId) ||
+                               recipeIds.Contains(item.RecipeId) ||
+                               (item.GeneratedRobotProgramId.HasValue && programIds.Contains(item.GeneratedRobotProgramId.Value)))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RobotProgramArtifacts.IgnoreQueryFilters()
+                .Where(item => programIds.Contains(item.RobotProgramId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RobotPrograms.IgnoreQueryFilters()
+                .Where(item => programIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RobotArtifacts.IgnoreQueryFilters()
+                .Where(item => item.OrganizationId == organization.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RobotArtifactDeclaredEffects.IgnoreQueryFilters()
+                .Where(item => contractIds.Contains(item.TechnicalContractId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RobotArtifactOrderingConstraints.IgnoreQueryFilters()
+                .Where(item => contractIds.Contains(item.TechnicalContractId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RobotArtifactTechnicalContracts.IgnoreQueryFilters()
+                .Where(item => contractIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductOptionIngredientRequirements.IgnoreQueryFilters()
+                .Where(item => optionIds.Contains(item.ProductOptionId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductOptions.IgnoreQueryFilters()
+                .Where(item => optionIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.OptionGroups.IgnoreQueryFilters()
+                .Where(item => optionGroupIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.RecipeItems.IgnoreQueryFilters()
+                .Where(item => recipeIds.Contains(item.RecipeId))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Recipes.IgnoreQueryFilters()
+                .Where(item => recipeIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.ProductVariants.IgnoreQueryFilters()
+                .Where(item => variantIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Products.IgnoreQueryFilters()
+                .Where(item => productIds.Contains(item.Id))
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.AccountRoles.IgnoreQueryFilters()
+                .Where(item => item.OrganizationId == organization.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await dbContext.Organizations.IgnoreQueryFilters()
+                .Where(item => item.Id == organization.Id)
+                .ExecuteDeleteAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        foreach (var objectKey in objectKeys.Distinct(StringComparer.Ordinal))
+        {
+            try
+            {
+                await objectStorage.DeleteIfExistsAsync(objectKey, cancellationToken);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception,
+                    "Retained orphaned automation fixture object {StorageKey}; orphan cleanup can retry it.", objectKey);
+            }
+        }
+
+        logger.LogInformation("Deleted legacy development fixture organization {OrganizationCode}.",
+            AutomationFixtureOrganizationCode);
+        return true;
     }
 
     private async Task EnsureNoRuntimeEvidenceAsync(

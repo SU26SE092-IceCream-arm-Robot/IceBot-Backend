@@ -134,7 +134,9 @@ Rules:
 
 - Do not use `/me` for business resources such as orders, kiosks, reports, or maintenance tickets.
 - Password recovery is not `/me` because the user may be logged out.
-- `/me/access` reports the caller's current token roles, permission codes, and effective scoped ids. `permissionCodes` is the UI capability contract; clients must not infer a permission from a role name. It is not a fresh database authorization recalculation.
+- `/me/access` reports the caller's current token roles, permission codes, effective scoped ids, and `permissionScopes`. `permissionCodes` answers whether the token carries a capability; `permissionScopes` identifies the exact role-assignment scopes that grant each capability. Clients must not infer either value from role names. This is token evidence, not a fresh database authorization recalculation.
+- Each `permissionScopes` item contains `permissionCode`, `scopeRequired`, `isGlobal`, and scope tuples containing `organizationId`, `storeId`, and `kioskId`. Keep tuples intact when matching a selected resource; do not combine ids from separate tuples. An organization-only tuple applies within that organization and its descendants, a store tuple applies within that store and its kiosks, and a kiosk tuple applies only to that kiosk. `isGlobal` is true for System Admin access and permissions whose catalog definition does not require tenant scope.
+- Route guards and navigation may use this evidence for UX, but every management API must still enforce authorization and resource tenancy independently.
 - Notification-device routes are self-service FCM registration only. They never accept `AccountId`, expose a push token/hash, or grant trusted-session behavior. Registration is serialized by both account installation and token identity. Reassigning or invalidating a registration removes the stored raw provider token while retaining its hash as audit correlation. Delivery selects registrations only while their owning account is Active.
 
 ## Authentication And Password Recovery APIs

@@ -68,31 +68,39 @@ To deliberately seed a role again, remove or deactivate every active assignment 
 
 Do not enable this setting in deployed environments. Real accounts must use the normal invitation and role-assignment flows.
 
-## Robot Authoring Automation Fixture
+## Reset IceBot Demo Authoring Data
 
-Use the isolated `ICEBOT-AUTOMATION-TEST` organization to repeat robot-authoring
-bundle tests without changing `ICEBOT-DEMO` or editing a ZIP between attempts.
+Use the demo reset to repeat robot-authoring bundle tests against `ICEBOT-DEMO`.
+It also removes the obsolete `ICEBOT-AUTOMATION-TEST` fixture organization.
 
 Run the reset only after stopping the local WebAPI process:
 
 ```powershell
-.\scripts\reset-robot-authoring-automation-test.ps1
+.\scripts\reset-icebot-demo.ps1
 ```
 
 The command is available only with `ASPNETCORE_ENVIRONMENT=Development`. It:
 
-- creates or reuses `ICEBOT-AUTOMATION-TEST`;
-- grants the existing local `orgadmin@icebot.local` an additional `OrgAdmin`
-  assignment for that organization when the account exists;
-- deletes that tenant's authoring imports, Draft/Published test programs,
+- preserves the `ICEBOT-DEMO` organization, its Store/Kiosk baseline, and account scopes;
+- deletes `ICEBOT-DEMO` authoring imports, Draft/Published test programs,
   artifacts, technical contracts, and their object-storage bytes;
-- deletes that tenant's operator-confirmed bindings, configuration releases,
+- deletes the Vanilla demo product's operator-confirmed bindings, configuration releases,
   routes, and menu items that reference the reset product;
-- rebuilds the organization-owned Vanilla soft-serve product, variant, and
+- rebuilds the organization-owned Vanilla soft-serve product, variants, options, and
   active Recipe from the global template.
 
+The legacy `ICEBOT-AUTOMATION-TEST` organization is hard-deleted only when it
+has no Store/Kiosk or production-package state. Its authoring data, local object
+storage bytes, and account-role assignments are removed first.
+
+To remove only that obsolete fixture without resetting `ICEBOT-DEMO`, run:
+
+```powershell
+.\scripts\delete-legacy-automation-fixture.ps1
+```
+
 The command may run after authoring and publication, but refuses to erase the
-fixture when it has order, deployment, execution, active-release, or production
+demo data when it has order, deployment, execution, active-release, or production
 package evidence. Do not use it as an operational rollback or against production data.
 If object storage is unavailable after the database reset, metadata remains
 reset and the command logs retained orphaned object keys for normal orphan

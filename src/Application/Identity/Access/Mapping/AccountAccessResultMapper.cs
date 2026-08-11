@@ -25,18 +25,20 @@ internal static class AccountAccessResultMapper
             })
             .ToList();
 
+        var roleCodes = activeRoles
+            .Select(accountRole => accountRole.Role.Code)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(roleCode => roleCode)
+            .ToList();
+        var isSystemAdmin = roleCodes.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase);
+
         return new AccountAccessResult
         {
             AccountId = account.Id,
-            IsSystemAdmin = activeRoles.Any(accountRole =>
-                string.Equals(accountRole.Role.Code, "SystemAdmin", StringComparison.OrdinalIgnoreCase)),
-            Roles = activeRoles
-                .Select(accountRole => accountRole.Role.Code)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(roleCode => roleCode)
-                .ToList(),
-            PermissionCodes = PermissionCatalog.ResolvePermissionCodes(
-                activeRoles.Select(accountRole => accountRole.Role.Code)),
+            IsSystemAdmin = isSystemAdmin,
+            Roles = roleCodes,
+            PermissionCodes = PermissionCatalog.ResolvePermissionCodes(roleCodes),
+            PermissionScopes = ToPermissionScopes(roleCodes, roleScopes, isSystemAdmin),
             RoleScopes = roleScopes,
             EffectiveScope = ToEffectiveScope(roleScopes)
         };
@@ -53,19 +55,24 @@ internal static class AccountAccessResultMapper
             .Cast<AccountRoleScopeAccessResult>()
             .ToList();
 
+        var normalizedRoleCodes = roleCodes
+            .Where(roleCode => !string.IsNullOrWhiteSpace(roleCode))
+            .Append(userContext.IsSystemAdmin ? "SystemAdmin" : string.Empty)
+            .Where(roleCode => !string.IsNullOrWhiteSpace(roleCode))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(roleCode => roleCode)
+            .ToList();
+
         return new AccountAccessResult
         {
             AccountId = userContext.AccountId,
             IsSystemAdmin = userContext.IsSystemAdmin,
-            Roles = roleCodes
-                .Where(roleCode => !string.IsNullOrWhiteSpace(roleCode))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(roleCode => roleCode)
-                .ToList(),
-            PermissionCodes = PermissionCatalog.ResolvePermissionCodes(
-                userContext.IsSystemAdmin
-                    ? roleCodes.Append("SystemAdmin")
-                    : roleCodes),
+            Roles = normalizedRoleCodes,
+            PermissionCodes = PermissionCatalog.ResolvePermissionCodes(normalizedRoleCodes),
+            PermissionScopes = ToPermissionScopes(
+                normalizedRoleCodes,
+                roleScopes,
+                userContext.IsSystemAdmin),
             RoleScopes = roleScopes,
             EffectiveScope = new EffectiveScopeResult
             {
@@ -74,6 +81,51 @@ internal static class AccountAccessResultMapper
                 KioskIds = userContext.AllowedKioskIds.OrderBy(id => id).ToList()
             }
         };
+    }
+
+    private static List<PermissionScopeAccessResult> ToPermissionScopes(
+        IReadOnlyCollection<string> roleCodes,
+        IReadOnlyCollection<AccountRoleScopeAccessResult> roleScopes,
+        bool isSystemAdmin)
+    {
+        var activeRoleCodes = roleCodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return PermissionCatalog.Matrix
+            .Where(permission => permission.Roles.Any(activeRoleCodes.Contains))
+            .OrderBy(permission => permission.Policy, StringComparer.Ordinal)
+            .Select(permission =>
+            {
+                var grantingRoles = permission.Roles
+                    .Where(activeRoleCodes.Contains)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var matchingScopes = roleScopes
+                    .Where(roleScope => grantingRoles.Contains(roleScope.RoleCode))
+                    .Select(roleScope => new AccessScopeResult
+                    {
+                        OrganizationId = roleScope.OrganizationId,
+                        StoreId = roleScope.StoreId,
+                        KioskId = roleScope.KioskId
+                    })
+                    .DistinctBy(scope => (scope.OrganizationId, scope.StoreId, scope.KioskId))
+                    .OrderBy(scope => scope.OrganizationId)
+                    .ThenBy(scope => scope.StoreId)
+                    .ThenBy(scope => scope.KioskId)
+                    .ToList();
+
+                return new PermissionScopeAccessResult
+                {
+                    PermissionCode = permission.Policy,
+                    ScopeRequired = permission.ScopeRequired,
+                    IsGlobal = isSystemAdmin ||
+                        !permission.ScopeRequired ||
+                        matchingScopes.Any(scope =>
+                            !scope.OrganizationId.HasValue &&
+                            !scope.StoreId.HasValue &&
+                            !scope.KioskId.HasValue),
+                    Scopes = matchingScopes
+                };
+            })
+            .ToList();
     }
 
     private static EffectiveScopeResult ToEffectiveScope(IReadOnlyCollection<AccountRoleScopeAccessResult> roleScopes)

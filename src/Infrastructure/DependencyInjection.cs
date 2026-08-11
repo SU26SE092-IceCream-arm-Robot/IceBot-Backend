@@ -100,7 +100,7 @@ namespace Infrastructure
             services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure(config);
-            services.AddScoped<DevelopmentRobotAuthoringAutomationReset>();
+            services.AddScoped<DevelopmentIceBotDemoReset>();
             services.AddHostedService<DevelopmentVanillaSoftServeCatalogSeedHostedService>();
             services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
             services.AddOrdersInfrastructure();

@@ -11,7 +11,7 @@ if ($env:ASPNETCORE_ENVIRONMENT -and $env:ASPNETCORE_ENVIRONMENT -ne "Developmen
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 Push-Location $projectRoot
 try {
-    dotnet run --project .\src\WebAPI\WebAPI.csproj -- --reset-robot-authoring-automation-test
+    dotnet run --project .\src\WebAPI\WebAPI.csproj -- --reset-icebot-demo
     if ($LASTEXITCODE -ne 0) {
         exit $LASTEXITCODE
     }
