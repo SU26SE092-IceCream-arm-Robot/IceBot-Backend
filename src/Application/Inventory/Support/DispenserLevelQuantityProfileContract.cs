@@ -51,4 +51,18 @@ internal static class DispenserLevelQuantityProfileContract
             return [];
         }
     }
+
+    public static bool TryResolveEstimatedQuantity(
+        string? json,
+        Domain.Inventory.Enums.IngredientLevelStatus level,
+        out decimal? estimatedQuantity)
+    {
+        estimatedQuantity = null;
+        var point = Deserialize(json).FirstOrDefault(candidate => candidate.Level == level);
+        if (point is null)
+            return false;
+
+        estimatedQuantity = point.EstimatedQuantity;
+        return true;
+    }
 }

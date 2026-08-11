@@ -6,7 +6,10 @@ namespace Application.Identity.InternalAccounts;
 
 internal static class InternalAccountResultMapper
 {
-    public static InternalAccountResult ToResult(Account account, AccountInvitationResult? invitation = null)
+    public static InternalAccountResult ToResult(
+        Account account,
+        AccountInvitationResult? invitation = null,
+        Guid? organizationId = null)
     {
         return new InternalAccountResult
         {
@@ -26,7 +29,10 @@ internal static class InternalAccountResultMapper
                     ExpiresAt = invitation.ExpiresAt,
                     EmailSentAt = invitation.EmailSentAt
                 },
-            Roles = account.AccountRoles.Select(accountRole => new InternalAccountRoleResult
+            Roles = account.AccountRoles
+                .Where(accountRole => !organizationId.HasValue ||
+                    AccountManagementAccessRules.BelongsToOrganization(accountRole, organizationId.Value))
+                .Select(accountRole => new InternalAccountRoleResult
             {
                 RoleCode = accountRole.Role.Code,
                 OrganizationId = accountRole.OrganizationId,

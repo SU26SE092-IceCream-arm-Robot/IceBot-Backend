@@ -73,20 +73,16 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
             return ApiResult<RobotArtifactResult>.Fail("Published robot artifact template not found.", 404);
         }
 
-        if (!observedTemplate.TechnicalContractId.HasValue ||
-            string.IsNullOrWhiteSpace(observedTemplate.TechnicalContractChecksum))
+        var observedContractId = observedTemplate.TechnicalContractId;
+        var resources = new List<TechnicalResourceMutationIdentity>
         {
-            return ApiResult<RobotArtifactResult>.Fail(
-                "The published template does not have a technical contract.", 409);
-        }
-
-        var observedContractId = observedTemplate.TechnicalContractId.Value;
+            TechnicalResourceMutationIdentity.ArtifactDefinition(command.OrganizationId, code),
+            TechnicalResourceMutationIdentity.Template(command.TemplateId)
+        };
+        if (observedContractId.HasValue)
+            resources.Add(TechnicalResourceMutationIdentity.Contract(observedContractId.Value));
         return await _mutations.ExecuteAsync(
-            [
-                TechnicalResourceMutationIdentity.ArtifactDefinition(command.OrganizationId, code),
-                TechnicalResourceMutationIdentity.Contract(observedContractId),
-                TechnicalResourceMutationIdentity.Template(command.TemplateId)
-            ],
+            resources,
             ct => CloneLockedAsync(command, code, observedContractId, ct),
             cancellationToken);
     }
@@ -94,7 +90,7 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
     private async Task<ApiResult<RobotArtifactResult>> CloneLockedAsync(
         CloneRobotArtifactTemplateCommand command,
         string code,
-        Guid observedContractId,
+        Guid? observedContractId,
         CancellationToken cancellationToken)
     {
         var template = await _templateStore.GetByIdAsync(
@@ -105,26 +101,29 @@ public sealed class CloneRobotArtifactTemplateCommandHandler
                 "The robot artifact template is no longer published; retry with an active template.", 409);
         }
 
-        if (template.TechnicalContractId != observedContractId ||
-            string.IsNullOrWhiteSpace(template.TechnicalContractChecksum))
+        if (template.TechnicalContractId != observedContractId)
         {
             return ApiResult<RobotArtifactResult>.Fail(
                 "The robot artifact template technical contract changed concurrently; retry cloning.", 409);
         }
 
-        var technicalContract = await _technicalContracts.GetAsync(
-            observedContractId,
-            false,
-            cancellationToken);
-        if (technicalContract is null ||
-            technicalContract.OrganizationId.HasValue ||
-            technicalContract.Status != RobotArtifactContractStatus.Published ||
-            !string.Equals(technicalContract.ContractChecksum, template.TechnicalContractChecksum, StringComparison.Ordinal) ||
-            !string.Equals(technicalContract.RuntimeTargetCode, template.RuntimeTargetCode, StringComparison.OrdinalIgnoreCase) ||
-            !string.Equals(technicalContract.MachineModelCode, template.MachineModelCode, StringComparison.OrdinalIgnoreCase))
+        if (observedContractId.HasValue)
         {
-            return ApiResult<RobotArtifactResult>.Fail(
-                "The template technical contract is no longer published or compatible.", 409);
+            if (string.IsNullOrWhiteSpace(template.TechnicalContractChecksum))
+                return ApiResult<RobotArtifactResult>.Fail(
+                    "The template technical declaration checksum is missing.", 409);
+            var technicalContract = await _technicalContracts.GetAsync(
+                observedContractId.Value,
+                false,
+                cancellationToken);
+            if (technicalContract is null ||
+                technicalContract.OrganizationId.HasValue ||
+                technicalContract.Status != RobotArtifactContractStatus.Published ||
+                !string.Equals(technicalContract.ContractChecksum, template.TechnicalContractChecksum, StringComparison.Ordinal))
+            {
+                return ApiResult<RobotArtifactResult>.Fail(
+                    "The template technical declaration is no longer published or checksum-consistent.", 409);
+            }
         }
 
         var existing = await _store.GetArtifactByCodeAndChecksumAsync(

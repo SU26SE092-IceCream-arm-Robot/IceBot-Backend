@@ -18,9 +18,9 @@ public sealed class ManagementRolesController : ControllerBase
         _listRolesHandler = listRolesHandler;
     }
 
-    [HttpGet("roles")]
-    [Authorize(Policy = "roles.view")]
-    public async Task<IActionResult> ListRoles(CancellationToken cancellationToken)
+    [HttpGet("accounts/assignable-role-options")]
+    [Authorize(Policy = "accounts.manage")]
+    public async Task<IActionResult> ListAssignableRoleOptions(CancellationToken cancellationToken)
     {
         var userContext = User.GetUserContext();
         var userRoles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();

@@ -108,12 +108,15 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     [Authorize(Policy = "release.rollback")]
     public async Task<IActionResult> Rollback(
         Guid kioskId, Guid deploymentId, [FromHeader(Name = "Idempotency-Key")] string idempotencyKey,
+        [FromBody] RollbackConfigurationDeploymentRequest request,
         CancellationToken cancellationToken)
     {
         var result = await _rollbackHandler.HandleAsync(new RollbackConfigurationDeploymentCommand
         {
             UserContext = User.GetUserContext(), KioskId = kioskId, TargetDeploymentId = deploymentId,
-            IdempotencyKey = idempotencyKey
+            IdempotencyKey = idempotencyKey,
+            Reason = request.Reason,
+            ExpectedActiveDeploymentId = request.ExpectedActiveDeploymentId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -130,6 +133,7 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
+            Reason = request.Reason,
             DeploymentPreviewChecksum = request.DeploymentPreviewChecksum,
             AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk
         }, cancellationToken);
@@ -166,6 +170,7 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
+            Reason = request.Reason,
             DeploymentPreviewChecksum = request.DeploymentPreviewChecksum,
             AcknowledgeRemainingRisk = request.AcknowledgeRemainingRisk,
             Selections = request.Selections.Select(item => new DeployLowCostArtifactSelection(
@@ -185,6 +190,9 @@ public sealed class DeployFullEdgeConfigurationRequest
 
     [Required, StringLength(64, MinimumLength = 64)]
     public string DeploymentPreviewChecksum { get; init; } = string.Empty;
+
+    [Required, StringLength(500, MinimumLength = 3)]
+    public string Reason { get; init; } = string.Empty;
 
     public bool AcknowledgeRemainingRisk { get; init; }
 
@@ -208,11 +216,23 @@ public sealed class DeployLowCostArtifactSetRequest
     [Required, StringLength(64, MinimumLength = 64)]
     public string DeploymentPreviewChecksum { get; init; } = string.Empty;
 
+    [Required, StringLength(500, MinimumLength = 3)]
+    public string Reason { get; init; } = string.Empty;
+
     public bool AcknowledgeRemainingRisk { get; init; }
 
     [Required, MinLength(1)]
     public IReadOnlyCollection<DeployLowCostArtifactSetSelectionRequest> Selections { get; init; } = [];
 
+}
+
+public sealed class RollbackConfigurationDeploymentRequest
+{
+    [Required, StringLength(500, MinimumLength = 3)]
+    public string Reason { get; init; } = string.Empty;
+
+    [Required]
+    public Guid ExpectedActiveDeploymentId { get; init; }
 }
 
 public sealed class DeployLowCostArtifactSetSelectionRequest

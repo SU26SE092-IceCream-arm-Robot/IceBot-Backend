@@ -13,6 +13,7 @@ namespace Application.Identity.Abstractions
         Task<List<Account>> ListAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
@@ -24,6 +25,7 @@ namespace Application.Identity.Abstractions
         Task<int> CountAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
@@ -35,5 +37,6 @@ namespace Application.Identity.Abstractions
         Task<bool> UserNameExistsAsync(string userName, CancellationToken cancellationToken = default);
         Task AddAsync(Account account, CancellationToken cancellationToken = default);
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+        Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default);
     }
 }

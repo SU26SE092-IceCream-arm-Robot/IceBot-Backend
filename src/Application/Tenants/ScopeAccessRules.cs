@@ -58,6 +58,37 @@ public static class ScopeAccessRules
         });
     }
 
+    public static IReadOnlyList<AuthorizationScopeSnapshot> GetAuthorizingScopeSnapshots(
+        IReadOnlyCollection<string> allowedRoles,
+        CurrentUserContext userContext,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId)
+    {
+        if (userContext.IsSystemAdmin && allowedRoles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase))
+        {
+            return [new AuthorizationScopeSnapshot("SystemAdmin", null, null, null)];
+        }
+
+        return userContext.RoleScopes
+            .Where(scope => allowedRoles.Contains(scope.RoleCode, StringComparer.OrdinalIgnoreCase))
+            .Where(scope =>
+                scope.KioskId.HasValue
+                    ? scope.KioskId == kioskId
+                    : scope.StoreId.HasValue
+                        ? scope.StoreId == storeId
+                        : scope.OrganizationId.HasValue && scope.OrganizationId == organizationId)
+            .Select(scope => new AuthorizationScopeSnapshot(
+                scope.RoleCode,
+                scope.OrganizationId,
+                scope.StoreId,
+                scope.KioskId))
+            .OrderByDescending(scope => scope.KioskId.HasValue)
+            .ThenByDescending(scope => scope.StoreId.HasValue)
+            .ThenBy(scope => scope.RoleCode, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+    }
+
     public static bool SharesAnyActiveScope(
         IReadOnlyCollection<string> allowedRoles,
         CurrentUserContext userContext,
@@ -82,9 +113,15 @@ public sealed record EffectiveScope(
     IReadOnlySet<Guid> StoreIds,
     IReadOnlySet<Guid> KioskIds);
 
+public sealed record AuthorizationScopeSnapshot(
+    string RoleCode,
+    Guid? OrganizationId,
+    Guid? StoreId,
+    Guid? KioskId);
+
 public static class ScopeRoleSets
 {
-    public static readonly string[] AccountsRead = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] AccountsRead = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OrganizationsView = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OrganizationsUpdate = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] StoresView = ["SystemAdmin", "OrgAdmin", "Manager"];
@@ -93,10 +130,10 @@ public static class ScopeRoleSets
     public static readonly string[] KiosksView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] KiosksManage = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] TenantTreeView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
-    public static readonly string[] RoleScopeOptionsView = ["SystemAdmin", "OrgAdmin", "Manager"];
-    public static readonly string[] ProductsManage = ["SystemAdmin", "Manager"];
-    public static readonly string[] ProductTemplatesRead = ["SystemAdmin", "Manager"];
-    public static readonly string[] MenusManage = ["SystemAdmin", "Manager"];
+    public static readonly string[] AccountsManage = ["SystemAdmin", "OrgAdmin"];
+    public static readonly string[] ProductsManage = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] ProductTemplatesRead = ["SystemAdmin", "OrgAdmin", "Manager"];
+    public static readonly string[] MenusManage = ["SystemAdmin", "OrgAdmin", "Manager"];
     public static readonly string[] InventoryManage = ["SystemAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] InventoryView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] InventoryConfigure = ["SystemAdmin", "Manager", "Technician"];
@@ -125,6 +162,7 @@ public static class ScopeRoleSets
     public static readonly string[] PackageFork = ["SystemAdmin", "OrgAdmin"];
     public static readonly string[] OperationsView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] OperationsDiagnostics = ["SystemAdmin", "Technician"];
+    public static readonly string[] NotificationsView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] NotificationsManage = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] DashboardView = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
 }

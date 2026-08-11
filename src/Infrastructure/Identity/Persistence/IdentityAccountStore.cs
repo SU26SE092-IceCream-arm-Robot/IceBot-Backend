@@ -3,6 +3,7 @@ using Domain.Identity.Entities;
 using Domain.Identity.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace Infrastructure.Identity.Persistence
 {
@@ -79,6 +80,7 @@ namespace Infrastructure.Identity.Persistence
         public Task<List<Account>> ListAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
@@ -91,6 +93,7 @@ namespace Infrastructure.Identity.Persistence
                     BuildAccountQuery(asNoTracking: true),
                     search,
                     status,
+                    organizationId,
                     isSystemAdmin,
                     allowedOrganizationIds,
                     allowedStoreIds,
@@ -104,6 +107,7 @@ namespace Infrastructure.Identity.Persistence
         public Task<int> CountAsync(
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
@@ -114,6 +118,7 @@ namespace Infrastructure.Identity.Persistence
                     _dbContext.Accounts.WhereNotDeleted().AsNoTracking(),
                     search,
                     status,
+                    organizationId,
                     isSystemAdmin,
                     allowedOrganizationIds,
                     allowedStoreIds,
@@ -152,11 +157,36 @@ namespace Infrastructure.Identity.Persistence
             return _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        public async Task<T> ExecuteInTransactionAsync<T>(
+            Func<Task<T>> operation,
+            CancellationToken cancellationToken = default)
+        {
+            if (_dbContext.Database.CurrentTransaction is not null)
+            {
+                return await operation();
+            }
+
+            var strategy = _dbContext.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                    IsolationLevel.Serializable,
+                    cancellationToken);
+                var result = await operation();
+                await transaction.CommitAsync(cancellationToken);
+                return result;
+            });
+        }
+
         private IQueryable<Account> BuildAccountQuery(bool asNoTracking)
         {
             var query = _dbContext.Accounts.WhereNotDeleted()
                 .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Role)
+                .Include(account => account.AccountRoles)
+                    .ThenInclude(accountRole => accountRole.Store)
+                .Include(account => account.AccountRoles)
+                    .ThenInclude(accountRole => accountRole.Kiosk)
                 .AsQueryable();
 
             return asNoTracking ? query.AsNoTracking() : query;
@@ -166,11 +196,18 @@ namespace Infrastructure.Identity.Persistence
             IQueryable<Account> query,
             string? search,
             string? status,
+            Guid organizationId,
             bool isSystemAdmin,
             IReadOnlySet<Guid> allowedOrganizationIds,
             IReadOnlySet<Guid> allowedStoreIds,
             IReadOnlySet<Guid> allowedKioskIds)
         {
+            query = query.Where(account => account.AccountRoles.Any(role =>
+                role.IsActive &&
+                (role.OrganizationId == organizationId ||
+                    (role.Store != null && role.Store.OrganizationId == organizationId) ||
+                    (role.Kiosk != null && role.Kiosk.OrganizationId == organizationId))));
+
             if (!isSystemAdmin)
             {
                 var allowedOrgIds = allowedOrganizationIds.ToArray();

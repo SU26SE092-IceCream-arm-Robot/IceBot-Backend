@@ -102,11 +102,6 @@ public class RobotArtifact : RobotConfigurationEntity
             throw new DomainRuleException("Only draft robot artifacts can be published.");
         }
 
-        if (!TechnicalContractId.HasValue || string.IsNullOrWhiteSpace(TechnicalContractChecksum))
-        {
-            throw new DomainRuleException("A published technical contract is required before publishing a robot artifact.");
-        }
-
         Status = RobotArtifactStatus.Published;
     }
 

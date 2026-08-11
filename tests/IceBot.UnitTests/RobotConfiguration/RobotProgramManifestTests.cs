@@ -51,6 +51,39 @@ public sealed class RobotProgramManifestTests
     }
 
     [Fact]
+    public void Publish_AllowsBlackBoxArtifactsWithoutTechnicalDeclaration()
+    {
+        var organizationId = Guid.NewGuid();
+        var artifact = RobotArtifact.CreateDraft(
+            organizationId,
+            "BLACK_BOX",
+            "Black box",
+            $"robot-artifacts/{organizationId:D}/black-box.lua",
+            "black-box.lua",
+            new string('f', 64),
+            "FAIRINO_LUA_V1",
+            "FR5",
+            128,
+            DateTimeOffset.UtcNow);
+        artifact.Publish();
+        var program = RobotProgram.CreateDraft(
+            "BLACK_BOX_PROGRAM",
+            "Black box program",
+            TenantScopeType.Organization,
+            organizationId);
+        program.AddArtifact(artifact.Id, 1);
+
+        program.Publish(DateTimeOffset.UtcNow, [Snapshot(artifact)]);
+
+        var manifestArtifact = Assert.Single(
+            RobotProgramManifestBuilder.Parse(program.ProgramManifestJson!).Artifacts).RobotArtifact;
+        Assert.Null(manifestArtifact.TechnicalContractId);
+        Assert.Null(manifestArtifact.TechnicalContractChecksum);
+        Assert.Equal(artifact.Checksum, manifestArtifact.Checksum);
+        Assert.Equal(artifact.StorageKey, manifestArtifact.StorageKey);
+    }
+
+    [Fact]
     public void Publish_RejectsSnapshotThatDoesNotMatchProgramMembership()
     {
         var organizationId = Guid.NewGuid();

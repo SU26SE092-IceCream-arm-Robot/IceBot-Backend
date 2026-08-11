@@ -19,6 +19,23 @@ namespace IceBot.UnitTests.Catalog;
 public sealed class CatalogManagementTenantBoundaryTests
 {
     [Fact]
+    public void OrgAdmin_CanManageCatalogOnlyInsideAssignedOrganization()
+    {
+        var organizationId = Guid.NewGuid();
+        var otherOrganizationId = Guid.NewGuid();
+        var context = OrgAdmin(organizationId);
+
+        Assert.True(ScopeAccessRules.CanAccessScopedRow(
+            ScopeRoleSets.ProductsManage, context, organizationId, null, null));
+        Assert.True(ScopeAccessRules.CanAccessScopedRow(
+            ScopeRoleSets.MenusManage, context, organizationId, null, null));
+        Assert.False(ScopeAccessRules.CanAccessScopedRow(
+            ScopeRoleSets.ProductsManage, context, otherOrganizationId, null, null));
+        Assert.False(ScopeAccessRules.CanAccessScopedRow(
+            ScopeRoleSets.MenusManage, context, otherOrganizationId, null, null));
+    }
+
+    [Fact]
     public void StoreRole_DoesNotExpandToOrganizationScope()
     {
         var organizationId = Guid.NewGuid();
@@ -307,6 +324,33 @@ public sealed class CatalogManagementTenantBoundaryTests
         Assert.Equal(404, mutation.StatusCode);
     }
 
+    [Fact]
+    public async Task OrgAdmin_CanReadButCannotMutateGlobalProductTemplate()
+    {
+        var organizationId = Guid.NewGuid();
+        var template = ProductFor(null, TenantScopeType.Global);
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(template.Id, true, Arg.Any<CancellationToken>()).Returns(template);
+        var orgAdmin = OrgAdmin(organizationId);
+
+        var read = await new GetProductQueryHandler(store).HandleAsync(new GetProductQuery(template.Id)
+        {
+            UserContext = orgAdmin,
+            IsGlobalTemplate = true
+        });
+        var mutation = await new SetProductAvailabilityCommandHandler(store).HandleAsync(
+            new SetProductAvailabilityCommand
+            {
+                Scope = new ProductManagementCommandScope(orgAdmin, null, IsGlobalTemplate: true),
+                ProductId = template.Id,
+                IsAvailable = false
+            });
+
+        Assert.True(read.Succeeded, read.Message);
+        Assert.False(mutation.Succeeded);
+        Assert.Equal(404, mutation.StatusCode);
+    }
+
     private static Product ProductFor(Guid? organizationId, TenantScopeType scopeType = TenantScopeType.Organization) => new()
     {
         Id = Guid.NewGuid(),
@@ -322,5 +366,12 @@ public sealed class CatalogManagementTenantBoundaryTests
         AccountId = Guid.NewGuid(),
         AllowedOrganizationIds = new HashSet<Guid> { organizationId },
         RoleScopes = new[] { new UserRoleScope("Manager", organizationId, null, null) }
+    };
+
+    private static CurrentUserContext OrgAdmin(Guid organizationId) => new()
+    {
+        AccountId = Guid.NewGuid(),
+        AllowedOrganizationIds = new HashSet<Guid> { organizationId },
+        RoleScopes = new[] { new UserRoleScope("OrgAdmin", organizationId, null, null) }
     };
 }

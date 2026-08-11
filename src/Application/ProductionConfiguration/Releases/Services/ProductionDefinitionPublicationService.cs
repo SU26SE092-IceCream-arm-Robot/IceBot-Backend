@@ -26,12 +26,10 @@ public sealed class ProductionDefinitionPublicationService
             {
                 if (!programSnapshots.TryGetValue(binding.RobotProgramId, out var program))
                     throw new DomainRuleException("Production definition requires published RobotProgram snapshots.");
-                if (program.Artifacts.Any(x => !x.TechnicalContractId.HasValue || string.IsNullOrWhiteSpace(x.TechnicalContractChecksum)))
-                    throw new DomainRuleException("Production definition requires artifact technical-contract provenance.");
                 return new
                 {
                     binding.BindingOrder,
-                    binding.RequiredWorkcellCapabilityCode,
+                    RequiredCapabilityCodes = binding.GetRequiredCapabilityCodes(),
                     RobotProgramId = program.Id,
                     program.ManifestSchemaVersion,
                     program.ManifestChecksum,

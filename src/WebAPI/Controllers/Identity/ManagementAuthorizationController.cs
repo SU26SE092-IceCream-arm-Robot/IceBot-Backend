@@ -18,7 +18,7 @@ public sealed class ManagementAuthorizationController : ControllerBase
     }
 
     [HttpGet("permission-matrix")]
-    [Authorize(Policy = "roles.view")]
+    [Authorize(Policy = "permission-matrix.view")]
     public async Task<IActionResult> GetPermissionMatrix(CancellationToken cancellationToken)
     {
         var result = await _permissionMatrixHandler.HandleAsync(

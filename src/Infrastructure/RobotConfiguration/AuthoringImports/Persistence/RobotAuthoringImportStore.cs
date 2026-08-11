@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 using Application.Shared.Concurrency;
+using Application.RobotConfiguration.AuthoringImports.Queries;
 
 namespace Infrastructure.RobotConfiguration.AuthoringImports.Persistence;
 
@@ -39,6 +40,48 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
         CancellationToken cancellationToken) =>
         Query(tracked).FirstOrDefaultAsync(x => x.OrganizationId == organizationId && x.Id == importId,
             cancellationToken);
+
+    public Task<int> CountImportsAsync(RobotAuthoringImportListCriteria criteria,
+        CancellationToken cancellationToken) =>
+        BuildListQuery(criteria).CountAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<RobotAuthoringImportListRow>> ListImportsAsync(
+        RobotAuthoringImportListCriteria criteria,
+        CancellationToken cancellationToken)
+    {
+        return await BuildListQuery(criteria)
+            .OrderByDescending(importSession => importSession.CreatedAt)
+            .ThenByDescending(importSession => importSession.Id)
+            .Skip((criteria.PageNumber - 1) * criteria.PageSize)
+            .Take(criteria.PageSize)
+            .Select(importSession => new RobotAuthoringImportListRow(
+                importSession.Id,
+                importSession.OrganizationId,
+                importSession.StoreId,
+                importSession.KioskId,
+                importSession.DeviceId,
+                importSession.Status,
+                importSession.ProposedProgramCode,
+                importSession.ProposedProgramName,
+                importSession.RuntimeTargetCode,
+                importSession.MachineModelCode,
+                importSession.ValidationReportJson,
+                importSession.Items.Count,
+                importSession.AppliedRobotProgramId,
+                importSession.LinkedConfigurationReleaseId,
+                importSession.ComposedRecipeId,
+                importSession.CreatedAt,
+                importSession.ValidatedAt,
+                importSession.AppliedAt,
+                importSession.PublishedAt,
+                importSession.FailureCode,
+                importSession.FailureMessage,
+                dbContext.Accounts
+                    .Where(account => account.Id == importSession.CreatedByAccountId)
+                    .Select(account => account.FullName ?? account.UserName)
+                    .FirstOrDefault()))
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<RobotArtifactTechnicalContract>> GetContractsAsync(Guid organizationId,
         IReadOnlyCollection<string> codes, bool tracked, CancellationToken cancellationToken)
@@ -196,5 +239,48 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
     {
         IQueryable<RobotAuthoringImport> query = dbContext.RobotAuthoringImports.Include(x => x.Items);
         return tracked ? query : query.AsNoTracking();
+    }
+
+    private IQueryable<RobotAuthoringImport> BuildListQuery(RobotAuthoringImportListCriteria criteria)
+    {
+        var query = dbContext.RobotAuthoringImports.AsNoTracking()
+            .Where(importSession => importSession.OrganizationId == criteria.OrganizationId);
+
+        if (criteria.StoreId.HasValue)
+            query = query.Where(importSession => importSession.StoreId == criteria.StoreId);
+        if (criteria.KioskId.HasValue)
+            query = query.Where(importSession => importSession.KioskId == criteria.KioskId);
+        if (criteria.DeviceId.HasValue)
+            query = query.Where(importSession => importSession.DeviceId == criteria.DeviceId);
+        if (!string.IsNullOrWhiteSpace(criteria.Search))
+        {
+            var term = criteria.Search.Trim();
+            query = query.Where(importSession =>
+                EF.Functions.ILike(importSession.ProposedProgramCode, $"%{term}%") ||
+                EF.Functions.ILike(importSession.ProposedProgramName, $"%{term}%"));
+        }
+        if (criteria.CreatedFrom.HasValue)
+            query = query.Where(importSession => importSession.CreatedAt >= criteria.CreatedFrom.Value);
+        if (criteria.CreatedTo.HasValue)
+            query = query.Where(importSession => importSession.CreatedAt <= criteria.CreatedTo.Value);
+
+        return criteria.Status switch
+        {
+            RobotAuthoringImportPublicStatus.Uploaded =>
+                query.Where(importSession => importSession.Status == RobotAuthoringImportStatus.Uploaded),
+            RobotAuthoringImportPublicStatus.Validated =>
+                query.Where(importSession => importSession.Status == RobotAuthoringImportStatus.Validated),
+            RobotAuthoringImportPublicStatus.Materialized =>
+                query.Where(importSession => importSession.Status == RobotAuthoringImportStatus.Applied &&
+                    importSession.PublishedAt == null),
+            RobotAuthoringImportPublicStatus.ResourcesPublished =>
+                query.Where(importSession => importSession.Status == RobotAuthoringImportStatus.Applied &&
+                    importSession.PublishedAt != null),
+            RobotAuthoringImportPublicStatus.Failed =>
+                query.Where(importSession => importSession.Status == RobotAuthoringImportStatus.Failed),
+            RobotAuthoringImportPublicStatus.Discarded =>
+                query.Where(importSession => importSession.Status == RobotAuthoringImportStatus.Discarded),
+            _ => query
+        };
     }
 }

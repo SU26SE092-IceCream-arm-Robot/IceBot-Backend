@@ -29,6 +29,8 @@ using Application.RobotConfiguration.Artifacts.Abstractions;
 using Application.RobotConfiguration.Artifacts.Queries;
 using Application.RobotConfiguration.Programs.Abstractions;
 using Infrastructure.Catalog;
+using Infrastructure.Catalog.Bootstrap;
+using Infrastructure.Devices.Bootstrap;
 using Infrastructure.Dashboard.Persistence;
 using Infrastructure.Data;
 using Infrastructure.Devices.Catalog.Persistence;
@@ -43,6 +45,7 @@ using Infrastructure.Payments;
 using Infrastructure.ProductionConfiguration.Persistence.Deployments;
 using Infrastructure.ProductionConfiguration.Persistence.Releases;
 using Infrastructure.ProductionConfiguration.Persistence.Routes;
+using Infrastructure.ProductionConfiguration.Persistence.Bindings;
 using Infrastructure.ProductionConfiguration.ObjectStorage;
 using Infrastructure.ProductionPackages;
 using Application.ProductionPackages;
@@ -97,6 +100,9 @@ namespace Infrastructure
             services.AddScoped<IEmailSender, MailKitEmailSender>();
             services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure(config);
+            services.AddScoped<DevelopmentRobotAuthoringAutomationReset>();
+            services.AddHostedService<DevelopmentVanillaSoftServeCatalogSeedHostedService>();
+            services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
             services.AddOrdersInfrastructure();
             services.AddOptions<Application.Orders.Management.Automation.FulfillmentReminderOptions>()
                 .Bind(config.GetSection(Application.Orders.Management.Automation.FulfillmentReminderOptions.SectionName))
@@ -105,9 +111,10 @@ namespace Infrastructure
                 .ValidateOnStart();
             services.AddHostedService<Orders.Jobs.FulfillmentReminderJob>();
             services.AddPaymentsInfrastructure(config);
-            services.AddSalesCatalogInfrastructure();
+            services.AddSalesCatalogInfrastructure(config);
             services.AddTenantsInfrastructure();
             services.AddScoped<IInventoryStore, InventoryStore>();
+            services.AddScoped<IInventorySensorObservationStore, InventorySensorObservationStore>();
             services.AddOptions<Persistence.Jobs.DataRetentionOptions>()
                 .Bind(config.GetSection(Persistence.Jobs.DataRetentionOptions.SectionName))
                 .Validate(options =>
@@ -217,7 +224,9 @@ namespace Infrastructure
             services.AddScoped<Application.Shared.Concurrency.ITechnicalResourceMutationCoordinator,
                 Concurrency.PostgresTechnicalResourceMutationCoordinator>();
             services.AddScoped<IConfigurationReleaseStore, ConfigurationReleaseStore>();
-            services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
+              services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
+              services.AddScoped<Application.ProductionConfiguration.Bindings.IProductionProgramBindingStore,
+                  ProductionProgramBindingStore>();
             services.AddScoped<ConfigurationDeploymentStore>();
             services.AddScoped<IConfigurationDeploymentStore>(provider =>
                 provider.GetRequiredService<ConfigurationDeploymentStore>());

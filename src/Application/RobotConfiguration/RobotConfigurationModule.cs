@@ -10,6 +10,7 @@ using Application.RobotConfiguration.AuthoringImports;
 using Application.RobotConfiguration.AuthoringImports.ReleaseLinkage;
 using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.RobotConfiguration.AuthoringImports.Workspace;
+using Application.RobotConfiguration.AuthoringImports.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.RobotConfiguration;
@@ -31,6 +32,7 @@ public static class RobotConfigurationModule
         services.AddScoped<DiscardDraftRobotProgramCommandHandler>();
         services.AddScoped<CreateRobotProgramCommandHandler>();
         services.AddScoped<ReplaceRobotProgramArtifactsCommandHandler>();
+        services.AddScoped<ImportRawLuaRobotProgramArtifactsCommandHandler>();
         services.AddScoped<UpdateRobotProgramCommandHandler>();
         services.AddScoped<ListRobotArtifactsQueryHandler>();
         services.AddScoped<GetRobotArtifactQueryHandler>();
@@ -50,9 +52,11 @@ public static class RobotConfigurationModule
         services.AddScoped<RobotArtifactTechnicalContractHandlers>();
         services.AddScoped<AssignRobotArtifactTechnicalContractHandler>();
         services.AddScoped<RobotAuthoringImportHandlers>();
+        services.AddScoped<ListRobotAuthoringImportsQueryHandler>();
         services.AddScoped<RobotAuthoringImportValidator>();
         services.AddScoped<CreateRobotAuthoringReleaseDraftCommandHandler>();
         services.AddScoped<RobotAuthoringCompositionHandlers>();
+        services.AddScoped<RobotAuthoringRecipeResolver>();
         services.AddScoped<RobotAuthoringWorkspaceHandler>();
 
         return services;

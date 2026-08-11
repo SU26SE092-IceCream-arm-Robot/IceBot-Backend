@@ -104,8 +104,8 @@ internal static class OrderExecutionDispatchPlanner
                     activeItem.ExecutionRouteId == route.Id && activeItem.RobotProgramId == binding.RobotProgramId)).ToArray();
             }
 
-            if (bindings.Length == 0 || bindings.Any(binding =>
-                    !availableCapabilities.Contains(binding.RequiredWorkcellCapabilityCode)))
+            if (bindings.Length == 0 || bindings.Any(binding => binding.GetRequiredCapabilityCodes()
+                    .Any(capability => !availableCapabilities.Contains(capability))))
                 return null;
 
             routes.Add(new OrderExecutionResolvedRoute(item.Id, route, bindings));
@@ -200,7 +200,7 @@ internal static class OrderExecutionDispatchPlanner
         return new ExecuteOrderRobotProgramPayload
         {
             BindingOrder = binding.BindingOrder,
-            RequiredWorkcellCapabilityCode = binding.RequiredWorkcellCapabilityCode,
+            RequiredCapabilityCodes = binding.GetRequiredCapabilityCodes(),
             RobotProgramId = binding.RobotProgram.Id,
             ProgramManifestSchemaVersion = binding.RobotProgram.ProgramManifestSchemaVersion,
             ProgramManifestChecksum = binding.RobotProgram.ProgramManifestChecksum!,

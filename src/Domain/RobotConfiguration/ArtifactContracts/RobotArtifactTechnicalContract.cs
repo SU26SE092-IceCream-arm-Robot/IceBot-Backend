@@ -164,8 +164,7 @@ public sealed class RobotArtifactTechnicalContract : BusinessEntity
         EnsureDraft();
         if (_effects.Count == 0)
             throw new DomainRuleException("A robot artifact technical contract requires effects before publication.");
-        if (!parameterizedRuntimeSupported && _effects.Any(x => x.QuantityMode == RobotArtifactQuantityMode.Parameterized))
-            throw new DomainRuleException("Parameterized artifact quantities are not supported by the current runtime contract.");
+        _ = parameterizedRuntimeSupported; // Retained for source compatibility; declarations do not prove runtime support.
     }
 
     public void Retire(DateTimeOffset now, Guid? actorId)

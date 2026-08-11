@@ -10,7 +10,7 @@ namespace WebAPI.Controllers.Tenants;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/management/role-scope-options")]
-[Authorize(Policy = "role-scope-options.view")]
+[Authorize(Policy = "accounts.manage")]
 public sealed class ManagementRoleScopeOptionsController : ControllerBase
 {
     private readonly GetRoleScopeOptionsQueryHandler _queryHandler;

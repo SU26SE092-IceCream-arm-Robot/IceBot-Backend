@@ -25,6 +25,18 @@ namespace Infrastructure.Identity.Persistence
             return query.FirstOrDefaultAsync(token => token.TokenHash == tokenHash, cancellationToken);
         }
 
+        public Task<RefreshToken?> GetActiveByAccountAndIdAsync(
+            Guid accountId,
+            Guid sessionId,
+            CancellationToken cancellationToken = default) =>
+            _dbContext.RefreshTokens.FirstOrDefaultAsync(token =>
+                token.Id == sessionId &&
+                token.AccountId == accountId &&
+                token.RevokedAt == null &&
+                !token.IsUsed &&
+                token.ExpiresAt > DateTimeOffset.UtcNow,
+                cancellationToken);
+
         public Task<List<RefreshToken>> ListActiveByAccountIdAsync(Guid accountId, CancellationToken cancellationToken = default)
         {
             return _dbContext.RefreshTokens

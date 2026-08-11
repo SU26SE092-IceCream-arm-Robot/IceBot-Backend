@@ -4,6 +4,7 @@ using Application.ProductionConfiguration;
 using Application.ProductionConfiguration.Deployments;
 using Application.ProductionConfiguration.Deployments.Abstractions;
 using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Deployments.ReadModels;
 using Application.ProductionConfiguration.Deployments.Services;
 using Application.ProductionConfiguration.Readiness;
 using Application.ProductionConfiguration.Readiness.Services;
@@ -55,7 +56,7 @@ public sealed class DeploymentIdempotencyTests
         {
             UserContext = TestData.SystemAdmin(), KioskId = kioskId,
             ConfigurationReleaseId = release.Id, KioskExecutionEndpointId = endpointId,
-            IdempotencyKey = Guid.NewGuid().ToString("N"), DeploymentPreviewChecksum = new string('a', 64)
+            IdempotencyKey = Guid.NewGuid().ToString("N"), Reason = "Test deployment request", DeploymentPreviewChecksum = new string('a', 64)
         });
 
         Assert.False(result.Succeeded);
@@ -103,7 +104,8 @@ public sealed class DeploymentIdempotencyTests
             KioskId = kioskId,
             ConfigurationReleaseId = release.Id,
             KioskExecutionEndpointId = endpointId,
-            IdempotencyKey = idempotencyKey
+            IdempotencyKey = idempotencyKey,
+            Reason = "Test deployment retry"
         });
 
         Assert.True(result.Succeeded);
@@ -166,11 +168,72 @@ public sealed class DeploymentIdempotencyTests
             ConfigurationReleaseId = release.Id,
             KioskExecutionEndpointId = endpointId,
             IdempotencyKey = idempotencyKey,
+            Reason = "Test deployment retry",
             Selections = [new DeployLowCostArtifactSelection(routeId, programId)]
         });
 
         Assert.True(result.Succeeded);
         Assert.Equal(deployment.Id, result.Data!.Id);
+        Assert.DoesNotContain(
+            deploymentStore.ReceivedCalls(),
+            call => call.GetMethodInfo().Name == nameof(IConfigurationDeploymentStore.ExecuteDeploymentCreationAsync));
+    }
+
+    [Fact]
+    public async Task Rollback_RejectsWhenClientObservedActiveDeploymentIsStale()
+    {
+        var organizationId = Guid.NewGuid();
+        var kioskId = Guid.NewGuid();
+        var endpointId = Guid.NewGuid();
+        var targetDeploymentId = Guid.NewGuid();
+        var currentDeploymentId = Guid.NewGuid();
+        var deploymentStore = Substitute.For<IConfigurationDeploymentStore>();
+        var endpoint = Endpoint(
+            endpointId, kioskId, organizationId, KioskExecutionProfile.FullEdge, Guid.NewGuid(), null);
+        TestData.SetProperty(endpoint, nameof(KioskExecutionEndpoint.ActiveConfigurationDeploymentId), currentDeploymentId);
+        deploymentStore.GetConfigurationDeploymentAsync(targetDeploymentId, Arg.Any<CancellationToken>())
+            .Returns(new ConfigurationDeploymentReadModel
+            {
+                Id = targetDeploymentId,
+                Profile = ConfigurationDeploymentProfile.FullEdge,
+                OrganizationId = organizationId,
+                StoreId = endpoint.Kiosk.StoreId,
+                KioskId = kioskId,
+                KioskExecutionEndpointId = endpointId,
+                ConfigurationReleaseId = Guid.NewGuid(),
+                ReleaseChecksum = new string('a', 64),
+                Status = ConfigurationDeploymentReadStatus.Active
+            });
+        deploymentStore.GetEndpointForDeploymentAsync(endpointId, Arg.Any<CancellationToken>()).Returns(endpoint);
+
+        var fullEdge = new DeployFullEdgeConfigurationCommandHandler(
+            deploymentStore,
+            Substitute.For<IConfigurationReleaseStore>(),
+            Substitute.For<IEdgeCommandStore>(),
+            Substitute.For<IEdgeCommandWakeUpPublisher>(),
+            ReadinessGuard(),
+            new FullEdgeReleaseBundleService(Substitute.For<IArtifactObjectStorage>()));
+        var lowCost = new DeployLowCostArtifactSetCommandHandler(
+            deploymentStore,
+            Substitute.For<IConfigurationReleaseStore>(),
+            Substitute.For<IEdgeCommandStore>(),
+            Options.Create(new LowCostControllerCapacityOptions()),
+            Substitute.For<IEdgeCommandWakeUpPublisher>(),
+            ReadinessGuard());
+        var handler = new RollbackConfigurationDeploymentCommandHandler(deploymentStore, fullEdge, lowCost);
+
+        var result = await handler.HandleAsync(new RollbackConfigurationDeploymentCommand
+        {
+            UserContext = TestData.SystemAdmin(),
+            KioskId = kioskId,
+            TargetDeploymentId = targetDeploymentId,
+            ExpectedActiveDeploymentId = Guid.NewGuid(),
+            IdempotencyKey = Guid.NewGuid().ToString("N"),
+            Reason = "Rollback after production incident."
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(409, result.StatusCode);
         Assert.DoesNotContain(
             deploymentStore.ReceivedCalls(),
             call => call.GetMethodInfo().Name == nameof(IConfigurationDeploymentStore.ExecuteDeploymentCreationAsync));

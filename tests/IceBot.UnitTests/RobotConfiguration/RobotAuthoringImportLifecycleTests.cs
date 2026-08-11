@@ -42,7 +42,10 @@ public sealed class RobotAuthoringImportLifecycleTests
         Assert.Equal("Materialized", materialized.Status);
         Assert.Equal(programId, materialized.MaterializedRobotProgramId);
         Assert.Equal(now, materialized.MaterializedAt);
+        Assert.Contains("PublishImportResources", materialized.NextActions);
 
+        importSession.ConfirmComposition(Guid.NewGuid(), [], "preview-checksum", now.AddSeconds(30), Guid.NewGuid());
+        Assert.Contains("PublishImportResources", RobotAuthoringImportResult.From(importSession).NextActions);
         importSession.MarkPublished(now.AddMinutes(1), Guid.NewGuid());
         var published = RobotAuthoringImportResult.From(importSession);
 
@@ -58,6 +61,21 @@ public sealed class RobotAuthoringImportLifecycleTests
             importSession.LinkConfigurationRelease(Guid.NewGuid(), DateTimeOffset.UtcNow, Guid.NewGuid()));
 
         Assert.Contains("published resources", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void PublishingTechnicalResources_DoesNotCreateOrRequireRecipeComposition()
+    {
+        var importSession = CreateImport();
+        var now = DateTimeOffset.UtcNow;
+        importSession.MarkValidated("{}", now, Guid.NewGuid());
+        importSession.MarkApplied(Guid.NewGuid(), now, Guid.NewGuid());
+
+        importSession.MarkPublished(now.AddMinutes(1), Guid.NewGuid());
+
+        Assert.Null(importSession.ComposedRecipeId);
+        Assert.NotNull(importSession.PublishedAt);
+        Assert.Contains("CreateProductionBinding", RobotAuthoringImportResult.From(importSession).NextActions);
     }
 
     [Fact]
@@ -82,6 +100,7 @@ public sealed class RobotAuthoringImportLifecycleTests
         var now = DateTimeOffset.UtcNow;
         importSession.MarkValidated("{}", now, Guid.NewGuid());
         importSession.MarkApplied(Guid.NewGuid(), now, Guid.NewGuid());
+        importSession.ConfirmComposition(Guid.NewGuid(), [], "preview-checksum", now, Guid.NewGuid());
         importSession.MarkPublished(now, Guid.NewGuid());
         return importSession;
     }

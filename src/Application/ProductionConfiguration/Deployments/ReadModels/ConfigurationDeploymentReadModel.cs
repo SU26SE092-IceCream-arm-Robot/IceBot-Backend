@@ -23,6 +23,7 @@ public sealed class ConfigurationDeploymentReadModel
     public Guid KioskId { get; init; }
     public Guid KioskExecutionEndpointId { get; init; }
     public string EndpointCode { get; init; } = string.Empty;
+    public Guid? ObservedActiveDeploymentId { get; init; }
     public Guid ConfigurationReleaseId { get; init; }
     public long ReleaseNumber { get; init; }
     public string ReleaseChecksum { get; init; } = string.Empty;

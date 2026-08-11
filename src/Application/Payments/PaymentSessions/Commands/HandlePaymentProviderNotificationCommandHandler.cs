@@ -3,6 +3,7 @@ using Application.Abstractions.Realtime.Events;
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Results;
 using Application.Payments.PaymentSessions.Support;
+using Application.Payments.PaymentSessions.Observability;
 using Application.Payments.Providers;
 using Application.Shared.Exceptions;
 using Application.Shared.Wrappers;
@@ -89,6 +90,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         bool canRetryPayment = false;
         bool requiresStaffSupport = false;
         bool requiresMachineExecution = false;
+        var verifiedUnmatched = false;
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
@@ -159,7 +161,10 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
 
             if (paymentTransaction is null)
             {
-                return ApiResult<PaymentNotificationResult>.Fail("Payment transaction not found.", 404);
+                verifiedUnmatched = true;
+                var acknowledgement = ApiResult<PaymentNotificationResult>.Success();
+                acknowledgement.Message = "Verified payment callback acknowledged without a matching local transaction.";
+                return acknowledgement;
             }
 
             await _paymentStore.AcquireOrderWorkflowLockAsync(paymentTransaction.OrderId, ct);
@@ -265,6 +270,16 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 AlreadyProcessed = alreadyProcessed
             });
         }, cancellationToken);
+
+        if (verifiedUnmatched)
+        {
+            PaymentWebhookMetrics.RecordVerifiedUnmatched();
+            _logger.LogInformation(
+                "Verified payment callback was acknowledged without a matching local transaction. Provider={Provider}, EventType={EventType}",
+                notification.Provider,
+                notification.EventType);
+            return result;
+        }
 
         if (result.Succeeded && result.Data is not null)
         {

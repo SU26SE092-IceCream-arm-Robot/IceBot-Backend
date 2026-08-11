@@ -21,7 +21,7 @@ public sealed class RequeueNotificationDeliveryService(
     INotificationDeliveryStore deliveries,
     IOperationLogStore operationLogs)
 {
-    public async Task<ApiResult<NotificationDeliveryDiagnosticsResult>> RequeueAsync(
+    public async Task<ApiResult<NotificationDeliveryOperationalResult>> RequeueAsync(
         CurrentUserContext user,
         Guid organizationId,
         Guid deliveryId,
@@ -30,14 +30,14 @@ public sealed class RequeueNotificationDeliveryService(
     {
         reason = reason?.Trim() ?? string.Empty;
         if (reason.Length is < 3 or > 500)
-            return ApiResult<NotificationDeliveryDiagnosticsResult>.Fail(
+            return ApiResult<NotificationDeliveryOperationalResult>.Fail(
                 "Requeue reason must be between 3 and 500 characters.", 400);
 
         var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.NotificationsManage, user);
         var visible = await reads.GetAsync(organizationId, deliveryId, user.IsSystemAdmin,
             scope.OrganizationIds, scope.StoreIds, scope.KioskIds, cancellationToken);
         if (visible is null)
-            return ApiResult<NotificationDeliveryDiagnosticsResult>.Fail("Notification delivery not found.", 404);
+            return ApiResult<NotificationDeliveryOperationalResult>.Fail("Notification delivery not found.", 404);
 
         try
         {
@@ -68,13 +68,13 @@ public sealed class RequeueNotificationDeliveryService(
                     SyncedAt = delivery.UpdatedAt
                 }, ct);
                 await deliveries.SaveChangesAsync(ct);
-                return NotificationDeliveryDiagnosticsResult.From(delivery);
+                return NotificationDeliveryOperationalResult.From(delivery);
             }, cancellationToken);
-            return ApiResult<NotificationDeliveryDiagnosticsResult>.Success(result, "Notification delivery requeued.");
+            return ApiResult<NotificationDeliveryOperationalResult>.Success(result, "Notification delivery requeued.");
         }
         catch (DomainRuleException ex)
         {
-            return ApiResult<NotificationDeliveryDiagnosticsResult>.Fail(ex.Message, 409);
+            return ApiResult<NotificationDeliveryOperationalResult>.Fail(ex.Message, 409);
         }
     }
 }

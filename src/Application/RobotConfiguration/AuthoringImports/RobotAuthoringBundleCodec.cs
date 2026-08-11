@@ -230,8 +230,8 @@ public static class RobotAuthoringBundleCodec
     private static void ValidateSidecar(RobotAuthoringManifestProgram program, RobotAuthoringManifestArtifact item,
         RobotAuthoringSidecar sidecar)
     {
-        if (sidecar.SchemaVersion is not 1 and not 2 || sidecar.Effects is null || sidecar.Effects.Count == 0)
-            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' must use schema version 1 or 2 and declare effects.");
+        if (sidecar.SchemaVersion is not 1 and not 2 || sidecar.Effects is null)
+            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' must use schema version 1 or 2 and declare effects as an array.");
         if (sidecar.OrderingConstraints is null)
             throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' must declare orderingConstraints as an array.");
         if (sidecar.Effects.Any(effect => effect is null) ||
@@ -239,10 +239,8 @@ public static class RobotAuthoringBundleCodec
             throw new RobotAuthoringBundleException(
                 $"Sidecar '{item.SidecarFileName}' effects and orderingConstraints cannot contain null items.");
         if (!EqualsCode(sidecar.ArtifactCode, item.ArtifactCode) ||
-            !string.Equals(sidecar.ArtifactFileName, item.FileName, StringComparison.OrdinalIgnoreCase) ||
-            !EqualsCode(sidecar.RuntimeTargetCode, program.RuntimeTargetCode) ||
-            !EqualsCode(sidecar.MachineModelCode, program.MachineModelCode))
-            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' does not match its manifest artifact or target.");
+            !string.Equals(sidecar.ArtifactFileName, item.FileName, StringComparison.OrdinalIgnoreCase))
+            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' does not match its manifest artifact.");
 
         if (sidecar.Effects.Any(effect => !Enum.IsDefined(effect.EffectKind) ||
                 !Enum.IsDefined(effect.QuantityMode)))
@@ -276,10 +274,6 @@ public static class RobotAuthoringBundleCodec
                 not RobotArtifactEffectKind.Option)
                 throw new RobotAuthoringBundleException(
                     $"Sidecar '{item.SidecarFileName}' uses an effect kind that is not supported by authoring schema V2.");
-            if (EqualsCode(program.RuntimeTargetCode, "FAIRINO_LUA_V1") &&
-                effect.QuantityMode == RobotArtifactQuantityMode.Parameterized)
-                throw new RobotAuthoringBundleException(
-                    $"Sidecar '{item.SidecarFileName}' cannot use parameterized quantities for FAIRINO_LUA_V1.");
             if (effect.EffectKind == RobotArtifactEffectKind.Ingredient && string.IsNullOrWhiteSpace(effect.IngredientCode))
                 throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' ingredient effects require ingredientCode.");
             if (effect.EffectKind == RobotArtifactEffectKind.Option && string.IsNullOrWhiteSpace(effect.OptionCode))

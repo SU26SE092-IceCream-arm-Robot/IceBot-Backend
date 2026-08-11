@@ -15,6 +15,7 @@ using Application.RobotConfiguration.Artifacts.Commands;
 using Application.RobotConfiguration.Programs.Commands;
 using Application.RobotConfiguration.ArtifactContracts;
 using Application.Shared.Concurrency;
+using Application.RobotConfiguration.AuthoringImports.Queries;
 
 namespace Application.RobotConfiguration.AuthoringImports;
 
@@ -23,6 +24,8 @@ public interface IRobotAuthoringImportStore
     Task<bool> ScopeExistsAsync(Guid organizationId, Guid? storeId, Guid? kioskId, Guid? deviceId, CancellationToken cancellationToken);
     Task<RobotAuthoringImport?> GetByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, bool tracked, CancellationToken cancellationToken);
     Task<RobotAuthoringImport?> GetAsync(Guid organizationId, Guid importId, bool tracked, CancellationToken cancellationToken);
+    Task<int> CountImportsAsync(RobotAuthoringImportListCriteria criteria, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RobotAuthoringImportListRow>> ListImportsAsync(RobotAuthoringImportListCriteria criteria, CancellationToken cancellationToken);
     Task<IReadOnlyList<RobotArtifactTechnicalContract>> GetContractsAsync(Guid organizationId, IReadOnlyCollection<string> codes, bool tracked, CancellationToken cancellationToken);
     Task<IReadOnlyList<RobotArtifact>> GetArtifactsAsync(Guid organizationId, IReadOnlyCollection<string> codes, bool tracked, CancellationToken cancellationToken);
     Task<RobotProgram?> GetProgramAsync(Guid organizationId, Guid? storeId, Guid? kioskId, Guid? deviceId, string code, bool tracked, CancellationToken cancellationToken);
@@ -54,6 +57,7 @@ public sealed class UploadRobotAuthoringImportCommand
 
 public sealed record GetRobotAuthoringImportQuery(CurrentUserContext UserContext, Guid OrganizationId, Guid ImportId);
 public sealed record ValidateRobotAuthoringImportCommand(CurrentUserContext UserContext, Guid OrganizationId, Guid ImportId);
+public sealed record ResumeRobotAuthoringImportCommand(CurrentUserContext UserContext, Guid OrganizationId, Guid ImportId);
 public sealed record MaterializeRobotAuthoringImportCommand(
     CurrentUserContext UserContext,
     Guid OrganizationId,
@@ -90,22 +94,13 @@ public sealed record RobotAuthoringImportResult(Guid Id, Guid OrganizationId, Gu
         RobotAuthoringImportValidationReport? validation = null;
         if (!string.IsNullOrWhiteSpace(value.ValidationReportJson))
             validation = JsonSerializer.Deserialize<RobotAuthoringImportValidationReport>(value.ValidationReportJson);
-        var actions = value.Status switch
-        {
-            RobotAuthoringImportStatus.Uploaded => new[] { "ValidateImport", "DiscardImport" },
-            RobotAuthoringImportStatus.Validated when validation?.CanMaterialize == true => new[] { "MaterializeImport", "DiscardImport" },
-            RobotAuthoringImportStatus.Validated => new[] { "ResolveArtifactRevisionConflict", "DiscardImport" },
-            RobotAuthoringImportStatus.Applied when value.LinkedConfigurationReleaseId.HasValue =>
-                new[] { "ReviewConfigurationReleaseDraft", "PublishConfigurationRelease" },
-            RobotAuthoringImportStatus.Applied when value.PublishedAt.HasValue =>
-                new[] { "CreateConfigurationReleaseDraft" },
-            RobotAuthoringImportStatus.Applied => new[] { "PreviewSemanticComposition", "ReviewTechnicalContracts", "PublishImportResources" },
-            RobotAuthoringImportStatus.Failed => new[] { "ValidateImport", "DiscardImport" },
-            _ => Array.Empty<string>()
-        };
-        var publicStatus = value.Status == RobotAuthoringImportStatus.Applied
-            ? value.PublishedAt.HasValue ? "ResourcesPublished" : "Materialized"
-            : value.Status.ToString();
+        var actions = RobotAuthoringImportLifecycleProjection.GetNextActions(
+            value.Status,
+            validation?.CanMaterialize == true,
+            value.LinkedConfigurationReleaseId,
+            value.PublishedAt,
+            value.ComposedRecipeId.HasValue);
+        var publicStatus = RobotAuthoringImportLifecycleProjection.GetPublicStatus(value.Status, value.PublishedAt);
         return new RobotAuthoringImportResult(value.Id, value.OrganizationId, value.StoreId, value.KioskId,
             value.DeviceId, value.ClientExportId, value.ImportChecksum, value.SchemaVersion, publicStatus,
             value.ProposedProgramCode, value.ProposedProgramName, value.RuntimeTargetCode, value.MachineModelCode,
@@ -157,7 +152,9 @@ public sealed class RobotAuthoringImportHandlers(
             if (existing.ImportChecksum != checksum || existing.ClientExportId != bundle.Manifest.ExportId ||
                 existing.StoreId != command.StoreId || existing.KioskId != command.KioskId || existing.DeviceId != command.DeviceId)
                 return ApiResult<RobotAuthoringImportResult>.Fail("Idempotency key was already used with a different bundle or scope.", 409);
-            return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(existing), "Existing import returned.");
+            var resumed = await ResumeAutomaticProcessingAsync(command.UserContext, command.OrganizationId,
+                existing.Id, cancellationToken);
+            return ApiResult<RobotAuthoringImportResult>.Success(resumed, AutomationMessage(resumed));
         }
 
         var importId = Guid.NewGuid();
@@ -192,12 +189,14 @@ public sealed class RobotAuthoringImportHandlers(
                     insert.Import.StoreId != command.StoreId || insert.Import.KioskId != command.KioskId ||
                     insert.Import.DeviceId != command.DeviceId)
                     return ApiResult<RobotAuthoringImportResult>.Fail("Idempotency key was concurrently used with a different bundle or scope.", 409);
-                return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(insert.Import),
-                    "Concurrent retry resolved to the existing import.");
+                var resumed = await ResumeAutomaticProcessingAsync(command.UserContext, command.OrganizationId,
+                    insert.Import.Id, cancellationToken);
+                return ApiResult<RobotAuthoringImportResult>.Success(resumed, AutomationMessage(resumed));
             }
             RobotAuthoringImportObservability.Uploaded(bundle.Items.Count);
-            return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(insert.Import),
-                "Robot authoring bundle staged.", 201);
+            var processed = await ResumeAutomaticProcessingAsync(command.UserContext, command.OrganizationId,
+                insert.Import.Id, cancellationToken);
+            return ApiResult<RobotAuthoringImportResult>.Success(processed, AutomationMessage(processed), 201);
         }
         catch
         {
@@ -216,6 +215,90 @@ public sealed class RobotAuthoringImportHandlers(
             ? ApiResult<RobotAuthoringImportResult>.Fail("Robot authoring import not found.", 404)
             : ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(session));
     }
+
+    private async Task<RobotAuthoringImportResult> ResumeAutomaticProcessingAsync(
+        CurrentUserContext userContext,
+        Guid organizationId,
+        Guid importId,
+        CancellationToken cancellationToken)
+    {
+        var current = await store.GetAsync(organizationId, importId, false, cancellationToken)
+            ?? throw new InvalidOperationException("The persisted robot authoring import was not found.");
+
+        if (current.Status is RobotAuthoringImportStatus.Uploaded or RobotAuthoringImportStatus.Failed)
+        {
+            var validation = await ValidateAsync(new ValidateRobotAuthoringImportCommand(
+                userContext, organizationId, importId), cancellationToken);
+            if (!validation.Succeeded || validation.Data is null)
+            {
+                var failed = await store.GetAsync(organizationId, importId, false, cancellationToken);
+                return RobotAuthoringImportResult.From(failed ?? current);
+            }
+            current = await store.GetAsync(organizationId, importId, false, cancellationToken) ?? current;
+        }
+
+        if (current.Status == RobotAuthoringImportStatus.Validated &&
+            CanMaterialize(current) &&
+            CanManageProgram(userContext, organizationId))
+        {
+            var materialization = await MaterializeAsync(new MaterializeRobotAuthoringImportCommand(
+                userContext, organizationId, importId), cancellationToken);
+            if (materialization.Succeeded && materialization.Data is not null)
+                current = await store.GetAsync(organizationId, importId, false, cancellationToken) ?? current;
+        }
+
+        var latest = await store.GetAsync(organizationId, importId, false, cancellationToken);
+        return RobotAuthoringImportResult.From(latest ?? current);
+    }
+
+    public async Task<ApiResult<RobotAuthoringImportResult>> ResumeAsync(
+        ResumeRobotAuthoringImportCommand command,
+        CancellationToken cancellationToken)
+    {
+        if (!CanUpload(command.UserContext, command.OrganizationId) ||
+            !CanManageProgram(command.UserContext, command.OrganizationId))
+            return ApiResult<RobotAuthoringImportResult>.Fail(
+                "Both artifact.upload and program.manage access are required.", 403);
+
+        var session = await store.GetAsync(
+            command.OrganizationId, command.ImportId, false, cancellationToken);
+        if (session is null)
+            return ApiResult<RobotAuthoringImportResult>.Fail(
+                "Robot authoring import not found.", 404);
+        if (session.Status == RobotAuthoringImportStatus.Discarded)
+            return ApiResult<RobotAuthoringImportResult>.Fail(
+                "Discarded imports cannot be resumed.", 409);
+
+        var resumed = await ResumeAutomaticProcessingAsync(
+            command.UserContext, command.OrganizationId, command.ImportId, cancellationToken);
+        return ApiResult<RobotAuthoringImportResult>.Success(
+            resumed, AutomationMessage(resumed));
+    }
+
+    private static bool CanMaterialize(RobotAuthoringImport import)
+    {
+        if (string.IsNullOrWhiteSpace(import.ValidationReportJson))
+            return false;
+
+        try
+        {
+            return JsonSerializer.Deserialize<RobotAuthoringImportValidationReport>(import.ValidationReportJson)
+                ?.CanMaterialize == true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static string AutomationMessage(RobotAuthoringImportResult import) => import.Status switch
+    {
+        "Materialized" => "Bundle validated and Draft technical resources materialized. Select or confirm a Recipe before publication.",
+        "Validated" when import.Validation?.CanMaterialize == false =>
+            "Bundle staged and validated with blockers. Resolve the reported conflicts before materialization.",
+        "Validated" => "Bundle validated. Draft resource materialization requires program.manage access.",
+        _ => "Robot authoring bundle staged."
+    };
 
     public async Task<ApiResult<RobotAuthoringImportResult>> ValidateAsync(ValidateRobotAuthoringImportCommand command,
         CancellationToken cancellationToken)
@@ -394,8 +477,13 @@ public sealed class RobotAuthoringImportHandlers(
             foreach (var item in bundle.Items.OrderBy(x => x.ManifestItem.RunOrder))
             {
                 var code = Normalize(item.ManifestItem.ArtifactCode);
-                var contract = existingContracts.SingleOrDefault(x => x.ContractCode == code);
-                if (contract is null)
+                var matchingContracts = existingContracts.Where(x => x.ContractCode == code).ToArray();
+                RobotArtifactTechnicalContract? contract = matchingContracts.Length == 1 &&
+                    matchingContracts[0].Status != RobotArtifactContractStatus.Retired &&
+                    RobotAuthoringImportValidator.DeclarationMatches(matchingContracts[0], item.Sidecar)
+                        ? matchingContracts[0]
+                        : null;
+                if (contract is null && matchingContracts.Length == 0 && item.Sidecar.Effects.Count > 0)
                 {
                     contract = CreateDraftContract(session, item, command.UserContext.AccountId);
                     newContracts.Add(contract);
@@ -410,13 +498,13 @@ public sealed class RobotAuthoringImportHandlers(
                             ApiResult<RobotAuthoringImportResult>.Fail(
                                 $"Artifact '{code}' changed while the import was being prepared; validate again.", 409));
                     artifact = CreateDraftArtifact(session, item, stagedObject,
-                        contract.Status == RobotArtifactContractStatus.Published ? contract : null,
+                        contract?.Status == RobotArtifactContractStatus.Published ? contract : null,
                         command.UserContext.AccountId);
                     usedKeys.Add(artifact.StorageKey);
                     newArtifacts.Add(artifact);
                     created = true;
                 }
-                session.Items.Single(x => x.ArtifactCode == code).MarkResolved(artifact.Id, contract.Id, created);
+                session.Items.Single(x => x.ArtifactCode == code).MarkResolved(artifact.Id, contract?.Id, created);
             }
 
             if (program is null)
@@ -440,7 +528,7 @@ public sealed class RobotAuthoringImportHandlers(
             RobotAuthoringImportObservability.Materialized(
                 Stopwatch.GetElapsedTime(startedAt), session.Items.Count);
             return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(session),
-                "Draft technical contracts, artifacts, and ordered program materialized.");
+                "Artifacts and ordered program materialized; declared metadata was retained when usable.");
         }
         catch (DomainRuleException ex)
         {
@@ -540,56 +628,61 @@ public sealed class RobotAuthoringImportHandlers(
                     "Import resources were already published.");
             }
 
-            if (session.Items.Any(item => !item.TechnicalContractId.HasValue || !item.RobotArtifactId.HasValue))
+            if (session.Items.Any(item => !item.RobotArtifactId.HasValue))
                 return await RollbackPublicationFailureAsync("IMPORT_ITEM_INCOMPLETE",
                     "Import item is missing materialized resource identities.");
 
             var publicationResources = session.Items
-                .SelectMany(item => new[]
-                {
-                    TechnicalResourceMutationIdentity.Artifact(item.RobotArtifactId!.Value),
-                    TechnicalResourceMutationIdentity.Contract(item.TechnicalContractId!.Value)
-                })
+                .SelectMany(item => item.TechnicalContractId.HasValue
+                    ? new[]
+                    {
+                        TechnicalResourceMutationIdentity.Artifact(item.RobotArtifactId!.Value),
+                        TechnicalResourceMutationIdentity.Contract(item.TechnicalContractId.Value)
+                    }
+                    : new[] { TechnicalResourceMutationIdentity.Artifact(item.RobotArtifactId!.Value) })
                 .Append(TechnicalResourceMutationIdentity.Program(session.AppliedRobotProgramId.Value))
                 .ToArray();
             await mutationCoordinator.ExecuteAsync(publicationResources, _ => Task.FromResult(true), cancellationToken);
 
             foreach (var item in session.Items.OrderBy(x => x.RunOrder))
             {
-                var publishContract = await technicalContractHandlers.PublishAsync(
-                    new PublishRobotArtifactTechnicalContractCommand(command.UserContext, command.OrganizationId,
-                        item.TechnicalContractId!.Value), cancellationToken);
-                if (!publishContract.Succeeded && publishContract.StatusCode != 400)
-                    return await RollbackPublicationFailureAsync("CONTRACT_PUBLICATION_FAILED",
-                        publishContract.Message, artifactCode: item.ArtifactCode);
-                if (!publishContract.Succeeded)
+                if (item.TechnicalContractId.HasValue)
                 {
-                    var contracts = await store.GetContractsAsync(command.OrganizationId,
-                        [item.ArtifactCode], false, cancellationToken);
-                    var contract = contracts.SingleOrDefault(candidate =>
-                        candidate.Id == item.TechnicalContractId.Value);
-                    if (contract?.Status != RobotArtifactContractStatus.Published)
+                    var publishContract = await technicalContractHandlers.PublishAsync(
+                        new PublishRobotArtifactTechnicalContractCommand(command.UserContext, command.OrganizationId,
+                            item.TechnicalContractId.Value), cancellationToken);
+                    if (!publishContract.Succeeded && publishContract.StatusCode != 400)
                         return await RollbackPublicationFailureAsync("CONTRACT_PUBLICATION_FAILED",
                             publishContract.Message, artifactCode: item.ArtifactCode);
-                }
+                    if (!publishContract.Succeeded)
+                    {
+                        var contracts = await store.GetContractsAsync(command.OrganizationId,
+                            [item.ArtifactCode], false, cancellationToken);
+                        var contract = contracts.SingleOrDefault(candidate =>
+                            candidate.Id == item.TechnicalContractId.Value);
+                        if (contract?.Status != RobotArtifactContractStatus.Published)
+                            return await RollbackPublicationFailureAsync("CONTRACT_PUBLICATION_FAILED",
+                                publishContract.Message, artifactCode: item.ArtifactCode);
+                    }
 
-                var assignment = await assignContractHandler.AssignArtifactAsync(command.UserContext,
-                    command.OrganizationId, item.RobotArtifactId!.Value, item.TechnicalContractId!.Value, cancellationToken);
-                if (!assignment.Succeeded)
-                {
-                    var artifacts = await store.GetArtifactsAsync(command.OrganizationId,
-                        [item.ArtifactCode], false, cancellationToken);
-                    var artifact = artifacts.SingleOrDefault(candidate => candidate.Id == item.RobotArtifactId.Value);
-                    if (artifact?.TechnicalContractId != item.TechnicalContractId.Value)
-                        return await RollbackPublicationFailureAsync("CONTRACT_ASSIGNMENT_FAILED",
-                            assignment.Message, artifactCode: item.ArtifactCode);
+                    var assignment = await assignContractHandler.AssignArtifactAsync(command.UserContext,
+                        command.OrganizationId, item.RobotArtifactId!.Value, item.TechnicalContractId.Value, cancellationToken);
+                    if (!assignment.Succeeded)
+                    {
+                        var artifacts = await store.GetArtifactsAsync(command.OrganizationId,
+                            [item.ArtifactCode], false, cancellationToken);
+                        var artifact = artifacts.SingleOrDefault(candidate => candidate.Id == item.RobotArtifactId.Value);
+                        if (artifact?.TechnicalContractId != item.TechnicalContractId.Value)
+                            return await RollbackPublicationFailureAsync("CONTRACT_ASSIGNMENT_FAILED",
+                                assignment.Message, artifactCode: item.ArtifactCode);
+                    }
                 }
 
                 var publishArtifact = await publishArtifactHandler.HandleAsync(new PublishRobotArtifactCommand
                 {
                     UserContext = command.UserContext,
                     OrganizationId = command.OrganizationId,
-                    ArtifactId = item.RobotArtifactId.Value
+                    ArtifactId = item.RobotArtifactId!.Value
                 }, cancellationToken);
                 if (!publishArtifact.Succeeded)
                 {
@@ -620,7 +713,7 @@ public sealed class RobotAuthoringImportHandlers(
             await store.CommitMutationAsync(cancellationToken);
             transactionStarted = false;
             return ApiResult<RobotAuthoringImportResult>.Success(RobotAuthoringImportResult.From(session),
-                "Technical contracts, artifacts, and robot program published.");
+                "Artifacts and robot program published; optional declarations were published when present.");
         }
         catch (DomainRuleException ex)
         {

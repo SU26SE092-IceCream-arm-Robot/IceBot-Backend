@@ -25,6 +25,7 @@ public static class OperationsModule
         services.AddScoped<CancelMaintenanceTicketCommandHandler>();
         services.AddScoped<GetMaintenanceTicketQueryHandler>();
         services.AddScoped<ListMaintenanceTicketsQueryHandler>();
+        services.AddScoped<ListMaintenanceTicketAssigneeOptionsQueryHandler>();
         services.AddScoped<ListAlertsQueryHandler>();
         services.AddScoped<GetAlertQueryHandler>();
         services.AddScoped<AcknowledgeAlertCommandHandler>();
@@ -35,6 +36,7 @@ public static class OperationsModule
         services.AddScoped<GetOperationLogQueryHandler>();
         services.AddScoped<GetOperationLogDiagnosticsQueryHandler>();
         services.AddScoped<NotificationDeliveryDiagnosticsService>();
+        services.AddScoped<NotificationDeliveryOperationsService>();
         services.AddScoped<RequeueNotificationDeliveryService>();
         services.AddScoped<IMaintenanceAssignmentNotifier, MaintenanceAssignmentNotifier>();
         services.AddScoped<MqttCredentialOperationalAlertReconciler>();

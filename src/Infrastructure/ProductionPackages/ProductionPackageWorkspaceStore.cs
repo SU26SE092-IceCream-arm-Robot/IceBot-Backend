@@ -139,8 +139,7 @@ public sealed class ProductionPackageWorkspaceStore(
             .Select(x => x.RobotProgramId).ToHashSet() ?? [];
         var releasePrograms = programs.Where(x => releaseProgramIds.Contains(x.Id)).ToArray();
         var readyEndpoint = endpoints.FirstOrDefault(endpoint => releasePrograms.Length > 0 && releasePrograms.All(program =>
-            program.RobotProgramArtifacts.All(membership => artifactsById.TryGetValue(membership.RobotArtifactId, out var artifact) &&
-                endpoint.SupportsRobotTarget(artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId))) &&
+            program.RobotProgramArtifacts.All(membership => artifactsById.ContainsKey(membership.RobotArtifactId))) &&
             readinessByEndpoint.TryGetValue(endpoint.Id, out var readiness) &&
             readiness.Readiness == ExecutionReadinessState.Ready && readiness.Safety == ExecutionSafetyState.Safe &&
             requiredCapabilityCodes.All(code => readiness.Capabilities.Any(capability => capability.IsAvailable &&

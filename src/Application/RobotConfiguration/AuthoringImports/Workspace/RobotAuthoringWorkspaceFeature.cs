@@ -2,6 +2,7 @@ using Application.Identity.Tokens.Claims;
 using Application.ProductionConfiguration.Deployments.Services;
 using Application.ProductionConfiguration.Releases.Abstractions;
 using Application.ProductionPackages.Ownership;
+using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.Shared.Wrappers;
 using Domain.ProductionConfiguration.Enums;
 using Domain.ProductionConfiguration.Entities;
@@ -13,6 +14,7 @@ public sealed record RobotAuthoringWorkspaceResult(
     RobotAuthoringImportResult Import,
     string? ConfigurationReleaseStatus,
     IReadOnlyCollection<RobotAuthoringPackageTarget> PackageTargets,
+    RobotAuthoringRecipeResolution RecipeResolution,
     ConfigurationDeploymentPreview? DeploymentPreview,
     IReadOnlyCollection<RobotAuthoringWorkspaceBlocker> Blockers,
     IReadOnlyCollection<RobotAuthoringWorkspaceAction> Actions);
@@ -36,6 +38,7 @@ public sealed record RobotAuthoringWorkspaceBlocker(
 
 public sealed class RobotAuthoringWorkspaceHandler(
     RobotAuthoringImportHandlers imports,
+    RobotAuthoringRecipeResolver recipeResolver,
     IProductionPackageTechnicalOwnershipStore packageOwnership,
     IConfigurationReleaseStore releases,
     IConfigurationDeploymentPreviewService deploymentPreview)
@@ -53,6 +56,8 @@ public sealed class RobotAuthoringWorkspaceHandler(
                 importResult.Message ?? "Robot authoring import not found.", importResult.StatusCode);
 
         var import = importResult.Data;
+        var recipeResolution = await recipeResolver.ResolveAsync(
+            organizationId, importId, cancellationToken);
         var blockers = new List<RobotAuthoringWorkspaceBlocker>();
         ConfigurationRelease? release = null;
         if (import.LinkedConfigurationReleaseId.HasValue)
@@ -117,6 +122,7 @@ public sealed class RobotAuthoringWorkspaceHandler(
             import,
             releaseStatus?.ToString(),
             targets,
+            recipeResolution,
             preview,
             distinctBlockers,
             actions));
@@ -139,14 +145,16 @@ public sealed class RobotAuthoringWorkspaceHandler(
             .Select(code => new RobotAuthoringWorkspaceAction(code, false))
             .ToList();
 
-        if (import.LinkedConfigurationReleaseId.HasValue && releaseStatus == ConfigurationReleaseStatus.Draft)
+        if (import.LinkedConfigurationReleaseId.HasValue && import.ComposedRecipeId.HasValue &&
+            releaseStatus == ConfigurationReleaseStatus.Draft)
         {
             actions.Add(new("ReviewConfigurationReleaseDraft", false,
                 ResourceId: import.LinkedConfigurationReleaseId));
             actions.Add(new("PublishConfigurationRelease", false,
                 ResourceId: import.LinkedConfigurationReleaseId));
         }
-        else if (!import.LinkedConfigurationReleaseId.HasValue && import.PublishedAt.HasValue)
+        else if (!import.LinkedConfigurationReleaseId.HasValue && import.PublishedAt.HasValue &&
+                 import.ComposedRecipeId.HasValue)
         {
             actions.Add(new("CreateConfigurationReleaseDraft", false));
         }

@@ -74,6 +74,30 @@ internal sealed class ExecutionRouteConfiguration : IEntityTypeConfiguration<Exe
     }
 }
 
+internal sealed class ProductionProgramBindingConfiguration : IEntityTypeConfiguration<ProductionProgramBinding>
+{
+    public void Configure(EntityTypeBuilder<ProductionProgramBinding> entity)
+    {
+        entity.ToTable("ProductionProgramBindings");
+        entity.HasIndex(x => new { x.OrganizationId, x.RecipeId, x.RobotProgramId, x.Status });
+        entity.HasIndex(x => x.BindingChecksum).IsUnique();
+        entity.Property(x => x.ProgramManifestChecksum).HasMaxLength(64);
+        entity.Property(x => x.BindingChecksum).HasMaxLength(64);
+        entity.Property(x => x.RequiredCapabilityCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
+            .HasDefaultValueSql("'[]'::jsonb");
+        entity.Property(x => x.SupportedOptionCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
+            .HasDefaultValueSql("'[]'::jsonb");
+        entity.HasOne<Domain.Tenants.Entities.Organization>().WithMany().HasForeignKey(x => x.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Domain.Catalog.Entities.ProductVariant>().WithMany().HasForeignKey(x => x.ProductVariantId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Domain.Catalog.Entities.Recipe>().WithMany().HasForeignKey(x => x.RecipeId)
+            .OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Domain.RobotConfiguration.Programs.RobotProgram>().WithMany().HasForeignKey(x => x.RobotProgramId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class ExecutionRouteRobotBindingConfiguration : IEntityTypeConfiguration<ExecutionRouteRobotBinding>
 {
     public void Configure(EntityTypeBuilder<ExecutionRouteRobotBinding> entity)
@@ -83,11 +107,18 @@ internal sealed class ExecutionRouteRobotBindingConfiguration : IEntityTypeConfi
             .IsUnique()
             .HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => x.RobotProgramId);
+        entity.HasIndex(x => x.ProductionProgramBindingId);
+        entity.Property(x => x.ProductionProgramBindingChecksum).HasMaxLength(64);
+        entity.Property(x => x.RequiredWorkcellCapabilityCode).HasMaxLength(500);
+        entity.Property(x => x.RequiredCapabilityCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
+            .HasDefaultValueSql("'[]'::jsonb");
         entity.HasOne(x => x.ExecutionRoute)
             .WithMany(x => x.RobotBindings)
             .HasForeignKey(x => x.ExecutionRouteId)
             .OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.RobotProgram).WithMany().HasForeignKey(x => x.RobotProgramId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<ProductionProgramBinding>().WithMany().HasForeignKey(x => x.ProductionProgramBindingId)
+            .OnDelete(DeleteBehavior.Restrict);
 
     }
 }

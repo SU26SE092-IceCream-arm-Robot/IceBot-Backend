@@ -103,6 +103,21 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 | Payment-session reconciliation batch | `Payments__SessionReconciliation__BatchSize` | **P2** | Maximum pending transactions queried per scan; appsettings default is `50`. |
 | Order payment window | `Payments__OrderPaymentWindow__DurationMinutes` | **P1** | Server-authoritative time allowed to start payment after Order placement, including across Store closing or a manual sales pause. Default `15`; startup validation allows `1-120`. PayOS session expiry is capped by this deadline. |
 
+## Runtime Menu Redis Cache
+
+The runtime-menu cache is optional. It accelerates the anonymous kiosk menu projection but does not replace live kiosk/store admission or transactional checkout validation. Keep it disabled until the environment has an isolated Redis service.
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| Enable runtime-menu cache | `RuntimeMenuCache__Enabled` | **P1** | Set `true` only after Redis connectivity is verified. `false` uses the database projection without changing the public API. |
+| Redis connection string | `RuntimeMenuCache__RedisConnectionString` | **P0 Feature** | **Secret/env required** when enabled. Use an environment-specific Redis endpoint, TLS policy, and credentials. |
+| Redis namespace | `RuntimeMenuCache__InstanceName` | **P1** | Required when enabled. Use a distinct prefix per deployment, for example `icebot:production:`. Do not share a namespace across environments. |
+| Distributed projection TTL | `RuntimeMenuCache__DistributedExpirationSeconds` | **P2** | Default `10`; allowed `1-60`. Bounds stale catalog projection data in Redis. |
+| Process-local projection TTL | `RuntimeMenuCache__LocalExpirationSeconds` | **P2** | Default `1`; allowed `1` through the distributed TTL. This short L1 cache reduces stampedes but is not actively invalidated across API replicas. |
+| Uncached response TTL | `RuntimeMenuCache__UncachedSnapshotExpirationSeconds` | **P2** | Default `15`; applies when cache is disabled or Redis is unavailable. |
+
+Redis loss must not make kiosk ordering unavailable: the backend logs the cache failure, records a metric, and resolves the projection from PostgreSQL. Do not set a long TTL to compensate for slow catalog queries; profile and fix the query path instead.
+
 ## Robot Artifact Storage
 
 | Area | Configuration key | Priority | Deploy action |

@@ -5,6 +5,7 @@ public sealed class AccountAccessResult
     public Guid AccountId { get; set; }
     public bool IsSystemAdmin { get; set; }
     public List<string> Roles { get; set; } = [];
+    public List<string> PermissionCodes { get; set; } = [];
     public List<AccountRoleScopeAccessResult> RoleScopes { get; set; } = [];
     public EffectiveScopeResult EffectiveScope { get; set; } = new();
 }

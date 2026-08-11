@@ -104,10 +104,8 @@ public sealed class UploadRobotArtifactCommandHandler
             technicalContract = await _technicalContracts.GetAsync(
                 command.TechnicalContractId.Value, false, cancellationToken);
             if (technicalContract is null || technicalContract.Status != RobotArtifactContractStatus.Published ||
-                (technicalContract.OrganizationId.HasValue && technicalContract.OrganizationId != command.OrganizationId) ||
-                !string.Equals(technicalContract.RuntimeTargetCode, command.RuntimeTargetCode.Trim(), StringComparison.OrdinalIgnoreCase) ||
-                !string.Equals(technicalContract.MachineModelCode, command.MachineModelCode.Trim(), StringComparison.OrdinalIgnoreCase))
-                return ApiResult<RobotArtifactResult>.Fail("Published compatible technical contract not found.", 400);
+                (technicalContract.OrganizationId.HasValue && technicalContract.OrganizationId != command.OrganizationId))
+                return ApiResult<RobotArtifactResult>.Fail("Published technical declaration not found in organization scope.", 400);
         }
 
         var checksum = bufferedContent.Checksum;

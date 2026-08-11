@@ -42,6 +42,75 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
     }
 
     [Fact]
+    public async Task InvalidWebhookSignature_IsRejectedBeforePaymentStoreAccess()
+    {
+        var store = Substitute.For<IPaymentStore>();
+        var gateway = Substitute.For<IPaymentGateway>();
+        gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ProviderPaymentNotification>>(_ =>
+                throw new InvalidOperationException("Invalid PayOS webhook signature."));
+
+        var result = await CreateHandler(store, gateway).HandleAsync(
+            new HandlePaymentProviderNotificationCommand
+            {
+                Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{\"data\":{}}" }
+            });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Empty(store.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task VerifiedUnmatchedWebhook_IsAcknowledgedWithoutPaymentMutationOrDispatch()
+    {
+        var notification = new ProviderPaymentNotification
+        {
+            Provider = "PayOS",
+            ProviderEventId = "event:verified-unmatched",
+            ProviderOrderCode = Guid.NewGuid().ToString("N"),
+            EventType = "PAID",
+            ProviderStatus = "PAID",
+            IsPaid = true,
+            PaidAmount = 30_000,
+            RawPayloadJson = "{\"verified\":true}"
+        };
+        var store = Substitute.For<IPaymentStore>();
+        store.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>()(CancellationToken.None));
+        store.GetPaymentCallbackAsync(notification.Provider, notification.ProviderEventId, Arg.Any<CancellationToken>())
+            .Returns((PaymentCallback?)null);
+        store.GetPaymentTransactionByProviderOrderCodeAsync(
+                notification.Provider, notification.ProviderOrderCode, Arg.Any<CancellationToken>())
+            .Returns((PaymentTransaction?)null);
+        var gateway = Substitute.For<IPaymentGateway>();
+        gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(notification);
+        var publisher = Substitute.For<IRealtimeNotificationPublisher>();
+        var dispatchStore = Substitute.For<IOrderExecutionDispatchStore>();
+        var handler = CreateHandler(store, gateway, dispatchStore, publisher);
+
+        var result = await handler.HandleAsync(new HandlePaymentProviderNotificationCommand
+        {
+            Request = new HandlePaymentProviderNotificationRequest { RawPayload = notification.RawPayloadJson }
+        });
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(200, result.StatusCode);
+        Assert.Null(result.Data);
+        await store.DidNotReceive().AddPaymentCallbackAsync(Arg.Any<PaymentCallback>(), Arg.Any<CancellationToken>());
+        await store.DidNotReceive().AddOrderStatusHistoryAsync(Arg.Any<OrderStatusHistory>(), Arg.Any<CancellationToken>());
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        Assert.Empty(publisher.ReceivedCalls());
+        await dispatchStore.DidNotReceive().ExecuteSerializedAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Func<CancellationToken, Task<ApiResult<Application.EdgeIntegration.Dispatch.Results.OrderExecutionDispatchResult>>>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task PaidWebhookWithMismatchedAmount_IsRejectedBeforeStateMutation()
     {
         var order = new Order { Id = Guid.NewGuid(), KioskId = Guid.NewGuid() };
@@ -156,6 +225,65 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         Assert.Equal(409, result.StatusCode);
         Assert.Contains("different payment or payload", result.Message, StringComparison.OrdinalIgnoreCase);
         await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DuplicateMatchingWebhook_RemainsIdempotentWithoutSecondDispatch()
+    {
+        var payment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(),
+            OrderId = Guid.NewGuid(),
+            Provider = "PayOS",
+            ProviderOrderCode = Guid.NewGuid().ToString("N"),
+            Status = PaymentTransactionStatus.Paid
+        };
+        const string payload = "{\"status\":\"PAID\"}";
+        var callback = new PaymentCallback
+        {
+            PaymentTransactionId = payment.Id,
+            PaymentTransaction = payment,
+            Provider = payment.Provider,
+            ProviderEventId = "event:duplicate",
+            EventType = "PAID",
+            PayloadJson = payload,
+            ReceivedAt = DateTimeOffset.UtcNow
+        };
+        callback.MarkProcessed(DateTimeOffset.UtcNow);
+        var store = Substitute.For<IPaymentStore>();
+        store.ExecuteInTransactionAsync(
+                Arg.Any<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => call.Arg<Func<CancellationToken, Task<ApiResult<PaymentNotificationResult>>>>()(CancellationToken.None));
+        store.GetPaymentCallbackAsync(payment.Provider, callback.ProviderEventId!, Arg.Any<CancellationToken>())
+            .Returns(callback);
+        var gateway = Substitute.For<IPaymentGateway>();
+        gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new ProviderPaymentNotification
+            {
+                Provider = payment.Provider,
+                ProviderEventId = callback.ProviderEventId,
+                ProviderOrderCode = payment.ProviderOrderCode,
+                EventType = "PAID",
+                IsPaid = true,
+                PaidAmount = 30_000,
+                RawPayloadJson = payload
+            });
+        var dispatchStore = Substitute.For<IOrderExecutionDispatchStore>();
+
+        var result = await CreateHandler(store, gateway, dispatchStore).HandleAsync(
+            new HandlePaymentProviderNotificationCommand
+            {
+                Request = new HandlePaymentProviderNotificationRequest { RawPayload = payload }
+            });
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.True(result.Data!.AlreadyProcessed);
+        await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
+        await dispatchStore.DidNotReceive().ExecuteSerializedAsync(
+            Arg.Any<Guid>(),
+            Arg.Any<Func<CancellationToken, Task<ApiResult<Application.EdgeIntegration.Dispatch.Results.OrderExecutionDispatchResult>>>>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -282,7 +410,8 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
     private static HandlePaymentProviderNotificationCommandHandler CreateHandler(
         IPaymentStore store,
         IPaymentGateway gateway,
-        IOrderExecutionDispatchStore? dispatchStore = null)
+        IOrderExecutionDispatchStore? dispatchStore = null,
+        IRealtimeNotificationPublisher? publisher = null)
     {
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             dispatchStore ?? Substitute.For<IOrderExecutionDispatchStore>(),
@@ -291,7 +420,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         return new HandlePaymentProviderNotificationCommandHandler(
             store,
             gateway,
-            Substitute.For<IRealtimeNotificationPublisher>(),
+            publisher ?? Substitute.For<IRealtimeNotificationPublisher>(),
             dispatchHandler,
             NullLogger<HandlePaymentProviderNotificationCommandHandler>.Instance);
     }

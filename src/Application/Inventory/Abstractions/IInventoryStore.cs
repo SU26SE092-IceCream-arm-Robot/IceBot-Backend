@@ -45,7 +45,9 @@ public interface IInventoryStore
     Task<List<InventoryTopologyChangeRecord>> ListTopologyChangeRecordsAsync(Guid dispenserStateId, int take, CancellationToken cancellationToken = default);
     Task<int> CountTopologyChangeRecordsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<List<StockMovement>> ListStockMovementsForDispenserAsync(Guid dispenserStateId, int take, CancellationToken cancellationToken = default);
+    Task<List<InventorySensorObservation>> ListSensorObservationsForDispenserAsync(Guid dispenserStateId, int take, CancellationToken cancellationToken = default);
     Task<int> CountStockMovementsForDispenserAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
+    Task<int> CountSensorObservationsForDispenserAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<int> CountTopologyRebindRecordsAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<List<Account>> ListAccountsForInventoryHistoryAsync(IReadOnlyCollection<Guid> accountIds, CancellationToken cancellationToken = default);
 

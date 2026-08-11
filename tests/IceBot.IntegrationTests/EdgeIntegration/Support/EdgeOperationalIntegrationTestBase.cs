@@ -822,6 +822,7 @@ public abstract class EdgeOperationalIntegrationTestBase
             var deploymentStore = new ConfigurationDeploymentStore(dbContext);
             var packageOwnership = new ProductionPackageTechnicalOwnershipPolicy(
                 new ProductionPackageTechnicalOwnershipStore(dbContext));
+            var mutationCoordinator = new PostgresTechnicalResourceMutationCoordinator(dbContext);
             var createdRelease = await new CreateConfigurationReleaseCommandHandler(releaseStore).HandleAsync(
                 new CreateConfigurationReleaseCommand
                 {
@@ -832,19 +833,20 @@ public abstract class EdgeOperationalIntegrationTestBase
             releaseId = createdRelease.Data!.Id;
 
             var routed = await new ReplaceConfigurationReleaseRoutesCommandHandler(
-                releaseStore, routeStore, packageOwnership).HandleAsync(
+                releaseStore, routeStore, packageOwnership, mutationCoordinator).HandleAsync(
                 new ReplaceConfigurationReleaseRoutesCommand
                 {
                     UserContext = user,
                     OrganizationId = graph.OrganizationId,
                     ReleaseId = releaseId,
+                    ExpectedRevision = createdRelease.Data.Revision,
                     Routes =
                     [
                         new ConfigurationReleaseRouteInput(
                             graph.RecipeId,
                             "DEFAULT",
                             0,
-                            null,
+                            [],
                             Array.Empty<string>(),
                             [new ConfigurationReleaseRobotBindingInput(programId, 1, "ICE_CREAM")])
                     ]
@@ -886,7 +888,8 @@ public abstract class EdgeOperationalIntegrationTestBase
                     KioskId = graph.KioskId,
                     ConfigurationReleaseId = releaseId,
                     KioskExecutionEndpointId = graph.EndpointId,
-                    IdempotencyKey = Guid.NewGuid().ToString("N")
+                    IdempotencyKey = Guid.NewGuid().ToString("N"),
+                    Reason = "Edge operational integration deployment"
                 });
             Assert.True(deployed.Succeeded, deployed.Message);
             deploymentId = deployed.Data!.Id;

@@ -1,4 +1,6 @@
 using Application.Identity.Access.Results;
+using Application.Identity.InternalAccounts;
+using Application.Identity.Roles.Queries;
 using Application.Identity.Tokens.Claims;
 using Domain.Identity.Entities;
 
@@ -6,10 +8,11 @@ namespace Application.Identity.Access.Mapping;
 
 internal static class AccountAccessResultMapper
 {
-    public static AccountAccessResult FromAccount(Account account)
+    public static AccountAccessResult FromAccount(Account account, Guid? organizationId = null)
     {
         var activeRoles = account.AccountRoles
-            .Where(accountRole => accountRole.IsActive)
+            .Where(accountRole => accountRole.IsActive &&
+                (!organizationId.HasValue || AccountManagementAccessRules.BelongsToOrganization(accountRole, organizationId.Value)))
             .ToList();
 
         var roleScopes = activeRoles
@@ -32,6 +35,8 @@ internal static class AccountAccessResultMapper
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(roleCode => roleCode)
                 .ToList(),
+            PermissionCodes = PermissionCatalog.ResolvePermissionCodes(
+                activeRoles.Select(accountRole => accountRole.Role.Code)),
             RoleScopes = roleScopes,
             EffectiveScope = ToEffectiveScope(roleScopes)
         };
@@ -57,6 +62,10 @@ internal static class AccountAccessResultMapper
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(roleCode => roleCode)
                 .ToList(),
+            PermissionCodes = PermissionCatalog.ResolvePermissionCodes(
+                userContext.IsSystemAdmin
+                    ? roleCodes.Append("SystemAdmin")
+                    : roleCodes),
             RoleScopes = roleScopes,
             EffectiveScope = new EffectiveScopeResult
             {

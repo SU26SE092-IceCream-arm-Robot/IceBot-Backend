@@ -144,6 +144,7 @@ public class IceBotDbContext : DbContext
     public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<IngredientDispenserState> IngredientDispenserStates => Set<IngredientDispenserState>();
+    public DbSet<InventorySensorObservation> InventorySensorObservations => Set<InventorySensorObservation>();
     public DbSet<InventoryTopologyRebindRecord> InventoryTopologyRebindRecords => Set<InventoryTopologyRebindRecord>();
     public DbSet<InventoryTopologyChangeRecord> InventoryTopologyChangeRecords => Set<InventoryTopologyChangeRecord>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
@@ -191,6 +192,7 @@ public class IceBotDbContext : DbContext
     public DbSet<ProductionPackageUpgradeAvailabilityChange> ProductionPackageUpgradeAvailabilityChanges => Set<ProductionPackageUpgradeAvailabilityChange>();
     public DbSet<ProductionComposition> ProductionCompositions => Set<ProductionComposition>();
     public DbSet<ConfigurationRelease> ConfigurationReleases => Set<ConfigurationRelease>();
+    public DbSet<ProductionProgramBinding> ProductionProgramBindings => Set<ProductionProgramBinding>();
     public DbSet<ExecutionRoute> ExecutionRoutes => Set<ExecutionRoute>();
     public DbSet<ExecutionRouteRobotBinding> ExecutionRouteRobotBindings => Set<ExecutionRouteRobotBinding>();
     public DbSet<KioskConfigurationDeployment> KioskConfigurationDeployments => Set<KioskConfigurationDeployment>();

@@ -8,6 +8,7 @@ using Application.ProductionConfiguration.Releases.Services;
 using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration.Deployments.Services;
 using Application.ProductionConfiguration.Deployments.Notifications;
+using Application.ProductionConfiguration.Bindings;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.ProductionConfiguration;
@@ -22,6 +23,7 @@ public static class ProductionConfigurationModule
         services.AddScoped<ProductionDefinitionPublicationService>();
         services.AddScoped<DeploymentValidationService>();
         services.AddScoped<ConfigurationDeploymentPreviewHandler>();
+        services.AddScoped<DeploymentOperationAuditWriter>();
         services.AddScoped<IConfigurationDeploymentPreviewService>(provider =>
             provider.GetRequiredService<ConfigurationDeploymentPreviewHandler>());
         services.AddScoped<RetireConfigurationReleaseCommandHandler>();
@@ -30,6 +32,7 @@ public static class ProductionConfigurationModule
         services.AddScoped<DeployLowCostArtifactSetCommandHandler>();
         services.AddScoped<CreateConfigurationReleaseCommandHandler>();
         services.AddScoped<ReplaceConfigurationReleaseRoutesCommandHandler>();
+        services.AddScoped<ProductionProgramBindingHandlers>();
         services.AddScoped<ListConfigurationReleasesQueryHandler>();
         services.AddScoped<GetConfigurationReleaseQueryHandler>();
         services.AddScoped<GetConfigurationReleaseAuthoringOptionsQueryHandler>();

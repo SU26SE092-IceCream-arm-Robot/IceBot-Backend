@@ -8,5 +8,6 @@ public sealed class GetConfigurationReleaseAuthoringOptionsQuery
     public Guid OrganizationId { get; init; }
     public Guid? ProductVariantId { get; init; }
     public string? Search { get; init; }
+    public bool IncludeGlobalTemplates { get; init; }
     public int Limit { get; init; } = 50;
 }

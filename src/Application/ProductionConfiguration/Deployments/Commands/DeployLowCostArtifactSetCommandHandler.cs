@@ -41,6 +41,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
     private readonly DeploymentValidationService? _deploymentValidation;
     private readonly IConfigurationDeploymentPreviewService? _deploymentPreview;
+    private readonly DeploymentOperationAuditWriter? _operationAudit;
 
     public DeployLowCostArtifactSetCommandHandler(
         IConfigurationDeploymentStore deploymentStore,
@@ -86,6 +87,22 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         _deploymentPreview = deploymentPreview;
     }
 
+    public DeployLowCostArtifactSetCommandHandler(
+        IConfigurationDeploymentStore deploymentStore,
+        IConfigurationReleaseStore releaseStore,
+        IEdgeCommandStore edgeCommandStore,
+        IOptions<LowCostControllerCapacityOptions> capacity,
+        IEdgeCommandWakeUpPublisher wakeUpPublisher,
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        DeploymentValidationService deploymentValidation,
+        IConfigurationDeploymentPreviewService deploymentPreview,
+        DeploymentOperationAuditWriter operationAudit)
+        : this(deploymentStore, releaseStore, edgeCommandStore, capacity, wakeUpPublisher,
+            inventoryReadiness, deploymentValidation, deploymentPreview)
+    {
+        _operationAudit = operationAudit;
+    }
+
     public async Task<ApiResult<ControllerArtifactSetDeploymentResult>> HandleAsync(
         DeployLowCostArtifactSetCommand command,
         CancellationToken cancellationToken = default)
@@ -96,6 +113,12 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             string.IsNullOrWhiteSpace(command.IdempotencyKey) || command.IdempotencyKey.Trim().Length > 200)
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Kiosk, configuration release, and execution endpoint are required.", 400);
+        }
+
+        var reason = command.Reason?.Trim();
+        if (reason is null or { Length: < 3 or > 500 })
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Deployment reason is required and must be between 3 and 500 characters.", 400);
         }
 
         if (command.Selections.Count == 0)
@@ -294,6 +317,26 @@ public sealed class DeployLowCostArtifactSetCommandHandler
 
                     await _deploymentStore.AddControllerArtifactSetDeploymentAsync(deployment, ct);
                     await _edgeCommandStore.AddAsync(edgeCommand, ct);
+                    if (_operationAudit is not null)
+                    {
+                        await _operationAudit.WriteRequestedAsync(
+                            command.UserContext,
+                            command.IsRollback ? ScopeRoleSets.ReleaseRollback : ScopeRoleSets.ReleaseDeploy,
+                            command.IsRollback ? "ConfigurationRollbackRequested" : "ConfigurationDeploymentRequested",
+                            reason,
+                            endpoint.Kiosk.OrganizationId,
+                            endpoint.Kiosk.StoreId,
+                            deployment.KioskId,
+                            deployment.KioskExecutionEndpointId,
+                            deployment.Id,
+                            edgeCommand.Id,
+                            deployment.SourceConfigurationReleaseId,
+                            deployment.ReleaseChecksum,
+                            endpoint.ActiveArtifactSetDeploymentId,
+                            command.RollbackTargetDeploymentId,
+                            now,
+                            ct);
+                    }
                     await _deploymentStore.SaveChangesAsync(ct);
 
                     return ApiResult<ControllerArtifactSetDeploymentResult>.Success(

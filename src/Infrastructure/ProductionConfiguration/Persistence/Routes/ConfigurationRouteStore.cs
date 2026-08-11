@@ -37,6 +37,18 @@ public sealed class ConfigurationRouteStore : IConfigurationRouteStore
             .Where(program => ids.Contains(program.Id))
             .ToListAsync(cancellationToken);
 
+    public async Task<IReadOnlyList<ProductionProgramBinding>> ListProductionProgramBindingsByIdsAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default) =>
+        await _dbContext.ProductionProgramBindings.AsNoTracking()
+            .Where(binding => ids.Contains(binding.Id) && binding.DeletedAt == null)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<ProductionProgramBinding>> ListActiveProductionProgramBindingsAsync(Guid organizationId,
+        IReadOnlyCollection<Guid> recipeIds, IReadOnlyCollection<Guid> robotProgramIds, CancellationToken cancellationToken = default) =>
+        await _dbContext.ProductionProgramBindings.AsNoTracking().Where(binding => binding.OrganizationId == organizationId &&
+            recipeIds.Contains(binding.RecipeId) && robotProgramIds.Contains(binding.RobotProgramId) &&
+            binding.Status == ProductionProgramBindingStatus.Active && binding.DeletedAt == null).ToListAsync(cancellationToken);
+
     public async Task SaveReleaseReplacementAsync(
         IReadOnlyCollection<ExecutionRoute> removedRoutes,
         CancellationToken cancellationToken = default)

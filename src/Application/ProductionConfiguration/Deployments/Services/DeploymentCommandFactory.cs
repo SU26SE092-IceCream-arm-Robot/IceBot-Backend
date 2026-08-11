@@ -132,8 +132,6 @@ public static class DeploymentCommandFactory
             foreach (var programArtifact in programManifest.Artifacts.OrderBy(item => item.RunOrder))
             {
                 var artifact = programArtifact.RobotArtifact;
-                if (!endpoint.SupportsRobotTarget(artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId))
-                    throw new DomainRuleException("Selected robot program contains an artifact that is not compatible with the controller endpoint.");
                 items.Add(new ControllerArtifactSetItemSnapshot(
                     route.Id, program.Id, program.ProgramManifestChecksum!, artifact.Id, artifact.Checksum,
                     artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode, program.DeviceId,

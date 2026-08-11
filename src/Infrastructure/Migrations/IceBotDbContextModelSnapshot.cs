@@ -2139,6 +2139,89 @@ namespace Infrastructure.Migrations
                     b.ToTable("IngredientDispenserStates", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Inventory.Entities.InventorySensorObservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CloudReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("DerivedEstimatedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Disposition")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("IngredientDispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskExecutionEndpointId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("ObservationSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ObservedLevelStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SensorPayloadJson")
+                        .HasMaxLength(16384)
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid>("SourceEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceExecutorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KioskExecutionEndpointId");
+
+                    b.HasIndex("IngredientDispenserStateId", "CloudReceivedAt");
+
+                    b.HasIndex("OriginNodeId", "Version");
+
+                    b.HasIndex("SourceExecutorId", "SourceEventId")
+                        .IsUnique();
+
+                    b.HasIndex("SourceExecutorId", "IngredientDispenserStateId", "ObservationSequence");
+
+                    b.ToTable("InventorySensorObservations", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyChangeRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4365,6 +4448,20 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("ExecutionRouteId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ProductionProgramBindingChecksum")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("ProductionProgramBindingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequiredCapabilityCodesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10000)
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<string>("RequiredWorkcellCapabilityCode")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -4380,6 +4477,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ProductionProgramBindingId");
 
                     b.HasIndex("RobotProgramId");
 
@@ -4515,6 +4614,96 @@ namespace Infrastructure.Migrations
                     b.HasIndex("KioskId", "Status", "RequestedAt");
 
                     b.ToTable("KioskConfigurationDeployments", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ProductionProgramBinding", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Assurance")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("BindingChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("CapabilityEvidenceStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductVariantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProgramManifestChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("RecipeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RecipeVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequiredCapabilityCodesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10000)
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("RobotProgramId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SupportedOptionCodesJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(10000)
+                        .HasColumnType("jsonb")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BindingChecksum")
+                        .IsUnique();
+
+                    b.HasIndex("ProductVariantId");
+
+                    b.HasIndex("RecipeId");
+
+                    b.HasIndex("RobotProgramId");
+
+                    b.HasIndex("OrganizationId", "RecipeId", "RobotProgramId", "Status");
+
+                    b.ToTable("ProductionProgramBindings", (string)null);
                 });
 
             modelBuilder.Entity("Domain.ProductionExecution.Projections.OrderExecutionRecord", b =>
@@ -8307,6 +8496,21 @@ namespace Infrastructure.Migrations
                     b.Navigation("Kiosk");
                 });
 
+            modelBuilder.Entity("Domain.Inventory.Entities.InventorySensorObservation", b =>
+                {
+                    b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", null)
+                        .WithMany()
+                        .HasForeignKey("IngredientDispenserStateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", null)
+                        .WithMany()
+                        .HasForeignKey("KioskExecutionEndpointId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.Inventory.Entities.InventoryTopologyRebindRecord", b =>
                 {
                     b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", null)
@@ -8818,6 +9022,11 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Domain.ProductionConfiguration.Entities.ProductionProgramBinding", null)
+                        .WithMany()
+                        .HasForeignKey("ProductionProgramBindingId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.RobotConfiguration.Programs.RobotProgram", "RobotProgram")
                         .WithMany()
                         .HasForeignKey("RobotProgramId")
@@ -8865,6 +9074,33 @@ namespace Infrastructure.Migrations
                     b.Navigation("ConfigurationRelease");
 
                     b.Navigation("KioskExecutionEndpoint");
+                });
+
+            modelBuilder.Entity("Domain.ProductionConfiguration.Entities.ProductionProgramBinding", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.ProductVariant", null)
+                        .WithMany()
+                        .HasForeignKey("ProductVariantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Catalog.Entities.Recipe", null)
+                        .WithMany()
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.RobotConfiguration.Programs.RobotProgram", null)
+                        .WithMany()
+                        .HasForeignKey("RobotProgramId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.ProductionExecution.Projections.OrderExecutionRecord", b =>

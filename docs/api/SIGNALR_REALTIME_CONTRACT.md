@@ -42,7 +42,7 @@ Clients must explicitly join a group to receive targeted events.
 ### OperationsHub Events
 - `OrderItemFulfillmentChanged`: The same committed line delta is sent to `kiosk:{kioskId}` so the staff fulfillment workspace can update without waiting for an aggregate order transition.
 - `MaintenanceTicketChanged`: Triggered when a maintenance ticket is created, updated, assigned, started, resolved, closed, or cancelled.
-- `InventoryChanged`: Triggered when a dispenser is refilled or its stock estimate is adjusted.
+- `InventoryChanged`: Triggered when the committed inventory projection changes, including refill, adjustment, accepted Edge execution evidence, or an accepted sensor observation.
 - `KioskStatusChanged`: Triggered only after a committed lifecycle or connectivity transition. Management changes populate `oldLifecycleStatus/newLifecycleStatus`; heartbeat and timeout changes populate `oldConnectivity/newConnectivity`. Connectivity never mutates kiosk lifecycle. Duplicate heartbeat ingestion and unchanged projections do not emit this event.
 - `KioskOperationalStateChanged`: Triggered after a committed operator or maintenance-driven operational transition. It carries old/new state, actor, reason, optional source maintenance ticket, and transition time. `EmergencyStopRequested` means Cloud intervention intent, not confirmed hardware state. The event is separate from lifecycle/connectivity and is the UI signal for refetching sales/dispatch admission.
 - `ExecutionReadinessChanged`: Triggered after a newer typed readiness/capability projection commits. Payload carries endpoint, revision, readiness, activity, and safety; clients refresh detailed capability state from the read model when needed.

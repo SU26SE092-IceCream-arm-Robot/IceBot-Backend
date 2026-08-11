@@ -99,7 +99,7 @@ public class ConfigurationRelease : BusinessEntity
         IEnumerable<(Guid ProductVariantId, Guid RecipeId, string RouteCode, int Priority,
             string? RequiredCapabilitiesJson,
             IReadOnlyCollection<string> SupportedOptionCodes,
-            IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)> Bindings)> replacements)
+            IReadOnlyCollection<(Guid ProductionProgramBindingId, string ProductionProgramBindingChecksum, Guid RobotProgramId, int BindingOrder, IReadOnlyCollection<string> CapabilityCodes)> Bindings)> replacements)
     {
         EnsureDraft();
         var removed = _executionRoutes.ToArray();
@@ -109,10 +109,26 @@ public class ConfigurationRelease : BusinessEntity
             var route = AddRoute(replacement.ProductVariantId, replacement.RecipeId, replacement.RouteCode,
                 replacement.Priority, replacement.RequiredCapabilitiesJson, replacement.SupportedOptionCodes);
             foreach (var binding in replacement.Bindings)
-                route.AddRobotBinding(binding.RobotProgramId, binding.BindingOrder, binding.CapabilityCode);
+                route.AddRobotBinding(binding.ProductionProgramBindingId == Guid.Empty ? null : binding.ProductionProgramBindingId,
+                    binding.ProductionProgramBindingId == Guid.Empty ? null : binding.ProductionProgramBindingChecksum,
+                    binding.RobotProgramId, binding.BindingOrder, binding.CapabilityCodes);
         }
 
         return removed;
+    }
+
+    // Package materialization predates standalone bindings. It is retained until package routes are migrated.
+    public IReadOnlyCollection<ExecutionRoute> ReplaceRoutes(
+        IEnumerable<(Guid ProductVariantId, Guid RecipeId, string RouteCode, int Priority,
+            string? RequiredCapabilitiesJson, IReadOnlyCollection<string> SupportedOptionCodes,
+            IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)> Bindings)> replacements)
+    {
+        return ReplaceRoutes(replacements.Select(replacement => (
+            replacement.ProductVariantId, replacement.RecipeId, replacement.RouteCode, replacement.Priority,
+            replacement.RequiredCapabilitiesJson, replacement.SupportedOptionCodes,
+            (IReadOnlyCollection<(Guid ProductionProgramBindingId, string ProductionProgramBindingChecksum, Guid RobotProgramId, int BindingOrder, IReadOnlyCollection<string> CapabilityCodes)>)
+            replacement.Bindings.Select(binding => (Guid.Empty, string.Empty, binding.RobotProgramId, binding.BindingOrder,
+                (IReadOnlyCollection<string>)[binding.CapabilityCode])).ToArray())));
     }
 
     public void Publish(
@@ -230,19 +246,9 @@ public class ConfigurationRelease : BusinessEntity
                     endpoint.Kiosk,
                     "Robot program");
 
-                var programManifest = RobotProgramManifestBuilder.Parse(
+                _ = RobotProgramManifestBuilder.Parse(
                     binding.RobotProgram.ProgramManifestJson
                         ?? throw new DomainRuleException("Published robot program manifest is missing."));
-                foreach (var programArtifact in programManifest.Artifacts)
-                {
-                    if (!endpoint.SupportsRobotTarget(
-                            programArtifact.RobotArtifact.RuntimeTargetCode,
-                            programArtifact.RobotArtifact.MachineModelCode,
-                            binding.RobotProgram.DeviceId))
-                    {
-                        throw new DomainRuleException("The execution endpoint does not support a robot artifact required by this release.");
-                    }
-                }
             }
         }
     }

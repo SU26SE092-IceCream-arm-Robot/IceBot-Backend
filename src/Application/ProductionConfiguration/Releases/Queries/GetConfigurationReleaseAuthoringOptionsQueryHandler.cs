@@ -25,6 +25,7 @@ public sealed class GetConfigurationReleaseAuthoringOptionsQueryHandler
             query.OrganizationId,
             query.ProductVariantId,
             query.Search,
+            query.IncludeGlobalTemplates && query.UserContext.IsSystemAdmin,
             Math.Clamp(query.Limit, 1, 100),
             cancellationToken);
         return ApiResult<ConfigurationReleaseAuthoringOptionsReadModel>.Success(result);

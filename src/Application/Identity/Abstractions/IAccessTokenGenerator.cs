@@ -8,6 +8,7 @@ namespace Application.Identity.Abstractions
     {
         ApiResult<string> GenerateAccessToken(
             Guid accountId,
+            Guid sessionId,
             string accountUserName,
             IReadOnlyCollection<AccountRoleClaim> roles,
             AccountStatus accountStatus);

@@ -21,42 +21,33 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
             var matchingContracts = contracts.Where(x => x.ContractCode == code).ToArray();
             var contract = matchingContracts.Length == 1 ? matchingContracts[0] : null;
             if (matchingContracts.Length > 1)
-                errors.Add(new("TECHNICAL_CONTRACT_IDENTITY_CONFLICT",
-                    "Multiple technical contracts use the same V1 identity.", code));
-            if (contract is not null && !ContractMatches(contract, item.Sidecar))
-                errors.Add(new("TECHNICAL_CONTRACT_CONFLICT",
-                    "Existing contract identity has a different definition.", code));
+                warnings.Add(new("TECHNICAL_DECLARATION_IDENTITY_CONFLICT",
+                    "Multiple technical declarations use this code; none will be attached automatically.", code));
+            if (contract is not null && !DeclarationMatches(contract, item.Sidecar))
+                warnings.Add(new("TECHNICAL_DECLARATION_CONFLICT",
+                    "The existing declaration differs from the uploaded metadata; it will not be attached automatically.", code));
             if (contract?.Status == RobotArtifactContractStatus.Retired)
-                errors.Add(new("TECHNICAL_CONTRACT_NOT_REUSABLE",
-                    "A retired technical contract cannot be reused by a new authoring import.", code));
+                warnings.Add(new("TECHNICAL_DECLARATION_NOT_REUSABLE",
+                    "The retired declaration will not be attached automatically.", code));
 
             var matchingArtifacts = artifacts.Where(x => x.ArtifactCode == code).ToArray();
             var artifact = matchingArtifacts.Length == 1 ? matchingArtifacts[0] : null;
             if (matchingArtifacts.Length > 1)
                 errors.Add(new("ARTIFACT_REVISION_AMBIGUOUS",
                     "Multiple artifact revisions use this code; choose an explicit revision code.", code));
-            if (artifact is not null && (artifact.Checksum != item.LuaChecksum ||
-                !EqualsCode(artifact.RuntimeTargetCode, session.RuntimeTargetCode) ||
-                !EqualsCode(artifact.MachineModelCode, session.MachineModelCode)))
+            if (artifact is not null && artifact.Checksum != item.LuaChecksum)
                 errors.Add(new("ARTIFACT_REVISION_CONFLICT",
-                    "Artifact code already exists with different bytes or target; choose a new revision code.", code));
+                    "Artifact code already exists with different bytes; choose a new revision code.", code));
             if (artifact?.Status == RobotArtifactStatus.Retired)
                 errors.Add(new("ARTIFACT_NOT_REUSABLE",
                     "A retired robot artifact cannot be reused by a new authoring import.", code));
-            if (artifact?.Status == RobotArtifactStatus.Published &&
-                (contract?.Status != RobotArtifactContractStatus.Published ||
-                 artifact.TechnicalContractId != contract.Id ||
-                 !string.Equals(artifact.TechnicalContractChecksum, contract.ContractChecksum,
-                     StringComparison.Ordinal)))
-                errors.Add(new("PUBLISHED_ARTIFACT_CONTRACT_CONFLICT",
-                    "Published artifact is not bound to the matching published technical contract.", code));
-            if (item.Sidecar.Effects.All(x =>
+            if (item.Sidecar.Effects.Count == 0 || item.Sidecar.Effects.All(x =>
                     x.EffectKind is RobotArtifactEffectKind.System or RobotArtifactEffectKind.Motion))
-                warnings.Add(new("GENERIC_EFFECTS_ONLY",
-                    "Sidecar cannot yet prove Recipe or ProductOption semantics.", code));
+                warnings.Add(new("NO_PRODUCTION_DECLARATIONS",
+                    "No ingredient or option declarations were supplied. Recipe selection remains an operator decision.", code));
         }
 
-        ValidateExplicitOrder(bundle, errors);
+        ValidateDeclaredOrder(bundle, warnings);
         var program = await store.GetProgramAsync(session.OrganizationId, session.StoreId, session.KioskId,
             session.DeviceId, session.ProposedProgramCode, false, cancellationToken);
         if (program is not null)
@@ -86,8 +77,8 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
             existingContractCount, bundle.Items.Count - existingContractCount);
     }
 
-    private static void ValidateExplicitOrder(RobotAuthoringBundle bundle,
-        ICollection<RobotAuthoringImportValidationIssue> errors)
+    private static void ValidateDeclaredOrder(RobotAuthoringBundle bundle,
+        ICollection<RobotAuthoringImportValidationIssue> warnings)
     {
         var effectOwners = bundle.Items
             .SelectMany(item => item.Sidecar.Effects.Select(effect => new
@@ -99,7 +90,7 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
             .GroupBy(x => x.Code)
             .ToDictionary(x => x.Key, x => x.ToArray());
         foreach (var duplicate in effectOwners.Where(x => x.Value.Length > 1))
-            errors.Add(new("EFFECT_IDENTITY_AMBIGUOUS",
+            warnings.Add(new("DECLARED_EFFECT_IDENTITY_AMBIGUOUS",
                 $"Effect '{duplicate.Key}' is declared by multiple artifacts."));
 
         var previousPhaseRank = -1;
@@ -110,11 +101,11 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
             {
                 var rank = PhaseRank(constraint.Value);
                 if (rank < 0)
-                    errors.Add(new("ORDERING_PHASE_UNKNOWN", $"Unknown ordering phase '{constraint.Value}'.",
+                    warnings.Add(new("DECLARED_ORDERING_PHASE_UNKNOWN", $"Unknown declared ordering phase '{constraint.Value}'.",
                         item.ManifestItem.ArtifactCode));
                 else if (rank < previousPhaseRank)
-                    errors.Add(new("ORDERING_PHASE_VIOLATION",
-                        "Explicit RunOrder moves backward across declared phases.", item.ManifestItem.ArtifactCode));
+                    warnings.Add(new("DECLARED_ORDERING_PHASE_CONFLICT",
+                        "Manifest RunOrder differs from the declared phase order; manifest order remains authoritative.", item.ManifestItem.ArtifactCode));
                 else
                     previousPhaseRank = rank;
                 continue;
@@ -123,8 +114,8 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
             var targetCode = Normalize(constraint.Value);
             if (!effectOwners.TryGetValue(targetCode, out var owners) || owners.Length != 1)
             {
-                errors.Add(new("ORDERING_EFFECT_UNRESOLVED",
-                    $"Ordering target effect '{targetCode}' is missing or ambiguous.",
+                warnings.Add(new("DECLARED_ORDERING_EFFECT_UNRESOLVED",
+                    $"Declared ordering target effect '{targetCode}' is missing or ambiguous.",
                     item.ManifestItem.ArtifactCode));
                 continue;
             }
@@ -132,13 +123,13 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
                 ? item.ManifestItem.RunOrder < owners[0].RunOrder
                 : item.ManifestItem.RunOrder > owners[0].RunOrder;
             if (!valid)
-                errors.Add(new("ORDERING_CONSTRAINT_VIOLATION",
-                    $"Explicit RunOrder violates {constraint.ConstraintType} '{targetCode}'.",
+                warnings.Add(new("DECLARED_ORDERING_CONFLICT",
+                    $"Manifest RunOrder differs from declared {constraint.ConstraintType} '{targetCode}'; manifest order remains authoritative.",
                     item.ManifestItem.ArtifactCode));
         }
     }
 
-    private static bool ContractMatches(RobotArtifactTechnicalContract contract, RobotAuthoringSidecar sidecar) =>
+    internal static bool DeclarationMatches(RobotArtifactTechnicalContract contract, RobotAuthoringSidecar sidecar) =>
         contract.SchemaVersion == sidecar.SchemaVersion &&
         EqualsCode(contract.RuntimeTargetCode, sidecar.RuntimeTargetCode) &&
         EqualsCode(contract.MachineModelCode, sidecar.MachineModelCode) &&

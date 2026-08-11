@@ -99,6 +99,7 @@ public sealed class MenuStore : IMenuStore
     {
         return _dbContext.Menus
             .AsNoTracking()
+            .AsSplitQuery()
             .Include(menu => menu.MenuItems)
                 .ThenInclude(item => item.Product)
             .Include(menu => menu.MenuItems)
@@ -130,13 +131,21 @@ public sealed class MenuStore : IMenuStore
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
+    public async Task<IReadOnlyDictionary<ActiveProductionRouteOptionPolicyKey, ActiveProductionRouteOptionPolicy>>
+        GetActiveProductionRouteOptionPoliciesAsync(
         Guid kioskId,
-        Guid productVariantId,
-        Guid recipeId,
+        IReadOnlyCollection<ActiveProductionRouteOptionPolicyKey> keys,
         DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default)
     {
+        if (keys.Count == 0)
+        {
+            return new Dictionary<ActiveProductionRouteOptionPolicyKey, ActiveProductionRouteOptionPolicy>();
+        }
+
+        var productVariantIds = keys.Select(key => key.ProductVariantId).Distinct().ToArray();
+        var recipeIds = keys.Select(key => key.RecipeId).Distinct().ToArray();
+        var requestedKeys = keys.ToHashSet();
         var routes = await _dbContext.ExecutionEndpointReadinessProjections
             .AsNoTracking()
             .Where(readiness =>
@@ -150,8 +159,8 @@ public sealed class MenuStore : IMenuStore
                         ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
                         : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
                     release.Status == ConfigurationReleaseStatus.Published &&
-                    release.ExecutionRoutes.Any(route => route.ProductVariantId == productVariantId &&
-                        route.RecipeId == recipeId && route.RobotBindings.Any() &&
+                    release.ExecutionRoutes.Any(route => productVariantIds.Contains(route.ProductVariantId) &&
+                        recipeIds.Contains(route.RecipeId) && route.RobotBindings.Any() &&
                         route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
                             capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
             .SelectMany(readiness => _dbContext.ConfigurationReleases.WhereNotDeleted()
@@ -159,18 +168,39 @@ public sealed class MenuStore : IMenuStore
                     ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
                     : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId))
                 .SelectMany(release => release.ExecutionRoutes.Where(route =>
-                    route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
+                    productVariantIds.Contains(route.ProductVariantId) && recipeIds.Contains(route.RecipeId) &&
                     route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
                         capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
             .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
-            .Select(route => new { route.Id, route.SupportedOptionCodesJson, route.RequiredCapabilitiesJson })
+            .Select(route => new
+            {
+                route.Id,
+                route.ProductVariantId,
+                route.RecipeId,
+                route.SupportedOptionCodesJson,
+                route.RequiredCapabilitiesJson
+            })
             .ToListAsync(cancellationToken);
-        var route = routes.FirstOrDefault(candidate =>
-            !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
-                candidate.RequiredCapabilitiesJson));
-        return route is null ? null : new ActiveProductionRouteOptionPolicy(route.Id,
-            (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
-                .ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+        return routes
+            .Where(candidate => requestedKeys.Contains(new ActiveProductionRouteOptionPolicyKey(
+                candidate.ProductVariantId,
+                candidate.RecipeId)))
+            .Where(candidate => !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
+                candidate.RequiredCapabilitiesJson))
+            .GroupBy(candidate => new ActiveProductionRouteOptionPolicyKey(
+                candidate.ProductVariantId,
+                candidate.RecipeId))
+            .ToDictionary(
+                group => group.Key,
+                group =>
+                {
+                    var route = group.First();
+                    return new ActiveProductionRouteOptionPolicy(
+                        route.Id,
+                        (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase));
+                });
     }
 
     public Task<Menu?> GetMenuByIdAsync(Guid menuId, bool asNoTracking = true, CancellationToken cancellationToken = default)

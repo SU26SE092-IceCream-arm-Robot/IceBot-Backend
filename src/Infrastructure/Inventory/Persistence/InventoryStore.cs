@@ -301,6 +301,23 @@ public sealed class InventoryStore : IInventoryStore
             movement => movement.IngredientDispenserStateId == dispenserStateId,
             cancellationToken);
 
+    public Task<List<InventorySensorObservation>> ListSensorObservationsForDispenserAsync(
+        Guid dispenserStateId,
+        int take,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.InventorySensorObservations.AsNoTracking()
+            .Where(observation => observation.IngredientDispenserStateId == dispenserStateId)
+            .OrderByDescending(observation => observation.CloudReceivedAt)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
+    public Task<int> CountSensorObservationsForDispenserAsync(
+        Guid dispenserStateId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.InventorySensorObservations.CountAsync(
+            observation => observation.IngredientDispenserStateId == dispenserStateId,
+            cancellationToken);
+
     public async Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default)
     {
         await _dbContext.StockMovements.AddAsync(movement, cancellationToken);

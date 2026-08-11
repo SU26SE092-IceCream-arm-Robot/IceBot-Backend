@@ -44,9 +44,20 @@ public sealed class UpdateInternalAccountRolesCommandHandler
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
         }
 
+        if (!AccountManagementAccessRules.CanManageAccount(command.UserContext, command.OrganizationId, account))
+        {
+            return ApiResult<InternalAccountResult>.Fail("Account is outside the current organization's management scope.", 403);
+        }
+
         var requestedRoles = new List<(Role Role, Requests.AccountRoleScopeRequest Request)>();
         foreach (var requestRole in command.Request.Roles)
         {
+            if (requestRole.OrganizationId != command.OrganizationId)
+            {
+                return ApiResult<InternalAccountResult>.Fail(
+                    "Every account role must belong to the organization in the request route.", 403);
+            }
+
             if (string.IsNullOrWhiteSpace(requestRole.RoleCode))
             {
                 return ApiResult<InternalAccountResult>.Fail("Role code is required.", 400);
@@ -116,7 +127,7 @@ public sealed class UpdateInternalAccountRolesCommandHandler
         await _accounts.SaveChangesAsync(cancellationToken);
 
         return ApiResult<InternalAccountResult>.Success(
-            InternalAccountResultMapper.ToResult(account),
+            InternalAccountResultMapper.ToResult(account, organizationId: command.OrganizationId),
             "Account roles updated.");
     }
 }

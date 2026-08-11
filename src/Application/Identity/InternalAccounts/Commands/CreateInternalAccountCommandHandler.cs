@@ -33,6 +33,11 @@ public sealed class CreateInternalAccountCommandHandler
         var request = command.Request;
         var createdByAccountId = command.CreatedByAccountId;
 
+        if (command.OrganizationId == Guid.Empty)
+        {
+            return ApiResult<InternalAccountResult>.Fail("Organization id is required.", 400);
+        }
+
         var validationError = InternalAccountRequestValidator.ValidateRequest(request);
         if (validationError is not null)
         {
@@ -58,10 +63,34 @@ public sealed class CreateInternalAccountCommandHandler
         var roles = new List<(Role Role, AccountRoleScopeRequest Scope)>();
         foreach (var roleScope in request.Roles)
         {
+            if (roleScope.OrganizationId != command.OrganizationId)
+            {
+                return ApiResult<InternalAccountResult>.Fail(
+                    "Every account role must belong to the organization in the request route.", 403);
+            }
+
             var role = await _accounts.GetRoleByCodeAsync(roleScope.RoleCode.Trim(), cancellationToken);
             if (role is null)
             {
                 return ApiResult<InternalAccountResult>.Fail($"Role '{roleScope.RoleCode}' does not exist.", 400);
+            }
+
+            var authorizationError = AccountRoleAssignmentRules.ValidateRoleAssignmentPermission(
+                command.UserContext,
+                command.UserRoles,
+                role.Code);
+            if (authorizationError is not null)
+            {
+                return ApiResult<InternalAccountResult>.Fail(authorizationError, 403);
+            }
+
+            var scopeError = AccountRoleAssignmentRules.ValidateRequestedScope(
+                command.UserContext,
+                role.Code,
+                roleScope);
+            if (scopeError is not null)
+            {
+                return ApiResult<InternalAccountResult>.Fail(scopeError, 403);
             }
 
             roles.Add((role, roleScope));

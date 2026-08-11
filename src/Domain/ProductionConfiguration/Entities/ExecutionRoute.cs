@@ -97,9 +97,11 @@ public class ExecutionRoute : BusinessEntity
         JsonSerializer.Deserialize<string[]>(SupportedOptionCodesJson) ?? [];
 
     internal ExecutionRouteRobotBinding AddRobotBinding(
+        Guid? productionProgramBindingId,
+        string? productionProgramBindingChecksum,
         Guid robotProgramId,
         int bindingOrder,
-        string requiredWorkcellCapabilityCode)
+        IReadOnlyCollection<string> requiredCapabilityCodes)
     {
         if (_robotBindings.Any(binding => binding.BindingOrder == bindingOrder))
         {
@@ -107,12 +109,20 @@ public class ExecutionRoute : BusinessEntity
         }
 
         var binding = ExecutionRouteRobotBinding.Create(
+            productionProgramBindingId,
+            productionProgramBindingChecksum,
             robotProgramId,
             bindingOrder,
-            requiredWorkcellCapabilityCode);
+            requiredCapabilityCodes);
         _robotBindings.Add(binding);
         return binding;
     }
+
+    internal ExecutionRouteRobotBinding AddRobotBinding(
+        Guid robotProgramId,
+        int bindingOrder,
+        string requiredWorkcellCapabilityCode) =>
+        AddRobotBinding(null, null, robotProgramId, bindingOrder, [requiredWorkcellCapabilityCode]);
 
     public void SetPublishedProductionDefinition(int schemaVersion, string definitionJson, string checksum)
     {

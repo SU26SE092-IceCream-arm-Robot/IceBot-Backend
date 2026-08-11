@@ -4,11 +4,11 @@ This document is the backend source of truth for internal account onboarding, in
 
 ## Search Keywords
 
-`identity onboarding`, `account onboarding`, `admin creates account`, `internal account invitation`, `invitation link`, `accept invitation`, `GoogleEmail`, `GoogleSubjectId`, `Google login policy`, `email confirmed`, `EmailConfirmedAt`, `email ownership proof`, `CreateInvitation`, `SendInvitationEmail`, `InitialPassword`, `temporary password`, `Invited account`, `Active account`, `/api/v1/management/accounts`, `/api/v1/authentication/accept-invitation`
+`identity onboarding`, `account onboarding`, `admin creates account`, `internal account invitation`, `invitation link`, `accept invitation`, `GoogleEmail`, `GoogleSubjectId`, `Google login policy`, `email confirmed`, `EmailConfirmedAt`, `email ownership proof`, `CreateInvitation`, `SendInvitationEmail`, `InitialPassword`, `temporary password`, `Invited account`, `Active account`, `/api/v1/management/organizations/{organizationId}/accounts`, `/api/v1/authentication/accept-invitation`
 
 ## Purpose
 
-Internal accounts are created by authorized management users. Public signup is disabled for internal system accounts.
+Internal accounts are created by authorized management users. Public signup is disabled for internal system accounts. Account management is organization-owned: `SystemAdmin` may create and administer accounts for any selected organization, while `OrgAdmin` may do so only in its own organization scope. Either actor may assign `OrgAdmin`, `Manager`, `Staff`, and `Technician` within that route organization; neither organization route can assign the global `SystemAdmin` role. Initial/recovery `SystemAdmin` provisioning remains bootstrap-only.
 
 The default onboarding method is:
 
@@ -50,7 +50,7 @@ SendInvitationEmail = true
 Flow:
 
 ```text
-POST /api/v1/management/accounts
+POST /api/v1/management/organizations/{organizationId}/accounts
   -> create Account
   -> Status = Invited
   -> create AccountInvitation
@@ -168,7 +168,7 @@ requests cannot leave multiple active invitation records.
 Route direction:
 
 ```text
-POST /api/v1/management/accounts/{accountId}/invitation
+POST /api/v1/management/organizations/{organizationId}/accounts/{accountId}/invitation
 ```
 
 Request direction:

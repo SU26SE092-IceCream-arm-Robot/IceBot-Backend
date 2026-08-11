@@ -24,6 +24,20 @@ public sealed class RobotAuthoringCompositionStore(IceBotDbContext dbContext) : 
                 (!recipe.ProductVariant.Product.OrganizationId.HasValue ||
                  recipe.ProductVariant.Product.OrganizationId == organizationId), cancellationToken);
 
+    public async Task<IReadOnlyList<Recipe>> ListEligibleRecipesAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken) =>
+        await dbContext.Recipes.AsNoTracking()
+            .Include(recipe => recipe.RecipeItems).ThenInclude(item => item.Ingredient)
+            .Include(recipe => recipe.ProductVariant).ThenInclude(variant => variant.Product)
+            .Where(recipe => recipe.DeletedAt == null &&
+                recipe.OrganizationId == organizationId &&
+                recipe.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced &&
+                (recipe.Status == RecipeStatus.Published || recipe.Status == RecipeStatus.Active) &&
+                recipe.ProductVariant.Product.DeletedAt == null &&
+                recipe.ProductVariant.Product.OrganizationId == organizationId)
+            .ToListAsync(cancellationToken);
+
     public Task<RobotProgram?> GetProgramAsync(Guid organizationId, Guid programId, CancellationToken cancellationToken) =>
         dbContext.RobotPrograms.AsNoTracking().Include(program => program.RobotProgramArtifacts)
             .FirstOrDefaultAsync(program => program.Id == programId && program.OrganizationId == organizationId,

@@ -24,14 +24,12 @@ public sealed class GetInternalAccountQueryHandler
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
         }
 
-        if (!ScopeAccessRules.SharesAnyActiveScope(
-                ScopeRoleSets.AccountsRead,
-                query.UserContext,
-                account.AccountRoles))
+        if (!AccountManagementAccessRules.CanReadAccount(query.UserContext, query.OrganizationId, account))
         {
             return ApiResult<InternalAccountResult>.Fail("Access denied.", 403);
         }
 
-        return ApiResult<InternalAccountResult>.Success(InternalAccountResultMapper.ToResult(account));
+        return ApiResult<InternalAccountResult>.Success(
+            InternalAccountResultMapper.ToResult(account, organizationId: query.OrganizationId));
     }
 }

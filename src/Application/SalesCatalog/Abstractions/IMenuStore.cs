@@ -42,10 +42,10 @@ public interface IMenuStore
         DateTimeOffset now,
         CancellationToken cancellationToken = default);
 
-    Task<ActiveProductionRouteOptionPolicy?> GetActiveProductionRouteOptionPolicyAsync(
+    Task<IReadOnlyDictionary<ActiveProductionRouteOptionPolicyKey, ActiveProductionRouteOptionPolicy>>
+        GetActiveProductionRouteOptionPoliciesAsync(
         Guid kioskId,
-        Guid productVariantId,
-        Guid recipeId,
+        IReadOnlyCollection<ActiveProductionRouteOptionPolicyKey> keys,
         DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default);
 

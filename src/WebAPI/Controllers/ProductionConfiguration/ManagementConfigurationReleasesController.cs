@@ -1,6 +1,7 @@
 using Application.ProductionConfiguration.Releases.Commands;
 using Application.ProductionConfiguration.Deployments.Commands;
 using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Routes.Contracts;
 using Application.ProductionConfiguration.Releases.Queries;
 using Application.ProductionConfiguration.Deployments.Queries;
 using Application.ProductionConfiguration.Readiness.Queries;
@@ -83,6 +84,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
         Guid organizationId,
         [FromQuery] Guid? productVariantId,
         [FromQuery] string? search,
+        [FromQuery] bool includeGlobalTemplates = false,
         [FromQuery] int limit = 50,
         CancellationToken cancellationToken = default)
     {
@@ -93,6 +95,7 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
                 OrganizationId = organizationId,
                 ProductVariantId = productVariantId,
                 Search = search,
+                IncludeGlobalTemplates = includeGlobalTemplates,
                 Limit = limit
             },
             cancellationToken);
@@ -127,16 +130,19 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
             UserContext = User.GetUserContext(),
             OrganizationId = organizationId,
             ReleaseId = releaseId,
+            ExpectedRevision = request.ExpectedRevision,
             Routes = request.Routes.Select(route => new ConfigurationReleaseRouteInput(
                 route.RecipeId,
                 route.RouteCode,
                 route.Priority,
-                route.RequiredCapabilitiesJson,
+                route.RequiredCapabilities.Select(requirement => new ExecutionRouteCapabilityRequirementContract(
+                    requirement.Code,
+                    requirement.Required)).ToArray(),
                 route.SupportedOptionCodes,
-                route.RobotBindings.Select(binding => new ConfigurationReleaseRobotBindingInput(
-                    binding.RobotProgramId,
-                    binding.BindingOrder,
-                    binding.RequiredWorkcellCapabilityCode)).ToArray())).ToArray()
+                route.RobotBindings.Select(binding => binding.ProductionProgramBindingId != Guid.Empty
+                    ? new ConfigurationReleaseRobotBindingInput(binding.ProductionProgramBindingId, binding.BindingOrder)
+                    : new ConfigurationReleaseRobotBindingInput(binding.RobotProgramId, binding.BindingOrder,
+                        binding.RequiredWorkcellCapabilityCode)).ToArray())).ToArray()
         };
         var result = await _replaceConfigurationReleaseRoutesHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -191,6 +197,9 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
 
 public sealed class ReplaceConfigurationReleaseRoutesRequest
 {
+    [Required, StringLength(64, MinimumLength = 64)]
+    public string ExpectedRevision { get; init; } = string.Empty;
+
     [Required, MinLength(1)]
     public IReadOnlyCollection<ConfigurationReleaseRouteRequest> Routes { get; init; } = Array.Empty<ConfigurationReleaseRouteRequest>();
 }
@@ -205,7 +214,7 @@ public sealed class ConfigurationReleaseRouteRequest
     [Range(0, int.MaxValue)]
     public int Priority { get; init; }
 
-    public string? RequiredCapabilitiesJson { get; init; }
+    public IReadOnlyCollection<ConfigurationReleaseCapabilityRequirementRequest> RequiredCapabilities { get; init; } = [];
 
     [Required]
     public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
@@ -214,13 +223,20 @@ public sealed class ConfigurationReleaseRouteRequest
     public IReadOnlyCollection<ConfigurationReleaseRobotBindingRequest> RobotBindings { get; init; } = Array.Empty<ConfigurationReleaseRobotBindingRequest>();
 }
 
+public sealed class ConfigurationReleaseCapabilityRequirementRequest
+{
+    [Required, StringLength(100)]
+    public string Code { get; init; } = string.Empty;
+
+    public bool Required { get; init; } = true;
+}
+
 public sealed class ConfigurationReleaseRobotBindingRequest
 {
+    public Guid ProductionProgramBindingId { get; init; }
     public Guid RobotProgramId { get; init; }
 
     [Range(1, int.MaxValue)]
     public int BindingOrder { get; init; }
-
-    [Required, StringLength(100)]
     public string RequiredWorkcellCapabilityCode { get; init; } = string.Empty;
 }

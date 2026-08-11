@@ -1,5 +1,6 @@
 using Application;
 using Infrastructure;
+using Infrastructure.Catalog.Bootstrap;
 using Microsoft.AspNetCore.Authorization;
 using Serilog;
 using WebAPI.Authorization;
@@ -54,6 +55,23 @@ try
 
     var app = builder.Build();
 
+    if (args.Contains("--reset-robot-authoring-automation-test", StringComparer.OrdinalIgnoreCase))
+    {
+        if (!app.Environment.IsDevelopment())
+            throw new InvalidOperationException("Robot authoring automation reset is available only in Development.");
+
+        await using var scope = app.Services.CreateAsyncScope();
+        var reset = scope.ServiceProvider.GetRequiredService<DevelopmentRobotAuthoringAutomationReset>();
+        var result = await reset.ResetAsync(CancellationToken.None);
+        Log.Information(
+            "Reset {OrganizationCode} ({OrganizationId}): {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, {MenuItems} menu items, {Objects} objects deleted, {RetainedObjects} objects retained.",
+            DevelopmentRobotAuthoringAutomationReset.OrganizationCode, result.OrganizationId,
+            result.DeletedImportCount, result.DeletedArtifactCount, result.DeletedProgramCount,
+            result.DeletedContractCount, result.DeletedBindingCount, result.DeletedReleaseCount,
+            result.DeletedMenuItemCount, result.DeletedObjectCount, result.RetainedObjectCount);
+        return;
+    }
+
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {
@@ -62,7 +80,13 @@ try
 
     app.UseIceBotSwagger();
 
-    app.UseHttpsRedirection();
+    // The local Next.js proxy targets the Development HTTP listener. Keep the
+    // production redirect, but avoid redirecting proxied local API calls to a
+    // browser-facing self-signed HTTPS endpoint.
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHttpsRedirection();
+    }
 
     app.UseCors("FrontendOnly");
 

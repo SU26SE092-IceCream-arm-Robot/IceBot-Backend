@@ -103,8 +103,10 @@ public static class ConfigurationReleaseManifestBuilder
         return new
         {
             binding.Id,
+            binding.ProductionProgramBindingId,
+            binding.ProductionProgramBindingChecksum,
             binding.BindingOrder,
-            binding.RequiredWorkcellCapabilityCode,
+            RequiredCapabilityCodes = binding.GetRequiredCapabilityCodes(),
             RobotProgram = new
             {
                 program.Id,

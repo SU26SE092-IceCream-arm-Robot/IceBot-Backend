@@ -2,6 +2,7 @@ using Application.RobotConfiguration.AuthoringImports;
 using Application.RobotConfiguration.AuthoringImports.ReleaseLinkage;
 using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.RobotConfiguration.AuthoringImports.Workspace;
+using Application.RobotConfiguration.AuthoringImports.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,11 +16,34 @@ namespace WebAPI.Controllers.RobotConfiguration;
 [Route("api/v{version:apiVersion}/management/organizations/{organizationId:guid}/robot-authoring-imports")]
 public sealed class ManagementRobotAuthoringImportsController(
     RobotAuthoringImportHandlers handlers,
+    ListRobotAuthoringImportsQueryHandler listHandler,
     CreateRobotAuthoringReleaseDraftCommandHandler createReleaseDraftHandler,
     RobotAuthoringCompositionHandlers compositionHandlers,
     RobotAuthoringWorkspaceHandler workspaceHandler) : ControllerBase
 {
     private const long MaximumMultipartRequestBytes = RobotAuthoringBundleCodec.MaximumArchiveBytes + 1024 * 1024;
+
+    [HttpGet]
+    [Authorize(Policy = "program.read")]
+    public async Task<IActionResult> List(
+        Guid organizationId,
+        [FromQuery] string? status,
+        [FromQuery] Guid? storeId,
+        [FromQuery] Guid? kioskId,
+        [FromQuery] Guid? deviceId,
+        [FromQuery] string? search,
+        [FromQuery] int pageNumber = 1,
+        [FromQuery] int pageSize = 20,
+        [FromQuery] DateTimeOffset? createdFrom = null,
+        [FromQuery] DateTimeOffset? createdTo = null,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await listHandler.HandleAsync(new ListRobotAuthoringImportsQuery(
+            User.GetUserContext(), organizationId, status, storeId, kioskId, deviceId, search, pageNumber, pageSize,
+            createdFrom, createdTo),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
 
     [HttpPost]
     [Authorize(Policy = "artifact.upload")]
@@ -73,6 +97,19 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPost("{importId:guid}/resume")]
+    [Authorize(Policy = "artifact.upload")]
+    [Authorize(Policy = "program.manage")]
+    public async Task<IActionResult> Resume(
+        Guid organizationId,
+        Guid importId,
+        CancellationToken cancellationToken)
+    {
+        var result = await handlers.ResumeAsync(new ResumeRobotAuthoringImportCommand(
+            User.GetUserContext(), organizationId, importId), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("{importId:guid}/materialize")]
     [Authorize(Policy = "artifact.upload")]
     [Authorize(Policy = "program.manage")]
@@ -122,7 +159,6 @@ public sealed class ManagementRobotAuthoringImportsController(
                 organizationId,
                 importId,
                 request.RecipeId,
-                request.RequiredWorkcellCapabilityCode,
                 request.SupportedOptionCodes),
             cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -164,8 +200,6 @@ public sealed class UploadRobotAuthoringImportRequest
 public sealed class CreateRobotAuthoringReleaseDraftRequest
 {
     public Guid RecipeId { get; init; }
-    [StringLength(100)]
-    public string? RequiredWorkcellCapabilityCode { get; init; }
     public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
 }
 

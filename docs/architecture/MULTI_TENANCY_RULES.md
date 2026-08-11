@@ -154,10 +154,11 @@ Do not use `tenant-tree` as an operations overview endpoint. Keep revenue, alert
 To select valid scopes for a target role being assigned to an account, use:
 
 ```text
+GET /api/v1/management/accounts/assignable-role-options
 GET /api/v1/management/role-scope-options?roleCode={roleCode}
 ```
 
-It enforces scope boundaries based on the current user context, and projects allowed scope types:
+First select a role from the assignable-role list, then request its scope options. Both endpoints require `accounts.manage`; the mutation handler revalidates the selected role and scope. The scope lookup projects allowed scope types:
 - `OrgAdmin` allows Organization scope.
 - `Manager` allows Organization and Store scope.
 - `Technician` / `Staff` allows Store and Kiosk scope.

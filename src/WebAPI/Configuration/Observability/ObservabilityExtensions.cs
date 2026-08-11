@@ -4,6 +4,7 @@ using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Sinks.OpenTelemetry;
 using Application.EdgeIntegration.Observability;
+using Application.Payments.PaymentSessions.Observability;
 using Application.ProductionPackages.Upgrades;
 using Infrastructure.Payments.Observability;
 using Infrastructure.Firebase;
@@ -11,6 +12,7 @@ using Application.RobotConfiguration.AuthoringImports;
 using Infrastructure.Operations.Notifications;
 using Infrastructure.Operations.Automation;
 using Infrastructure.Devices.Credentials.Observability;
+using Infrastructure.SalesCatalog.Caching;
 
 namespace WebAPI.Configuration.Observability;
 
@@ -109,6 +111,7 @@ public static class ObservabilityExtensions
             {
                 metrics
                     .AddMeter(IceBotEdgeMetrics.MeterName)
+                    .AddMeter(PaymentWebhookMetrics.MeterName)
                     .AddMeter(PayOsResilienceMetrics.MeterName)
                     .AddMeter(FirebaseAccountPushNotificationSender.MeterName)
                     .AddMeter(RobotAuthoringImportObservability.InstrumentationName)
@@ -116,6 +119,7 @@ public static class ObservabilityExtensions
                     .AddMeter(NotificationDeliveryMetrics.MeterName)
                     .AddMeter(OperationalAutomationMetrics.MeterName)
                     .AddMeter(MqttCredentialReconciliationMetrics.MeterName)
+                    .AddMeter(RuntimeMenuProjectionCache.MeterName)
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();
