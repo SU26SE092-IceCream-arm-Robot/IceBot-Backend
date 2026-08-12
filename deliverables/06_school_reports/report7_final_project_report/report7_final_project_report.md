@@ -4,31 +4,33 @@
 
 ### Cover Page
 
-**Project name:** `[Official project name — Needs Team Review]`
+**Project name:** `[PLACEHOLDER: PROJECT METADATA]`
 
 **Working product name:** IceBot Backend
 
-**Group name:** `[Group name — Needs Team Review]`
+**Group name:** `[PLACEHOLDER: PROJECT METADATA]`
 
 **Group members:**
 
 | No. | Full name | Student ID | Role |
 |---:|---|---|---|
-| 1 | `[Team member — Needs Team Review]` | `[Student ID — Needs Team Review]` | `[Project role — Needs Team Review]` |
+| 1 | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` |
 
-`[Add one approved row for each group member — Needs Team Review]`
+`[PLACEHOLDER: TEAM INFO] Add one approved row for each group member.`
 
-**Supervisor:** `[Supervisor name — Needs Team Review]`
+**Supervisor:** `[PLACEHOLDER: SUPERVISOR CONFIRMATION]`
 
-**External supervisor:** `[External supervisor name or Not Applicable — Needs Team Review]`
+**External supervisor:** `[PLACEHOLDER: SUPERVISOR CONFIRMATION]`
 
-**Capstone project code:** `[Capstone project code — Needs Team Review]`
+**Capstone project code:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Month/year:** `[Month and year — Needs Team Review]`
+**Month/year:** `[PLACEHOLDER: PROJECT METADATA]`
 
 ## Acknowledgement
 
-`[Team-Owned Placeholder]` The project team must provide and approve the acknowledgement. It should identify the people and organizations that materially supported the project, use the university's expected formal style, and avoid inventing names, roles, or contributions.
+`[PLACEHOLDER: TEAM INFO]` The project team must provide and approve the acknowledgement. It should identify only people and organizations that materially supported the project.
+
+Draft-DOCX placeholder mapping: every remaining `[Team-Owned Placeholder]` in Part II means `[PLACEHOLDER: PMP]`; every `[Consolidation Required]` means `[PLACEHOLDER: MANUAL VERIFICATION]`; every UI-review marker means `[PLACEHOLDER: UI WORKFLOW]` and, where an image is required, `[PLACEHOLDER: UI SCREENSHOT]`; every pending execution value means `[PLACEHOLDER: TEST RESULT]`. These mappings make the draft convertible but do not close the underlying work.
 
 ## Definition and Acronyms
 
@@ -131,7 +133,7 @@ Limitations and exclusions include:
 
 # II. Project Management Plan
 
-> `[Team-Owned Placeholder]` Report 2 — Project Management Plan has not been supplied in the school-report deliverables. This entire section must be completed and approved by the project team. No names, dates, estimates, schedules, assignments, communication commitments, or management outcomes are asserted below.
+> `[PLACEHOLDER: PMP]` Report 2 — Project Management Plan has not been supplied in the school-report deliverables. This entire section must be completed and approved by the project team. No names, dates, estimates, schedules, assignments, communication commitments, or management outcomes are asserted below.
 
 ## 1. Overview
 

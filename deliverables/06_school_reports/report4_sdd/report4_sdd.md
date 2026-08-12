@@ -2,15 +2,15 @@
 
 ## REPORT 4 — SOFTWARE DESIGN DOCUMENT
 
-**Project name:** `[Official project name — to be confirmed by the team]`
+**Project name:** `[PLACEHOLDER: PROJECT METADATA]`
 
 **Working product name:** IceBot Backend
 
-**Project code:** `[Project code]`
+**Project code:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Group name:** `[Group name]`
+**Group name:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Location and date:** `[Location, month, year]`
+**Location and date:** `[PLACEHOLDER: PROJECT METADATA]`
 
 # I. Record of Changes
 
@@ -18,9 +18,11 @@
 
 | Date | A/M/D | In charge | Change Description |
 |---|---|---|---|
-| `[dd/mm/yyyy]` | A | `[Author/team member]` | Initial school-template Software Design Document prepared from the approved deliverable evidence set. |
+| `[PLACEHOLDER: PROJECT METADATA]` | A | `[PLACEHOLDER: TEAM INFO]` | Initial school-template Software Design Document prepared from the current evidence set. `[PLACEHOLDER: MANUAL VERIFICATION]` Confirm the approved baseline before submission. |
 
 # II. Software Design Document
+
+Draft-DOCX rule: unresolved architecture, cardinality, client/Edge, and physical-outcome statements retain their technical labels and require `[PLACEHOLDER: MANUAL VERIFICATION]`. Missing rendered diagrams use `[PLACEHOLDER: UI SCREENSHOT]` only when a UI image is required; Mermaid design figures require final rendering and citation under `[PLACEHOLDER: FINAL CITATION]`.
 
 Status notation used in this report:
 

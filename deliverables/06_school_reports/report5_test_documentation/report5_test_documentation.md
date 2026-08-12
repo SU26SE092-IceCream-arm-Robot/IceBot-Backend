@@ -2,15 +2,15 @@
 
 ## REPORT 5 — SOFTWARE TEST DOCUMENTATION
 
-**Project name:** `[Official project name — Needs Team Review]`
+**Project name:** `[PLACEHOLDER: PROJECT METADATA]`
 
 **Working product name:** IceBot Backend
 
-**Project code:** `[Project code — Needs Team Review]`
+**Project code:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Group name:** `[Group name — Needs Team Review]`
+**Group name:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Location and date:** `[Location and date — Needs Team Review]`
+**Location and date:** `[PLACEHOLDER: PROJECT METADATA]`
 
 # I. Record of Changes
 
@@ -18,11 +18,11 @@
 
 | Date | A/M/D | In charge | Change Description |
 |---|---|---|---|
-| `[Date — Needs Team Review]` | A | `[Author/team member — Needs Team Review]` | Initial school-template Software Test Documentation draft prepared from the SRS, RTM, design documents, and repository evidence. |
+| `[PLACEHOLDER: PROJECT METADATA]` | A | `[PLACEHOLDER: TEAM INFO]` | Initial school-template Software Test Documentation draft prepared from the SRS, RTM, design documents, and repository evidence. |
 
 # II. Testing Documentation
 
-This document defines the proposed test scope, strategy, plan, and high-level test catalogue for IceBot Backend. It is not evidence that any test has run or passed. The existing SRS/RTM status **Supported** means statically code-evidenced, not runtime-tested. Unless explicitly replaced by a dated execution record, every case in Section 4 has status `[Planned]`, and every result in Section 5 is `[To Be Updated After Test Execution]`.
+This document defines the proposed test scope, strategy, plan, and high-level test catalogue for IceBot Backend. It is not evidence that any test has run or passed. The existing SRS/RTM status **Supported** means statically code-evidenced, not runtime-tested. Unless explicitly replaced by a dated execution record, every case in Section 4 has status `[Planned]`, and every result in Section 5 is `[PLACEHOLDER: TEST RESULT]`. Execution environment, tester, build, date, evidence, defects, statistics, and sign-off also remain `[PLACEHOLDER: TEST RESULT]`.
 
 ## 1. Scope of Testing
 
@@ -172,6 +172,8 @@ External-dependency evidence must identify its boundary. A deterministic fake su
 
 ### 3.1 Human Resources
 
+`[PLACEHOLDER: TEAM INFO]` Replace each unnamed test role only after responsibility and sign-off authority are approved.
+
 | Test responsibility | Assigned person | Responsibilities | Status |
 |---|---|---|---|
 | Test lead / coordinator | `[Name — Needs Team Review]` | Own scope, schedule, entry/exit criteria, reporting, and sign-off routing. | `[Needs Team Review]` |
@@ -184,6 +186,8 @@ External-dependency evidence must identify its boundary. A deterministic fake su
 | Product/acceptance representative | `[Name — Needs Team Review]` | Approve business expectations, known limitations, and acceptance disposition. | `[Needs Team Review]` |
 
 ### 3.2 Test Environment
+
+`[PLACEHOLDER: CONFIGURATION VALUE] [PLACEHOLDER: DEPLOYMENT DETAIL]` Record the exact approved build, runtime, database, provider/broker/storage, client/Edge simulator, isolation, reset, and evidence-capture environment. Repository defaults are not execution evidence.
 
 | Environment component | Required configuration | Data / isolation requirement | Status |
 |---|---|---|---|
@@ -216,6 +220,8 @@ Each execution cycle must attach an immutable environment manifest. All values a
 | Observability/evidence location and retention policy | `[Needs Team Review]` |
 
 ### 3.3 Test Milestones
+
+`[PLACEHOLDER: PROJECT METADATA]` Replace milestone labels with approved dates/phase references from the team-owned PMP; do not infer progress from repository history.
 
 Exact dates depend on the approved capstone schedule.
 
@@ -333,6 +339,8 @@ In this documentation package, **RTM** means the existing Requirements Traceabil
 Detailed row-level scripts, test data, actual outputs, timestamps, executor identity, build/database baseline, evidence attachments, and defect links must be maintained in `Report5_Unit Test.xls` and `Report5_Test Report.xlsx` (or the team-approved equivalent preserving the university structure). `[Needs Team Review]`
 
 ## 5. Test Reports
+
+`[PLACEHOLDER: TEST RESULT]` Every value in this section must come from dated execution evidence for an approved build and environment. Until then, tables are intentionally blank placeholders and no pass/fail conclusion is asserted.
 
 ### Summary
 

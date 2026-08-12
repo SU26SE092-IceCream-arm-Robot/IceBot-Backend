@@ -1,0 +1,63 @@
+# DOCX Placeholder Index
+
+This index supports draft DOCX generation. A placeholder marks missing input or verification; it is not evidence that the item is optional or resolved. Technical `[Unclear]`, `[Open Question]`, `[Needs Review]`, and similar qualifications remain authoritative until their owning issue is closed.
+
+| Placeholder ID | Tag | Report | Section | What must be filled later | Owner | Priority |
+|---|---|---|---|---|---|---|
+| PH-R1-001 | `[PLACEHOLDER: PROJECT METADATA]` | Report 1 | Cover / 1.1 Project Information | Official project name, code, group, location/date, requester, and target release. | Project manager / report owner | Before submission |
+| PH-R1-002 | `[PLACEHOLDER: TEAM INFO]` | Report 1 | Record of Changes / 1.2 Project Team | Author/reviewer, approved team roster, roles, contacts, and required student identifiers. | Project manager | Before submission |
+| PH-R1-003 | `[PLACEHOLDER: SUPERVISOR CONFIRMATION]` | Report 1 | 1.1–1.2 | Supervisor/lecturer identity and approval of displayed academic information. | Supervisor / project manager | Before submission |
+| PH-R1-004 | `[PLACEHOLDER: FINAL CITATION]` | Report 1 | 3. Existing Systems | Comparable-system names, reliable sources, features, advantages, and limitations. | Business analyst / report writer | Before submission |
+| PH-R1-005 | `[PLACEHOLDER: SUPERVISOR CONFIRMATION]` | Report 1 | 3–6 | Approved comparison conclusions, opportunity, vision, scope, and limitations. | Supervisor / product representative | Before submission |
+| PH-R1-006 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 1 | Scope / limitations / counts | Reconcile current evidence baseline and capability-count wording before final claims. | Backend lead / report reviewer | Before submission |
+| PH-R3-001 | `[PLACEHOLDER: PROJECT METADATA]` | Report 3 | Cover / Record of Changes | Official project metadata, revision dates, authors, and reviewers. | Project manager | Before submission |
+| PH-R3-002 | `[PLACEHOLDER: UI WORKFLOW]` | Report 3 | 3.1.1–3.1.3 | Approved screen flow, screen inventory, actors, navigation, fields/actions, and UI authorization matrix. | Frontend/mobile/tablet lead | Before defense |
+| PH-R3-003 | `[PLACEHOLDER: UI SCREENSHOT]` | Report 3 | 3.1.1–3.1.3 | Screenshots/mock-ups from an approved client build, with captions and redaction. | Frontend/mobile/tablet lead | Before defense |
+| PH-R3-004 | `[PLACEHOLDER: UI WORKFLOW]` | Report 3 | 5.3 Application Messages List | Approved user-facing messages, display type, trigger, localization, and client context. | UI lead / product representative | Before defense |
+| PH-R3-005 | `[PLACEHOLDER: FINAL CITATION]` | Report 3 | Diagrams / FR / NFR evidence | Final citations to the approved evidence baseline, client contracts, diagrams, and tests. | Report writer / technical reviewer | Before submission |
+| PH-R3-006 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 3 | 2–5 | Resolve or formally defer actor/policy, notification privacy, package, Edge, database, and requirement-status conflicts. | Backend lead / architecture reviewer | Before submission |
+| PH-R3-007 | `[PLACEHOLDER: CONFIGURATION VALUE]` | Report 3 | NFR-013 and quality attributes | Approved cache profile/TTL/invalidation and measurable quality/acceptance thresholds. | Backend/operations lead | Before submission |
+| PH-R4-001 | `[PLACEHOLDER: PROJECT METADATA]` | Report 4 | Cover / Record of Changes | Official metadata, revision date, author, and reviewer. | Project manager | Before submission |
+| PH-R4-002 | `[PLACEHOLDER: FINAL CITATION]` | Report 4 | 1–3 diagrams | Render Mermaid figures, assign figure numbers/captions, and cite the approved design baseline. | Design owner / report writer | Before submission |
+| PH-R4-003 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 4 | 2. Database Design | Correct/reconcile entity catalogues, cardinalities, nullability, FKs, indexes, delete behavior, JSON, and migrations. | Database reviewer | Before submission |
+| PH-R4-004 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 4 | 3.2 Robot / Edge | Confirm external Edge/schema compatibility and keep physical execution/safety outside backend proof. | Robot/IoT/Edge lead | Before defense |
+| PH-R4-005 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 4 | 3.3–3.5 | Approve omitted or additional detailed flows for observations, bindings/deployment, notification privacy, sync, and operations. | Architecture reviewer | Before submission |
+| PH-R4-006 | `[PLACEHOLDER: DEPLOYMENT DETAIL]` | Report 4 | 1.1 architecture / 3.5 operations | Approved deployment topology, enabled jobs, observability, recovery, and operational ownership. | DevOps / operations lead | Before defense |
+| PH-R5-001 | `[PLACEHOLDER: PROJECT METADATA]` | Report 5 | Cover / Record of Changes | Official metadata, revision date, author, and reviewer. | Project manager | Before submission |
+| PH-R5-002 | `[PLACEHOLDER: TEAM INFO]` | Report 5 | 3.1 Human Resources | Named test owners, responsibilities, review authority, and acceptance representative. | Test lead / project manager | Before submission |
+| PH-R5-003 | `[PLACEHOLDER: CONFIGURATION VALUE]` | Report 5 | 2.3 / 3.2 Test Environment | Exact tools, versions, build, database, fixtures, provider/broker/storage, simulator/device, reset, and isolation details. | Test lead / DevOps | Before defense |
+| PH-R5-004 | `[PLACEHOLDER: PROJECT METADATA]` | Report 5 | 3.3 Test Milestones | Approved milestones, dates, entry/exit criteria, and dependencies from the PMP/test plan. | Project manager / test lead | Before submission |
+| PH-R5-005 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 5 | 4. Test Cases | Complete executable STM mapping every requirement/subclaim to stable cases, data, environment, and evidence. | Test lead | Before defense |
+| PH-R5-006 | `[PLACEHOLDER: TEST RESULT]` | Report 5 | 5. Test Reports | Actual execution status, build/environment/date, statistics, evidence, and overall assessment. | Test lead | Before submission |
+| PH-R5-007 | `[PLACEHOLDER: TEST RESULT]` | Report 5 | 5. Defects / coverage / sign-off | Defect export, retest/regression, coverage, known issues, acceptance disposition, and signatures. | Test lead / product representative | Before submission |
+| PH-R5-008 | `[DEFERRED: NOT REQUIRED FOR DRAFT DOCX]` | Report 5 | External/client/hardware tests | Provider-internal, frontend-internal, Edge-internal, and physical safety results until separately approved and executed. | Owning external/UI/Edge teams | Nice to fix |
+| PH-R6-001 | `[PLACEHOLDER: PROJECT METADATA]` | Report 6 | Cover / Record of Changes | Official metadata, revision date, author, and reviewer. | Project manager | Before submission |
+| PH-R6-002 | `[PLACEHOLDER: DEPLOYMENT DETAIL]` | Report 6 | 1. Deliverable Package | Versioned release manifest, artifact paths, versions, source revision, checksums, owners, approvals, and known issues. | Release manager | Before submission |
+| PH-R6-003 | `[PLACEHOLDER: CONFIGURATION VALUE]` | Report 6 | 2.1 System Requirements | Supported runtime/OS/container/database/broker/storage/provider versions, capacity, time, and network assumptions. | DevOps / backend lead | Before defense |
+| PH-R6-004 | `[PLACEHOLDER: CONFIGURATION VALUE]` | Report 6 | 2.2 Configuration | Approved non-secret keys/templates and secret provisioning, rotation, and recovery procedure. | DevOps / security owner | Before submission |
+| PH-R6-005 | `[PLACEHOLDER: DEPLOYMENT DETAIL]` | Report 6 | 2.2 Installation Instructions | Tested migration, backup, build, deploy, start/stop, rollback, health, and troubleshooting procedure. | DevOps / database reviewer | Before defense |
+| PH-R6-006 | `[PLACEHOLDER: UI WORKFLOW]` | Report 6 | 3. User Manual | Approved client navigation and role workflows for identity, catalog, inventory, ordering, operations, and configuration. | Frontend/mobile/tablet lead | Before defense |
+| PH-R6-007 | `[PLACEHOLDER: UI SCREENSHOT]` | Report 6 | 3. User Manual | Approved, captioned, redacted screenshots for the documented workflows and error states. | Frontend/mobile/tablet lead | Before defense |
+| PH-R6-008 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 6 | 3.5 Robot / Edge | Verified Edge/device installation, command/report compatibility, physical boundary, and operator procedure. | Robot/IoT/Edge lead | Before defense |
+| PH-R6-009 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 6 | Installation verification / sign-off | Dated installation evidence and authorized acceptance for the approved environment. | Release manager / acceptance representative | Before submission |
+| PH-R7-001 | `[PLACEHOLDER: PROJECT METADATA]` | Report 7 | Cover Page | Official project/group/code/date metadata. | Project manager | Before submission |
+| PH-R7-002 | `[PLACEHOLDER: TEAM INFO]` | Report 7 | Cover / Acknowledgement | Team roster, student IDs, roles, acknowledgement, and approved contacts if required. | Project manager / team | Before submission |
+| PH-R7-003 | `[PLACEHOLDER: SUPERVISOR CONFIRMATION]` | Report 7 | Cover / approval | Supervisor and external-supervisor identity or approved Not Applicable value. | Supervisor / project manager | Before submission |
+| PH-R7-004 | `[PLACEHOLDER: PMP]` | Report 7 | II. Project Management Plan | Complete Report 2 content: approach, estimation, objectives, risks, quality, training, schedule, organization, communication, and configuration management. | Project manager / whole team | Before submission |
+| PH-R7-005 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 7 | III–VI consolidation | Losslessly import approved Reports 3–6 content and remove each consolidation marker only after coverage review. | Final report editor / independent reviewer | Before submission |
+| PH-R7-006 | `[PLACEHOLDER: UI WORKFLOW]` | Report 7 | III / VI | Import only approved screen flows, authorization presentation, workflows, and messages. | UI lead / final report editor | Before defense |
+| PH-R7-007 | `[PLACEHOLDER: UI SCREENSHOT]` | Report 7 | III / VI | Insert selected approved client screenshots/figures with captions and citations. | UI lead / report writer | Before defense |
+| PH-R7-008 | `[PLACEHOLDER: TEST RESULT]` | Report 7 | V. Software Testing Documentation | Import approved Report 5 execution summary, statistics, defects, coverage, known issues, and sign-off. | Test lead / final report editor | Before submission |
+| PH-R7-009 | `[PLACEHOLDER: DEPLOYMENT DETAIL]` | Report 7 | VI. Release Package & User Guides | Import the approved release manifest, installation runbook, environment, verification, and support procedure. | Release manager / final report editor | Before submission |
+| PH-R7-010 | `[PLACEHOLDER: FINAL CITATION]` | Report 7 | VII. Appendix | Final glossary, references, figure/table sources, external comparisons, and artifact links. | Report writer | Before submission |
+| PH-R7-011 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Report 7 | Whole report | Confirm FR/NFR/BR/DR/TC IDs, uncertainty labels, counts, cross-references, diagrams, and no unsupported physical/test/deployment claims. | Independent reviewer | Before submission |
+| PH-ALL-001 | `[PLACEHOLDER: SUPERVISOR CONFIRMATION]` | Reports 1–7 | Template control | Confirm university template/student-guide version and current-cohort submission rules. | Supervisor / report owner | Before submission |
+| PH-ALL-002 | `[PLACEHOLDER: FINAL CITATION]` | Reports 1–7 | Evidence metadata | Approve one commit/date/evidence manifest and classify cited artifacts as current, hybrid, or superseded. | Backend lead / report owner | Before submission |
+| PH-ALL-003 | `[PLACEHOLDER: MANUAL VERIFICATION]` | Reports 1–7 | DOCX quality gate | Render diagrams; verify numbering, captions, TOC, page breaks, references, placeholders, uncertainty labels, and redaction. | Final report editor / whole team | Before submission |
+| PH-ALL-004 | `[DEFERRED: NOT REQUIRED FOR DRAFT DOCX]` | Reports 1–7 | Draft layout review | Cosmetic refinements that do not affect correctness, required template structure, defense readability, or submission compliance. | Final report editor | Nice to fix |
+
+## Draft Conversion Rule
+
+- “Before submission” placeholders may remain visible in an internal draft DOCX but must be resolved, explicitly deferred with approval, or removed with evidence before submission.
+- “Before defense” placeholders may be absent from the first layout draft but must be supplied if the defense/report requires the related workflow, screenshot, environment, or demonstration.
+- “Nice to fix” items must not displace correctness, evidence reconciliation, testing, PMP completion, or submission compliance.

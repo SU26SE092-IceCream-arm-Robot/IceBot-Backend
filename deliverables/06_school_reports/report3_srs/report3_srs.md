@@ -2,14 +2,14 @@
 
 ## REPORT 3 — SOFTWARE REQUIREMENT SPECIFICATION
 
-**Project name:** `[Official project name — to be confirmed by the team]`
+**Project name:** `[PLACEHOLDER: PROJECT METADATA]`
 
 **Working product name:** IceBot Backend
 
-**Project code:** `[Project code]`
+**Project code:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Group name:** `[Group name]`
-**Location and date:** `[Location, month, year]`
+**Group name:** `[PLACEHOLDER: PROJECT METADATA]`
+**Location and date:** `[PLACEHOLDER: PROJECT METADATA]`
 
 # I. Record of Changes
 
@@ -17,10 +17,12 @@
 
 | Date | A/M/D | In charge | Change Description |
 |---|---|---|---|
-| `[dd/mm/yyyy]` | A | `[Author/team member]` | Initial school-template SRS draft prepared from the evidence-based SRS and Requirements Traceability Matrix. |
-| `[dd/mm/yyyy]` | M | `[Reviewer/team member]` | Review corrections applied to actor terminology, non-screen classification, ERD descriptions, NFR confidence statuses, and internal references. |
+| `[PLACEHOLDER: PROJECT METADATA]` | A | `[PLACEHOLDER: TEAM INFO]` | Initial school-template SRS draft prepared from the evidence-based SRS and Requirements Traceability Matrix. |
+| `[PLACEHOLDER: PROJECT METADATA]` | M | `[PLACEHOLDER: TEAM INFO]` | Review corrections applied. `[PLACEHOLDER: MANUAL VERIFICATION]` Confirm the approved baseline and reviewer before submission. |
 
 # II. Software Requirement Specification
+
+Draft-DOCX rule: `[PLACEHOLDER: UI WORKFLOW]` and `[PLACEHOLDER: UI SCREENSHOT]` identify client-owned content that is absent from backend evidence. Technical `[Unclear]`, `[Open Question]`, and `[Needs Review]` statements remain unresolved and require `[PLACEHOLDER: MANUAL VERIFICATION]` before submission; they are not requirements accepted by omission.
 
 ## 1. Product Overview
 
@@ -171,7 +173,7 @@ The actor lists summarize each consolidated FR range. They are not an authorizat
 
 #### 3.1.1 Screens Flow
 
-**[Needs Team/UI Review]** This backend repository does not contain an authoritative frontend, tablet, mobile, or management-screen implementation. An API route or GraphQL query does not prove that a corresponding screen exists. The team must supply the owning UI repositories/builds and an approved screen-flow diagram before this section can be completed.
+**[PLACEHOLDER: UI WORKFLOW]** This backend repository does not contain an authoritative frontend, tablet, mobile, or management-screen implementation. Supply the approved screen-flow diagram from the owning client build. An API route or GraphQL query does not prove that a corresponding screen exists.
 
 The minimum flows to validate with the UI teams are:
 
@@ -182,19 +184,19 @@ The minimum flows to validate with the UI teams are:
 
 #### 3.1.2 Screen Descriptions
 
-**[Needs Team/UI Review]** No screen names, layouts, fields, navigation paths, screenshots, or user-facing validation messages are claimed from backend evidence. The team must complete the following table from the approved client implementations.
+**[PLACEHOLDER: UI WORKFLOW] [PLACEHOLDER: UI SCREENSHOT]** No screen names, layouts, fields, navigation paths, screenshots, or user-facing validation messages are claimed from backend evidence. Complete the following table from approved client implementations.
 
 | Screen ID | Screen name | Client/application | Actor | Purpose | Related API/query/event | Related FRs | Review status |
 |---|---|---|---|---|---|---|---|
-| `[UI-xx]` | `[Screen name]` | `[Tablet / Management / Mobile / Edge UI]` | `[Actor]` | `[Purpose]` | `[Contract]` | `[FR IDs]` | `[Needs Team/UI Review]` |
+| `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: FINAL CITATION]` | `[PLACEHOLDER: MANUAL VERIFICATION]` | `[PLACEHOLDER: UI SCREENSHOT]` |
 
 #### 3.1.3 Screen Authorization
 
-**[Needs Team/UI Review]** Backend policies and tenant checks cannot establish client-side screen visibility. The final matrix must compare UI navigation/activity permissions with backend enforcement. UI hiding is not an authorization boundary.
+**[PLACEHOLDER: UI WORKFLOW]** The final matrix must compare approved UI navigation/activity permissions with backend enforcement. UI hiding is not an authorization boundary.
 
 | Screen or activity | SystemAdmin | OrgAdmin | Manager | Staff | Technician | Customer | Backend policy/scope evidence | Review status |
 |---|---|---|---|---|---|---|---|---|
-| `[Screen/activity]` |  |  |  |  |  |  | `[Policy and FR]` | `[Needs Team/UI Review]` |
+| `[PLACEHOLDER: UI WORKFLOW]` |  |  |  |  |  |  | `[PLACEHOLDER: FINAL CITATION]` | `[PLACEHOLDER: UI WORKFLOW]` |
 
 #### 3.1.4 Non-Screen Functions
 
@@ -1930,11 +1932,11 @@ The following cross-cutting rules recur across multiple functional requirements 
 
 ### 5.3 Application Messages List
 
-**[Needs Team/UI Review]** The backend evidence does not establish a complete approved catalog of user-facing messages, display type, screen context, or localized wording. Exact HTTP/GraphQL error envelopes and status-code coverage are also incomplete in the evidence set. The team must populate this table from the approved UI and API contracts.
+**[PLACEHOLDER: UI WORKFLOW]** The backend evidence does not establish a complete approved catalog of user-facing messages, display type, screen context, or localized wording. Populate this table from approved UI and API contracts; use `[PLACEHOLDER: FINAL CITATION]` for the owning build/contract reference.
 
 | Message code | Message type | Context | Approved content | Related FR/validation | Status |
 |---|---|---|---|---|---|
-| `[MSG-xxx]` | `[Inline / toast / dialog / system notification]` | `[Trigger and client]` | `[Approved user-facing text]` | `[FR/BR ID]` | `[Needs Team/UI Review]` |
+| `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: UI WORKFLOW]` | `[PLACEHOLDER: MANUAL VERIFICATION]` | `[PLACEHOLDER: FINAL CITATION]` |
 
 ### 5.4 Open Questions and Assumptions
 

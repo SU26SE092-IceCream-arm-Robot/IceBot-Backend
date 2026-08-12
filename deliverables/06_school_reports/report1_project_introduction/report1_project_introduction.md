@@ -2,12 +2,12 @@
 
 ## REPORT 1 — PROJECT INTRODUCTION
 
-**Project name:** `[Official project name — to be confirmed by the team]`  
+**Project name:** `[PLACEHOLDER: PROJECT METADATA]`
 **Working product name:** IceBot Backend  
-**Project code:** `[Project code]`  
-**Group name:** `[Group name]`  
+**Project code:** `[PLACEHOLDER: PROJECT METADATA]`
+**Group name:** `[PLACEHOLDER: PROJECT METADATA]`
 **Institution:** FPT University  
-**Location and date:** `[Location, month, year]`
+**Location and date:** `[PLACEHOLDER: PROJECT METADATA]`
 
 # I. Record of Changes
 
@@ -15,7 +15,7 @@
 
 | Date | A/M/D | In charge | Change Description |
 |---|---|---|---|
-| `[dd/mm/yyyy]` | A | `[Author/team member]` | Initial school-template draft prepared from the approved backend documentation baseline. |
+| `[PLACEHOLDER: PROJECT METADATA]` | A | `[PLACEHOLDER: TEAM INFO]` | Initial school-template draft prepared from the current evidence baseline. `[PLACEHOLDER: MANUAL VERIFICATION]` Confirm the approved baseline before submission. |
 
 # II. Project Introduction
 
@@ -25,14 +25,14 @@
 
 | Item | Information |
 |---|---|
-| Project name | `[Official project name — to be confirmed by the team]` |
+| Project name | `[PLACEHOLDER: PROJECT METADATA]` |
 | Working product name | IceBot Backend |
-| Project code | `[Project code]` |
-| Group name | `[Group name]` |
+| Project code | `[PLACEHOLDER: PROJECT METADATA]` |
+| Group name | `[PLACEHOLDER: PROJECT METADATA]` |
 | Software type | Server-side web API and integration backend for an automated vending platform |
-| Customer / project requester | `[Customer or project requester]` |
-| Supervisor / lecturer | `[Supervisor or lecturer]` |
-| Target release | `[Target release or semester milestone]` |
+| Customer / project requester | `[PLACEHOLDER: PROJECT METADATA]` |
+| Supervisor / lecturer | `[PLACEHOLDER: SUPERVISOR CONFIRMATION]` |
+| Target release | `[PLACEHOLDER: PROJECT METADATA]` |
 
 IceBot Backend is the Cloud-side server application for a multi-location automated vending platform with robot-arm order fulfilment. It supports tablet-originated customer checkout, payment processing, robot execution coordination, kiosk operations, and centralized administration of organizations, stores, kiosks, catalogs, menus, devices, inventory, and production configuration.
 
@@ -44,12 +44,12 @@ The evidence used for this draft establishes implemented source structure and wi
 
 | Full Name | Role | Email | Mobile |
 |---|---|---|---|
-| `[Supervisor or lecturer name]` | Supervisor / Lecturer | `[Email]` | `[Mobile]` |
-| `[Team member name]` | Team Leader | `[Email]` | `[Mobile]` |
-| `[Team member name]` | Member | `[Email]` | `[Mobile]` |
-| `[Team member name]` | Member | `[Email]` | `[Mobile]` |
-| `[Team member name]` | Member | `[Email]` | `[Mobile]` |
-| `[Add or remove rows to match the official team]` | `[Role]` | `[Email]` | `[Mobile]` |
+| `[PLACEHOLDER: TEAM INFO]` | Supervisor / Lecturer | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` |
+| `[PLACEHOLDER: TEAM INFO]` | Team Leader | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` |
+| `[PLACEHOLDER: TEAM INFO]` | Member | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` |
+| `[PLACEHOLDER: TEAM INFO]` | Member | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` |
+| `[PLACEHOLDER: TEAM INFO]` | Member | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` |
+| `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` | `[PLACEHOLDER: TEAM INFO]` |
 
 All names, roles, contact details, and academic identifiers in this section must be supplied and approved by the team before submission.
 
@@ -67,27 +67,27 @@ The repository evidence indicates that the product is designed for multi-organiz
 
 The university template requires an evaluation of comparable or predecessor systems. The current IceBot backend deliverables contain no approved market research, competitor analysis, customer legacy-system description, or cited comparison of external products. This section must therefore be completed by the team from approved external or project-owner sources.
 
-### 3.1 `[Comparable System 1 — name to be supplied]`
+### 3.1 `[PLACEHOLDER: FINAL CITATION] Comparable System 1`
 
 | Evaluation Item | Team Input Required |
 |---|---|
-| System name and source/link | `[Name and reliable source]` |
-| Intended users and actors | `[Actors]` |
-| Relevant functions | `[Functions comparable to IceBot]` |
-| Advantages | `[Evidence-based advantages]` |
-| Limitations | `[Evidence-based limitations]` |
-| Lessons applicable to IceBot | `[Design or product lessons]` |
+| System name and source/link | `[PLACEHOLDER: FINAL CITATION]` |
+| Intended users and actors | `[PLACEHOLDER: FINAL CITATION]` |
+| Relevant functions | `[PLACEHOLDER: FINAL CITATION]` |
+| Advantages | `[PLACEHOLDER: FINAL CITATION]` |
+| Limitations | `[PLACEHOLDER: FINAL CITATION]` |
+| Lessons applicable to IceBot | `[PLACEHOLDER: SUPERVISOR CONFIRMATION]` |
 
-### 3.2 `[Comparable System 2 — name to be supplied]`
+### 3.2 `[PLACEHOLDER: FINAL CITATION] Comparable System 2`
 
 | Evaluation Item | Team Input Required |
 |---|---|
-| System name and source/link | `[Name and reliable source]` |
-| Intended users and actors | `[Actors]` |
-| Relevant functions | `[Functions comparable to IceBot]` |
-| Advantages | `[Evidence-based advantages]` |
-| Limitations | `[Evidence-based limitations]` |
-| Lessons applicable to IceBot | `[Design or product lessons]` |
+| System name and source/link | `[PLACEHOLDER: FINAL CITATION]` |
+| Intended users and actors | `[PLACEHOLDER: FINAL CITATION]` |
+| Relevant functions | `[PLACEHOLDER: FINAL CITATION]` |
+| Advantages | `[PLACEHOLDER: FINAL CITATION]` |
+| Limitations | `[PLACEHOLDER: FINAL CITATION]` |
+| Lessons applicable to IceBot | `[PLACEHOLDER: SUPERVISOR CONFIRMATION]` |
 
 `[Add further comparable systems if required by the supervisor. Remove all university-template example content before submission.]`
 

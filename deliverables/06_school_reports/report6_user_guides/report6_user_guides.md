@@ -2,15 +2,15 @@
 
 ## REPORT 6 — SOFTWARE USER GUIDES
 
-**Project name:** `[Official project name — Needs Team Review]`
+**Project name:** `[PLACEHOLDER: PROJECT METADATA]`
 
 **Working product name:** IceBot Backend
 
-**Project code:** `[Project code — Needs Team Review]`
+**Project code:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Group name:** `[Group name — Needs Team Review]`
+**Group name:** `[PLACEHOLDER: PROJECT METADATA]`
 
-**Location and date:** `[Location and date — Needs Team Review]`
+**Location and date:** `[PLACEHOLDER: PROJECT METADATA]`
 
 # I. Record of Changes
 
@@ -18,11 +18,11 @@
 
 | Date | A/M/D | In charge | Change Description |
 |---|---|---|---|
-| `[Date — Needs Team Review]` | A | `[Author/team member — Needs Team Review]` | Initial school-template Release Package and Software User Guides draft prepared from the repository evidence and school-report baseline. |
+| `[PLACEHOLDER: PROJECT METADATA]` | A | `[PLACEHOLDER: TEAM INFO]` | Initial school-template Release Package and Software User Guides draft prepared from the repository evidence and school-report baseline. |
 
 # II. Release Package & User Guides
 
-This document is a school-report draft for IceBot Backend. It is not a verified production runbook, final release manifest, or approved UI manual. Repository paths and supported contracts are documented where evidence exists. Release versions, checksums, package locations, credentials, deployment commands, client navigation, screenshots, and physical Edge/robot procedures remain team-owned inputs.
+This document is a school-report draft for IceBot Backend. It is not a verified production runbook, final release manifest, or approved UI manual. Repository paths and supported contracts are documented where evidence exists. Release versions, checksums, package locations, credentials, deployment commands, and topology use `[PLACEHOLDER: DEPLOYMENT DETAIL]` or `[PLACEHOLDER: CONFIGURATION VALUE]`; client navigation uses `[PLACEHOLDER: UI WORKFLOW]`; images use `[PLACEHOLDER: UI SCREENSHOT]`; physical Edge/robot verification uses `[PLACEHOLDER: MANUAL VERIFICATION]`.
 
 Status notation:
 
@@ -30,6 +30,13 @@ Status notation:
 - `[Needs Team Review]` — a team-supplied value, decision, procedure, environment, or external-repository confirmation is required.
 - `[Needs UI/Team Review]` — the backend establishes a role/contract workflow but not the owning client screen, layout, navigation, or message text.
 - `[Unclear]` — the supplied evidence is incomplete or inconsistent.
+
+Draft-DOCX placeholder mapping:
+
+- unresolved release, installation, network, environment, migration, secret, and operations details → `[PLACEHOLDER: DEPLOYMENT DETAIL]` or `[PLACEHOLDER: CONFIGURATION VALUE]`;
+- missing client navigation and images → `[PLACEHOLDER: UI WORKFLOW]` and `[PLACEHOLDER: UI SCREENSHOT]`;
+- required installation, Edge, provider, or physical-device proof → `[PLACEHOLDER: MANUAL VERIFICATION]`;
+- optional material not required to review this draft → `[DEFERRED: NOT REQUIRED FOR DRAFT DOCX]`.
 
 ## 1. Deliverable Package
 
