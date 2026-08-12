@@ -1,4 +1,5 @@
 using Application.Catalog;
+using Application.ContentManagement;
 using Application.Dashboard.Queries;
 using Application.Devices;
 using Application.EdgeIntegration;
@@ -13,6 +14,7 @@ using Application.ProductionConfiguration;
 using Application.ProductionPackages;
 using Application.RobotConfiguration;
 using Application.SalesCatalog;
+using Application.ServiceRegistration;
 using Application.Tenants;
 using Application.Sync;
 using Microsoft.Extensions.DependencyInjection;
@@ -24,6 +26,7 @@ namespace Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddCatalogModule();
+            services.AddContentManagementApplication();
             services.AddDevicesModule();
             services.AddSyncModule();
             services.AddEdgeIntegrationModule();
@@ -36,6 +39,7 @@ namespace Application
             services.AddProductionPackagesModule();
             services.AddRobotConfigurationModule();
             services.AddSalesCatalogModule();
+            services.AddServiceRegistrationApplication();
             services.AddTenantsApplication();
             services.AddScoped<GetManagementDashboardQueryHandler>();
             return services;

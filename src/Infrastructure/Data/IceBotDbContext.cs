@@ -17,6 +17,7 @@ using Domain.Sync.Ingestion;
 using Domain.Devices.Telemetry;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Catalog.Entities;
+using Domain.ContentManagement.Entities;
 using Domain.Common;
 using Domain.Devices.Catalog;
 using Domain.Identity.Entities;
@@ -34,6 +35,8 @@ using Domain.ProductionPackages;
 using Domain.SalesCatalog.Entities;
 using Domain.Sync.Entities;
 using Domain.Tenants.Entities;
+using Domain.ServiceRegistration.Entities;
+using ServiceRegistrationEntity = Domain.ServiceRegistration.Entities.ServiceRegistration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using System.Linq.Expressions;
@@ -115,10 +118,15 @@ public class IceBotDbContext : DbContext
     public DbSet<Role> Roles => Set<Role>();
 
     public DbSet<Organization> Organizations => Set<Organization>();
+    public DbSet<OrganizationStatusTransition> OrganizationStatusTransitions => Set<OrganizationStatusTransition>();
     public DbSet<Store> Stores => Set<Store>();
     public DbSet<Kiosk> Kiosks => Set<Kiosk>();
     public DbSet<KioskOperationalStateTransition> KioskOperationalStateTransitions => Set<KioskOperationalStateTransition>();
     public DbSet<FranchiseOnboarding> FranchiseOnboardings => Set<FranchiseOnboarding>();
+    public DbSet<ServiceRegistrationEntity> ServiceRegistrations => Set<ServiceRegistrationEntity>();
+
+    public DbSet<ContentPage> ContentPages => Set<ContentPage>();
+    public DbSet<ContentPageRevision> ContentPageRevisions => Set<ContentPageRevision>();
 
     public DbSet<DeviceType> DeviceTypes => Set<DeviceType>();
     public DbSet<DeviceModel> DeviceModels => Set<DeviceModel>();

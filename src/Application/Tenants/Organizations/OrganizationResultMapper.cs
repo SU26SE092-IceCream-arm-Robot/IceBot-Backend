@@ -18,6 +18,12 @@ internal static class OrganizationResultMapper
             PhoneNumber = org.PhoneNumber,
             Address = org.Address,
             Status = org.Status.ToString(),
+            StatusRevision = org.StatusRevision,
+            SuspensionReasonCode = org.SuspensionReasonCode,
+            SuspensionReason = org.SuspensionReason,
+            SuspendedAt = org.SuspendedAt,
+            DeactivatedAt = org.DeactivatedAt,
+            ReactivatedAt = org.ReactivatedAt,
             CreatedAt = org.CreatedAt,
             UpdatedAt = org.UpdatedAt
         };

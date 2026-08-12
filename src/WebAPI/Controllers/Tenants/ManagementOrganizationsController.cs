@@ -15,25 +15,25 @@ public class ManagementOrganizationsController : ControllerBase
 {
     private readonly ListOrganizationsQueryHandler _listOrganizations;
     private readonly GetOrganizationQueryHandler _getOrganization;
+    private readonly ListOrganizationStatusHistoryQueryHandler _statusHistory;
     private readonly CreateOrganizationCommandHandler _createOrganization;
     private readonly UpdateOrganizationCommandHandler _updateOrganization;
-    private readonly DisableOrganizationCommandHandler _disableOrganization;
-    private readonly ActivateOrganizationCommandHandler _activateOrganization;
+    private readonly OrganizationLifecycleTransitionCommandHandler _lifecycleTransition;
 
     public ManagementOrganizationsController(
         ListOrganizationsQueryHandler listOrganizations,
         GetOrganizationQueryHandler getOrganization,
+        ListOrganizationStatusHistoryQueryHandler statusHistory,
         CreateOrganizationCommandHandler createOrganization,
         UpdateOrganizationCommandHandler updateOrganization,
-        DisableOrganizationCommandHandler disableOrganization,
-        ActivateOrganizationCommandHandler activateOrganization)
+        OrganizationLifecycleTransitionCommandHandler lifecycleTransition)
     {
         _listOrganizations = listOrganizations;
         _getOrganization = getOrganization;
+        _statusHistory = statusHistory;
         _createOrganization = createOrganization;
         _updateOrganization = updateOrganization;
-        _disableOrganization = disableOrganization;
-        _activateOrganization = activateOrganization;
+        _lifecycleTransition = lifecycleTransition;
     }
 
     [HttpGet]
@@ -108,35 +108,81 @@ public class ManagementOrganizationsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("{organizationId:guid}/disable")]
+    [HttpPost("{organizationId:guid}/suspend")]
     [Authorize(Policy = "organizations.manage")]
-    public async Task<IActionResult> DisableOrganization(
+    public async Task<IActionResult> SuspendOrganization(
         Guid organizationId,
+        [FromBody] OrganizationLifecycleTransitionRequest request,
         CancellationToken cancellationToken)
     {
-        var context = User.GetUserContext();
-        var command = new DisableOrganizationCommand
+        var result = await _lifecycleTransition.HandleAsync(new OrganizationLifecycleTransitionCommand
         {
-            UserContext = context,
-            OrganizationId = organizationId
-        };
-        var result = await _disableOrganization.HandleAsync(command, cancellationToken);
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            Action = OrganizationLifecycleAction.Suspend,
+            Request = request
+        }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPatch("{organizationId:guid}/activate")]
+    [HttpGet("{organizationId:guid}/status-history")]
     [Authorize(Policy = "organizations.manage")]
-    public async Task<IActionResult> ActivateOrganization(
+    public async Task<IActionResult> ListOrganizationStatusHistory(
         Guid organizationId,
         CancellationToken cancellationToken)
     {
-        var context = User.GetUserContext();
-        var command = new ActivateOrganizationCommand
+        var result = await _statusHistory.HandleAsync(User.GetUserContext(), organizationId, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{organizationId:guid}/resume")]
+    [Authorize(Policy = "organizations.manage")]
+    public async Task<IActionResult> ResumeOrganization(
+        Guid organizationId,
+        [FromBody] OrganizationLifecycleTransitionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _lifecycleTransition.HandleAsync(new OrganizationLifecycleTransitionCommand
         {
-            UserContext = context,
-            OrganizationId = organizationId
-        };
-        var result = await _activateOrganization.HandleAsync(command, cancellationToken);
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            Action = OrganizationLifecycleAction.Resume,
+            Request = request
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{organizationId:guid}/deactivate")]
+    [Authorize(Policy = "organizations.manage")]
+    public async Task<IActionResult> DeactivateOrganization(
+        Guid organizationId,
+        [FromBody] OrganizationLifecycleTransitionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _lifecycleTransition.HandleAsync(new OrganizationLifecycleTransitionCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            Action = OrganizationLifecycleAction.Deactivate,
+            Request = request
+        }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPost("{organizationId:guid}/reactivate")]
+    [Authorize(Policy = "organizations.manage")]
+    public async Task<IActionResult> ReactivateOrganization(
+        Guid organizationId,
+        [FromBody] OrganizationLifecycleTransitionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await _lifecycleTransition.HandleAsync(new OrganizationLifecycleTransitionCommand
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            Action = OrganizationLifecycleAction.Reactivate,
+            Request = request
+        }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 }

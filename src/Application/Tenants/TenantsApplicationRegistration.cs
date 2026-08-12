@@ -35,10 +35,10 @@ public static class TenantsApplicationRegistration
 
         services.AddScoped<ListOrganizationsQueryHandler>();
         services.AddScoped<GetOrganizationQueryHandler>();
+        services.AddScoped<ListOrganizationStatusHistoryQueryHandler>();
         services.AddScoped<CreateOrganizationCommandHandler>();
         services.AddScoped<UpdateOrganizationCommandHandler>();
-        services.AddScoped<DisableOrganizationCommandHandler>();
-        services.AddScoped<ActivateOrganizationCommandHandler>();
+        services.AddScoped<OrganizationLifecycleTransitionCommandHandler>();
 
         services.AddScoped<GetTenantTreeQueryHandler>();
         services.AddScoped<FranchiseOnboardingService>();

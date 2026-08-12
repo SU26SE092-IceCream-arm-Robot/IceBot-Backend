@@ -2,6 +2,7 @@ using Application.Identity.Abstractions;
 using Application.Identity.Authentication.Results;
 using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
+using Domain.Common.Enums;
 using Domain.Identity.Entities;
 using Domain.Identity.Enums;
 
@@ -29,6 +30,15 @@ namespace Application.Identity.Tokens.Services
             string? userAgent = null)
         {
             var roles = ResolveRoleClaims(account);
+            var organizationAccessError = ResolveOrganizationAccessError(account, roles);
+            if (organizationAccessError is not null)
+            {
+                return ApiResult<AuthenticatedAccountResult>.Fail(
+                    organizationAccessError.Value.Message,
+                    403,
+                    organizationAccessError.Value.Code);
+            }
+
             var refreshToken = await _refreshTokens.CreateAsync(account.Id, ipAddress, userAgent);
             var accessToken = _accessTokenGenerator.GenerateAccessToken(
                 account.Id,
@@ -73,6 +83,20 @@ namespace Application.Identity.Tokens.Services
             }
 
             var roles = ResolveRoleClaims(account);
+            var organizationAccessError = ResolveOrganizationAccessError(account, roles);
+            if (organizationAccessError is not null)
+            {
+                await _refreshTokens.RevokeAllForAccountAsync(
+                    account.Id,
+                    organizationAccessError.Value.Code,
+                    ipAddress,
+                    userAgent);
+                return ApiResult<AuthenticatedAccountResult>.Fail(
+                    organizationAccessError.Value.Message,
+                    403,
+                    organizationAccessError.Value.Code);
+            }
+
             var accessToken = _accessTokenGenerator.GenerateAccessToken(
                 account.Id,
                 rotation.NewToken.Entity.Id,
@@ -124,6 +148,7 @@ namespace Application.Identity.Tokens.Services
         {
             return account.AccountRoles
                        .Where(accountRole => accountRole.IsActive)
+                       .Where(HasActiveOrganizationScope)
                        .OrderBy(accountRole => accountRole.Role.Priority)
                        .Select(accountRole => new AccountRoleClaim(
                            accountRole.Role.Code,
@@ -131,6 +156,46 @@ namespace Application.Identity.Tokens.Services
                            accountRole.StoreId,
                            accountRole.KioskId))
                        .ToList();
+        }
+
+        private static bool HasActiveOrganizationScope(AccountRole accountRole)
+        {
+            if (string.Equals(accountRole.Role.Code, "SystemAdmin", StringComparison.OrdinalIgnoreCase) &&
+                !accountRole.OrganizationId.HasValue &&
+                !accountRole.StoreId.HasValue &&
+                !accountRole.KioskId.HasValue)
+            {
+                return true;
+            }
+
+            var organizationStatus = accountRole.Organization?.Status
+                ?? accountRole.Store?.Organization?.Status
+                ?? accountRole.Kiosk?.Organization?.Status;
+            return organizationStatus == EntityStatus.Active;
+        }
+
+        private static (string Code, string Message)? ResolveOrganizationAccessError(
+            Account account,
+            IReadOnlyCollection<AccountRoleClaim> roles)
+        {
+            if (roles.Count > 0)
+            {
+                return null;
+            }
+
+            var statuses = account.AccountRoles
+                .Where(role => role.IsActive)
+                .Select(role => role.Organization?.Status ?? role.Store?.Organization?.Status ?? role.Kiosk?.Organization?.Status)
+                .Where(status => status.HasValue)
+                .Select(status => status!.Value)
+                .Distinct()
+                .ToArray();
+
+            return statuses.Length == 1 && statuses[0] == EntityStatus.Suspended
+                ? ("ORGANIZATION_SUSPENDED", "This account belongs only to suspended organizations.")
+                : statuses.Length == 1 && statuses[0] == EntityStatus.Inactive
+                    ? ("ORGANIZATION_INACTIVE", "This account belongs only to inactive organizations.")
+                    : ("ORGANIZATION_ACCESS_UNAVAILABLE", "This account has no active organization scope.");
         }
     }
 }

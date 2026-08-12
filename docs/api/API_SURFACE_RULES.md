@@ -36,9 +36,12 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Area | Main routes | Read when asking about |
 | --- | --- | --- |
 | Authentication and password recovery | `/api/v1/authentication/*` | login, external login, Firebase Google login, refresh token, forgot password, reset password, accept invitation |
+| Public landing content and service registration | `/api/v1/content-pages/{slug}`, `/api/v1/service-registrations` | public legal/content pages and idempotent service-interest registration; registration does not create a tenant directly |
+| Service-registration review | `/api/v1/management/service-registrations/*` | SystemAdmin-only review, rejection, atomic tenant/OrgAdmin provisioning, and retry after a provisioning failure |
+| Content page management | `/api/v1/management/content-pages/*` | SystemAdmin-only draft and immutable publication of platform public long-form pages |
 | Current account | `/api/v1/me`, `/api/v1/me/profile`, `/api/v1/me/password`, `/api/v1/me/access`, `/api/v1/me/sessions`, `/api/v1/me/notification-devices` | own profile, edit profile, change password, inspect/revoke active refresh sessions and current token access, and manage the caller's FCM registrations |
 | Account management | `/api/v1/management/organizations/{organizationId}/accounts/*` | create internal account, invitation link generation, assign/update roles, effective access, disable account, set password |
-| Organization management | `/api/v1/management/organizations/*` | create/update/activate/disable organizations, list and view organizations |
+| Organization management | `/api/v1/management/organizations/*` | create/update organizations, list/view lifecycle evidence, and SystemAdmin suspend/resume or deactivate/reactivate organization service |
 | Store management | `/api/v1/management/stores/*`, `/api/v1/management/organizations/*/stores` | create/update/activate/disable stores, list and view stores |
 | Kiosk management | `/api/v1/management/kiosks/*`, `/api/v1/management/stores/*/kiosks` | create/update/set status of kiosks, list and view kiosks |
 | Device management | global index: `/api/v1/management/devices`; kiosk-owned operations: `/api/v1/management/kiosks/{kioskId}/devices/*` | create/update/set management status/retire devices, list and view devices |
@@ -79,6 +82,37 @@ Create and mutation routes should prefer the parent owner path. Global list/sear
 - Distinguish platform templates from tenant-owned resources in the noun itself when both are exposed. Platform contracts use `/robot-artifact-template-contracts`; tenant contracts use `/organizations/{organizationId}/robot-artifact-technical-contracts`.
 - A global route without an owner is allowed for a read-only cross-scope index, such as `/configuration-deployments`. Item mutation and detail routes still include the physical or tenant owner.
 - Do not retain legacy aliases before first production deployment. Controller attributes, generated OpenAPI, flow docs, and frontend operation catalogs must change together.
+
+### Organization Operational Lifecycle
+
+Organization service lifecycle is platform-owned and has three operational states:
+
+```text
+Active -> Suspended -> Active       temporary platform hold and resume
+Active -> Inactive                  service end/offboarding
+Suspended -> Inactive               end service while held
+Inactive -> Active                  explicit reactivation after readiness confirmation
+```
+
+Use explicit SystemAdmin commands; do not use ambiguous `disable`/`activate`
+aliases for Organizations:
+
+```text
+POST /api/v1/management/organizations/{organizationId}/suspend
+POST /api/v1/management/organizations/{organizationId}/resume
+POST /api/v1/management/organizations/{organizationId}/deactivate
+POST /api/v1/management/organizations/{organizationId}/reactivate
+GET  /api/v1/management/organizations/{organizationId}/status-history
+```
+
+Every transition requires `reason`, `expectedRevision`, and an optional
+idempotency key. Suspension additionally requires a structured `reasonCode`.
+Reactivation requires `readinessConfirmed: true`; it is not a resume alias.
+Suspended and inactive Organization role scopes are removed before management
+authorization is evaluated, including for access tokens issued before the state
+transition. SystemAdmin's global scope remains available for inspection and
+recovery. Edge evidence, provider webhooks, and reconciliation ingress use
+their own authentication paths and remain outside this tenant-account gate.
 
 ## Tablet / Customer APIs
 
@@ -418,3 +452,7 @@ Clients must join relevant groups to receive scoped events:
 - [Checkout Execution Flow](../flows/CHECKOUT_EXECUTION_FLOW.md)
 - [Management Read Flow](../flows/MANAGEMENT_READ_FLOW.md)
 - [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md)
+Suspension and deactivation commit the Organization state and immutable
+transition evidence before a hosted reconciliation job revokes refresh sessions
+for accounts assigned to that Organization. The revocation job is retryable;
+current HTTP scope enforcement does not wait for it.

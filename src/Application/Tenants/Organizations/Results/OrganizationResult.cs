@@ -20,6 +20,17 @@ public sealed class OrganizationResult
 
     public string Status { get; set; } = null!;
 
+    public long StatusRevision { get; set; }
+
+    public string? SuspensionReasonCode { get; set; }
+
+    public string? SuspensionReason { get; set; }
+
+    public DateTimeOffset? SuspendedAt { get; set; }
+
+    public DateTimeOffset? DeactivatedAt { get; set; }
+
+    public DateTimeOffset? ReactivatedAt { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
 

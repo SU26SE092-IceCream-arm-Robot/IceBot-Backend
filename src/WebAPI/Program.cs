@@ -2,6 +2,7 @@ using Application;
 using Infrastructure;
 using Infrastructure.Catalog.Bootstrap;
 using Microsoft.AspNetCore.Authorization;
+using System.Threading.RateLimiting;
 using Serilog;
 using WebAPI.Authorization;
 using WebAPI.Configuration.Diagnostics;
@@ -41,6 +42,21 @@ try
     builder.Services.AddIceBotCors(builder.Configuration, builder.Environment);
     builder.Services.AddIceBotAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddAuthorization(options => options.AddIceBotAuthorizationPolicies());
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("service-registration-submission", context =>
+        {
+            var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter(address, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+        });
+    });
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
 
@@ -103,6 +119,8 @@ try
 
     app.UseCors("FrontendOnly");
 
+    app.UseRateLimiter();
+
     app.UseMiddleware<CorrelationIdMiddleware>();
 
     app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -115,6 +133,8 @@ try
     }
 
     app.UseAuthentication();
+
+    app.UseMiddleware<OrganizationAccessScopeMiddleware>();
 
     app.UseAuthorization();
 

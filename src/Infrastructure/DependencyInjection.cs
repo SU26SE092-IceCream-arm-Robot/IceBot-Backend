@@ -60,6 +60,7 @@ using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.RobotConfiguration.ArtifactContracts;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
+using Infrastructure.ServiceRegistration;
 using Infrastructure.Sync;
 using Infrastructure.Tenants;
 using Microsoft.EntityFrameworkCore;
@@ -112,6 +113,7 @@ namespace Infrastructure
             services.AddHostedService<Orders.Jobs.FulfillmentReminderJob>();
             services.AddPaymentsInfrastructure(config);
             services.AddSalesCatalogInfrastructure(config);
+            services.AddServiceRegistrationInfrastructure();
             services.AddTenantsInfrastructure();
             services.AddScoped<IInventoryStore, InventoryStore>();
             services.AddScoped<IInventorySensorObservationStore, InventorySensorObservationStore>();

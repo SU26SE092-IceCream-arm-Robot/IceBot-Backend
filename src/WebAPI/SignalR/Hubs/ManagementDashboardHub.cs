@@ -10,10 +10,12 @@ namespace WebAPI.SignalR.Hubs;
 public sealed class ManagementDashboardHub : Hub
 {
     private readonly IStoreStore _storeStore;
+    private readonly IOrganizationAccessStateReader _organizationAccess;
 
-    public ManagementDashboardHub(IStoreStore storeStore)
+    public ManagementDashboardHub(IStoreStore storeStore, IOrganizationAccessStateReader organizationAccess)
     {
         _storeStore = storeStore;
+        _organizationAccess = organizationAccess;
     }
 
     public async Task JoinDashboard(string scope, Guid? organizationId, Guid? storeId)
@@ -29,7 +31,9 @@ public sealed class ManagementDashboardHub : Hub
                     : throw new HubException("Access denied: you do not have SystemAdmin access.");
                 break;
             case "organization":
-                groupKey = organizationId.HasValue && ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, organizationId.Value, null, null)
+                groupKey = organizationId.HasValue &&
+                    await _organizationAccess.IsActiveAsync(organizationId.Value, Context.ConnectionAborted) &&
+                    ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, organizationId.Value, null, null)
                     ? $"dashboard:organization:{organizationId.Value}"
                     : throw new HubException("Access denied: you do not have access to this organization dashboard.");
                 break;
@@ -40,7 +44,9 @@ public sealed class ManagementDashboardHub : Hub
                 }
 
                 var store = await _storeStore.GetByIdAsync(storeId.Value, Context.ConnectionAborted);
-                groupKey = store is not null && ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, store.OrganizationId, store.Id, null)
+                groupKey = store is not null &&
+                    await _organizationAccess.IsActiveAsync(store.OrganizationId, Context.ConnectionAborted) &&
+                    ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, store.OrganizationId, store.Id, null)
                     ? $"dashboard:store:{store.Id}"
                     : throw new HubException("Access denied: you do not have access to this store dashboard.");
                 break;

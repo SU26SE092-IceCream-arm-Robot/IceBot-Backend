@@ -1,5 +1,6 @@
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
+using Application.Tenants.Abstractions;
 using Microsoft.AspNetCore.SignalR;
 using WebAPI.SignalR.Hubs;
 
@@ -11,21 +12,29 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
     private readonly IHubContext<OperationsHub> _operationsHubContext;
     private readonly IHubContext<ManagementDashboardHub> _dashboardHubContext;
     private readonly ILogger<SignalRNotificationPublisher> _logger;
+    private readonly IOrganizationAccessStateReader _organizationAccess;
 
     public SignalRNotificationPublisher(
         IHubContext<OrderHub> orderHubContext,
         IHubContext<OperationsHub> operationsHubContext,
         IHubContext<ManagementDashboardHub> dashboardHubContext,
+        IOrganizationAccessStateReader organizationAccess,
         ILogger<SignalRNotificationPublisher> logger)
     {
         _orderHubContext = orderHubContext;
         _operationsHubContext = operationsHubContext;
         _dashboardHubContext = dashboardHubContext;
+        _organizationAccess = organizationAccess;
         _logger = logger;
     }
 
     public async Task PublishOrderStatusChangedAsync(OrderStatusChangedEvent evt, CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _orderHubContext.Clients.Group($"order:{evt.OrderId}").SendAsync("OrderStatusChanged", evt, ct);
@@ -50,6 +59,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         OrderItemFulfillmentChangedEvent evt,
         CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _orderHubContext.Clients.Group($"order:{evt.OrderId}")
@@ -79,6 +93,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         OrderExecutionObservationChangedEvent evt,
         CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _orderHubContext.Clients.Group($"order:{evt.OrderId}")
@@ -95,6 +114,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishPaymentStatusChangedAsync(PaymentStatusChangedEvent evt, CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _orderHubContext.Clients.Group($"order:{evt.OrderId}").SendAsync("PaymentStatusChanged", evt, ct);
@@ -117,6 +141,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishKioskStatusChangedAsync(KioskStatusChangedEvent evt, CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("KioskStatusChanged", evt, ct);
@@ -141,6 +170,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         KioskOperationalStateChangedEvent evt,
         CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}")
@@ -166,6 +200,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishDeviceEventCreatedAsync(DeviceEventCreatedEvent evt, CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("DeviceEventCreated", evt, ct);
@@ -194,6 +233,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishAlertChangedAsync(AlertChangedEvent evt, CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("AlertChanged", evt, ct);
@@ -215,6 +259,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishMaintenanceTicketChangedAsync(MaintenanceTicketChangedEvent evt, CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("MaintenanceTicketChanged", evt, ct);
@@ -237,6 +286,11 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishInventoryChangedAsync(InventoryChangedEvent evt, CancellationToken ct = default)
     {
+        if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
+        {
+            return;
+        }
+
         try
         {
             await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("InventoryChanged", evt, ct);
@@ -263,7 +317,7 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
         {
             await _dashboardHubContext.Clients.Group("dashboard:system").SendAsync("DashboardInvalidated", evt, ct);
 
-            if (evt.OrganizationId.HasValue)
+            if (evt.OrganizationId.HasValue && await CanDeliverTenantEventAsync(evt.OrganizationId.Value, ct))
             {
                 await _dashboardHubContext.Clients.Group($"dashboard:organization:{evt.OrganizationId.Value}").SendAsync("DashboardInvalidated", evt, ct);
             }
@@ -278,4 +332,9 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
             _logger.LogWarning(ex, "Failed to publish SignalR DashboardInvalidated event. Reason={Reason}", evt.Reason);
         }
     }
+
+    private Task<bool> CanDeliverTenantEventAsync(Guid? organizationId, CancellationToken cancellationToken) =>
+        organizationId.HasValue
+            ? _organizationAccess.IsActiveAsync(organizationId.Value, cancellationToken)
+            : Task.FromResult(false);
 }

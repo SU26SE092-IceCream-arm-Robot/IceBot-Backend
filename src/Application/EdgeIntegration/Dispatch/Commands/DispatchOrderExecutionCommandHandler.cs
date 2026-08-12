@@ -18,6 +18,7 @@ using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
 using Application.Devices.Telemetry;
+using Application.Tenants.Abstractions;
 
 namespace Application.EdgeIntegration.Dispatch.Commands;
 
@@ -27,17 +28,20 @@ public sealed class DispatchOrderExecutionCommandHandler
     private readonly OrderExecutionDispatchOptions _options;
     private readonly EdgeTelemetryIngestionOptions _telemetryOptions;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
+    private readonly IOrganizationAccessStateReader? _organizationAccess;
 
     public DispatchOrderExecutionCommandHandler(
         IOrderExecutionDispatchStore store,
         IOptions<OrderExecutionDispatchOptions> options,
         IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        IOptions<EdgeTelemetryIngestionOptions>? telemetryOptions = null)
+        IOptions<EdgeTelemetryIngestionOptions>? telemetryOptions = null,
+        IOrganizationAccessStateReader? organizationAccess = null)
     {
         _store = store;
         _options = options.Value;
         _telemetryOptions = telemetryOptions?.Value ?? new EdgeTelemetryIngestionOptions();
         _wakeUpPublisher = wakeUpPublisher;
+        _organizationAccess = organizationAccess;
     }
 
     public async Task<ApiResult<OrderExecutionDispatchResult>> HandleAsync(
@@ -152,6 +156,8 @@ public sealed class DispatchOrderExecutionCommandHandler
         var order = await _store.GetOrderAsync(orderId, cancellationToken);
         if (order is null)
             return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
+        if (!await AllowsNewProductionEffectAsync(order.OrganizationId, cancellationToken))
+            return OrganizationUnavailable();
         await _store.AcquireKioskOperationalLockAsync(order.KioskId, cancellationToken);
         if (!await _store.IsKioskOperationalAsync(order.KioskId, cancellationToken))
             return KioskNotOperational();
@@ -306,6 +312,10 @@ public sealed class DispatchOrderExecutionCommandHandler
         {
             return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
         }
+        if (!await AllowsNewProductionEffectAsync(order.OrganizationId, cancellationToken))
+        {
+            return OrganizationUnavailable();
+        }
 
         var eligible = latest.Status == EdgeCommandStatus.DeliveryFailed ||
             (latest.Status == EdgeCommandStatus.Rejected && order.Status == OrderStatus.ExecutionRejected);
@@ -342,6 +352,10 @@ public sealed class DispatchOrderExecutionCommandHandler
         if (order is null)
         {
             return ApiResult<OrderExecutionDispatchResult>.Fail("Order not found.", 404);
+        }
+        if (!await AllowsNewProductionEffectAsync(order.OrganizationId, cancellationToken))
+        {
+            return OrganizationUnavailable();
         }
 
         await _store.AcquireKioskOperationalLockAsync(order.KioskId, cancellationToken);
@@ -463,6 +477,16 @@ public sealed class DispatchOrderExecutionCommandHandler
     private static ApiResult<OrderExecutionDispatchResult> KioskNotOperational() =>
         ApiResult<OrderExecutionDispatchResult>.Fail(
             "Kiosk is not operational. The paid order remains queued and will not be dispatched until operations resume.",
+            409);
+
+    private Task<bool> AllowsNewProductionEffectAsync(Guid? organizationId, CancellationToken cancellationToken) =>
+        organizationId.HasValue
+            ? _organizationAccess?.IsActiveAsync(organizationId.Value, cancellationToken) ?? Task.FromResult(true)
+            : Task.FromResult(false);
+
+    private static ApiResult<OrderExecutionDispatchResult> OrganizationUnavailable() =>
+        ApiResult<OrderExecutionDispatchResult>.Fail(
+            "Organization is suspended or inactive. New production commands are blocked while existing evidence continues.",
             409);
 
     private static OrderExecutionDispatchResult ToResult(

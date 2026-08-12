@@ -133,7 +133,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `dashboard.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View management dashboard metrics within assigned scope |
 | `accounts.read` | `SystemAdmin`, `OrgAdmin` | Read internal accounts through an organization-owned route. Results contain only role scopes belonging to that organization. |
 | `accounts.manage` | `SystemAdmin`, `OrgAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for organization-owned internal accounts. `OrgAdmin` is limited to accounts with assignable roles and scopes inside the actor's assigned organization; it cannot grant `SystemAdmin` or access another organization. Global `SystemAdmin` provisioning is bootstrap-only. |
-| `organizations.manage` | `SystemAdmin` | Platform-level organization management: create, activate, disable organizations |
+| `organizations.manage` | `SystemAdmin` | Platform-level organization management: create organizations; suspend/resume a temporary tenant hold; deactivate/reactivate organization service; and inspect lifecycle history. Tenant actors cannot change Organization lifecycle. |
 | `organizations.view` | `SystemAdmin`, `OrgAdmin` | View organizations. OrgAdmin can view/read only their assigned organization(s) |
 | `organizations.update` | `SystemAdmin`, `OrgAdmin` | Update organizations. OrgAdmin can update only basic profile/contact info for assigned organization(s); SystemAdmin can update platform-managed fields |
 | `stores.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View stores. Scoped to assigned organization/store |

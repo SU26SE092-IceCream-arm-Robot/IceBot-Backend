@@ -40,8 +40,11 @@ GET /api/v1/management/organizations
 GET /api/v1/management/organizations/{organizationId}
 POST /api/v1/management/organizations
 PUT /api/v1/management/organizations/{organizationId}
-PATCH /api/v1/management/organizations/{organizationId}/disable
-PATCH /api/v1/management/organizations/{organizationId}/activate
+POST /api/v1/management/organizations/{organizationId}/suspend
+POST /api/v1/management/organizations/{organizationId}/resume
+POST /api/v1/management/organizations/{organizationId}/deactivate
+POST /api/v1/management/organizations/{organizationId}/reactivate
+GET /api/v1/management/organizations/{organizationId}/status-history
 GET /api/v1/management/stores
 GET /api/v1/management/stores/{storeId}
 POST /api/v1/management/organizations/{organizationId}/stores

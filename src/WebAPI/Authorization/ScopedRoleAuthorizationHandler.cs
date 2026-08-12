@@ -20,10 +20,11 @@ public sealed class ScopedRoleAuthorizationHandler : AuthorizationHandler<Scoped
         var hasScopedRole = roleScopes.Any(scope =>
             requirement.AllowedRoles.Contains(scope.RoleCode, StringComparer.OrdinalIgnoreCase));
 
-        var hasRoleClaim = context.User.FindAll(ClaimTypes.Role)
-            .Any(claim => requirement.AllowedRoles.Contains(claim.Value, StringComparer.OrdinalIgnoreCase));
+        var hasGlobalSystemAdminRole = requirement.AllowedRoles.Contains("SystemAdmin", StringComparer.OrdinalIgnoreCase) &&
+            context.User.FindAll(ClaimTypes.Role)
+                .Any(claim => string.Equals(claim.Value, "SystemAdmin", StringComparison.OrdinalIgnoreCase));
 
-        if (hasScopedRole || hasRoleClaim)
+        if (hasScopedRole || hasGlobalSystemAdminRole)
         {
             context.Succeed(requirement);
         }

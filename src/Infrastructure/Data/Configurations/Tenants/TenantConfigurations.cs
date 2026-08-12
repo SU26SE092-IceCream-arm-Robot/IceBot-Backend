@@ -29,7 +29,33 @@ internal sealed class OrganizationConfiguration : IEntityTypeConfiguration<Organ
     {
         entity.ToTable("Organizations");
         entity.HasIndex(x => x.Code).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
+        entity.Property(x => x.StatusRevision).IsConcurrencyToken();
+        entity.Property(x => x.SuspensionReasonCode).HasMaxLength(100);
+        entity.Property(x => x.SuspensionReason).HasMaxLength(1000);
+        entity.Property(x => x.DeactivationReason).HasMaxLength(1000);
 
+    }
+}
+
+internal sealed class OrganizationStatusTransitionConfiguration
+    : IEntityTypeConfiguration<OrganizationStatusTransition>
+{
+    public void Configure(EntityTypeBuilder<OrganizationStatusTransition> entity)
+    {
+        entity.ToTable("OrganizationStatusTransitions");
+        entity.Property(x => x.ReasonCode).HasMaxLength(100);
+        entity.Property(x => x.Reason).HasMaxLength(1000);
+        entity.Property(x => x.RequestIdempotencyKey).HasMaxLength(200);
+        entity.Property(x => x.SessionRevocationLastError).HasMaxLength(2000);
+        entity.HasIndex(x => new { x.OrganizationId, x.ChangedAt });
+        entity.HasIndex(x => new { x.SessionRevocationStatus, x.NextSessionRevocationAttemptAt });
+        entity.HasIndex(x => new { x.OrganizationId, x.RequestIdempotencyKey })
+            .IsUnique()
+            .HasFilter("\"RequestIdempotencyKey\" IS NOT NULL");
+        entity.HasOne<Organization>()
+            .WithMany()
+            .HasForeignKey(x => x.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
 

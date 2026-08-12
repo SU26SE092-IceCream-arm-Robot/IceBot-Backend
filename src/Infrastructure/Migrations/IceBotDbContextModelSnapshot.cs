@@ -731,6 +731,103 @@ namespace Infrastructure.Migrations
                     b.ToTable("RecipeItems", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.ContentManagement.Entities.ContentPage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DraftBodyHtml")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)");
+
+                    b.Property<string>("DraftTitle")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("PublishedRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Key")
+                        .IsUnique();
+
+                    b.HasIndex("PublishedRevisionId");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("ContentPages", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.ContentManagement.Entities.ContentPageRevision", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BodyHtml")
+                        .IsRequired()
+                        .HasMaxLength(100000)
+                        .HasColumnType("character varying(100000)");
+
+                    b.Property<Guid>("ContentPageId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("PublishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PublishedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RevisionNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContentPageId", "RevisionNumber")
+                        .IsUnique();
+
+                    b.ToTable("ContentPageRevisions", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Devices.Catalog.Device", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7117,6 +7214,157 @@ namespace Infrastructure.Migrations
                     b.ToTable("MenuItemProductOptions", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.ServiceRegistration.Entities.ServiceRegistration", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ApprovedProvisioningJson")
+                        .HasMaxLength(8000)
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("BusinessName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<int?>("ExpectedLocationCount")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("LegalName")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<string>("NormalizedPhoneNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("PhoneNumber")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("PrivacyPolicyAcceptedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PrivacyPolicyRevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProvisionedInvitationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProvisionedOrgAdminAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ProvisionedOrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProvisioningFailureCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProvisioningFailureMessage")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ReferenceCode")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<string>("RequestChecksum")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("ReviewReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ReviewedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReviewedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("TaxCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("ProvisionedOrgAdminAccountId")
+                        .IsUnique()
+                        .HasFilter("\"ProvisionedOrgAdminAccountId\" IS NOT NULL");
+
+                    b.HasIndex("ProvisionedOrganizationId")
+                        .IsUnique()
+                        .HasFilter("\"ProvisionedOrganizationId\" IS NOT NULL");
+
+                    b.HasIndex("ReferenceCode")
+                        .IsUnique();
+
+                    b.HasIndex("NormalizedEmail", "CreatedAt");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("ServiceRegistrations", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Sync.DeadLetters.SyncDeadLetter", b =>
                 {
                     b.Property<Guid>("Id")
@@ -7867,6 +8115,16 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("CreatedByAccountId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateTimeOffset?>("DeactivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeactivatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeactivationReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -7894,8 +8152,32 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<DateTimeOffset?>("ReactivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ReactivatedByAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
+
+                    b.Property<long>("StatusRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("SuspendedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("SuspendedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SuspensionReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("SuspensionReasonCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("TaxCode")
                         .HasMaxLength(500)
@@ -7914,6 +8196,86 @@ namespace Infrastructure.Migrations
                         .HasFilter("\"DeletedAt\" IS NULL");
 
                     b.ToTable("Organizations", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Tenants.Entities.OrganizationStatusTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("NextSessionRevocationAttemptAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("OrganizationStatusRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool?>("ReadinessConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RequestIdempotencyKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("SessionRevocationAttemptCount")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("SessionRevocationCompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SessionRevocationLastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("SessionRevocationStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "ChangedAt");
+
+                    b.HasIndex("OrganizationId", "RequestIdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"RequestIdempotencyKey\" IS NOT NULL");
+
+                    b.HasIndex("SessionRevocationStatus", "NextSessionRevocationAttemptAt");
+
+                    b.ToTable("OrganizationStatusTransitions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Tenants.Entities.Store", b =>
@@ -8193,6 +8555,23 @@ namespace Infrastructure.Migrations
                     b.Navigation("Ingredient");
 
                     b.Navigation("Recipe");
+                });
+
+            modelBuilder.Entity("Domain.ContentManagement.Entities.ContentPage", b =>
+                {
+                    b.HasOne("Domain.ContentManagement.Entities.ContentPageRevision", null)
+                        .WithMany()
+                        .HasForeignKey("PublishedRevisionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.ContentManagement.Entities.ContentPageRevision", b =>
+                {
+                    b.HasOne("Domain.ContentManagement.Entities.ContentPage", null)
+                        .WithMany()
+                        .HasForeignKey("ContentPageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Devices.Catalog.Device", b =>
@@ -9846,6 +10225,15 @@ namespace Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("SourceMaintenanceTicketId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.Tenants.Entities.OrganizationStatusTransition", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Tenants.Entities.Store", b =>

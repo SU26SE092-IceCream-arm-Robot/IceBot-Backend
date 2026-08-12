@@ -31,7 +31,7 @@ public static class PermissionCatalog
         new()
         {
             Policy = "organizations.manage",
-            Description = "Platform-level organization management (create, activate, disable).",
+            Description = "Platform-level organization management: create, suspend/resume, deactivate/reactivate, and inspect lifecycle history.",
             Roles = new[] { "SystemAdmin" },
             ScopeRequired = false
         },
@@ -425,6 +425,34 @@ public static class PermissionCatalog
             Description = "Fork package-managed technical configuration within assigned organization.",
             Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "service-registrations.read",
+            Description = "Read pre-tenant service registration requests.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "service-registrations.manage",
+            Description = "Review, reject, and provision pre-tenant service registrations.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "content-pages.read",
+            Description = "Read platform-managed public content page drafts and publication state.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "content-pages.manage",
+            Description = "Author and publish platform-managed public content pages.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
         }
     };
 

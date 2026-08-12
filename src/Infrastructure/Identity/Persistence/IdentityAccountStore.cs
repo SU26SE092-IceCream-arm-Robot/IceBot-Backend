@@ -184,9 +184,13 @@ namespace Infrastructure.Identity.Persistence
                 .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Role)
                 .Include(account => account.AccountRoles)
+                    .ThenInclude(accountRole => accountRole.Organization)
+                .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Store)
+                        .ThenInclude(store => store!.Organization)
                 .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Kiosk)
+                        .ThenInclude(kiosk => kiosk!.Organization)
                 .AsQueryable();
 
             return asNoTracking ? query.AsNoTracking() : query;
