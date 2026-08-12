@@ -72,16 +72,11 @@ public class FirebaseClient : IFirebaseClient
             }
             else
             {
-                var credentialsPath =
-                    _configuration.GetSection("Firebase").GetValue<string>("CredentialsPath")
-                    ?? "../Infrastructure/Firebase/icecream-arm-robot-firebase-adminsdk-fbsvc-d729c976e7.json";
+                var credentialsPath = FirebaseCredentialFileResolver.Resolve(
+                    _configuration,
+                    _environment);
 
-                if (!Path.IsPathRooted(credentialsPath))
-                {
-                    credentialsPath = Path.Combine(_environment.ContentRootPath, credentialsPath);
-                }
-
-                if (!File.Exists(credentialsPath))
+                if (credentialsPath is null || !File.Exists(credentialsPath))
                 {
                     throw new AppException("Firebase integration is unavailable because credentials are not configured.", 503);
                 }

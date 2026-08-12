@@ -142,7 +142,7 @@ public static class HealthEndpointExtensions
 
             checks.Add(CheckJwtConfig(configuration));
             checks.Add(CheckSmtpConfig(configuration));
-            checks.Add(CheckFirebaseConfig(configuration));
+            checks.Add(CheckFirebaseConfig(configuration, environment));
             checks.Add(CheckPayOsConfig(configuration));
 
             if (configuration.GetValue<bool>("Diagnostics:EnableExternalPing"))
@@ -279,7 +279,9 @@ public static class HealthEndpointExtensions
         }
     }
 
-    private static HealthCheckResult CheckFirebaseConfig(IConfiguration configuration)
+    private static HealthCheckResult CheckFirebaseConfig(
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         var enabled = configuration.GetValue<bool?>("Firebase:Enabled") ?? true;
         if (!enabled)
@@ -287,15 +289,22 @@ public static class HealthEndpointExtensions
             return new HealthCheckResult("firebase_config", "Disabled", 0, "Firebase integration is disabled.");
         }
 
-        var googleCredentials = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
-        var configuredPath = configuration["Firebase:CredentialsPath"];
-        var fallbackPath = "../Infrastructure/Firebase/icecream-arm-robot-firebase-adminsdk-fbsvc-d729c976e7.json";
-
-        if (File.Exists(googleCredentials) ||
-            File.Exists(configuredPath) ||
-            File.Exists(fallbackPath))
+        if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("FIREBASE_CREDENTIALS")))
         {
             return new HealthCheckResult("firebase_config", "Healthy", 0);
+        }
+
+        try
+        {
+            var credentialsPath = FirebaseCredentialFileResolver.Resolve(configuration, environment);
+            if (credentialsPath is not null && File.Exists(credentialsPath))
+            {
+                return new HealthCheckResult("firebase_config", "Healthy", 0);
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new HealthCheckResult("firebase_config", "Invalid", 0, ex.Message);
         }
 
         return new HealthCheckResult("firebase_config", "Missing", 0, "Firebase credentials are not configured.");
