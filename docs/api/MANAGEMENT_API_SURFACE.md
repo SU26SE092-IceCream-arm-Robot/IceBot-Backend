@@ -258,6 +258,7 @@ registration is not an assignment prerequisite.
 - Management APIs can expose configuration/admin fields that tablet APIs should not expose.
 - Organization update uses scoped authorization: `SystemAdmin` can update platform-managed fields; `OrgAdmin` can update only basic profile/contact fields for assigned organization scope.
 - Product and menu ownership comes from the organization route, never from a body-supplied `OrganizationId`. Generic updates cannot move `OrganizationId`, `ScopeType`, `StoreId`, `KioskId`, or template lineage. Global product templates are managed separately by `SystemAdmin`; `POST .../products/from-template` copies template metadata, variants, options, and the latest Published/Active recipe definitions into a new organization-owned Draft configuration while recording template lineage.
+- Product list/detail variants expose `recipeCount` and `sellableRecipeCount` (`Published` or `Active`) as a lightweight back-office readiness projection. These counts do not replace the Recipe endpoints. A missing sellable Recipe blocks product setup readiness only for `MachineProduced` variants; `Manual` and `Packaged` variants do not require a Recipe.
 - GraphQL `tenantTree` is a scope/navigation read model, not a dashboard overview. Do not add revenue, alert, inventory, or runtime metrics to it.
 
 ### Orders, Fulfillment, And Payments

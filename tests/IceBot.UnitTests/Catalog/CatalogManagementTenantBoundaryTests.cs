@@ -351,6 +351,53 @@ public sealed class CatalogManagementTenantBoundaryTests
         Assert.Equal(404, mutation.StatusCode);
     }
 
+    [Fact]
+    public async Task ProductReadModel_ReportsRecipeReadinessPerVariant()
+    {
+        var organizationId = Guid.NewGuid();
+        var product = ProductFor(organizationId);
+        var variant = new ProductVariant
+        {
+            Id = Guid.NewGuid(),
+            ProductId = product.Id,
+            Code = "MACHINE",
+            Name = "Machine produced",
+            Currency = "VND"
+        };
+        variant.Recipes.Add(new Recipe
+        {
+            Id = Guid.NewGuid(),
+            ProductVariantId = variant.Id,
+            Code = "DRAFT",
+            Name = "Draft recipe",
+            Status = Domain.Catalog.Enums.RecipeStatus.Draft
+        });
+        variant.Recipes.Add(new Recipe
+        {
+            Id = Guid.NewGuid(),
+            ProductVariantId = variant.Id,
+            Code = "PUBLISHED",
+            Name = "Published recipe",
+            Status = Domain.Catalog.Enums.RecipeStatus.Published
+        });
+        product.ProductVariants.Add(variant);
+
+        var store = Substitute.For<IProductStore>();
+        store.GetProductByIdAsync(product.Id, true, Arg.Any<CancellationToken>())
+            .Returns(product);
+
+        var result = await new GetProductQueryHandler(store).HandleAsync(new GetProductQuery(product.Id)
+        {
+            UserContext = OrgAdmin(organizationId),
+            OrganizationId = organizationId
+        });
+
+        Assert.True(result.Succeeded, result.Message);
+        var mappedVariant = Assert.Single(result.Data!.Variants);
+        Assert.Equal(2, mappedVariant.RecipeCount);
+        Assert.Equal(1, mappedVariant.SellableRecipeCount);
+    }
+
     private static Product ProductFor(Guid? organizationId, TenantScopeType scopeType = TenantScopeType.Organization) => new()
     {
         Id = Guid.NewGuid(),

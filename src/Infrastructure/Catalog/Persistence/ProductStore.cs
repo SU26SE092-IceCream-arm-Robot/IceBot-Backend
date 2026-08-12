@@ -58,9 +58,11 @@ public sealed class ProductStore : IProductStore
                 _dbContext.Products.WhereNotDeleted()
                     .AsNoTracking()
                     .Include(product => product.ProductVariants)
+                        .ThenInclude(variant => variant.Recipes)
                     .Include(product => product.OptionGroups)
                         .ThenInclude(group => group.ProductOptions)
-                            .ThenInclude(option => option.IngredientRequirements),
+                            .ThenInclude(option => option.IngredientRequirements)
+                    .AsSplitQuery(),
                 search,
                 organizationId,
                 storeId,
@@ -84,9 +86,11 @@ public sealed class ProductStore : IProductStore
     {
         var query = _dbContext.Products.WhereNotDeleted()
             .Include(product => product.ProductVariants)
+                .ThenInclude(variant => variant.Recipes)
             .Include(product => product.OptionGroups)
                 .ThenInclude(group => group.ProductOptions)
                     .ThenInclude(option => option.IngredientRequirements)
+            .AsSplitQuery()
             .Where(product => product.Id == productId);
 
         if (asNoTracking)

@@ -105,6 +105,10 @@ internal static class ProductResultMapper
             BasePrice = variant.BasePrice,
             Currency = variant.Currency,
             IsAvailable = variant.IsAvailable,
+            RecipeCount = variant.Recipes.Count,
+            SellableRecipeCount = variant.Recipes.Count(recipe =>
+                recipe.Status is Domain.Catalog.Enums.RecipeStatus.Published or
+                    Domain.Catalog.Enums.RecipeStatus.Active),
             DisplayOrder = variant.DisplayOrder,
             PreparationTimeSeconds = variant.PreparationTimeSeconds,
             ImageUrl = variant.ImageUrl,

@@ -28,6 +28,10 @@ public sealed class ProductVariantResult
 
     public bool IsAvailable { get; set; }
 
+    public int RecipeCount { get; set; }
+
+    public int SellableRecipeCount { get; set; }
+
     public int DisplayOrder { get; set; }
 
     public int? PreparationTimeSeconds { get; set; }
