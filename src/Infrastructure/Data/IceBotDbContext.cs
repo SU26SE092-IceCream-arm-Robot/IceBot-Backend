@@ -114,6 +114,8 @@ public class IceBotDbContext : DbContext
     public DbSet<AccountNotificationDevice> AccountNotificationDevices => Set<AccountNotificationDevice>();
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
     public DbSet<AccountInvitation> AccountInvitations => Set<AccountInvitation>();
+    public DbSet<StaffWorkforceLifecycleTransition> StaffWorkforceLifecycleTransitions => Set<StaffWorkforceLifecycleTransition>();
+    public DbSet<StaffWorkforceCreateReplay> StaffWorkforceCreateReplays => Set<StaffWorkforceCreateReplay>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<Role> Roles => Set<Role>();
 
@@ -160,6 +162,8 @@ public class IceBotDbContext : DbContext
     public DbSet<Menu> Menus => Set<Menu>();
     public DbSet<MenuItem> MenuItems => Set<MenuItem>();
     public DbSet<MenuItemProductOption> MenuItemProductOptions => Set<MenuItemProductOption>();
+    public DbSet<KioskMenuItemAvailability> KioskMenuItemAvailabilities => Set<KioskMenuItemAvailability>();
+    public DbSet<KioskMenuItemAvailabilityTransition> KioskMenuItemAvailabilityTransitions => Set<KioskMenuItemAvailabilityTransition>();
 
     public DbSet<Order> Orders => Set<Order>();
     public DbSet<OrderItem> OrderItems => Set<OrderItem>();

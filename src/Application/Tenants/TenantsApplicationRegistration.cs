@@ -34,6 +34,7 @@ public static class TenantsApplicationRegistration
         services.AddScoped<ResumeStoreSalesCommandHandler>();
 
         services.AddScoped<ListOrganizationsQueryHandler>();
+        services.AddScoped<ListOrganizationSalesSummariesQueryHandler>();
         services.AddScoped<GetOrganizationQueryHandler>();
         services.AddScoped<ListOrganizationStatusHistoryQueryHandler>();
         services.AddScoped<CreateOrganizationCommandHandler>();

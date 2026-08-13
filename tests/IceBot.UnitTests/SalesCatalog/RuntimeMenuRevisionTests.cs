@@ -1,4 +1,5 @@
 using Application.SalesCatalog.Abstractions;
+using Application.SalesCatalog.Availability;
 using Application.SalesCatalog.ReadModels;
 using Application.SalesCatalog.RuntimeMenus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Abstractions;
@@ -37,10 +38,15 @@ public sealed class RuntimeMenuRevisionTests
         store.ListMenuItemOptionGroupsAsync(
                 Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<MenuItemOptionGroupReadModel>());
+        var availability = Substitute.For<IMenuItemOperationalAvailabilityReader>();
+        availability.GetPausedMenuItemIdsAsync(
+                kiosk.Id, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new HashSet<Guid>());
         var handler = new GetKioskRuntimeMenuQueryHandler(
             store,
             new RuntimeMenuProjectionBuilder(store),
-            new PassthroughRuntimeMenuCache());
+            new PassthroughRuntimeMenuCache(),
+            availability);
 
         var first = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
         var second = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
@@ -64,11 +70,13 @@ public sealed class RuntimeMenuRevisionTests
         var store = Substitute.For<IMenuStore>();
         store.GetKioskByIdAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(kiosk);
         store.GetKioskConnectivityAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(connectivity);
+        var availability = Substitute.For<IMenuItemOperationalAvailabilityReader>();
         var cache = new RecordingRuntimeMenuCache();
         var handler = new GetKioskRuntimeMenuQueryHandler(
             store,
             new RuntimeMenuProjectionBuilder(store),
-            cache);
+            cache,
+            availability);
 
         var result = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
 

@@ -1774,6 +1774,10 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<long>("WorkforceRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Email")
@@ -2132,6 +2136,122 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Roles", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Identity.Entities.StaffWorkforceCreateReplay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("StaffWorkforceCreateReplays", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Identity.Entities.StaffWorkforceLifecycleTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorOrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorRoleCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("ActorStoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("RequestIdempotencyKey")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("WorkforceRevision")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId", "CreatedAt");
+
+                    b.HasIndex("OrganizationId", "RequestIdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"RequestIdempotencyKey\" IS NOT NULL");
+
+                    b.ToTable("StaffWorkforceLifecycleTransitions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Inventory.Entities.IngredientDispenserState", b =>
@@ -6979,6 +7099,155 @@ namespace Infrastructure.Migrations
                     b.ToTable("RobotProgramArtifacts", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.KioskMenuItemAvailability", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("ReasonCode")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("State")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MenuId");
+
+                    b.HasIndex("MenuItemId");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("KioskId", "MenuItemId")
+                        .IsUnique();
+
+                    b.HasIndex("KioskId", "State");
+
+                    b.ToTable("KioskMenuItemAvailabilities", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.KioskMenuItemAvailabilityTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ActorAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorRoleCodeSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("AvailabilityId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("AvailabilityRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("FromState")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MenuItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<int>("ReasonCode")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("RequestId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ToState")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("AvailabilityId", "OccurredAt");
+
+                    b.HasIndex("AvailabilityId", "RequestId")
+                        .IsUnique();
+
+                    b.ToTable("KioskMenuItemAvailabilityTransitions", (string)null);
+                });
+
             modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>
                 {
                     b.Property<Guid>("Id")
@@ -9979,6 +10248,36 @@ namespace Infrastructure.Migrations
                     b.Navigation("RobotProgram");
                 });
 
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.KioskMenuItemAvailability", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.SalesCatalog.Entities.Menu", null)
+                        .WithMany()
+                        .HasForeignKey("MenuId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.SalesCatalog.Entities.MenuItem", null)
+                        .WithMany()
+                        .HasForeignKey("MenuItemId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.KioskMenuItemAvailabilityTransition", b =>
+                {
+                    b.HasOne("Domain.SalesCatalog.Entities.KioskMenuItemAvailability", null)
+                        .WithMany("Transitions")
+                        .HasForeignKey("AvailabilityId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>
                 {
                     b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
@@ -10409,6 +10708,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.RobotConfiguration.Programs.RobotProgram", b =>
                 {
                     b.Navigation("RobotProgramArtifacts");
+                });
+
+            modelBuilder.Entity("Domain.SalesCatalog.Entities.KioskMenuItemAvailability", b =>
+                {
+                    b.Navigation("Transitions");
                 });
 
             modelBuilder.Entity("Domain.SalesCatalog.Entities.Menu", b =>

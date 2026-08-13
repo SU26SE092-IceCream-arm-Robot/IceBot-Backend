@@ -3,6 +3,7 @@ using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 using Application.SalesCatalog.ReadModels;
 using Domain.Devices.Connectivity;
+using Application.SalesCatalog.Availability;
 
 namespace Application.SalesCatalog.Abstractions;
 
@@ -99,6 +100,43 @@ public interface IMenuStore
     Task AddMenuAsync(Menu menu, CancellationToken cancellationToken = default);
 
     Task AddMenuItemAsync(MenuItem menuItem, CancellationToken cancellationToken = default);
+
+    Task<List<Menu>> ListMenusForKioskAvailabilityAsync(
+        Guid? organizationId,
+        Guid storeId,
+        Guid kioskId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default);
+
+    Task<KioskMenuItemAvailabilitySnapshot?> GetKioskMenuItemAvailabilityAsync(
+        Guid kioskId,
+        Guid menuItemId,
+        bool asNoTracking = true,
+        CancellationToken cancellationToken = default);
+
+    Task<KioskMenuItemAvailabilityRequestReplay?> GetKioskMenuItemAvailabilityByRequestIdAsync(
+        Guid kioskId,
+        Guid menuItemId,
+        string requestId,
+        CancellationToken cancellationToken = default);
+
+    Task<KioskMenuItemAvailability?> GetTrackedKioskMenuItemAvailabilityAsync(
+        Guid kioskId,
+        Guid menuItemId,
+        CancellationToken cancellationToken = default);
+
+    Task AddKioskMenuItemAvailabilityAsync(
+        KioskMenuItemAvailability availability,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlySet<Guid>> GetPausedMenuItemIdsAsync(
+        Guid kioskId,
+        IReadOnlyCollection<Guid> menuItemIds,
+        CancellationToken cancellationToken = default);
+
+    Task<T> ExecuteInTransactionAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default);
 
     void ReplaceMenuItemProductOptions(
         MenuItem menuItem,

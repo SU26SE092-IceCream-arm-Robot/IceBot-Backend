@@ -139,9 +139,9 @@ Detailed API naming rules live in [Naming Rules](NAMING_RULES.md).
 
 Docs should reduce repeated reasoning, not duplicate long explanations.
 
-Use the project documentation index first when the task spans multiple repos or document areas:
+Use the project documentation index first when a task spans multiple document areas:
 
-- [Product Documentation Index](../../../IceBot-Product/README.md)
+- [Documentation Routing Map](../DOCUMENTATION_ROUTING_MAP.md)
 
 Do not read all docs by default. Read the smallest relevant set, usually 1-3 files, then inspect code as needed.
 
@@ -159,7 +159,7 @@ Use:
 - [System Flows](../flows/SYSTEM_FLOWS.md) for the flow index, then the matching flow-specific document.
 - [IoT Contract](../iot/IOT_CONTRACT.md) for tablet-edge-cloud flow.
 
-The project-level `Vault/` folder is a personal reasoning notebook, not implementation truth. Use it only as background context unless a decision has been promoted into `IceBot-Product/` or repository docs.
+The project-level `Vault/` folder is a personal reasoning notebook, not implementation truth. Use it only as background context unless a decision has been promoted into repository docs.
 
 Do not load `Vault/` by default. Use it only when the user asks about reasoning history, trade-offs, rejected designs, unresolved ideas, or why a decision was considered.
 

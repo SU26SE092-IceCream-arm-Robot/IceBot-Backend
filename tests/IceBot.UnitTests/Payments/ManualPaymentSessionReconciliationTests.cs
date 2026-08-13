@@ -3,6 +3,7 @@ using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Notifications;
 using Application.Payments.Providers;
+using Application.Identity.Tokens.Claims;
 using Domain.Orders.Entities;
 using Domain.Operations.Entities;
 using Domain.Payments.Entities;
@@ -63,7 +64,7 @@ public sealed class ManualPaymentSessionReconciliationTests
             order.Id,
             payment.Id,
             "Provider response was lost",
-            new() { IsSystemAdmin = true, AccountId = Guid.NewGuid() }));
+            CreateManagerContext(order)));
 
         Assert.True(result.Succeeded, result.Message);
         Assert.Equal(PaymentSessionReconciliationOutcome.Restored, result.Data!.Outcome);
@@ -100,7 +101,7 @@ public sealed class ManualPaymentSessionReconciliationTests
             Guid.NewGuid(),
             payment.Id,
             "Investigate",
-            new() { IsSystemAdmin = true, AccountId = Guid.NewGuid() }));
+            CreateManagerContext(payment.Order)));
 
         Assert.False(result.Succeeded);
         Assert.Equal(404, result.StatusCode);
@@ -109,4 +110,10 @@ public sealed class ManualPaymentSessionReconciliationTests
         await operationLogs.DidNotReceive().AddAsync(
             Arg.Any<OperationLog>(), Arg.Any<CancellationToken>());
     }
+
+    private static CurrentUserContext CreateManagerContext(Order order) => new()
+    {
+        AccountId = Guid.NewGuid(),
+        RoleScopes = [new UserRoleScope("Manager", null, null, order.KioskId)]
+    };
 }

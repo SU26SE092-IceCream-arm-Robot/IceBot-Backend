@@ -57,7 +57,7 @@ are advanced technical-authoring resources. Use them to inspect, repair, clone,
 or deliberately build a graph without a normal import. They are not the normal
 bundle-import sequence.
 
-The shared product/UI journey is [Robot Authoring Workspace Journey](../../../IceBot-Product/product/journeys/ROBOT_AUTHORING_WORKSPACE.md).
+The backend contract in this document is the current source for the robot authoring workspace integration.
 
 The management result uses `Materialized` and `ResourcesPublished` as public
 status values. It exposes `materializedRobotProgramId`, `materializedAt`, and

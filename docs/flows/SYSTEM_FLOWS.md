@@ -2,8 +2,6 @@
 
 This document is the flow index for IceBot backend-facing workflows. Read the smallest flow file that matches the task instead of reading every flow.
 
-Business/user-facing flows live in the `IceBot-Product` repository at `product/`.
-
 Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md).
 
 ## Search Keywords

@@ -74,7 +74,7 @@ public static class PermissionCatalog
         {
             Policy = "kiosks.view",
             Description = "View kiosk details within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
             ScopeRequired = true
         },
         new()
@@ -158,7 +158,7 @@ public static class PermissionCatalog
         {
             Policy = "payments.manage",
             Description = "Manage payment methods and status.",
-            Roles = new[] { "SystemAdmin", "Manager" },
+            Roles = new[] { "Manager" },
             ScopeRequired = true
         },
         new()
@@ -186,22 +186,43 @@ public static class PermissionCatalog
         {
             Policy = "orders.view",
             Description = "View back-office orders within allowed scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
+            Roles = new[] { "OrgAdmin", "Manager", "Staff" },
             ScopeRequired = true
         },
         new()
         {
             Policy = "orders.manage",
             Description = "Manage order lifecycle and manual/packaged item fulfillment within allowed scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
+            Roles = new[] { "OrgAdmin", "Manager", "Staff" },
             ScopeRequired = true
         },
         new()
         {
             Policy = "refunds.manage",
             Description = "Manage refunds (request, processed, reject, cancel) within allowed scope.",
-            Roles = new[] { "SystemAdmin", "Manager", "Staff" },
+            Roles = new[] { "Manager", "Staff" },
             ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "workforce.staff.read",
+            Description = "View Staff workforce accounts within assigned organization or store scope.",
+            Roles = new[] { "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "workforce.staff.manage",
+            Description = "Create, update, scope, invite, deactivate, and reactivate Staff-only workforce accounts within assigned scope.",
+            Roles = new[] { "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "platform.organization-sales.view",
+            Description = "View organization-level aggregate sales collections for platform administration and reporting.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
         },
         new()
         {
@@ -424,6 +445,13 @@ public static class PermissionCatalog
             Policy = "package.fork",
             Description = "Fork package-managed technical configuration within assigned organization.",
             Roles = new[] { "SystemAdmin", "OrgAdmin" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "menu-items.availability.manage",
+            Description = "Pause or resume menu-item sales for assigned kiosks without changing menu authoring data.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
             ScopeRequired = true
         },
         new()

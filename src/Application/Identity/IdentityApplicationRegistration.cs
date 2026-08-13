@@ -12,6 +12,7 @@ using Application.Identity.Invitations.Services;
 using Application.Identity.PasswordReset.Commands;
 using Application.Identity.Roles.Queries;
 using Application.Identity.Tokens.Services;
+using Application.Identity.Workforce.Staff;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Identity;
@@ -51,6 +52,14 @@ public static class IdentityApplicationRegistration
         services.AddScoped<GetInternalAccountEffectiveAccessQueryHandler>();
         services.AddScoped<AcceptInvitationCommandHandler>();
         services.AddScoped<GetCurrentAccountAccessQueryHandler>();
+        services.AddScoped<ListStaffWorkforceQueryHandler>();
+        services.AddScoped<GetStaffWorkforceQueryHandler>();
+        services.AddScoped<CreateStaffWorkforceCommandHandler>();
+        services.AddScoped<UpdateStaffWorkforceCommandHandler>();
+        services.AddScoped<UpdateStaffWorkforceScopesCommandHandler>();
+        services.AddScoped<ChangeStaffWorkforceLifecycleCommandHandler>();
+        services.AddScoped<SendStaffWorkforceInvitationCommandHandler>();
+        services.AddScoped<IStaffSessionRevoker, RefreshTokenStaffSessionRevoker>();
 
         services.AddScoped<RequestPasswordResetCommandHandler>();
         services.AddScoped<ResetPasswordCommandHandler>();

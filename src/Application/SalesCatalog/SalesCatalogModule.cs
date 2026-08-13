@@ -2,6 +2,7 @@ using Application.SalesCatalog.Menus.Commands;
 using Application.SalesCatalog.Menus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Services;
+using Application.SalesCatalog.Availability;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.SalesCatalog;
@@ -20,6 +21,9 @@ public static class SalesCatalogModule
         services.AddScoped<UpdateMenuItemCommandHandler>();
         services.AddScoped<SetMenuItemStatusCommandHandler>();
         services.AddScoped<DeleteMenuItemCommandHandler>();
+        services.AddScoped<ListKioskMenuItemAvailabilityQueryHandler>();
+        services.AddScoped<SetKioskMenuItemAvailabilityCommandHandler>();
+        services.AddScoped<IMenuItemOperationalAvailabilityReader, MenuItemOperationalAvailabilityReader>();
 
         services.AddScoped<RuntimeMenuProjectionBuilder>();
         services.AddScoped<GetKioskRuntimeMenuQueryHandler>();

@@ -31,6 +31,7 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         entity.HasIndex(x => x.Email).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => x.GoogleSubjectId).IsUnique().HasFilter(EfModelConfigurationConstants.NotNullAndActive(nameof(Account.GoogleSubjectId)));
         entity.HasIndex(x => x.GoogleEmail).HasFilter("\"GoogleEmail\" IS NOT NULL");
+        entity.Property(x => x.WorkforceRevision).IsConcurrencyToken();
 
         entity.Property(x => x.Password)
             .HasConversion(
@@ -56,6 +57,30 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
                     join.HasKey("AccountId", "StoreId");
                 });
 
+    }
+}
+
+internal sealed class StaffWorkforceLifecycleTransitionConfiguration : IEntityTypeConfiguration<StaffWorkforceLifecycleTransition>
+{
+    public void Configure(EntityTypeBuilder<StaffWorkforceLifecycleTransition> entity)
+    {
+        entity.ToTable("StaffWorkforceLifecycleTransitions");
+        entity.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+        entity.Property(x => x.ActorRoleCode).HasMaxLength(100).IsRequired();
+        entity.Property(x => x.RequestIdempotencyKey).HasMaxLength(128);
+        entity.HasIndex(x => new { x.AccountId, x.CreatedAt });
+        entity.HasIndex(x => new { x.OrganizationId, x.RequestIdempotencyKey }).IsUnique().HasFilter("\"RequestIdempotencyKey\" IS NOT NULL");
+    }
+}
+
+internal sealed class StaffWorkforceCreateReplayConfiguration : IEntityTypeConfiguration<StaffWorkforceCreateReplay>
+{
+    public void Configure(EntityTypeBuilder<StaffWorkforceCreateReplay> entity)
+    {
+        entity.ToTable("StaffWorkforceCreateReplays");
+        entity.Property(x => x.IdempotencyKey).HasMaxLength(128).IsRequired();
+        entity.Property(x => x.RequestFingerprint).HasMaxLength(64).IsRequired();
+        entity.HasIndex(x => new { x.OrganizationId, x.IdempotencyKey }).IsUnique();
     }
 }
 

@@ -28,7 +28,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 6. Tablet checks runtime projection freshness:
    now - generatedAt <= 5-15 seconds.
 7. Tablet calls Cloud Backend to place order.
-8. Cloud re-evaluates kiosk lifecycle, `KioskOperationalState.Operational`, connectivity, Store opening hours in `Store.TimeZone`, explicit Store sales pause, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store, kiosk operational state, or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found.
+8. Cloud re-evaluates kiosk lifecycle, `KioskOperationalState.Operational`, connectivity, Store opening hours in `Store.TimeZone`, explicit Store sales pause, kiosk-scoped menu-item operational availability, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store, kiosk operational state, operational item pause, or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found.
 9. Cloud creates:
    - Order
    - OrderItems

@@ -25,12 +25,14 @@ Catalog
 - An empty Store schedule means no opening-hours restriction. Once any day is configured, an omitted day is treated as closed; opening is inclusive and closing is exclusive. `OpensAt > ClosesAt` represents an overnight interval that continues until the following day's close time.
 - Runtime menu from Cloud is a sales catalog snapshot, not a live machine readiness guarantee.
 - Kiosk connectivity/operational state and Store sales admission are evaluated on every runtime-menu request before any cached projection is read. A paused, closed, offline, or non-operational kiosk therefore receives no stale cached menu.
+- A kiosk-scoped menu-item operational pause is evaluated after the cached catalog projection is read and before the runtime snapshot is returned. The cache stores only base catalog sellability; an operator pause therefore takes effect immediately without mutating shared menu authoring data.
 - The optional Redis cache stores only the kiosk-specific sellable projection (`Revision` and items), never request-scoped `SnapshotId` or `GeneratedAt`. Each successful request creates a new snapshot identity after reading the projection.
 - Redis caching is bounded-TTL acceleration, not sales authority: cache failure falls back to the database projection, and checkout still revalidates sellability transactionally. Cache expiry may delay static catalog visibility by at most the configured distributed TTL plus a short process-local TTL.
 - Each snapshot has a random request identity and a deterministic content `Revision`. The runtime endpoint returns that revision as `ETag`; clients may revalidate with `If-None-Match` after `ExpiresAt` and receive `304` when sellable content is unchanged.
 - Edge projection may include inventory, device, queue, and robot availability.
 - Order item snapshots preserve historical sale truth after catalog/menu changes.
 - Checkout revalidates Catalog and Sales Catalog under one repeatable-read transaction snapshot before persisting immutable order-item, recipe, and option snapshots.
+- Checkout also revalidates the current kiosk menu-item operational pause. A client that retained an older runtime snapshot receives `409` instead of creating a new order for a paused item.
 - Product/ProductVariant deletion and Product currency changes are rejected while a non-deleted MenuItem references them. Menu currency changes are rejected once the Menu contains items. These rules prevent active menu references from retaining deleted catalog definitions or a currency mismatch.
 - Activating a MenuItem performs static authoring preflight for Product/Variant/Recipe ownership, recipe lifecycle and ingredients, currency, and option satisfiability. Dynamic route, connectivity, and inventory readiness remain runtime or deployment concerns.
 - Inventory V1 is reporting/operations only and does not decide runtime menu sellability.

@@ -133,6 +133,8 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `dashboard.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View management dashboard metrics within assigned scope |
 | `accounts.read` | `SystemAdmin`, `OrgAdmin` | Read internal accounts through an organization-owned route. Results contain only role scopes belonging to that organization. |
 | `accounts.manage` | `SystemAdmin`, `OrgAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for organization-owned internal accounts. `OrgAdmin` is limited to accounts with assignable roles and scopes inside the actor's assigned organization; it cannot grant `SystemAdmin` or access another organization. Global `SystemAdmin` provisioning is bootstrap-only. |
+| `workforce.staff.read` | `OrgAdmin`, `Manager` | Read Staff-only workforce accounts within the exact Organization or Store scope granted by the same role assignment. This does not expose OrgAdmin, Manager, Technician, SystemAdmin, or mixed-role accounts. |
+| `workforce.staff.manage` | `OrgAdmin`, `Manager` | Create, update, scope, invite, deactivate, and reactivate Staff-only workforce accounts inside the actor's exact scope. It does not grant broad account management, role assignment, password management, cross-organization movement, or Technician management. |
 | `organizations.manage` | `SystemAdmin` | Platform-level organization management: create organizations; suspend/resume a temporary tenant hold; deactivate/reactivate organization service; and inspect lifecycle history. Tenant actors cannot change Organization lifecycle. |
 | `organizations.view` | `SystemAdmin`, `OrgAdmin` | View organizations. OrgAdmin can view/read only their assigned organization(s) |
 | `organizations.update` | `SystemAdmin`, `OrgAdmin` | Update organizations. OrgAdmin can update only basic profile/contact info for assigned organization(s); SystemAdmin can update platform-managed fields |
@@ -170,9 +172,12 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `ingredients.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Browse the global ingredient reference catalog used by recipe authoring |
 | `ingredients.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ingredient definitions |
 | `menus.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
-| `payments.manage` | `SystemAdmin`, `Manager` | Tenant payment operations and intervention workflows |
+| `orders.view` | `OrgAdmin`, `Manager`, `Staff` | View back-office orders within assigned tenant scope; SystemAdmin uses aggregate platform reporting instead of tenant order detail. |
+| `orders.manage` | `OrgAdmin`, `Manager`, `Staff` | Manage order lifecycle and manual/packaged fulfillment within assigned tenant scope. |
+| `payments.manage` | `Manager` | Tenant payment-session intervention workflows within assigned scope. |
 | `payment-methods.manage` | `SystemAdmin` | Global payment-method catalog status management |
-| `refunds.manage` | `SystemAdmin`, `Manager`, `Staff` | Manual support/refund workflow. Auto provider refund is future work |
+| `refunds.manage` | `Manager`, `Staff` | Manual support/refund workflow within assigned tenant scope. Auto provider refund is future work. |
+| `platform.organization-sales.view` | `SystemAdmin` | Read organization-level aggregate sales collections for platform administration and reporting. It does not authorize tenant order, payment, refund, customer, or provider-transaction detail. |
 | `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
 | `inventory.manage` | `SystemAdmin`, `Manager`, `Staff`, `Technician` | Refill dispenser state and adjust inventory estimates within assigned scope |
 | `inventory.configure` | `SystemAdmin`, `Manager`, `Technician` | Provision and configure dispenser topology, activate/retire states, and delete only unused states within assigned scope |
@@ -196,19 +201,20 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 - Management list queries pass role-specific effective scope sets into persistence filters. Sensitive read-by-id and mutation queries should include the same scope predicate and return `404` when the resource is outside that scope.
 - Route/resource authorization must validate requested scope before returning scoped tenant data or applying a state transition.
 - Account read APIs use `accounts.read` and must remain scope-filtered for non-`SystemAdmin` callers. Account mutation APIs use `accounts.manage`; `OrgAdmin` can mutate only an account whose every active role is inside the caller's own organization scope. This prevents a shared or cross-organization account from being modified through one matching role.
+- Workforce Staff APIs are separate from account-management APIs. A Manager may manage only an account whose active roles are exclusively `Staff`, never itself, and only when every target Staff scope is reachable from the same Organization or Store assignment that grants workforce access. A kiosk Staff assignment must include its parent Store id; backend validates Organization -> Store -> Kiosk ownership from persisted tenant data.
 - `GET /management/organizations/{organizationId}/accounts/{accountId}/effective-access` uses `accounts.read` and returns only the target account's active role scopes and effective ids for that organization.
 - `GET /management/accounts/assignable-role-options` is account-authoring input, not a global role-management surface. It returns only roles the current `accounts.manage` actor may assign, with required scope metadata. `GET /management/role-scope-options` is the second step after selecting one of those roles; mutation handlers still validate the assignment.
 - Effective access does not expand organization scope into store/kiosk ids. Use GraphQL `tenantTree` or the account-authoring scope lookup for UI tree display.
 - `GET /me/access` is a self-inspection endpoint based on current access-token claims. It returns `permissionCodes` plus permission-specific `permissionScopes`; clients must not infer permissions or their scopes from role names. Scope tuples are derived only from role assignments that grant that permission, preventing a permission from one role from borrowing another role's tenant scope. Refresh the token after role changes to see updated access.
 - `permissionScopes[].isGlobal` is true only for System Admin access, a globally assigned granting role, or a permission whose catalog entry has `ScopeRequired = false`. A scoped permission with no matching tuple is not usable for a scoped UI action even if its code appears in `permissionCodes`; backend resource authorization remains authoritative.
 - `GET /management/maintenance-tickets/{ticketId}/assignee-options` requires `maintenance.manage`, derives organization/store/kiosk from the ticket, and does not grant account-directory access. It returns only Active `Technician` or `Manager` accounts with a role scope matching that ticket. Assignment revalidates the same eligibility at submit time.
+- `platform.organization-sales.view` authorizes only `GET /management/organizations/sales-summaries`. The platform operator is assumed authorized to access organization-level aggregate sales metrics for administration and reporting. The response excludes customer identity, order detail, provider transaction detail, and exact payment/refund timestamps.
 - `/me/notification-devices` is authenticated self-service only; callers can register, inspect, or invalidate only their own FCM installations.
 - `PUT /management/organizations/{organizationId}/accounts/{accountId}/roles` replaces active role assignments for the target account. `POST /management/organizations/{organizationId}/accounts/{accountId}/roles` remains an add/upsert single-role operation. Every submitted role must carry the same `OrganizationId` as the route, including Store/Kiosk-scoped roles.
 - Do not add `Staff` or `Technician` to product/menu pricing policies unless the business explicitly gives them that responsibility.
 
 ## Related Docs
 
-- [Product Overview](../../../IceBot-Product/product/OVERVIEW.md)
 - [API Surface Rules](API_SURFACE_RULES.md)
 - [Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md)
 - [Dependency Rules](../architecture/DEPENDENCY_RULES.md)

@@ -37,6 +37,7 @@ GET /api/v1/management/organizations/{organizationId}/accounts/{accountId}/effec
 PUT /api/v1/management/organizations/{organizationId}/accounts/{accountId}/roles
 GET /api/v1/management/payment-methods
 GET /api/v1/management/organizations
+GET /api/v1/management/organizations/sales-summaries
 GET /api/v1/management/organizations/{organizationId}
 POST /api/v1/management/organizations
 PUT /api/v1/management/organizations/{organizationId}
@@ -58,7 +59,38 @@ GET /api/v1/management/kiosks/{kioskId}
 POST /api/v1/management/stores/{storeId}/kiosks
 PUT /api/v1/management/kiosks/{kioskId}
 PATCH /api/v1/management/kiosks/{kioskId}/status
+GET /api/v1/management/kiosks/{kioskId}/menu-item-availability
+PUT /api/v1/management/kiosks/{kioskId}/menu-items/{menuItemId}/availability
 ```
+
+`GET /api/v1/management/organizations/sales-summaries` is a SystemAdmin-only,
+paged aggregate reporting surface. It requires UTC `from` and `to` query
+parameters and treats the period as half-open `[from, to)`; the maximum range
+is 366 days. Optional `organizationId` and `search` filters narrow the report.
+Each row is grouped by organization and currency and returns only
+`organizationId`, `organizationCode`, `organizationName`,
+`organizationStatus`, `currency`, `paidOrderCount`,
+`grossCollectedAmount`, `processedRefundAmount`, and
+`netCollectedAmount`.
+
+`grossCollectedAmount` counts primary settlements whose `PaidAt` is within the
+report period. `processedRefundAmount` counts completed refunds whose
+`ProcessedAt` is within the report period and whose target is a primary
+settlement, even when that settlement was paid in an earlier period.
+`netCollectedAmount` is gross minus processed refunds and may be negative.
+`paidOrderCount` counts orders receiving a primary settlement in the period and
+is not reduced by later refunds. Current organization lifecycle status does not
+hide historical rows: Active, Suspended, Inactive, and Archived organizations
+remain reportable when they have relevant financial activity. This endpoint
+never returns customer data, order detail, provider transaction data, or exact
+financial timestamps.
+
+`menu-items.availability.manage` is a kiosk-scoped operational permission. The
+availability endpoint changes neither `MenuItem.Status` nor any product, price,
+recipe, option, or menu definition. A `PUT` requires `state`, `reasonCode`,
+non-empty `reason`, `expectedRevision`, and a client-generated `requestId`.
+The current override and one immutable transition are saved atomically; stale
+revisions and a reused request id with different content return `409`.
 
 ### Device And Execution Endpoint Routes
 
@@ -82,9 +114,30 @@ PATCH /api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/disab
 PATCH /api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/reactivate
 PATCH /api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/retire
 GET /api/v1/management/accounts/assignable-role-options
+GET /api/v1/management/organizations/{organizationId}/workforce/staff
+GET /api/v1/management/organizations/{organizationId}/workforce/staff/{accountId}
+POST /api/v1/management/organizations/{organizationId}/workforce/staff
+PUT /api/v1/management/organizations/{organizationId}/workforce/staff/{accountId}
+PUT /api/v1/management/organizations/{organizationId}/workforce/staff/{accountId}/scopes
+POST /api/v1/management/organizations/{organizationId}/workforce/staff/{accountId}/deactivate
+POST /api/v1/management/organizations/{organizationId}/workforce/staff/{accountId}/reactivate
+POST /api/v1/management/organizations/{organizationId}/workforce/staff/{accountId}/invitation
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 ```
+
+Staff workforce mutation rules:
+
+- Create requires the `Idempotency-Key` request header. The key is unique inside
+  the route Organization; an exact retry returns the originally created Staff
+  account and does not create another invitation.
+- Profile and scope replacement require `expectedRevision`.
+- Deactivate and reactivate require `reason`, `expectedRevision`, and a body
+  `idempotencyKey`. An exact lifecycle retry returns the original transition.
+- Deactivation commits the `Disabled` account state and transition audit before
+  refresh-session revocation. A `202` response means access is disabled but
+  revocation is pending; the Identity reconciliation job retries while a
+  disabled Staff account still has active refresh sessions.
 
 ### Ingredient And Recipe Routes
 

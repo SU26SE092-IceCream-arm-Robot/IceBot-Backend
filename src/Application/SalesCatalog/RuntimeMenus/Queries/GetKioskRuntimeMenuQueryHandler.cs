@@ -5,6 +5,8 @@ using Application.Shared.Wrappers;
 using Application.Tenants.Kiosks.Rules;
 using Application.Tenants.Stores;
 using Application.SalesCatalog.RuntimeMenus.Services;
+using Application.SalesCatalog.RuntimeMenus.Support;
+using Application.SalesCatalog.Availability;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
 
@@ -13,15 +15,18 @@ public sealed class GetKioskRuntimeMenuQueryHandler
     private readonly IMenuStore _menus;
     private readonly RuntimeMenuProjectionBuilder _projectionBuilder;
     private readonly IRuntimeMenuProjectionCache _cache;
+    private readonly IMenuItemOperationalAvailabilityReader _operationalAvailability;
 
     public GetKioskRuntimeMenuQueryHandler(
         IMenuStore menus,
         RuntimeMenuProjectionBuilder projectionBuilder,
-        IRuntimeMenuProjectionCache cache)
+        IRuntimeMenuProjectionCache cache,
+        IMenuItemOperationalAvailabilityReader operationalAvailability)
     {
         _menus = menus;
         _projectionBuilder = projectionBuilder;
         _cache = cache;
+        _operationalAvailability = operationalAvailability;
     }
 
     public async Task<ApiResult<RuntimeMenuResult>> HandleAsync(
@@ -54,14 +59,22 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             ct => _projectionBuilder.BuildAsync(kiosk, ct),
             cancellationToken);
 
+        var pausedMenuItemIds = await _operationalAvailability.GetPausedMenuItemIdsAsync(
+            kiosk.Id,
+            projection.Items.Select(item => item.MenuItemId).ToArray(),
+            cancellationToken);
+        var availableItems = pausedMenuItemIds.Count == 0
+            ? projection.Items
+            : projection.Items.Where(item => !pausedMenuItemIds.Contains(item.MenuItemId)).ToList();
+
         var result = new RuntimeMenuResult
         {
             SnapshotId = Guid.CreateVersion7(),
-            Revision = projection.Revision,
+            Revision = RuntimeMenuRevision.Compute(kiosk.Id, availableItems),
             KioskId = kiosk.Id,
             GeneratedAt = now,
             ExpiresAt = projection.ValidUntil,
-            Items = projection.Items
+            Items = availableItems
         };
 
         return ApiResult<RuntimeMenuResult>.Success(result);

@@ -3,6 +3,7 @@ using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Support;
 using Application.SalesCatalog.ReadModels;
 using Application.SalesCatalog.Rules;
+using Application.SalesCatalog.Availability;
 using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.Tenants.Entities;
@@ -15,6 +16,7 @@ public sealed record PlaceOrderItemAppendFailure(string Message, int StatusCode)
 
 public sealed class PlaceOrderItemAppender(
     IOrderStore orderStore,
+    IMenuItemOperationalAvailabilityReader operationalAvailability,
     IOptions<EdgeTelemetryIngestionOptions> options)
 {
     private readonly EdgeTelemetryIngestionOptions _options = options.Value;
@@ -34,6 +36,9 @@ public sealed class PlaceOrderItemAppender(
             cancellationToken);
         if (menuItem is null)
             return new($"Menu item '{itemRequest.MenuItemId}' not found.", 404);
+
+        if (await operationalAvailability.IsPausedAsync(kiosk.Id, menuItem.Id, cancellationToken))
+            return new($"Menu item '{menuItem.DisplayName}' is paused for this kiosk.", 409);
 
         var product = menuItem.Product;
         var productVariant = menuItem.ProductVariant;

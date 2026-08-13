@@ -49,7 +49,7 @@ public sealed class RefundConfirmationTests
             .HandleAsync(new RequestRefundCommand
             {
                 OrderId = order.Id,
-                UserContext = new CurrentUserContext { IsSystemAdmin = true },
+                UserContext = CreateManagerContext(order),
                 RefundMethod = "FullMoneyRefund",
                 Reason = "Duplicate payment",
                 IdempotencyKey = "refund-duplicate"
@@ -86,7 +86,7 @@ public sealed class RefundConfirmationTests
             {
                 OrderId = order.Id,
                 PaymentTransactionId = primary.Id,
-                UserContext = new CurrentUserContext { IsSystemAdmin = true },
+                UserContext = CreateManagerContext(order),
                 RefundMethod = "FullMoneyRefund",
                 Reason = "Wrong target",
                 IdempotencyKey = "refund-primary"
@@ -134,7 +134,7 @@ public sealed class RefundConfirmationTests
             .HandleAsync(new MarkRefundProcessedCommand
             {
                 RefundId = refund.Id,
-                UserContext = new CurrentUserContext { IsSystemAdmin = true },
+                UserContext = CreateManagerContext(order),
                 MoneyWasRefunded = true
             });
 
@@ -181,7 +181,7 @@ public sealed class RefundConfirmationTests
             .HandleAsync(new MarkRefundProcessedCommand
             {
                 RefundId = refund.Id,
-                UserContext = new CurrentUserContext { IsSystemAdmin = true },
+                UserContext = CreateManagerContext(order),
                 MoneyWasRefunded = true
             });
 
@@ -230,7 +230,7 @@ public sealed class RefundConfirmationTests
         var result = await handler.HandleAsync(new MarkRefundProcessedCommand
         {
             RefundId = refund.Id,
-            UserContext = new CurrentUserContext { IsSystemAdmin = true }
+            UserContext = CreateManagerContext(order)
         });
 
         Assert.False(result.Succeeded);
@@ -280,7 +280,7 @@ public sealed class RefundConfirmationTests
         var result = await handler.HandleAsync(new MarkRefundProcessedCommand
         {
             RefundId = refund.Id,
-            UserContext = new CurrentUserContext { IsSystemAdmin = true },
+            UserContext = CreateManagerContext(order),
             MoneyWasRefunded = false
         });
 
@@ -325,4 +325,10 @@ public sealed class RefundConfirmationTests
         transaction.MarkPaid(code, DateTimeOffset.UtcNow);
         return transaction;
     }
+
+    private static CurrentUserContext CreateManagerContext(Order order) => new()
+    {
+        AccountId = Guid.NewGuid(),
+        RoleScopes = [new UserRoleScope("Manager", null, null, order.KioskId)]
+    };
 }

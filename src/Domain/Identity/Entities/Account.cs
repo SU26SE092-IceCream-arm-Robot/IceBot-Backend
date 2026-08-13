@@ -46,6 +46,7 @@ public partial class Account : BusinessEntity
     public DateTimeOffset? LockedUntil { get; set; }
 
     public int FailedLoginCount { get; set; }
+    public long WorkforceRevision { get; set; }
 
     public virtual ICollection<AccountNotificationDevice> NotificationDevices { get; set; } = new List<AccountNotificationDevice>();
 

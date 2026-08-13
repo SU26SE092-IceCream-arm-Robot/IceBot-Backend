@@ -11,7 +11,7 @@ namespace WebAPI.Controllers.Payments;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/management/payment-methods")]
-[Authorize(Policy = "payments.manage")]
+[Authorize(Policy = "payment-methods.manage")]
 public sealed class ManagementPaymentMethodsController : ControllerBase
 {
     private readonly ListPaymentMethodsQueryHandler _listPaymentMethodsHandler;

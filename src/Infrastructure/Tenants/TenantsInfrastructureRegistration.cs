@@ -1,5 +1,6 @@
 using Application.Tenants.Abstractions;
 using Application.Tenants.Onboarding;
+using Application.Tenants.Organizations.Abstractions;
 using Infrastructure.Tenants.Persistence;
 using Infrastructure.Tenants.Jobs;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +12,7 @@ public static class TenantsInfrastructureRegistration
     public static IServiceCollection AddTenantsInfrastructure(this IServiceCollection services)
     {
         services.AddScoped<IOrganizationStore, OrganizationStore>();
+        services.AddScoped<IOrganizationSalesSummaryStore, OrganizationSalesSummaryStore>();
         services.AddScoped<IOrganizationAccessStateReader, OrganizationAccessStateReader>();
         services.AddOptions<OrganizationSessionRevocationOptions>()
             .Validate(options => options.IntervalSeconds is >= 5 and <= 3600 &&

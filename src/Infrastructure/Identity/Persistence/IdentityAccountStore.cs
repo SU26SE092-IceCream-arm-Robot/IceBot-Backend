@@ -126,6 +126,26 @@ namespace Infrastructure.Identity.Persistence
                 .CountAsync(cancellationToken);
         }
 
+        public Task<List<Account>> ListStaffAsync(
+            string? search, string? status, Guid organizationId,
+            IReadOnlySet<Guid> allowedOrganizationIds, IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds, int pageNumber, int pageSize,
+            CancellationToken cancellationToken = default)
+            => ApplyStaffFilters(BuildAccountQuery(asNoTracking: true), search, status, organizationId,
+                    allowedOrganizationIds, allowedStoreIds, allowedKioskIds)
+                .OrderBy(account => account.UserName)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync(cancellationToken);
+
+        public Task<int> CountStaffAsync(
+            string? search, string? status, Guid organizationId,
+            IReadOnlySet<Guid> allowedOrganizationIds, IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds, CancellationToken cancellationToken = default)
+            => ApplyStaffFilters(_dbContext.Accounts.WhereNotDeleted().AsNoTracking(), search, status, organizationId,
+                    allowedOrganizationIds, allowedStoreIds, allowedKioskIds)
+                .CountAsync(cancellationToken);
+
         public Task<bool> ExistsByEmailOrUserNameAsync(string email, string userName, CancellationToken cancellationToken = default)
         {
             return _dbContext.Accounts.WhereNotDeleted()
@@ -157,6 +177,16 @@ namespace Infrastructure.Identity.Persistence
             return _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        public Task AcquireStaffWorkforceCreateLockAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
+            _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-staff-create:{organizationId:D}:{idempotencyKey}"}, 0))",
+                cancellationToken);
+
+        public Task AcquireStaffWorkforceAccountLockAsync(Guid accountId, CancellationToken cancellationToken = default) =>
+            _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-staff-workforce:{accountId:D}"}, 0))",
+                cancellationToken);
+
         public async Task<T> ExecuteInTransactionAsync<T>(
             Func<Task<T>> operation,
             CancellationToken cancellationToken = default)
@@ -171,6 +201,27 @@ namespace Infrastructure.Identity.Persistence
             {
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(
                     IsolationLevel.Serializable,
+                    cancellationToken);
+                var result = await operation();
+                await transaction.CommitAsync(cancellationToken);
+                return result;
+            });
+        }
+
+        public async Task<T> ExecuteStaffWorkforceTransactionAsync<T>(
+            Func<Task<T>> operation,
+            CancellationToken cancellationToken = default)
+        {
+            if (_dbContext.Database.CurrentTransaction is not null)
+            {
+                return await operation();
+            }
+
+            var strategy = _dbContext.Database.CreateExecutionStrategy();
+            return await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(
+                    IsolationLevel.ReadCommitted,
                     cancellationToken);
                 var result = await operation();
                 await transaction.CommitAsync(cancellationToken);
@@ -238,6 +289,76 @@ namespace Infrastructure.Identity.Persistence
                 var normalized = search.Trim().ToLowerInvariant();
                 query = query.Where(account =>
                     account.UserName.ToLower().Contains(normalized) ||
+                    account.Email.ToLower().Contains(normalized) ||
+                    (account.FullName != null && account.FullName.ToLower().Contains(normalized)));
+            }
+
+            if (!string.IsNullOrWhiteSpace(status) &&
+                Enum.TryParse<AccountStatus>(status.Trim(), ignoreCase: true, out var parsedStatus))
+            {
+                query = query.Where(account => account.Status == parsedStatus);
+            }
+
+            return query;
+        }
+
+        public Task<StaffWorkforceCreateReplay?> GetStaffWorkforceCreateReplayAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
+            _dbContext.StaffWorkforceCreateReplays.SingleOrDefaultAsync(x => x.OrganizationId == organizationId && x.IdempotencyKey == idempotencyKey, cancellationToken);
+
+        public Task AddStaffWorkforceCreateReplayAsync(StaffWorkforceCreateReplay replay, CancellationToken cancellationToken = default) =>
+            _dbContext.StaffWorkforceCreateReplays.AddAsync(replay, cancellationToken).AsTask();
+
+        public Task<StaffWorkforceLifecycleTransition?> GetStaffWorkforceLifecycleTransitionByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
+            _dbContext.StaffWorkforceLifecycleTransitions.AsNoTracking().SingleOrDefaultAsync(
+                transition => transition.OrganizationId == organizationId && transition.RequestIdempotencyKey == idempotencyKey,
+                cancellationToken);
+
+        public Task AddStaffWorkforceLifecycleTransitionAsync(StaffWorkforceLifecycleTransition transition, CancellationToken cancellationToken = default) =>
+            _dbContext.StaffWorkforceLifecycleTransitions.AddAsync(transition, cancellationToken).AsTask();
+
+        public async Task<IReadOnlyList<Guid>> ListDisabledStaffWithActiveSessionsAsync(int batchSize, CancellationToken cancellationToken = default)
+        {
+            var size = Math.Clamp(batchSize, 1, 500);
+            return await _dbContext.Accounts.WhereNotDeleted()
+                .Where(account => account.Status == AccountStatus.Disabled)
+                .Where(account => account.AccountRoles.Any(role => role.IsActive && role.Role.Code == "Staff"))
+                .Where(account => _dbContext.RefreshTokens.Any(token =>
+                    token.AccountId == account.Id && token.RevokedAt == null && !token.IsUsed && token.ExpiresAt > DateTimeOffset.UtcNow))
+                .OrderBy(account => account.Id)
+                .Select(account => account.Id)
+                .Take(size)
+                .ToListAsync(cancellationToken);
+        }
+
+        private static IQueryable<Account> ApplyStaffFilters(
+            IQueryable<Account> query, string? search, string? status, Guid organizationId,
+            IReadOnlySet<Guid> allowedOrganizationIds, IReadOnlySet<Guid> allowedStoreIds,
+            IReadOnlySet<Guid> allowedKioskIds)
+        {
+            var organizationIds = allowedOrganizationIds.ToArray();
+            var storeIds = allowedStoreIds.ToArray();
+            var kioskIds = allowedKioskIds.ToArray();
+
+            query = query.Where(account => account.AccountRoles.Any(role => role.IsActive &&
+                (role.OrganizationId == organizationId ||
+                 (role.Store != null && role.Store.OrganizationId == organizationId) ||
+                 (role.Kiosk != null && role.Kiosk.OrganizationId == organizationId))));
+
+            query = query.Where(account => account.AccountRoles.Any(role => role.IsActive &&
+                ((role.OrganizationId.HasValue && organizationIds.Contains(role.OrganizationId.Value)) ||
+                 (role.StoreId.HasValue && (storeIds.Contains(role.StoreId.Value) ||
+                     (role.Store != null && organizationIds.Contains(role.Store.OrganizationId)))) ||
+                 (role.KioskId.HasValue && (kioskIds.Contains(role.KioskId.Value) ||
+                     (role.Kiosk != null && (storeIds.Contains(role.Kiosk.StoreId) ||
+                         organizationIds.Contains(role.Kiosk.OrganizationId))))))));
+
+            query = query.Where(account => account.AccountRoles.Any(role => role.IsActive && role.Role.Code == "Staff"))
+                .Where(account => !account.AccountRoles.Any(role => role.IsActive && role.Role.Code != "Staff"));
+
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var normalized = search.Trim().ToLowerInvariant();
+                query = query.Where(account => account.UserName.ToLower().Contains(normalized) ||
                     account.Email.ToLower().Contains(normalized) ||
                     (account.FullName != null && account.FullName.ToLower().Contains(normalized)));
             }

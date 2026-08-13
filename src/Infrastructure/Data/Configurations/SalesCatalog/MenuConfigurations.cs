@@ -62,3 +62,33 @@ internal sealed class MenuItemProductOptionConfiguration : IEntityTypeConfigurat
 
     }
 }
+
+internal sealed class KioskMenuItemAvailabilityConfiguration : IEntityTypeConfiguration<KioskMenuItemAvailability>
+{
+    public void Configure(EntityTypeBuilder<KioskMenuItemAvailability> entity)
+    {
+        entity.ToTable("KioskMenuItemAvailabilities");
+        entity.Property(x => x.Reason).HasMaxLength(1000);
+        entity.Property(x => x.Revision).IsConcurrencyToken();
+        entity.HasIndex(x => new { x.KioskId, x.MenuItemId }).IsUnique();
+        entity.HasIndex(x => new { x.KioskId, x.State });
+        entity.HasOne<Kiosk>().WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Menu>().WithMany().HasForeignKey(x => x.MenuId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<MenuItem>().WithMany().HasForeignKey(x => x.MenuItemId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class KioskMenuItemAvailabilityTransitionConfiguration : IEntityTypeConfiguration<KioskMenuItemAvailabilityTransition>
+{
+    public void Configure(EntityTypeBuilder<KioskMenuItemAvailabilityTransition> entity)
+    {
+        entity.ToTable("KioskMenuItemAvailabilityTransitions");
+        entity.Property(x => x.Reason).HasMaxLength(1000);
+        entity.Property(x => x.ActorRoleCodeSnapshot).HasMaxLength(100);
+        entity.Property(x => x.RequestId).HasMaxLength(200);
+        entity.HasIndex(x => new { x.AvailabilityId, x.OccurredAt });
+        entity.HasIndex(x => new { x.AvailabilityId, x.RequestId }).IsUnique();
+        entity.HasOne<KioskMenuItemAvailability>().WithMany(x => x.Transitions)
+            .HasForeignKey(x => x.AvailabilityId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
