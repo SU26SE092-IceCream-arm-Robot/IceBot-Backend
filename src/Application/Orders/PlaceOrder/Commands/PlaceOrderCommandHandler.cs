@@ -7,6 +7,7 @@ using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Rules;
 using Application.Orders.PlaceOrder.Support;
 using Application.Orders.PlaceOrder.Services;
+using Application.Orders.Admission;
 using Application.Shared.Wrappers;
 using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
@@ -97,6 +98,8 @@ public sealed class PlaceOrderCommandHandler
                 return ApiResult<OrderResult>.Fail("Kiosk not found.", 404);
             }
 
+            await _orderStore.AcquireKioskOperationalLockAsync(kiosk.Id, ct);
+
             var connectivity = await _orderStore.GetKioskConnectivityAsync(kiosk.Id, ct);
             var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk, connectivity);
             if (salesAvailabilityError is not null)
@@ -105,6 +108,10 @@ public sealed class PlaceOrderCommandHandler
             }
 
             var now = DateTimeOffset.UtcNow;
+            if (await _orderStore.HasActiveCustomerSessionAsync(kiosk.Id, now, cancellationToken: ct))
+            {
+                return ApiResult<OrderResult>.Fail(KioskCustomerSessionAdmission.OccupiedMessage, 409);
+            }
             var admissionError = StoreSalesAvailabilityRules.ValidateSalesAdmission(kiosk.Store, now);
             if (admissionError is not null)
             {

@@ -3,11 +3,12 @@ using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Support;
 using Application.SalesCatalog.ReadModels;
 using Application.SalesCatalog.Rules;
-using Application.SalesCatalog.Availability;
 using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.Tenants.Entities;
 using Application.Devices.Telemetry;
+using Application.Inventory.Abstractions;
+using Application.SalesCatalog.Availability;
 using Microsoft.Extensions.Options;
 
 namespace Application.Orders.PlaceOrder.Services;
@@ -17,7 +18,8 @@ public sealed record PlaceOrderItemAppendFailure(string Message, int StatusCode)
 public sealed class PlaceOrderItemAppender(
     IOrderStore orderStore,
     IMenuItemOperationalAvailabilityReader operationalAvailability,
-    IOptions<EdgeTelemetryIngestionOptions> options)
+    IOptions<EdgeTelemetryIngestionOptions> options,
+    MachineProductionInventoryGate? inventoryGate = null)
 {
     private readonly EdgeTelemetryIngestionOptions _options = options.Value;
 
@@ -100,6 +102,26 @@ public sealed class PlaceOrderItemAppender(
             selectedOptions.Select(option => option.ProductOptionId).ToArray(), cancellationToken);
         if (optionIngredientRequirements.Any(requirement => !requirement.IsIngredientActive))
             return new("One or more selected options require an inactive ingredient.", 409);
+
+        var inventoryDecision = inventoryGate is null
+            ? MachineProductionInventoryGateResult.Sellable
+            : await inventoryGate.EvaluateAsync(
+                kiosk,
+                menuItem,
+                routePolicy,
+                itemRequest.Quantity,
+                optionIngredientRequirements.Select(requirement => new InventoryIngredientRequirementInput(
+                    requirement.IngredientId,
+                    requirement.IngredientCode,
+                    requirement.IngredientName,
+                    requirement.Quantity,
+                    requirement.Unit)).ToArray(),
+                now,
+                cancellationToken);
+        if (!inventoryDecision.CanSell)
+        {
+            return new(inventoryDecision.Reason!, 409);
+        }
 
         var orderItem = order.AddItem(
             menuItem.Id,

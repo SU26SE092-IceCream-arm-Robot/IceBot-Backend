@@ -1,4 +1,8 @@
 using Application.Payments.Abstractions;
+using Application.Devices.Telemetry;
+using Application.Inventory.Abstractions;
+using Application.Orders.Abstractions;
+using Application.Orders.Admission;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
 using Application.Payments.PaymentSessions.Results;
@@ -12,6 +16,8 @@ using Domain.Common.Enums;
 using Domain.Devices.Connectivity;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
+using Application.SalesCatalog.Availability;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace IceBot.UnitTests.Payments;
@@ -53,7 +59,7 @@ public sealed class CreatePaymentSessionCommandHandlerTests
             .Returns(transaction);
         var gateway = Substitute.For<IPaymentGateway>();
         gateway.ProviderCode.Returns("payos");
-        var handler = new CreatePaymentSessionCommandHandler(store, gateway);
+        var handler = CreateHandler(store, gateway);
 
         var result = await handler.HandleAsync(new CreatePaymentSessionCommand
         {
@@ -109,7 +115,7 @@ public sealed class CreatePaymentSessionCommandHandlerTests
             .Returns(transaction);
         var gateway = Substitute.For<IPaymentGateway>();
         gateway.ProviderCode.Returns("payos");
-        var handler = new CreatePaymentSessionCommandHandler(store, gateway);
+        var handler = CreateHandler(store, gateway);
 
         var result = await handler.HandleAsync(new CreatePaymentSessionCommand
         {
@@ -301,7 +307,7 @@ public sealed class CreatePaymentSessionCommandHandlerTests
 
             var scenario = new ProviderCreateScenario
             {
-                Handler = new CreatePaymentSessionCommandHandler(paymentStore, gateway),
+                Handler = CreateHandler(paymentStore, gateway),
                 Store = paymentStore,
                 Gateway = gateway,
                 Order = order
@@ -333,4 +339,19 @@ public sealed class CreatePaymentSessionCommandHandlerTests
             ExpectedCurrency = "VND"
         }
     };
+
+    private static CreatePaymentSessionCommandHandler CreateHandler(
+        IPaymentStore paymentStore,
+        IPaymentGateway paymentGateway)
+    {
+        var inventoryGate = new MachineProductionInventoryGate(
+            Substitute.For<IInventoryReadinessEvaluator>(),
+            Options.Create(new EdgeTelemetryIngestionOptions()));
+        var sellabilityGuard = new OrderPaymentSellabilityGuard(
+            Substitute.For<IOrderStore>(),
+            Substitute.For<IMenuItemOperationalAvailabilityReader>(),
+            inventoryGate,
+            Options.Create(new EdgeTelemetryIngestionOptions()));
+        return new CreatePaymentSessionCommandHandler(paymentStore, paymentGateway, sellabilityGuard);
+    }
 }

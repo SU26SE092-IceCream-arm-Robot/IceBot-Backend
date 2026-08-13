@@ -7,8 +7,7 @@ using Application.RobotConfiguration.Programs.Queries;
 using Application.RobotConfiguration.Storage.Services;
 using Application.RobotConfiguration.ArtifactContracts;
 using Application.RobotConfiguration.AuthoringImports;
-using Application.RobotConfiguration.AuthoringImports.ReleaseLinkage;
-using Application.RobotConfiguration.AuthoringImports.Composition;
+using Application.RobotConfiguration.AuthoringImports.RecipeSuggestions;
 using Application.RobotConfiguration.AuthoringImports.Workspace;
 using Application.RobotConfiguration.AuthoringImports.Queries;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,8 +53,6 @@ public static class RobotConfigurationModule
         services.AddScoped<RobotAuthoringImportHandlers>();
         services.AddScoped<ListRobotAuthoringImportsQueryHandler>();
         services.AddScoped<RobotAuthoringImportValidator>();
-        services.AddScoped<CreateRobotAuthoringReleaseDraftCommandHandler>();
-        services.AddScoped<RobotAuthoringCompositionHandlers>();
         services.AddScoped<RobotAuthoringRecipeResolver>();
         services.AddScoped<RobotAuthoringWorkspaceHandler>();
 

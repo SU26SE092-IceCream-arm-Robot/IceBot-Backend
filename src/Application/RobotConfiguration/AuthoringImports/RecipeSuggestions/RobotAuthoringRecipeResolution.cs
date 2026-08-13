@@ -3,7 +3,16 @@ using Domain.Catalog.Enums;
 using Domain.RobotConfiguration.ArtifactContracts;
 using Domain.RobotConfiguration.AuthoringImports;
 
-namespace Application.RobotConfiguration.AuthoringImports.Composition;
+namespace Application.RobotConfiguration.AuthoringImports.RecipeSuggestions;
+
+public interface IRobotAuthoringRecipeSuggestionStore
+{
+    Task<IReadOnlyList<Recipe>> ListEligibleRecipesAsync(Guid organizationId, CancellationToken cancellationToken);
+    Task<IReadOnlyList<RobotArtifactTechnicalContract>> GetContractsAsync(
+        Guid organizationId,
+        IReadOnlyCollection<Guid> contractIds,
+        CancellationToken cancellationToken);
+}
 
 public sealed record RobotAuthoringRecipeCandidate(
     Guid RecipeId,
@@ -21,13 +30,13 @@ public sealed record RobotAuthoringRecipeResolution(
 {
     public static RobotAuthoringRecipeResolution NotReady() => new(
         "NotReady",
-        "Recipe matching begins after the import has materialized Draft technical resources.",
+        "Recipe suggestions are available after the import has materialized Draft technical resources.",
         []);
 }
 
 public sealed class RobotAuthoringRecipeResolver(
     IRobotAuthoringImportStore importStore,
-    IRobotAuthoringCompositionStore store)
+    IRobotAuthoringRecipeSuggestionStore store)
 {
     public async Task<RobotAuthoringRecipeResolution> ResolveAsync(
         Guid organizationId,
@@ -35,9 +44,7 @@ public sealed class RobotAuthoringRecipeResolver(
         CancellationToken cancellationToken)
     {
         var importSession = await importStore.GetAsync(organizationId, importId, false, cancellationToken);
-        if (importSession is null)
-            return RobotAuthoringRecipeResolution.NotReady();
-        if (importSession.Status != RobotAuthoringImportStatus.Applied)
+        if (importSession is null || importSession.Status != RobotAuthoringImportStatus.Applied)
             return RobotAuthoringRecipeResolution.NotReady();
 
         var contractIds = importSession.Items

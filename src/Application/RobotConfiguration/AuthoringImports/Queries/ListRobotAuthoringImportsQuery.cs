@@ -107,9 +107,7 @@ public sealed record RobotAuthoringImportListItemResult(
             RobotAuthoringImportLifecycleProjection.GetNextActions(
                 row.Status,
                 validation?.CanMaterialize == true,
-                row.LinkedConfigurationReleaseId,
-                row.PublishedAt,
-                row.ComposedRecipeId.HasValue),
+                row.PublishedAt),
             row.CreatedAt,
             row.ValidatedAt,
             row.MaterializedAt,
@@ -245,19 +243,14 @@ public static class RobotAuthoringImportLifecycleProjection
     public static IReadOnlyCollection<string> GetNextActions(
         RobotAuthoringImportStatus status,
         bool canMaterialize,
-        Guid? linkedConfigurationReleaseId,
-        DateTimeOffset? publishedAt,
-        bool compositionConfirmed) => status switch
+        DateTimeOffset? publishedAt) => status switch
     {
-        RobotAuthoringImportStatus.Uploaded => ["ValidateImport", "DiscardImport"],
-        RobotAuthoringImportStatus.Validated when canMaterialize => ["MaterializeImport", "DiscardImport"],
+        RobotAuthoringImportStatus.Uploaded => ["ResumeImport", "DiscardImport"],
+        RobotAuthoringImportStatus.Validated when canMaterialize => ["ResumeImport", "DiscardImport"],
         RobotAuthoringImportStatus.Validated => ["ResolveArtifactRevisionConflict", "DiscardImport"],
-        RobotAuthoringImportStatus.Applied when linkedConfigurationReleaseId.HasValue =>
-            ["ReviewConfigurationReleaseDraft", "PublishConfigurationRelease"],
-        RobotAuthoringImportStatus.Applied when publishedAt.HasValue && compositionConfirmed => ["CreateConfigurationReleaseDraft"],
         RobotAuthoringImportStatus.Applied when publishedAt.HasValue => ["CreateProductionBinding"],
         RobotAuthoringImportStatus.Applied => ["PublishImportResources"],
-        RobotAuthoringImportStatus.Failed => ["ValidateImport", "DiscardImport"],
+        RobotAuthoringImportStatus.Failed => ["ResumeImport", "DiscardImport"],
         _ => []
     };
 }

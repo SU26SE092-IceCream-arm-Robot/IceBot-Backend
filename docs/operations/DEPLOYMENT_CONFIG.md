@@ -161,7 +161,7 @@ Object storage is validated before background jobs start. Connection failure, in
 | Upgrade reconciliation schedule | `ProductionPackageUpgrade__Reconciliation__IntervalSeconds`, `__BatchSize` | **P2** | Defaults are `60` seconds and `100` candidates. Settings are startup-validated. |
 | Enable order execution dispatch | `OrderExecutionDispatch__Enabled` | **P1** | Keep enabled when paid machine-produced orders must be dispatched to Edge. |
 | Execute-order command expiry | `OrderExecutionDispatch__CommandExpiryMinutes` | **P1** | Review against kiosk queue and customer-wait policy; default is `30`. |
-| Active commands per endpoint | `OrderExecutionDispatch__MaxActiveCommandsPerEndpoint` | **P1** | Set from real Edge capacity; default is `20`. |
+| Active commands per endpoint | `OrderExecutionDispatch__MaxActiveCommandsPerEndpoint` | **P1** | Technical backstop for command delivery; keep `1` for the current one-customer-per-kiosk workflow. It is not a customer-queue capacity setting. |
 | Dispatch reconciliation interval | `OrderExecutionDispatch__ReconciliationIntervalSeconds` | **P2** | Use appsettings default `10` unless database load requires tuning. |
 | Dispatch reconciliation batch size | `OrderExecutionDispatch__ReconciliationBatchSize` | **P2** | Use appsettings default `50` unless recovery volume requires tuning. |
 | Initial dispatch support escalation | `OrderExecutionDispatch__InitialDispatchSupportEscalationMinutes` | **P1** | Paid machine orders with no initial command become `FulfillmentIssue` after this duration; default is `15` minutes. |
@@ -216,8 +216,10 @@ Broker startup, endpoint-scoped ACL provisioning, Edge subscription behavior, an
 | --- | --- | --- | --- |
 | Expose stack traces | `ErrorHandling__ExposeStackTrace` | **P1** | Use the safe appsettings default `false`. |
 | Serilog OTLP sink | `Observability__Serilog__OtlpSinkEnabled` | **P2** | Default `false`; enable when an OTLP log collector is deployed. |
-| OpenTelemetry OTLP export | `Observability__OpenTelemetry__OtlpExporterEnabled` | **P2** | Default `false`; enable when an OTLP collector is deployed. |
-| OpenTelemetry endpoint | `Observability__OpenTelemetry__OtlpEndpoint` | **P0 Feature** | Required when either OTLP exporter is enabled; environment-specific. |
+| OTel metric export | `Observability__OpenTelemetry__Metrics__ExporterEnabled` | **P2** | Default `false`; enable only when the Collector metric receiver is deployed. |
+| OTel trace export | `Observability__OpenTelemetry__Tracing__ExporterEnabled` | **P2** | Default `false`; enable only when the Collector trace receiver is deployed. |
+| OTel signal endpoint/protocol | `Observability__OpenTelemetry__Metrics__OtlpEndpoint`, `__Tracing__OtlpEndpoint`, `__OtlpProtocol` | **P0 Feature** | Required for each enabled signal; point to a private Collector receiver. Shared legacy endpoint/protocol remain fallback only. |
+| OTel resource identity | `Observability__DeploymentEnvironment`, `Observability__InstanceId` | **P2** | Identify environment and replica. `InstanceId` must be deployment/process identity, never tenant data. |
 | Debug body logging | `Observability__DebugBodyLogging__Enabled` | **P1** | Keep the safe appsettings default `false`; enable only for controlled debugging. |
 | Diagnostics external ping | `Diagnostics__EnableExternalPing` | **P2** | Default `false`; enable only for controlled provider diagnostics. |
 | External ping timeout | `Diagnostics__ExternalPingTimeoutSeconds` | **P2** | Use appsettings default `5` unless provider latency requires tuning. |
@@ -268,7 +270,7 @@ When enabled, diagnostics performs provider reachability checks without sending 
 - PayOS webhook/payment behavior depends on correct public return/cancel URLs and checksum key.
 - Robot artifact uploads store Lua files in S3-compatible object storage. Use MinIO for local/dev and S3-compatible cloud object storage in production. PostgreSQL stores metadata only.
 - Set `ErrorHandling__ExposeStackTrace=false` and `Observability__DebugBodyLogging__Enabled=false` in deployed environments.
-- For production observability, set `Observability__OpenTelemetry__OtlpExporterEnabled=true` for traces/metrics and `Observability__Serilog__OtlpSinkEnabled=true` for structured logs, then configure the OTLP endpoint to point to your collector.
+- For production observability, enable metric and trace exporters independently, point them to the private Collector receiver, and optionally enable the Serilog OTLP sink. See [Prometheus And Grafana Handoff](PROMETHEUS_GRAFANA_HANDOFF.md); the Collector, Prometheus, Grafana, retention, and alerts remain DevOps-owned.
 - Set `Diagnostics__ApiKey` outside Development before using `/management/diagnostics/health`.
 - Keep `Diagnostics__EnableExternalPing=false` unless the deployment check intentionally needs live SMTP/Firebase/PayOS reachability.
 - IoT runtime endpoints require HTTPS. Full Edge client certificates are accepted at the TLS handshake and authenticated by the provisioned SHA-256 fingerprint in WebAPI; do not terminate mTLS at an untrusted proxy.

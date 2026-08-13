@@ -6,7 +6,11 @@ public sealed class OrderExecutionDispatchOptions
 
     public bool Enabled { get; set; } = true;
     public int CommandExpiryMinutes { get; set; } = 30;
-    public int MaxActiveCommandsPerEndpoint { get; set; } = 20;
+    /// <summary>
+    /// Technical delivery backstop for execute-order commands. It does not
+    /// define customer queue capacity; customer admission is kiosk-scoped.
+    /// </summary>
+    public int MaxActiveCommandsPerEndpoint { get; set; } = 1;
     public int ReconciliationIntervalSeconds { get; set; } = 10;
     public int ReconciliationBatchSize { get; set; } = 50;
     public int InitialDispatchSupportEscalationMinutes { get; set; } = 15;

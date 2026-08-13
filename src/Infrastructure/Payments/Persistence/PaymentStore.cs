@@ -5,6 +5,8 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Application.Orders.Support;
 using Application.Payments.PaymentSessions.Support;
+using Application.Orders.Admission;
+using Application.Tenants.Kiosks.Rules;
 
 namespace Infrastructure.Payments.Persistence;
 
@@ -25,8 +27,26 @@ public sealed class PaymentStore : IPaymentStore
             .Include(order => order.Kiosk)
                 .ThenInclude(kiosk => kiosk.Organization)
             .Include(order => order.OrderItems)
+                .ThenInclude(item => item.Options)
+                    .ThenInclude(option => option.IngredientRequirements)
             .FirstOrDefaultAsync(order => order.Id == orderId, cancellationToken);
     }
+
+    public Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        AcquireAdvisoryLockAsync(KioskOperationalConcurrency.LockKey(kioskId), cancellationToken);
+
+    public Task<bool> HasActiveCustomerSessionAsync(
+        Guid kioskId,
+        DateTimeOffset observedAt,
+        Guid? excludingOrderId = null,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Orders.WhereNotDeleted()
+            .AnyAsync(
+                KioskCustomerSessionAdmission.BuildActiveSessionPredicate(
+                    kioskId, observedAt, excludingOrderId),
+                cancellationToken);
 
     public Task<PaymentMethod?> GetPaymentMethodByCodeAsync(string code, CancellationToken cancellationToken = default)
     {

@@ -6,10 +6,12 @@ using Application.EdgeIntegration.CommandDelivery.Commands;
 using Application.EdgeIntegration.Dispatch.Commands;
 using Application.EdgeIntegration.Reports.Commands;
 using Application.EdgeIntegration.Timeouts.Commands;
+using Infrastructure.Operations.Automation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 
 namespace Infrastructure.EdgeIntegration.Jobs;
 
@@ -46,6 +48,8 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
 
     private async Task ReconcileAsync(CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
+        var candidateFailures = 0;
         try
         {
             using var scope = _scopeFactory.CreateScope();
@@ -68,6 +72,8 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
 
                     if (!result.Succeeded)
                     {
+                        candidateFailures++;
+                        OperationalAutomationMetrics.RecordCandidateFailure("order_execution_dispatch_reconciliation");
                         _logger.LogWarning(
                             "Order execution dispatch reconciliation deferred order {OrderId}: {Message}",
                             orderId,
@@ -85,11 +91,18 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
                 }
                 catch (Exception ex)
                 {
+                    candidateFailures++;
+                    OperationalAutomationMetrics.RecordCandidateFailure("order_execution_dispatch_reconciliation");
                     _logger.LogError(ex,
                         "Order execution dispatch reconciliation failed for order {OrderId}.", orderId);
                     await TryEscalateAsync(orderId, ex.Message, cancellationToken);
                 }
             }
+
+            OperationalAutomationMetrics.RecordRun(
+                "order_execution_dispatch_reconciliation",
+                candidateFailures == 0 ? "succeeded" : "partial",
+                stopwatch.Elapsed);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -97,6 +110,10 @@ public sealed class OrderExecutionDispatchReconciliationJob : BackgroundService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Order execution dispatch reconciliation failed.");
+            OperationalAutomationMetrics.RecordRun(
+                "order_execution_dispatch_reconciliation",
+                "failed",
+                stopwatch.Elapsed);
         }
     }
 

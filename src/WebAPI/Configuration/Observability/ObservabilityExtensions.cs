@@ -18,23 +18,18 @@ namespace WebAPI.Configuration.Observability;
 
 public static class ObservabilityExtensions
 {
-    private const string DefaultServiceName = "IceBot.WebAPI";
-
     /// <summary>
     /// Configures Serilog structured logging and OpenTelemetry traces/metrics
     /// as a single observability extension for IceBot.WebAPI.
     /// </summary>
     public static WebApplicationBuilder AddIceBotObservability(this WebApplicationBuilder builder)
     {
-        var serviceName = builder.Configuration.GetValue<string>("Observability:ServiceName")
-                          ?? DefaultServiceName;
-
         var serviceVersion = typeof(ObservabilityExtensions).Assembly
             .GetName().Version?.ToString() ?? "0.0.0";
-
-        var otelSection = builder.Configuration.GetSection("Observability:OpenTelemetry");
-        var otlpEndpoint = otelSection.GetValue<string>("OtlpEndpoint") ?? "http://localhost:18889";
-        var otlpProtocol = otelSection.GetValue<string>("OtlpProtocol") ?? "grpc";
+        var settings = IceBotObservabilitySettingsReader.Read(
+            builder.Configuration,
+            builder.Environment.EnvironmentName,
+            $"{Environment.MachineName}:{Environment.ProcessId}");
 
         // --- Serilog ---
         builder.Host.UseSerilog(
@@ -50,12 +45,14 @@ public static class ObservabilityExtensions
                 {
                     config.WriteTo.OpenTelemetry(options =>
                     {
-                        options.Endpoint = otlpEndpoint;
-                        options.Protocol = ParseSerilogOtlpProtocol(otlpProtocol);
+                        options.Endpoint = settings.SerilogEndpoint;
+                        options.Protocol = ParseSerilogOtlpProtocol(settings.SerilogProtocol);
                         options.ResourceAttributes = new Dictionary<string, object>
                         {
-                            ["service.name"] = serviceName,
-                            ["service.version"] = serviceVersion
+                            ["service.name"] = settings.ServiceName,
+                            ["service.version"] = serviceVersion,
+                            ["service.instance.id"] = settings.InstanceId,
+                            ["deployment.environment.name"] = settings.DeploymentEnvironment
                         };
                         options.OnBeginSuppressInstrumentation =
                             OpenTelemetry.SuppressInstrumentationScope.Begin;
@@ -65,21 +62,21 @@ public static class ObservabilityExtensions
             writeToProviders: !builder.Environment.IsDevelopment());
 
         // --- OpenTelemetry ---
-        var otelEnabled = otelSection.GetValue("Enabled", true);
-
-        if (!otelEnabled)
+        if (!settings.OpenTelemetryEnabled)
         {
             return builder;
         }
-
-        var otlpExporterEnabled = otelSection.GetValue("OtlpExporterEnabled", false);
 
         builder.Services.AddOpenTelemetry()
             .ConfigureResource(resource =>
             {
                 resource.AddService(
-                    serviceName: serviceName,
-                    serviceVersion: serviceVersion);
+                    serviceName: settings.ServiceName,
+                    serviceVersion: serviceVersion)
+                    .AddAttributes([
+                        new KeyValuePair<string, object>("service.instance.id", settings.InstanceId),
+                        new KeyValuePair<string, object>("deployment.environment.name", settings.DeploymentEnvironment)
+                    ]);
             })
             .WithTracing(tracing =>
             {
@@ -98,12 +95,12 @@ public static class ObservabilityExtensions
                     })
                     .AddHttpClientInstrumentation();
 
-                if (otlpExporterEnabled)
+                if (settings.TracingExporter.Enabled)
                 {
                     tracing.AddOtlpExporter(options =>
                     {
-                        options.Endpoint = new Uri(otlpEndpoint);
-                        options.Protocol = ParseOtlpProtocol(otlpProtocol);
+                        options.Endpoint = new Uri(settings.TracingExporter.Endpoint);
+                        options.Protocol = ParseOtlpProtocol(settings.TracingExporter.Protocol);
                     });
                 }
             })
@@ -124,12 +121,12 @@ public static class ObservabilityExtensions
                     .AddHttpClientInstrumentation()
                     .AddRuntimeInstrumentation();
 
-                if (otlpExporterEnabled)
+                if (settings.MetricsExporter.Enabled)
                 {
                     metrics.AddOtlpExporter(options =>
                     {
-                        options.Endpoint = new Uri(otlpEndpoint);
-                        options.Protocol = ParseOtlpProtocol(otlpProtocol);
+                        options.Endpoint = new Uri(settings.MetricsExporter.Endpoint);
+                        options.Protocol = ParseOtlpProtocol(settings.MetricsExporter.Protocol);
                     });
                 }
             });
@@ -150,4 +147,5 @@ public static class ObservabilityExtensions
             ? OtlpProtocol.HttpProtobuf
             : OtlpProtocol.Grpc;
     }
+
 }

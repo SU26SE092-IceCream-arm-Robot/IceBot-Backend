@@ -22,6 +22,7 @@ using Application.Orders.Support;
 using Application.Tenants.Kiosks.Rules;
 using Domain.Tenants.Enums;
 using Domain.Orders.Incidents;
+using Application.Orders.Admission;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -72,6 +73,17 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
                 kiosk.Status == Domain.Tenants.Enums.KioskStatus.Active &&
                 kiosk.OperationalState == KioskOperationalState.Operational,
             cancellationToken);
+
+    public Task<bool> HasActiveCustomerSessionAsync(
+        Guid kioskId,
+        DateTimeOffset observedAt,
+        Guid? excludingOrderId = null,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Orders.WhereNotDeleted()
+            .AnyAsync(
+                KioskCustomerSessionAdmission.BuildActiveSessionPredicate(
+                    kioskId, observedAt, excludingOrderId),
+                cancellationToken);
 
     public Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default)
     {

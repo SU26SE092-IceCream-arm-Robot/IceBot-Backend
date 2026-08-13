@@ -12,7 +12,8 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
     public async Task<KioskInventoryReadinessResult?> EvaluateKioskAsync(
         Guid kioskId,
         IReadOnlyCollection<InventoryReadinessRouteInput> routes,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        InventoryReadinessEvaluationOptions? options = null)
     {
         var kiosk = await inventory.GetKioskForInventoryTopologyAsync(kioskId, cancellationToken);
         if (kiosk is null)
@@ -20,13 +21,14 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             return null;
         }
 
-        return await EvaluateAsync(kiosk, routes, cancellationToken);
+        return await EvaluateAsync(kiosk, routes, options ?? new(), cancellationToken);
     }
 
     public async Task<IReadOnlyList<KioskInventoryReadinessResult>> EvaluateOrganizationAsync(
         Guid organizationId,
         IReadOnlyCollection<InventoryReadinessRouteInput> routes,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        InventoryReadinessEvaluationOptions? options = null)
     {
         var kiosks = await inventory.ListKiosksForInventoryReadinessAsync(organizationId, cancellationToken);
         var results = new List<KioskInventoryReadinessResult>(kiosks.Count);
@@ -35,7 +37,7 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             var applicableRoutes = routes.Where(route => AppliesToKiosk(route, kiosk)).ToArray();
             if (applicableRoutes.Length > 0)
             {
-                results.Add(await EvaluateAsync(kiosk, applicableRoutes, cancellationToken));
+                results.Add(await EvaluateAsync(kiosk, applicableRoutes, options ?? new(), cancellationToken));
             }
         }
 
@@ -45,6 +47,7 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
     private async Task<KioskInventoryReadinessResult> EvaluateAsync(
         Kiosk kiosk,
         IReadOnlyCollection<InventoryReadinessRouteInput> routes,
+        InventoryReadinessEvaluationOptions options,
         CancellationToken cancellationToken)
     {
         var applicableRoutes = routes.Where(route => AppliesToKiosk(route, kiosk)).ToArray();
@@ -65,17 +68,31 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             foreach (var item in itemsByRecipe[route.RecipeId])
             {
                 var matching = statesByIngredient[item.IngredientId].ToArray();
-                results.Add(new InventoryIngredientReadinessResult
-                {
-                    ExecutionRouteId = route.ExecutionRouteId,
-                    RouteCode = route.RouteCode,
-                    RecipeId = route.RecipeId,
-                    IngredientId = item.IngredientId,
-                    IngredientCode = item.Ingredient.Code,
-                    IngredientName = item.Ingredient.Name,
-                    Status = ResolveStatus(matching),
-                    MatchingDispenserStateIds = matching.Select(state => state.Id).ToArray()
-                });
+                results.Add(CreateIngredientResult(
+                    route,
+                    item.IngredientId,
+                    item.Ingredient.Code,
+                    item.Ingredient.Name,
+                    matching,
+                    options,
+                    item.Quantity * route.RequestedQuantity,
+                    item.Unit,
+                    includeRequirementInResult: true));
+            }
+
+            foreach (var requirement in route.SelectedOptionIngredients ?? [])
+            {
+                var matching = statesByIngredient[requirement.IngredientId].ToArray();
+                results.Add(CreateIngredientResult(
+                    route,
+                    requirement.IngredientId,
+                    requirement.IngredientCode,
+                    requirement.IngredientName,
+                    matching,
+                    options,
+                    requirement.Quantity * route.RequestedQuantity,
+                    requirement.Unit,
+                    includeRequirementInResult: true));
             }
 
             var routeOptions = supportedOptions.Where(option =>
@@ -83,22 +100,21 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             foreach (var group in routeOptions.GroupBy(option => option.OptionGroupId))
             {
                 var groupDefinition = group.First().OptionGroup;
-                var options = group.Select(option =>
+                var optionResults = group.Select(option =>
                 {
                     var ingredients = option.IngredientRequirements.Select(requirement =>
                     {
                         var matching = statesByIngredient[requirement.IngredientId].ToArray();
-                        return new InventoryIngredientReadinessResult
-                        {
-                            ExecutionRouteId = route.ExecutionRouteId,
-                            RouteCode = route.RouteCode,
-                            RecipeId = route.RecipeId,
-                            IngredientId = requirement.IngredientId,
-                            IngredientCode = requirement.Ingredient.Code,
-                            IngredientName = requirement.Ingredient.Name,
-                            Status = ResolveStatus(matching),
-                            MatchingDispenserStateIds = matching.Select(state => state.Id).ToArray()
-                        };
+                        return CreateIngredientResult(
+                            route,
+                            requirement.IngredientId,
+                            requirement.Ingredient.Code,
+                            requirement.Ingredient.Name,
+                            matching,
+                            options,
+                            requirement.Quantity,
+                            requirement.Unit,
+                            includeRequirementInResult: false);
                     }).ToArray();
                     return new InventoryOptionReadinessResult
                     {
@@ -108,7 +124,7 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
                         Ingredients = ingredients
                     };
                 }).ToArray();
-                var readyCount = options.Count(option => option.IsReady);
+                var readyCount = optionResults.Count(option => option.IsReady);
                 optionGroupResults.Add(new InventoryOptionGroupReadinessResult
                 {
                     ExecutionRouteId = route.ExecutionRouteId,
@@ -120,7 +136,7 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
                     MinimumSelections = groupDefinition.MinSelections,
                     ReadyOptionCount = readyCount,
                     IsReady = !groupDefinition.IsRequired || readyCount >= groupDefinition.MinSelections,
-                    Options = options
+                    Options = optionResults
                 });
             }
         }
@@ -144,7 +160,39 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
         };
     }
 
-    private static InventoryReadinessStatus ResolveStatus(IReadOnlyCollection<IngredientDispenserState> states)
+    private static InventoryIngredientReadinessResult CreateIngredientResult(
+        InventoryReadinessRouteInput route,
+        Guid ingredientId,
+        string ingredientCode,
+        string ingredientName,
+        IReadOnlyCollection<IngredientDispenserState> matching,
+        InventoryReadinessEvaluationOptions options,
+        decimal requiredQuantity,
+        string requiredUnit,
+        bool includeRequirementInResult) =>
+        new()
+        {
+            ExecutionRouteId = route.ExecutionRouteId,
+            RouteCode = route.RouteCode,
+            RecipeId = route.RecipeId,
+            IngredientId = ingredientId,
+            IngredientCode = ingredientCode,
+            IngredientName = ingredientName,
+            RequiredQuantity = includeRequirementInResult && options.RequireQuantifiedEvidence
+                ? requiredQuantity
+                : null,
+            RequiredUnit = includeRequirementInResult && options.RequireQuantifiedEvidence
+                ? requiredUnit
+                : null,
+            Status = ResolveStatus(matching, options, requiredQuantity, requiredUnit),
+            MatchingDispenserStateIds = matching.Select(state => state.Id).ToArray()
+        };
+
+    private static InventoryReadinessStatus ResolveStatus(
+        IReadOnlyCollection<IngredientDispenserState> states,
+        InventoryReadinessEvaluationOptions options,
+        decimal requiredQuantity,
+        string requiredUnit)
     {
         if (states.Count == 0)
         {
@@ -168,9 +216,46 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             return InventoryReadinessStatus.DeviceUnavailable;
         }
 
-        return online.Any(state => !string.IsNullOrWhiteSpace(state.LevelToQuantityProfileJson))
+        var calibrated = online.Where(state => !string.IsNullOrWhiteSpace(state.LevelToQuantityProfileJson)).ToArray();
+        if (calibrated.Length == 0)
+        {
+            return InventoryReadinessStatus.CalibrationMissing;
+        }
+
+        if (!options.RequireQuantifiedEvidence)
+        {
+            return InventoryReadinessStatus.Ready;
+        }
+
+        var observedAt = options.ObservedAt ?? DateTimeOffset.UtcNow;
+        var usable = calibrated.Where(state =>
+            !state.ExpiresAt.HasValue || state.ExpiresAt.Value >= observedAt).ToArray();
+        if (usable.Length == 0)
+        {
+            return InventoryReadinessStatus.IngredientExpired;
+        }
+
+        if (options.MaximumEvidenceAge.HasValue && usable.All(state =>
+                state.LastMeasuredAt < observedAt - options.MaximumEvidenceAge.Value))
+        {
+            return InventoryReadinessStatus.InventoryEvidenceStale;
+        }
+
+        var sameUnit = usable.Where(state =>
+            string.Equals(state.Unit, requiredUnit, StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (sameUnit.Length == 0)
+        {
+            return InventoryReadinessStatus.UnitMismatch;
+        }
+
+        if (sameUnit.Any(state => !state.EstimatedQuantity.HasValue))
+        {
+            return InventoryReadinessStatus.QuantityUnavailable;
+        }
+
+        return sameUnit.Sum(state => state.EstimatedQuantity!.Value) >= requiredQuantity
             ? InventoryReadinessStatus.Ready
-            : InventoryReadinessStatus.CalibrationMissing;
+            : InventoryReadinessStatus.QuantityInsufficient;
     }
 
     private static InventoryReadinessStatus ResolveOverallStatus(
@@ -186,7 +271,12 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             InventoryReadinessStatus.MissingIngredient,
             InventoryReadinessStatus.ContainerInactive,
             InventoryReadinessStatus.DeviceUnavailable,
-            InventoryReadinessStatus.CalibrationMissing
+            InventoryReadinessStatus.CalibrationMissing,
+            InventoryReadinessStatus.IngredientExpired,
+            InventoryReadinessStatus.InventoryEvidenceStale,
+            InventoryReadinessStatus.UnitMismatch,
+            InventoryReadinessStatus.QuantityUnavailable,
+            InventoryReadinessStatus.QuantityInsufficient
         };
         return precedence.First(status => ingredients.Any(item => item.Status == status));
     }

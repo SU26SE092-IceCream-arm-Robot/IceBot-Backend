@@ -1,11 +1,13 @@
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
+using Infrastructure.Operations.Automation;
 using Infrastructure.Payments.Observability;
 using Infrastructure.Payments.Options;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 
 namespace Infrastructure.Payments.Jobs;
 
@@ -33,6 +35,8 @@ public sealed class PaymentSessionReconciliationJob(
 
     private async Task ReconcileBatchAsync(CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
+        var candidateFailures = 0;
         try
         {
             using var scope = scopeFactory.CreateScope();
@@ -81,10 +85,17 @@ public sealed class PaymentSessionReconciliationJob(
                 }
                 catch (Exception ex)
                 {
+                    candidateFailures++;
+                    OperationalAutomationMetrics.RecordCandidateFailure("payment_session_reconciliation");
                     logger.LogError(ex,
                         "Payment-session reconciliation failed for transaction {PaymentTransactionId}.", id);
                 }
             }
+
+            OperationalAutomationMetrics.RecordRun(
+                "payment_session_reconciliation",
+                candidateFailures == 0 ? "succeeded" : "partial",
+                stopwatch.Elapsed);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -92,6 +103,10 @@ public sealed class PaymentSessionReconciliationJob(
         catch (Exception ex)
         {
             logger.LogError(ex, "Payment-session reconciliation failed.");
+            OperationalAutomationMetrics.RecordRun(
+                "payment_session_reconciliation",
+                "failed",
+                stopwatch.Elapsed);
         }
     }
 }

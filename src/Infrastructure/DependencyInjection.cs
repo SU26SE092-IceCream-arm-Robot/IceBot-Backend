@@ -56,7 +56,7 @@ using Infrastructure.RobotConfiguration.Programs.Persistence;
 using Infrastructure.RobotConfiguration.ArtifactContracts;
 using Infrastructure.RobotConfiguration.AuthoringImports.Persistence;
 using Application.RobotConfiguration.AuthoringImports;
-using Application.RobotConfiguration.AuthoringImports.Composition;
+using Application.RobotConfiguration.AuthoringImports.RecipeSuggestions;
 using Application.RobotConfiguration.ArtifactContracts;
 using Infrastructure.Persistence.Repositories;
 using Infrastructure.SalesCatalog;
@@ -222,7 +222,7 @@ namespace Infrastructure
             services.AddScoped<IRobotArtifactTemplateStore, RobotArtifactTemplateStore>();
             services.AddScoped<IRobotArtifactTechnicalContractStore, RobotArtifactTechnicalContractStore>();
             services.AddScoped<IRobotAuthoringImportStore, RobotAuthoringImportStore>();
-            services.AddScoped<IRobotAuthoringCompositionStore, RobotAuthoringCompositionStore>();
+            services.AddScoped<IRobotAuthoringRecipeSuggestionStore, RobotAuthoringRecipeSuggestionStore>();
             services.AddScoped<Application.Shared.Concurrency.ITechnicalResourceMutationCoordinator,
                 Concurrency.PostgresTechnicalResourceMutationCoordinator>();
             services.AddScoped<IConfigurationReleaseStore, ConfigurationReleaseStore>();

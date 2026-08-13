@@ -27,6 +27,12 @@ public interface IOrderExecutionDispatchStore
         Guid kioskId,
         CancellationToken cancellationToken = default);
 
+    Task<bool> HasActiveCustomerSessionAsync(
+        Guid kioskId,
+        DateTimeOffset observedAt,
+        Guid? excludingOrderId = null,
+        CancellationToken cancellationToken = default);
+
     Task<Order?> GetOrderAsync(Guid orderId, CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<KioskExecutionEndpoint>> ListActiveEndpointsAsync(

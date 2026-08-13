@@ -27,7 +27,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | Wide scan, finding ledger, root-cause remediation, vertical-slice review, invariant checklist, pattern scan, failure scenarios, completion evidence | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) | [Working Protocol](process/WORKING_PROTOCOL.md), [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 | Deployment runtime config, environment variables, appsettings, health/info | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) | [API Surface Rules](api/API_SURFACE_RULES.md) |
 | Local demo accounts, repeat-safe development role seed, `ICEBOT-DEMO` tenant tree | [Local Development Bootstrap](operations/LOCAL_DEVELOPMENT_BOOTSTRAP.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md), [Authorization Rules](api/AUTHORIZATION_RULES.md) |
-| Observability, Serilog, OpenTelemetry, Aspire Dashboard, debug body logging, OTLP | [Observability](operations/OBSERVABILITY.md) | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
+| Observability, Serilog, OpenTelemetry, Aspire Dashboard, debug body logging, OTLP | [Observability](operations/OBSERVABILITY.md) | [Prometheus And Grafana Handoff](operations/PROMETHEUS_GRAFANA_HANDOFF.md), [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | Manual backend critical rule checks before handoff | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) | [Working Protocol](process/WORKING_PROTOCOL.md) |
 | How backend docs should be structured for RAG/search | [Documentation Rules](process/DOCUMENTATION_RULES.md) | this file |
 | Which module owns a topic, its primary contract/flow, and its verification entry point | [Documentation Coverage Matrix](DOCUMENTATION_COVERAGE.md) | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md), [System Flows](flows/SYSTEM_FLOWS.md) |
@@ -74,7 +74,7 @@ It is not a DDD bounded context map. Domain ownership lives in [Boundary Context
 | --- | --- |
 | `auth`, `login`, `forgot password`, `reset password`, `refresh token` | [API Surface Rules](api/API_SURFACE_RULES.md), section `Authentication And Password Recovery APIs` |
 | `deploy`, `deployment`, `env`, `appsettings`, `JWT`, `SMTP`, `PayOS`, `Firebase`, `health`, `info` | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
-| `observability`, `Serilog`, `OpenTelemetry`, `Aspire`, `OTLP`, `trace`, `metric`, `debug body logging` | [Observability](operations/OBSERVABILITY.md), [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
+| `observability`, `Serilog`, `OpenTelemetry`, `Aspire`, `OTLP`, `Prometheus`, `Grafana`, `trace`, `metric`, `debug body logging` | [Observability](operations/OBSERVABILITY.md), [Prometheus And Grafana Handoff](operations/PROMETHEUS_GRAFANA_HANDOFF.md), [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
 | `manual verification`, `critical rule`, `smoke checklist`, `maintenance lifecycle test`, `payment webhook test` | [Backend Critical Rule Checklist](process/BACKEND_CRITICAL_RULE_CHECKLIST.md) |
 | `wide scan`, `horizontal audit`, `finding ledger`, `root cause`, `pattern scan`, `vertical slice`, `invariant`, `failure path`, `scope freeze`, `completion evidence`, `poison item`, `independent diff review` | [Vertical Slice Review](process/VERTICAL_SLICE_REVIEW.md) |
 | `invitation`, `accept invitation`, `admin creates account`, `temporary password`, `CreateInvitation`, `SendInvitationEmail` | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |

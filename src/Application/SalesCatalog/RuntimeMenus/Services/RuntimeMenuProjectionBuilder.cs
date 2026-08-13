@@ -5,6 +5,7 @@ using Application.SalesCatalog.Rules;
 using Application.SalesCatalog.RuntimeMenus.Mapping;
 using Application.SalesCatalog.RuntimeMenus.Results;
 using Application.SalesCatalog.RuntimeMenus.Support;
+using Application.SalesCatalog.Availability;
 using Domain.Catalog.Enums;
 using Domain.Tenants.Entities;
 using Microsoft.Extensions.Options;
@@ -15,13 +16,16 @@ public sealed class RuntimeMenuProjectionBuilder
 {
     private readonly IMenuStore _menus;
     private readonly EdgeTelemetryIngestionOptions _options;
+    private readonly MachineProductionInventoryGate _inventoryGate;
 
     public RuntimeMenuProjectionBuilder(
         IMenuStore menus,
-        IOptions<EdgeTelemetryIngestionOptions>? options = null)
+        MachineProductionInventoryGate inventoryGate,
+        IOptions<EdgeTelemetryIngestionOptions> options)
     {
         _menus = menus;
-        _options = options?.Value ?? new EdgeTelemetryIngestionOptions();
+        _inventoryGate = inventoryGate;
+        _options = options.Value;
     }
 
     public async Task<RuntimeMenuProjection> BuildAsync(
@@ -82,30 +86,43 @@ public sealed class RuntimeMenuProjectionBuilder
             };
         });
 
-        var items = candidates
-            .Where(entry =>
+        var items = new List<RuntimeMenuItemResult>();
+        foreach (var entry in candidates
+                     .OrderBy(entry => entry.Menu.DisplayOrder)
+                     .ThenBy(entry => entry.Item.DisplayOrder)
+                     .ThenBy(entry => entry.Item.DisplayName))
+        {
+            var routeKey = entry.Item.RecipeId.HasValue
+                ? new ActiveProductionRouteOptionPolicyKey(entry.Item.ProductVariantId, entry.Item.RecipeId.Value)
+                : (ActiveProductionRouteOptionPolicyKey?)null;
+            var hasActiveProductionRoute =
+                entry.Item.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced &&
+                routeKey.HasValue;
+            var routePolicy = routeKey.HasValue && routePolicies.TryGetValue(routeKey.Value, out var resolvedPolicy)
+                ? resolvedPolicy
+                : null;
+            hasActiveProductionRoute &= routePolicy is not null;
+            if (MenuItemSellabilityRules.Validate(entry.Item, kiosk, now, hasActiveProductionRoute) is not null ||
+                !ProductOptionSelectionRules.IsSatisfiable(
+                    optionGroupsByMenuItem[entry.Item.Id].ToArray(),
+                    filteredOptionsByMenuItem[entry.Item.Id]))
             {
-                var routeKey = entry.Item.RecipeId.HasValue
-                    ? new ActiveProductionRouteOptionPolicyKey(entry.Item.ProductVariantId, entry.Item.RecipeId.Value)
-                    : (ActiveProductionRouteOptionPolicyKey?)null;
-                var hasActiveProductionRoute =
-                    entry.Item.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced &&
-                    routeKey.HasValue &&
-                    routePolicies.ContainsKey(routeKey.Value);
-                return MenuItemSellabilityRules.Validate(
-                           entry.Item,
-                           kiosk,
-                           now,
-                           hasActiveProductionRoute) is null &&
-                       ProductOptionSelectionRules.IsSatisfiable(
-                           optionGroupsByMenuItem[entry.Item.Id].ToArray(),
-                           filteredOptionsByMenuItem[entry.Item.Id]);
-            })
-            .OrderBy(entry => entry.Menu.DisplayOrder)
-            .ThenBy(entry => entry.Item.DisplayOrder)
-            .ThenBy(entry => entry.Item.DisplayName)
-            .Select(entry => RuntimeMenuResultMapper.ToResult(entry.Item, filteredOptionsByMenuItem[entry.Item.Id]))
-            .ToList();
+                continue;
+            }
+
+            var inventoryDecision = await _inventoryGate.EvaluateAsync(
+                kiosk,
+                entry.Item,
+                routePolicy,
+                1,
+                null,
+                now,
+                cancellationToken);
+            if (inventoryDecision.CanSell)
+            {
+                items.Add(RuntimeMenuResultMapper.ToResult(entry.Item, filteredOptionsByMenuItem[entry.Item.Id]));
+            }
+        }
 
         return new RuntimeMenuProjection(RuntimeMenuRevision.Compute(kiosk.Id, items), items);
 

@@ -190,12 +190,7 @@ GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports
 POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports
 GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}
 GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/workspace
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/validate
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/materialize
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/preview-composition
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/confirm-composition
 POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/publish-resources
-POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/create-release-draft
 POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/discard
 POST /api/v1/management/organizations/{organizationId}/robot-artifacts
 PATCH /api/v1/management/organizations/{organizationId}/robot-artifacts/publish

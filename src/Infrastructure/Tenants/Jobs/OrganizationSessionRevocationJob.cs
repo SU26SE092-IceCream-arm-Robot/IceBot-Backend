@@ -1,10 +1,12 @@
 using Application.Identity.Tokens.Services;
 using Application.Tenants.Abstractions;
 using Domain.Tenants.Enums;
+using Infrastructure.Operations.Automation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 
 namespace Infrastructure.Tenants.Jobs;
 
@@ -25,36 +27,64 @@ public sealed class OrganizationSessionRevocationJob(
 
     private async Task ReconcileAsync(CancellationToken cancellationToken)
     {
-        await using var discoveryScope = scopeFactory.CreateAsyncScope();
-        var discoveryStore = discoveryScope.ServiceProvider.GetRequiredService<IOrganizationStore>();
-        var dueTransitions = await discoveryStore.ListDueSessionRevocationTransitionsAsync(
-            DateTimeOffset.UtcNow,
-            options.Value.BatchSize,
-            cancellationToken);
-
-        foreach (var dueTransition in dueTransitions)
+        var stopwatch = Stopwatch.StartNew();
+        var candidateFailures = 0;
+        try
         {
-            try
+            await using var discoveryScope = scopeFactory.CreateAsyncScope();
+            var discoveryStore = discoveryScope.ServiceProvider.GetRequiredService<IOrganizationStore>();
+            var dueTransitions = await discoveryStore.ListDueSessionRevocationTransitionsAsync(
+                DateTimeOffset.UtcNow,
+                options.Value.BatchSize,
+                cancellationToken);
+
+            foreach (var dueTransition in dueTransitions)
             {
-                await ProcessAsync(dueTransition.Id, cancellationToken);
+                try
+                {
+                    if (!await ProcessAsync(dueTransition.Id, cancellationToken))
+                    {
+                        candidateFailures++;
+                        OperationalAutomationMetrics.RecordCandidateFailure("organization_session_revocation");
+                    }
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception exception)
+                {
+                    candidateFailures++;
+                    OperationalAutomationMetrics.RecordCandidateFailure("organization_session_revocation");
+                    logger.LogError(
+                        exception,
+                        "Organization session revocation processing failed for transition {TransitionId}.",
+                        dueTransition.Id);
+                }
             }
-            catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
-            {
-                logger.LogError(
-                    exception,
-                    "Organization session revocation processing failed for transition {TransitionId}.",
-                    dueTransition.Id);
-            }
+
+            OperationalAutomationMetrics.RecordRun(
+                "organization_session_revocation",
+                candidateFailures == 0 ? "succeeded" : "partial",
+                stopwatch.Elapsed);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception exception)
+        {
+            logger.LogError(exception, "Organization session revocation reconciliation failed.");
+            OperationalAutomationMetrics.RecordRun("organization_session_revocation", "failed", stopwatch.Elapsed);
         }
     }
 
-    private async Task ProcessAsync(Guid transitionId, CancellationToken cancellationToken)
+    private async Task<bool> ProcessAsync(Guid transitionId, CancellationToken cancellationToken)
     {
         await using var scope = scopeFactory.CreateAsyncScope();
         var store = scope.ServiceProvider.GetRequiredService<IOrganizationStore>();
         var refreshTokens = scope.ServiceProvider.GetRequiredService<RefreshTokenService>();
 
-        await store.ExecuteInTransactionAsync(async () =>
+        return await store.ExecuteInTransactionAsync(async () =>
         {
             var transition = await store.GetStatusTransitionByIdAsync(
                 transitionId,
@@ -62,7 +92,7 @@ public sealed class OrganizationSessionRevocationJob(
                 cancellationToken);
             if (transition is null || transition.SessionRevocationStatus == OrganizationLifecycleSideEffectStatus.Completed)
             {
-                return 0;
+                return true;
             }
 
             try
@@ -91,6 +121,7 @@ public sealed class OrganizationSessionRevocationJob(
                     transition.OrganizationId,
                     transition.Id,
                     accountIds.Count);
+                return true;
             }
             catch (Exception exception)
             {
@@ -103,9 +134,8 @@ public sealed class OrganizationSessionRevocationJob(
                     exception,
                     "Organization session revocation will retry for transition {TransitionId}.",
                     transition.Id);
+                return false;
             }
-
-            return 0;
         }, cancellationToken);
     }
 }

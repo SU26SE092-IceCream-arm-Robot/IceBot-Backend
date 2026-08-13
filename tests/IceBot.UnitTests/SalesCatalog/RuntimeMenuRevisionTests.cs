@@ -1,5 +1,7 @@
 using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.Availability;
+using Application.Devices.Telemetry;
+using Application.Inventory.Abstractions;
 using Application.SalesCatalog.ReadModels;
 using Application.SalesCatalog.RuntimeMenus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Abstractions;
@@ -11,6 +13,7 @@ using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using NSubstitute;
+using Microsoft.Extensions.Options;
 
 namespace IceBot.UnitTests.SalesCatalog;
 
@@ -44,7 +47,7 @@ public sealed class RuntimeMenuRevisionTests
             .Returns(new HashSet<Guid>());
         var handler = new GetKioskRuntimeMenuQueryHandler(
             store,
-            new RuntimeMenuProjectionBuilder(store),
+            new RuntimeMenuProjectionBuilder(store, CreateInventoryGate(), CreateTelemetryOptions()),
             new PassthroughRuntimeMenuCache(),
             availability);
 
@@ -74,7 +77,7 @@ public sealed class RuntimeMenuRevisionTests
         var cache = new RecordingRuntimeMenuCache();
         var handler = new GetKioskRuntimeMenuQueryHandler(
             store,
-            new RuntimeMenuProjectionBuilder(store),
+            new RuntimeMenuProjectionBuilder(store, CreateInventoryGate(), CreateTelemetryOptions()),
             cache,
             availability);
 
@@ -115,6 +118,12 @@ public sealed class RuntimeMenuRevisionTests
             Store = store
         };
     }
+
+    private static MachineProductionInventoryGate CreateInventoryGate() =>
+        new(Substitute.For<IInventoryReadinessEvaluator>(), CreateTelemetryOptions());
+
+    private static IOptions<EdgeTelemetryIngestionOptions> CreateTelemetryOptions() =>
+        Options.Create(new EdgeTelemetryIngestionOptions());
 
     private sealed class PassthroughRuntimeMenuCache : IRuntimeMenuProjectionCache
     {

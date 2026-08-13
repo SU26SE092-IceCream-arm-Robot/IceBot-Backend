@@ -24,6 +24,7 @@ public static class SalesCatalogModule
         services.AddScoped<ListKioskMenuItemAvailabilityQueryHandler>();
         services.AddScoped<SetKioskMenuItemAvailabilityCommandHandler>();
         services.AddScoped<IMenuItemOperationalAvailabilityReader, MenuItemOperationalAvailabilityReader>();
+        services.AddScoped<MachineProductionInventoryGate>();
 
         services.AddScoped<RuntimeMenuProjectionBuilder>();
         services.AddScoped<GetKioskRuntimeMenuQueryHandler>();

@@ -8,6 +8,12 @@ public interface IPaymentStore
 {
     Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default);
     Task<KioskConnectivityProjection?> GetKioskConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task AcquireKioskOperationalLockAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<bool> HasActiveCustomerSessionAsync(
+        Guid kioskId,
+        DateTimeOffset observedAt,
+        Guid? excludingOrderId = null,
+        CancellationToken cancellationToken = default);
 
     Task<PaymentMethod?> GetPaymentMethodByCodeAsync(string code, CancellationToken cancellationToken = default);
 

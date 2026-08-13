@@ -2,7 +2,7 @@
 
 ## Search Keywords
 
-`observability`, `Serilog`, `OpenTelemetry`, `OTLP`, `Aspire Dashboard`, `trace`, `metric`, `structured log`, `debug body logging`
+`observability`, `Serilog`, `OpenTelemetry`, `OTLP`, `OpenTelemetry Collector`, `Prometheus`, `Grafana`, `Aspire Dashboard`, `trace`, `metric`, `structured log`, `debug body logging`
 
 This document outlines the observability strategy for IceBot Backend. It uses a combination of **Serilog** for structured logging and **OpenTelemetry** for traces, metrics, and correlation.
 
@@ -13,6 +13,7 @@ The observability boundary is separated into roles to avoid duplicating log nois
 - **Serilog**: The structured logging pipeline. Responsible for application logs, console output, and file-based logs (or forwarding to Seq/Loki).
 - **OpenTelemetry (OTel)**: Handles traces, metrics, and correlation.
 - **Aspire Dashboard**: The local developer tool for visualizing traces and metrics.
+- **OpenTelemetry Collector + Prometheus + Grafana**: The production monitoring topology. The Collector receives OTLP; Prometheus stores metrics; Grafana owns dashboards and alerts.
 - **Debug Body Logging**: A temporary, config-gated "microscope" for debugging raw HTTP payloads.
 
 > [!WARNING]
@@ -35,6 +36,8 @@ cd ..\IceBot-Tools
 > [!NOTE]
 > Aspire Dashboard is for local development **only**. Do not expose it to the public network.
 
+Production topology and the DevOps handoff are defined in [Prometheus And Grafana Handoff](PROMETHEUS_GRAFANA_HANDOFF.md). None of those services is required for Backend startup.
+
 ## 3. Configuration
 
 Observability settings are managed in `appsettings.json` under the `Observability` block:
@@ -42,14 +45,23 @@ Observability settings are managed in `appsettings.json` under the `Observabilit
 ```json
 "Observability": {
   "ServiceName": "IceBot.WebAPI",
+  "DeploymentEnvironment": "Development",
+  "InstanceId": "optional-stable-instance-id",
   "Serilog": {
     "OtlpSinkEnabled": false
   },
   "OpenTelemetry": {
     "Enabled": true,
-    "OtlpExporterEnabled": false,
-    "OtlpEndpoint": "http://localhost:18889",
-    "OtlpProtocol": "grpc"
+    "Metrics": {
+      "ExporterEnabled": false,
+      "OtlpEndpoint": "http://localhost:4317",
+      "OtlpProtocol": "grpc"
+    },
+    "Tracing": {
+      "ExporterEnabled": false,
+      "OtlpEndpoint": "http://localhost:4317",
+      "OtlpProtocol": "grpc"
+    }
   },
   "DebugBodyLogging": {
     "Enabled": false,
@@ -60,12 +72,13 @@ Observability settings are managed in `appsettings.json` under the `Observabilit
 }
 ```
 
-### OTLP Exporter
+### OTLP Exporters
 
-- Set `OpenTelemetry:OtlpExporterEnabled: true` to export traces and metrics to the Aspire Dashboard or a production OTLP collector.
-- Set `Serilog:OtlpSinkEnabled: true` to export structured logs through the Serilog OpenTelemetry sink to the same OTLP endpoint.
-- `OtlpEndpoint` defines the destination.
-- In `appsettings.Development.json`, both OTLP exporters default to `false` so the app doesn't depend on Aspire being available.
+- `OpenTelemetry:Metrics:ExporterEnabled` and `OpenTelemetry:Tracing:ExporterEnabled` are independent. Enable only the signal that the collector is configured to receive.
+- Each signal can use its own `OtlpEndpoint` and `OtlpProtocol`. When omitted, existing common `OpenTelemetry:OtlpEndpoint` and `OtlpProtocol` values remain a backward-compatible fallback.
+- Set `Serilog:OtlpSinkEnabled: true` only when structured logs should also flow to the collector. It has its own optional `Serilog:OtlpEndpoint` and `Serilog:OtlpProtocol` overrides.
+- In `appsettings.Development.json`, exporters default to `false` so the app does not depend on Aspire being available.
+- `service.name`, `service.version`, `service.instance.id`, and `deployment.environment.name` are resource attributes. Do not use organization, kiosk, account, order, endpoint, payment, deployment, or artifact IDs as metric tags.
 
 Serilog OTLP logging is separate from OpenTelemetry traces/metrics:
 
@@ -182,12 +195,13 @@ Exact thresholds are deployment-specific and should be tuned from observed basel
 For production environments:
 1. **Logs**: Continue using Serilog. You can add a Serilog sink to export directly to Seq, Loki, or Elasticsearch.
 2. **Logs via OTLP**: If using an OTLP collector, enable `Observability:Serilog:OtlpSinkEnabled=true`.
-3. **Traces/Metrics**: Enable the OTLP exporter (`Observability:OpenTelemetry:OtlpExporterEnabled=true`) and point `OtlpEndpoint` to an OpenTelemetry Collector or APM ingest endpoint (e.g., Jaeger, Prometheus, Datadog).
+3. **Traces/Metrics**: Independently enable `Observability:OpenTelemetry:Metrics:ExporterEnabled` and/or `Observability:OpenTelemetry:Tracing:ExporterEnabled`, then point each configured endpoint to the OpenTelemetry Collector. Prometheus receives metrics from the Collector, not directly from Backend.
 4. **Debug Body Logging**: Keep `Observability:DebugBodyLogging:Enabled = false` unless actively diagnosing a live production payload issue.
 
 ## Related Docs
 
 - [Deployment Configuration](DEPLOYMENT_CONFIG.md)
+- [Prometheus And Grafana Handoff](PROMETHEUS_GRAFANA_HANDOFF.md)
 - [MQTT Operations](MQTT_OPERATIONS.md)
 - [Alert Lifecycle Flow](../flows/ALERT_LIFECYCLE_FLOW.md)
 - [Restart And Power Recovery](RESTART_AND_POWER_RECOVERY.md)

@@ -27,7 +27,9 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 5. Customer confirms checkout.
 6. Tablet checks runtime projection freshness:
    now - generatedAt <= 5-15 seconds.
-7. Tablet calls Cloud Backend to place order.
+7. Tablet calls Cloud Backend to place order. Cloud acquires the kiosk
+   customer-session lock and rejects a second non-expired customer session for
+   the same kiosk.
 8. Cloud re-evaluates kiosk lifecycle, `KioskOperationalState.Operational`, connectivity, Store opening hours in `Store.TimeZone`, explicit Store sales pause, kiosk-scoped menu-item operational availability, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store, kiosk operational state, operational item pause, or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found.
 9. Cloud creates:
    - Order
@@ -47,7 +49,11 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 14. Customer pays.
 15. Payment provider calls Cloud webhook.
 16. Cloud verifies provider callback and signature before payment/order lookup. A verified callback with no matching local provider transaction is acknowledged without creating callback/payment/order evidence or dispatching fulfillment.
-17. For a matching payment transaction, Cloud updates PaymentTransaction = Paid and Order = ReadyForFulfillment in one DB transaction.
+17. For a matching payment transaction, Cloud acquires the same kiosk session
+   lock, then updates PaymentTransaction = Paid and Order = ReadyForFulfillment
+   in one DB transaction. A verified late payment received after another
+   customer session began is retained as financial evidence but moves its Order
+   to RefundRequired and never dispatches robot work.
 18. Cloud commits payment/order state.
 19. After the payment transaction commits, Cloud dispatches execution attempt `1`.
    A reconciliation worker repairs any paid `ReadyForFulfillment` order whose required machine-execution command was not created.
@@ -70,6 +76,21 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
    - audit log
    - monitoring
 ```
+
+## Customer-Attended Kiosk Admission
+
+IceBot currently operates one kiosk as one customer session, not a customer
+queue. A customer session starts when an Order enters `PendingPayment` and
+continues through paid production and unresolved physical-output intervention.
+It releases when the pending-payment deadline passes or the current order has
+completed/cancelled terminally. `Order.Completed` is the normal release point:
+the robot has confirmed output completion, while inventory projection and
+analytics may continue asynchronously.
+
+Edge may retain a durable technical command queue for delivery/retry recovery,
+but Cloud does not admit a second customer order for the kiosk during the active
+session. The endpoint active-command limit is a technical backstop, not a
+customer queue capacity setting.
 
 Payment success and robot execution are separate concerns. Tablet can show payment success before Edge accepts the executable command.
 
@@ -108,7 +129,9 @@ Rules:
 - Do not make Tablet status depend on Edge dispatch success.
 - Dispatch is idempotent by `(OrderId, DispatchAttemptNo)`.
 - Reconciliation creates only missing attempt `1`; a new attempt number requires an explicit retry decision.
-- Admission counts active `ExecuteOrder` commands per endpoint and rejects dispatch when the configured queue limit is reached.
+- Customer-session admission permits only one active customer order per kiosk.
+  Endpoint active-command admission is a secondary technical backstop and has
+  a default limit of one.
 - Payment remains paid after provider-confirmed commit.
 
 ## Tablet Status Flow

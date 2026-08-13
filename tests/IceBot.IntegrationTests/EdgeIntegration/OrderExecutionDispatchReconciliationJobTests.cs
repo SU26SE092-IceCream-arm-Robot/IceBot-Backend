@@ -94,6 +94,12 @@ public sealed class OrderExecutionDispatchReconciliationJobTests
         public Task<bool> IsKioskOperationalAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
             Task.FromResult(true);
 
+        public Task<bool> HasActiveCustomerSessionAsync(
+            Guid kioskId,
+            DateTimeOffset observedAt,
+            Guid? excludingOrderId = null,
+            CancellationToken cancellationToken = default) => Task.FromResult(false);
+
         public Task<IReadOnlyList<KioskExecutionEndpoint>> ListActiveEndpointsAsync(
             Guid kioskId,
             CancellationToken cancellationToken = default) =>

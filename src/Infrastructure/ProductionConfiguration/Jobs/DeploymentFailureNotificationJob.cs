@@ -1,8 +1,10 @@
 using Application.ProductionConfiguration.Deployments.Notifications;
+using Infrastructure.Operations.Automation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using System.Diagnostics;
 
 namespace Infrastructure.ProductionConfiguration.Jobs;
 
@@ -19,6 +21,8 @@ public sealed class DeploymentFailureNotificationJob(
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(_options.IntervalSeconds));
         do
         {
+            var stopwatch = Stopwatch.StartNew();
+            var candidateFailures = 0;
             try
             {
                 IReadOnlyList<Guid> ids;
@@ -39,14 +43,28 @@ public sealed class DeploymentFailureNotificationJob(
                     }
                     catch (Exception ex)
                     {
+                        candidateFailures++;
+                        OperationalAutomationMetrics.RecordCandidateFailure("deployment_failure_notification");
                         logger.LogError(ex,
                             "Deployment failure notification reconciliation failed for deployment {DeploymentId}.",
                             id);
                     }
                 }
+
+                OperationalAutomationMetrics.RecordRun(
+                    "deployment_failure_notification",
+                    candidateFailures == 0 ? "succeeded" : "partial",
+                    stopwatch.Elapsed);
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested) { }
-            catch (Exception ex) { logger.LogError(ex, "Deployment failure notification reconciliation failed."); }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Deployment failure notification reconciliation failed.");
+                OperationalAutomationMetrics.RecordRun(
+                    "deployment_failure_notification",
+                    "failed",
+                    stopwatch.Elapsed);
+            }
         }
         while (await timer.WaitForNextTickAsync(stoppingToken));
     }

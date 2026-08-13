@@ -43,6 +43,8 @@ public sealed class InventoryIngredientReadinessResult
     public Guid IngredientId { get; set; }
     public string IngredientCode { get; set; } = null!;
     public string IngredientName { get; set; } = null!;
+    public decimal? RequiredQuantity { get; set; }
+    public string? RequiredUnit { get; set; }
     public InventoryReadinessStatus Status { get; set; }
     public IReadOnlyList<Guid> MatchingDispenserStateIds { get; set; } = [];
 }

@@ -141,40 +141,6 @@ public sealed class RobotAuthoringImport : BusinessEntity
         Touch(now, actorId);
     }
 
-    public void LinkConfigurationRelease(Guid configurationReleaseId, DateTimeOffset now, Guid actorId)
-    {
-        if (!PublishedAt.HasValue || Status != RobotAuthoringImportStatus.Applied)
-            throw new DomainRuleException("Only an import with published resources can be linked to a configuration release.");
-        if (!ComposedRecipeId.HasValue || !CompositionConfirmedAt.HasValue)
-            throw new DomainRuleException("Only an import with confirmed recipe composition can be linked to a configuration release.");
-        if (configurationReleaseId == Guid.Empty)
-            throw new DomainRuleException("Linked configuration release id is required.");
-        if (LinkedConfigurationReleaseId.HasValue && LinkedConfigurationReleaseId != configurationReleaseId)
-            throw new DomainRuleException("Robot authoring import is already linked to another configuration release.");
-
-        LinkedConfigurationReleaseId = configurationReleaseId;
-        ReleaseLinkedAt ??= now;
-        Touch(now, actorId);
-    }
-
-    public void ConfirmComposition(Guid recipeId, IReadOnlyCollection<string> optionCodes, string previewChecksum,
-        DateTimeOffset now, Guid actorId)
-    {
-        if (Status != RobotAuthoringImportStatus.Applied || !AppliedRobotProgramId.HasValue)
-            throw new DomainRuleException("Composition can only be confirmed for an applied import.");
-        if (recipeId == Guid.Empty || string.IsNullOrWhiteSpace(previewChecksum))
-            throw new DomainRuleException("Composition recipe and preview checksum are required.");
-        var normalizedOptions = optionCodes.Select(NormalizeCode).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
-        if (normalizedOptions.Length != optionCodes.Count)
-            throw new DomainRuleException("Composition option codes must be non-empty and unique.");
-
-        ComposedRecipeId = recipeId;
-        ComposedOptionCodesJson = JsonSerializer.Serialize(normalizedOptions);
-        CompositionPreviewChecksum = previewChecksum.Trim().ToLowerInvariant();
-        CompositionConfirmedAt = now;
-        Touch(now, actorId);
-    }
-
     public IReadOnlyCollection<string> GetComposedOptionCodes() =>
         string.IsNullOrWhiteSpace(ComposedOptionCodesJson)
             ? []

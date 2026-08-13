@@ -1,5 +1,5 @@
 using Application.RobotConfiguration.AuthoringImports;
-using Application.RobotConfiguration.AuthoringImports.Composition;
+using Application.RobotConfiguration.AuthoringImports.RecipeSuggestions;
 using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
 using Domain.RobotConfiguration.ArtifactContracts;
@@ -89,11 +89,11 @@ public sealed class RobotAuthoringRecipeResolverTests
     {
         var imports = Substitute.For<IRobotAuthoringImportStore>();
         imports.GetAsync(import.OrganizationId, import.Id, false, Arg.Any<CancellationToken>()).Returns(import);
-        var composition = Substitute.For<IRobotAuthoringCompositionStore>();
-        composition.GetContractsAsync(import.OrganizationId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+        var suggestions = Substitute.For<IRobotAuthoringRecipeSuggestionStore>();
+        suggestions.GetContractsAsync(import.OrganizationId, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(contracts.ToArray());
-        composition.ListEligibleRecipesAsync(import.OrganizationId, Arg.Any<CancellationToken>()).Returns(recipes.ToArray());
-        return new RobotAuthoringRecipeResolver(imports, composition);
+        suggestions.ListEligibleRecipesAsync(import.OrganizationId, Arg.Any<CancellationToken>()).Returns(recipes.ToArray());
+        return new RobotAuthoringRecipeResolver(imports, suggestions);
     }
 
     private static RobotAuthoringImport AppliedImport(Guid organizationId, out RobotArtifactTechnicalContract contract)

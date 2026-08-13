@@ -91,9 +91,7 @@ public sealed record RobotAuthoringImportResult(
         var actions = RobotAuthoringImportLifecycleProjection.GetNextActions(
             value.Status,
             validation?.CanMaterialize == true,
-            value.LinkedConfigurationReleaseId,
-            value.PublishedAt,
-            value.ComposedRecipeId.HasValue);
+            value.PublishedAt);
         var publicStatus = RobotAuthoringImportLifecycleProjection.GetPublicStatus(value.Status, value.PublishedAt);
 
         return new RobotAuthoringImportResult(

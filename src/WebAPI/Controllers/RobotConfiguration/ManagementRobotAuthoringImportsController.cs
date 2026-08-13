@@ -1,12 +1,9 @@
 using Application.RobotConfiguration.AuthoringImports;
-using Application.RobotConfiguration.AuthoringImports.ReleaseLinkage;
-using Application.RobotConfiguration.AuthoringImports.Composition;
 using Application.RobotConfiguration.AuthoringImports.Workspace;
 using Application.RobotConfiguration.AuthoringImports.Queries;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 using WebAPI.Authorization;
 
 namespace WebAPI.Controllers.RobotConfiguration;
@@ -17,8 +14,6 @@ namespace WebAPI.Controllers.RobotConfiguration;
 public sealed class ManagementRobotAuthoringImportsController(
     RobotAuthoringImportHandlers handlers,
     ListRobotAuthoringImportsQueryHandler listHandler,
-    CreateRobotAuthoringReleaseDraftCommandHandler createReleaseDraftHandler,
-    RobotAuthoringCompositionHandlers compositionHandlers,
     RobotAuthoringWorkspaceHandler workspaceHandler) : ControllerBase
 {
     private const long MaximumMultipartRequestBytes = RobotAuthoringBundleCodec.MaximumArchiveBytes + 1024 * 1024;
@@ -88,15 +83,6 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("{importId:guid}/validate")]
-    [Authorize(Policy = "artifact.upload")]
-    public async Task<IActionResult> Validate(Guid organizationId, Guid importId, CancellationToken cancellationToken)
-    {
-        var result = await handlers.ValidateAsync(new ValidateRobotAuthoringImportCommand(
-            User.GetUserContext(), organizationId, importId), cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
     [HttpPost("{importId:guid}/resume")]
     [Authorize(Policy = "artifact.upload")]
     [Authorize(Policy = "program.manage")]
@@ -106,19 +92,6 @@ public sealed class ManagementRobotAuthoringImportsController(
         CancellationToken cancellationToken)
     {
         var result = await handlers.ResumeAsync(new ResumeRobotAuthoringImportCommand(
-            User.GetUserContext(), organizationId, importId), cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpPost("{importId:guid}/materialize")]
-    [Authorize(Policy = "artifact.upload")]
-    [Authorize(Policy = "program.manage")]
-    public async Task<IActionResult> Materialize(
-        Guid organizationId,
-        Guid importId,
-        CancellationToken cancellationToken)
-    {
-        var result = await handlers.MaterializeAsync(new MaterializeRobotAuthoringImportCommand(
             User.GetUserContext(), organizationId, importId), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -145,48 +118,6 @@ public sealed class ManagementRobotAuthoringImportsController(
         return StatusCode(result.StatusCode, result);
     }
 
-    [HttpPost("{importId:guid}/create-release-draft")]
-    [Authorize(Policy = "release.publish")]
-    public async Task<IActionResult> CreateReleaseDraft(
-        Guid organizationId,
-        Guid importId,
-        [FromBody] CreateRobotAuthoringReleaseDraftRequest request,
-        CancellationToken cancellationToken)
-    {
-        var result = await createReleaseDraftHandler.HandleAsync(
-            new CreateRobotAuthoringReleaseDraftCommand(
-                User.GetUserContext(),
-                organizationId,
-                importId,
-                request.RecipeId,
-                request.SupportedOptionCodes),
-            cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpPost("{importId:guid}/preview-composition")]
-    [Authorize(Policy = "artifact.upload")]
-    [Authorize(Policy = "program.manage")]
-    public async Task<IActionResult> PreviewComposition(Guid organizationId, Guid importId,
-        [FromBody] PreviewRobotAuthoringCompositionRequest request, CancellationToken cancellationToken)
-    {
-        var result = await compositionHandlers.PreviewAsync(new PreviewRobotAuthoringCompositionQuery(
-            User.GetUserContext(), organizationId, importId, request.RecipeId, request.SelectedOptionCodes),
-            cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpPost("{importId:guid}/confirm-composition")]
-    [Authorize(Policy = "artifact.upload")]
-    [Authorize(Policy = "program.manage")]
-    public async Task<IActionResult> ConfirmComposition(Guid organizationId, Guid importId,
-        [FromBody] ConfirmRobotAuthoringCompositionRequest request, CancellationToken cancellationToken)
-    {
-        var result = await compositionHandlers.ConfirmAsync(new ConfirmRobotAuthoringCompositionCommand(
-            User.GetUserContext(), organizationId, importId, request.RecipeId, request.SelectedOptionCodes,
-            request.PreviewChecksum), cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
 }
 
 public sealed class UploadRobotAuthoringImportRequest
@@ -195,22 +126,4 @@ public sealed class UploadRobotAuthoringImportRequest
     public Guid? StoreId { get; init; }
     public Guid? KioskId { get; init; }
     public Guid? DeviceId { get; init; }
-}
-
-public sealed class CreateRobotAuthoringReleaseDraftRequest
-{
-    public Guid RecipeId { get; init; }
-    public IReadOnlyCollection<string> SupportedOptionCodes { get; init; } = [];
-}
-
-public class PreviewRobotAuthoringCompositionRequest
-{
-    public Guid RecipeId { get; init; }
-    public IReadOnlyCollection<string> SelectedOptionCodes { get; init; } = [];
-}
-
-public sealed class ConfirmRobotAuthoringCompositionRequest : PreviewRobotAuthoringCompositionRequest
-{
-    [Required, StringLength(64, MinimumLength = 64)]
-    public required string PreviewChecksum { get; init; }
 }

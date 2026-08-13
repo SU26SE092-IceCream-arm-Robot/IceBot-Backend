@@ -26,6 +26,12 @@ public interface IOrderStore
 
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
     Task<KioskConnectivityProjection?> GetKioskConnectivityAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task AcquireKioskOperationalLockAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<bool> HasActiveCustomerSessionAsync(
+        Guid kioskId,
+        DateTimeOffset observedAt,
+        Guid? excludingOrderId = null,
+        CancellationToken cancellationToken = default);
 
     Task<MenuItem?> GetMenuItemForKioskAsync(
         Guid menuItemId,

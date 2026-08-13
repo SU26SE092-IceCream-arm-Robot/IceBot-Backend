@@ -6,6 +6,7 @@ using Application.Payments.Providers;
 using Application.Shared.Wrappers;
 using Application.Shared.Idempotency;
 using Application.Tenants.Kiosks.Rules;
+using Application.Orders.Admission;
 using Domain.Orders.Enums;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
@@ -19,10 +20,16 @@ public sealed class CreatePaymentSessionCommandHandler
     private readonly IPaymentStore _paymentStore;
     private readonly IPaymentGateway _paymentGateway;
 
-    public CreatePaymentSessionCommandHandler(IPaymentStore paymentStore, IPaymentGateway paymentGateway)
+    private readonly OrderPaymentSellabilityGuard _sellabilityGuard;
+
+    public CreatePaymentSessionCommandHandler(
+        IPaymentStore paymentStore,
+        IPaymentGateway paymentGateway,
+        OrderPaymentSellabilityGuard sellabilityGuard)
     {
         _paymentStore = paymentStore;
         _paymentGateway = paymentGateway;
+        _sellabilityGuard = sellabilityGuard;
     }
 
     public async Task<ApiResult<PaymentSessionResult>> HandleAsync(
@@ -58,6 +65,8 @@ public sealed class CreatePaymentSessionCommandHandler
             {
                 return ApiResult<PaymentSessionResult>.Fail("Order not found.", 404);
             }
+
+            await _paymentStore.AcquireKioskOperationalLockAsync(order.KioskId, ct);
 
             var existingByIdempotencyKey = await _paymentStore.GetPaymentTransactionByIdempotencyKeyAsync(
                 scopedIdempotencyKey,
@@ -97,11 +106,26 @@ public sealed class CreatePaymentSessionCommandHandler
                 return ApiResult<PaymentSessionResult>.Fail("Order is already paid.", 409);
             }
 
+            if (await _paymentStore.HasActiveCustomerSessionAsync(
+                    order.KioskId,
+                    DateTimeOffset.UtcNow,
+                    order.Id,
+                    ct))
+            {
+                return ApiResult<PaymentSessionResult>.Fail(KioskCustomerSessionAdmission.OccupiedMessage, 409);
+            }
+
             var connectivity = await _paymentStore.GetKioskConnectivityAsync(order.KioskId, ct);
             var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(order.Kiosk, connectivity);
             if (salesAvailabilityError is not null)
             {
                 return ApiResult<PaymentSessionResult>.Fail(salesAvailabilityError, 409);
+            }
+
+            var sellabilityError = await _sellabilityGuard.ValidateAsync(order, DateTimeOffset.UtcNow, ct);
+            if (sellabilityError is not null)
+            {
+                return ApiResult<PaymentSessionResult>.Fail(sellabilityError, 409);
             }
 
             if (order.Status is OrderStatus.Cancelled or OrderStatus.Completed or OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)

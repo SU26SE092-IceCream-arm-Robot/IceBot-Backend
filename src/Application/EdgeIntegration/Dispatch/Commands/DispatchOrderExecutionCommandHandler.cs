@@ -363,6 +363,15 @@ public sealed class DispatchOrderExecutionCommandHandler
         {
             return KioskNotOperational();
         }
+        if (await _store.HasActiveCustomerSessionAsync(
+                order.KioskId,
+                DateTimeOffset.UtcNow,
+                order.Id,
+                cancellationToken))
+        {
+            return ApiResult<OrderExecutionDispatchResult>.Fail(
+                "Another customer order is active for this kiosk.", 409);
+        }
 
         var canPrepareRejectedOrder = redispatch is not null && order.Status == OrderStatus.ExecutionRejected;
         if (order.PaymentStatus != PaymentStatus.Paid ||

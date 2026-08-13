@@ -14,6 +14,7 @@ using Application.EdgeIntegration.CommandDelivery.Commands;
 using Application.EdgeIntegration.Dispatch.Commands;
 using Application.EdgeIntegration.Reports.Commands;
 using Application.EdgeIntegration.Timeouts.Commands;
+using Application.Orders.Admission;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Payments.PaymentSessions.Commands;
@@ -169,12 +170,19 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
 
             await _paymentStore.AcquireOrderWorkflowLockAsync(paymentTransaction.OrderId, ct);
             await _paymentStore.ReloadOrderAsync(paymentTransaction.Order, ct);
+            await _paymentStore.AcquireKioskOperationalLockAsync(paymentTransaction.Order.KioskId, ct);
 
             var appliedSettlement = notification.IsPaid
                 ? await _paymentStore.GetAppliedPaymentSettlementByOrderIdAsync(paymentTransaction.OrderId, ct)
                 : null;
             var paidByDifferentTransaction = appliedSettlement is not null &&
                 appliedSettlement.Id != paymentTransaction.Id;
+            var paymentConflictsWithActiveCustomerSession = notification.IsPaid &&
+                await _paymentStore.HasActiveCustomerSessionAsync(
+                    paymentTransaction.Order.KioskId,
+                    DateTimeOffset.UtcNow,
+                    paymentTransaction.OrderId,
+                    ct);
 
             var callback = new PaymentCallback
             {
@@ -220,6 +228,11 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                     {
                         paymentTransaction.AssignPrimarySettlement();
                         paymentTransaction.Order.MarkPaid(paidAmount, paidAt);
+                        if (paymentConflictsWithActiveCustomerSession)
+                        {
+                            paymentTransaction.Order.MarkRefundRequired(
+                                "Payment was confirmed after another customer session became active at this kiosk. Manual refund review is required.");
+                        }
                     }
                 }
 

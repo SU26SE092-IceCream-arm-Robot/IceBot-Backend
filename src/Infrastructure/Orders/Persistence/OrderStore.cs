@@ -15,6 +15,8 @@ using System.Text.Json;
 using Application.SalesCatalog.ReadModels;
 using Application.Orders.PlaceOrder.ReadModels;
 using Application.ProductionConfiguration.Routes.Support;
+using Application.Orders.Admission;
+using Application.Tenants.Kiosks.Rules;
 
 namespace Infrastructure.Orders.Persistence;
 
@@ -40,6 +42,24 @@ public sealed partial class OrderStore : IOrderStore
         CancellationToken cancellationToken = default) =>
         _dbContext.KioskConnectivityProjections.AsNoTracking()
             .FirstOrDefaultAsync(connectivity => connectivity.KioskId == kioskId, cancellationToken);
+
+    public Task AcquireKioskOperationalLockAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({KioskOperationalConcurrency.LockKey(kioskId)}, 0));",
+            cancellationToken);
+
+    public Task<bool> HasActiveCustomerSessionAsync(
+        Guid kioskId,
+        DateTimeOffset observedAt,
+        Guid? excludingOrderId = null,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Orders.WhereNotDeleted()
+            .AnyAsync(
+                KioskCustomerSessionAdmission.BuildActiveSessionPredicate(
+                    kioskId, observedAt, excludingOrderId),
+                cancellationToken);
 
     public Task<MenuItem?> GetMenuItemForKioskAsync(
         Guid menuItemId,
