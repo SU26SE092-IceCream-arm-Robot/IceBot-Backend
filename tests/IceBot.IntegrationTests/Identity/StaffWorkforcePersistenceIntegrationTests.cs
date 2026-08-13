@@ -55,6 +55,100 @@ public sealed class StaffWorkforcePersistenceIntegrationTests(IntegrationTestFix
     }
 
     [IntegrationFact]
+    public async Task ConcurrentCreate_WithDifferentKeysAndSameEmail_ReturnsConflictWithoutDuplicateAccount()
+    {
+        var graph = await SeedGraphAsync();
+        var email = $"staff-{Guid.NewGuid():N}@example.test";
+        var firstRequest = new CreateStaffWorkforceRequest
+        {
+            UserName = $"staff-a-{Guid.NewGuid():N}",
+            Email = email,
+            SendInvitationEmail = false,
+            StaffScopes = [new StaffWorkforceScopeRequest { StoreId = graph.StoreAId }]
+        };
+        var secondRequest = new CreateStaffWorkforceRequest
+        {
+            UserName = $"staff-b-{Guid.NewGuid():N}",
+            Email = email,
+            SendInvitationEmail = false,
+            StaffScopes = [new StaffWorkforceScopeRequest { StoreId = graph.StoreAId }]
+        };
+
+        var results = await Task.WhenAll(
+            CreateAsync(graph, firstRequest, $"staff-create-{Guid.NewGuid():N}"),
+            CreateAsync(graph, secondRequest, $"staff-create-{Guid.NewGuid():N}"));
+
+        Assert.Single(results, result => result.Succeeded && result.StatusCode == 201);
+        Assert.Single(results, result => !result.Succeeded && result.StatusCode == 409);
+
+        await using var assertion = fixture.CreateDbContext();
+        Assert.Equal(1, await assertion.Accounts.CountAsync(account => account.Email == email));
+    }
+
+    [IntegrationFact]
+    public async Task CreateReplay_ReturnsPersistedResult_WhenOriginalScopeIsNoLongerActive()
+    {
+        var graph = await SeedGraphAsync();
+        var key = $"staff-replay-{Guid.NewGuid():N}";
+        var request = new CreateStaffWorkforceRequest
+        {
+            UserName = $"staff-{Guid.NewGuid():N}",
+            Email = $"staff-{Guid.NewGuid():N}@example.test",
+            SendInvitationEmail = false,
+            StaffScopes = [new StaffWorkforceScopeRequest { StoreId = graph.StoreAId }]
+        };
+
+        var created = await CreateAsync(graph, request, key);
+        Assert.Equal(201, created.StatusCode);
+        var accountId = created.Data!.AccountId;
+
+        await using (var mutation = fixture.CreateDbContext())
+        {
+            var store = await mutation.Stores.SingleAsync(candidate => candidate.Id == graph.StoreAId);
+            store.Status = EntityStatus.Inactive;
+            await mutation.SaveChangesAsync();
+        }
+
+        var replay = await CreateAsync(graph, request, key);
+        Assert.True(replay.Succeeded, replay.Message);
+        Assert.Equal(200, replay.StatusCode);
+        Assert.Equal(accountId, replay.Data!.AccountId);
+    }
+
+    [IntegrationFact]
+    public async Task CreateReplay_RecreatesMissingInvitationWithoutDuplicatingStaffAccount()
+    {
+        var graph = await SeedGraphAsync();
+        var key = $"staff-invitation-replay-{Guid.NewGuid():N}";
+        var request = new CreateStaffWorkforceRequest
+        {
+            UserName = $"staff-{Guid.NewGuid():N}",
+            Email = $"staff-{Guid.NewGuid():N}@example.test",
+            SendInvitationEmail = false,
+            StaffScopes = [new StaffWorkforceScopeRequest { StoreId = graph.StoreAId }]
+        };
+
+        var created = await CreateAsync(graph, request, key);
+        Assert.Equal(201, created.StatusCode);
+        var accountId = created.Data!.AccountId;
+
+        await using (var mutation = fixture.CreateDbContext())
+        {
+            var invitation = await mutation.AccountInvitations.SingleAsync(candidate => candidate.AccountId == accountId);
+            mutation.AccountInvitations.Remove(invitation);
+            await mutation.SaveChangesAsync();
+        }
+
+        var replays = await Task.WhenAll(CreateAsync(graph, request, key), CreateAsync(graph, request, key));
+        Assert.All(replays, replay => Assert.True(replay.Succeeded, replay.Message));
+        Assert.All(replays, replay => Assert.Equal(200, replay.StatusCode));
+        Assert.All(replays, replay => Assert.Equal(accountId, replay.Data!.AccountId));
+        await using var assertion = fixture.CreateDbContext();
+        Assert.Equal(1, await assertion.Accounts.CountAsync(candidate => candidate.Id == accountId));
+        Assert.Equal(1, await assertion.AccountInvitations.CountAsync(candidate => candidate.AccountId == accountId));
+    }
+
+    [IntegrationFact]
     public async Task ManagerCannotAssignKioskFromAnotherStore_AndCanAssignKioskInOwnStore()
     {
         var graph = await SeedGraphAsync();
@@ -166,7 +260,9 @@ public sealed class StaffWorkforcePersistenceIntegrationTests(IntegrationTestFix
         await using (var lifecycleDb = fixture.CreateDbContext())
         {
             var handler = new ChangeStaffWorkforceLifecycleCommandHandler(
-                new IdentityAccountStore(lifecycleDb), new ThrowingSessionRevoker());
+                new IdentityAccountStore(lifecycleDb),
+                new ThrowingSessionRevoker(),
+                NullLogger<ChangeStaffWorkforceLifecycleCommandHandler>.Instance);
             var disabled = await handler.HandleAsync(new ChangeStaffWorkforceLifecycleCommand
             {
                 OrganizationId = graph.OrganizationId,

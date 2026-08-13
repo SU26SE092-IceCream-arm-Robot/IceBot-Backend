@@ -1,4 +1,5 @@
 using Application.Identity.Abstractions;
+using Application.Identity.Workforce.Staff;
 using Domain.Identity.Entities;
 using Domain.Identity.Enums;
 using Infrastructure.Data;
@@ -7,7 +8,7 @@ using System.Data;
 
 namespace Infrastructure.Identity.Persistence
 {
-    public class IdentityAccountStore : IIdentityAccountStore
+    public class IdentityAccountStore : IIdentityAccountStore, IStaffWorkforceStore
     {
         private readonly IceBotDbContext _dbContext;
 
@@ -177,12 +178,27 @@ namespace Infrastructure.Identity.Persistence
             return _dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        public Task AcquireStaffWorkforceCreateLockAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
+        public Task AcquireCreateLockAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
             _dbContext.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-staff-create:{organizationId:D}:{idempotencyKey}"}, 0))",
                 cancellationToken);
 
-        public Task AcquireStaffWorkforceAccountLockAsync(Guid accountId, CancellationToken cancellationToken = default) =>
+        public async Task AcquireCreateIdentityLocksAsync(
+            IReadOnlyCollection<string> identifiers,
+            CancellationToken cancellationToken = default)
+        {
+            foreach (var identifier in identifiers
+                .Where(identifier => !string.IsNullOrWhiteSpace(identifier))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(identifier => identifier, StringComparer.Ordinal))
+            {
+                await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-staff-account:{identifier}"}, 0))",
+                    cancellationToken);
+            }
+        }
+
+        public Task AcquireAccountLockAsync(Guid accountId, CancellationToken cancellationToken = default) =>
             _dbContext.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-staff-workforce:{accountId:D}"}, 0))",
                 cancellationToken);
@@ -208,7 +224,7 @@ namespace Infrastructure.Identity.Persistence
             });
         }
 
-        public async Task<T> ExecuteStaffWorkforceTransactionAsync<T>(
+        public async Task<T> ExecuteTransactionAsync<T>(
             Func<Task<T>> operation,
             CancellationToken cancellationToken = default)
         {
@@ -302,18 +318,18 @@ namespace Infrastructure.Identity.Persistence
             return query;
         }
 
-        public Task<StaffWorkforceCreateReplay?> GetStaffWorkforceCreateReplayAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
+        public Task<StaffWorkforceCreateReplay?> GetCreateReplayAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
             _dbContext.StaffWorkforceCreateReplays.SingleOrDefaultAsync(x => x.OrganizationId == organizationId && x.IdempotencyKey == idempotencyKey, cancellationToken);
 
-        public Task AddStaffWorkforceCreateReplayAsync(StaffWorkforceCreateReplay replay, CancellationToken cancellationToken = default) =>
+        public Task AddCreateReplayAsync(StaffWorkforceCreateReplay replay, CancellationToken cancellationToken = default) =>
             _dbContext.StaffWorkforceCreateReplays.AddAsync(replay, cancellationToken).AsTask();
 
-        public Task<StaffWorkforceLifecycleTransition?> GetStaffWorkforceLifecycleTransitionByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
+        public Task<StaffWorkforceLifecycleTransition?> GetLifecycleTransitionByIdempotencyKeyAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
             _dbContext.StaffWorkforceLifecycleTransitions.AsNoTracking().SingleOrDefaultAsync(
                 transition => transition.OrganizationId == organizationId && transition.RequestIdempotencyKey == idempotencyKey,
                 cancellationToken);
 
-        public Task AddStaffWorkforceLifecycleTransitionAsync(StaffWorkforceLifecycleTransition transition, CancellationToken cancellationToken = default) =>
+        public Task AddLifecycleTransitionAsync(StaffWorkforceLifecycleTransition transition, CancellationToken cancellationToken = default) =>
             _dbContext.StaffWorkforceLifecycleTransitions.AddAsync(transition, cancellationToken).AsTask();
 
         public async Task<IReadOnlyList<Guid>> ListDisabledStaffWithActiveSessionsAsync(int batchSize, CancellationToken cancellationToken = default)

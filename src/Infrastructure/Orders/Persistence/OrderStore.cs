@@ -1,6 +1,5 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.Orders.Abstractions;
-using Application.Orders.Management.Results;
 using Domain.Devices.Catalog;
 using Domain.Orders.Entities;
 using Domain.ProductionConfiguration.Enums;
@@ -11,115 +10,21 @@ using Domain.Sync.Enums;
 using Domain.Tenants.Entities;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
-using System.Text.Json;
 using System.Data;
+using System.Text.Json;
 using Application.SalesCatalog.ReadModels;
 using Application.Orders.PlaceOrder.ReadModels;
 using Application.ProductionConfiguration.Routes.Support;
 
 namespace Infrastructure.Orders.Persistence;
 
-public sealed class OrderStore : IOrderStore
+public sealed partial class OrderStore : IOrderStore
 {
     private readonly IceBotDbContext _dbContext;
 
     public OrderStore(IceBotDbContext dbContext)
     {
         _dbContext = dbContext;
-    }
-
-    public async Task<OrderOverviewResult> GetOrderOverviewAsync(
-        DateTimeOffset? from,
-        DateTimeOffset? to,
-        Domain.Orders.Enums.OrderStatus? status,
-        Guid? kioskId,
-        int take,
-        bool isSystemAdmin,
-        IReadOnlyCollection<Guid> allowedOrganizationIds,
-        IReadOnlyCollection<Guid> allowedStoreIds,
-        IReadOnlyCollection<Guid> allowedKioskIds,
-        CancellationToken cancellationToken = default)
-    {
-        var query = _dbContext.Orders.WhereNotDeleted().AsNoTracking();
-
-        if (from.HasValue)
-        {
-            query = query.Where(o => o.PlacedAt >= from.Value);
-        }
-
-        if (to.HasValue)
-        {
-            query = query.Where(o => o.PlacedAt <= to.Value);
-        }
-
-        if (status.HasValue)
-        {
-            query = query.Where(o => o.Status == status.Value);
-        }
-
-        if (kioskId.HasValue)
-        {
-            query = query.Where(o => o.KioskId == kioskId.Value);
-        }
-
-        if (!isSystemAdmin)
-        {
-            var allowedOrgs = allowedOrganizationIds ?? Array.Empty<Guid>();
-            var allowedStores = allowedStoreIds ?? Array.Empty<Guid>();
-            var allowedKiosks = allowedKioskIds ?? Array.Empty<Guid>();
-
-            query = query.Where(o =>
-                (o.OrganizationId.HasValue && allowedOrgs.Contains(o.OrganizationId.Value)) ||
-                (o.StoreId.HasValue && allowedStores.Contains(o.StoreId.Value)) ||
-                allowedKiosks.Contains(o.KioskId));
-        }
-
-        var totalCount = await query.CountAsync(cancellationToken);
-
-        var statusCounts = await query
-            .GroupBy(o => o.Status)
-            .Select(g => new { Status = g.Key, Count = g.Count() })
-            .ToListAsync(cancellationToken);
-
-        var byStatus = statusCounts
-            .Select(sc => new OrderStatusSummaryDto
-            {
-                Status = sc.Status.ToString(),
-                Count = sc.Count
-            })
-            .ToList();
-
-        var recentOrdersList = await query
-            .Include(o => o.Kiosk)
-            .OrderByDescending(o => o.PlacedAt)
-            .Take(take)
-            .ToListAsync(cancellationToken);
-
-        var recentOrders = recentOrdersList.Select(o =>
-        {
-            var project = Application.Orders.Support.OrderStatusProjector.ProjectFromOrder(o);
-            return new RecentOrderDto
-            {
-                OrderId = o.Id,
-                OrderNumber = o.OrderNumber,
-                KioskId = o.KioskId,
-                KioskCode = o.Kiosk?.Code ?? string.Empty,
-                Status = o.Status.ToString(),
-                PaymentStatus = o.PaymentStatus.ToString(),
-                TotalAmount = o.TotalAmount,
-                CreatedAt = o.PlacedAt,
-                CustomerStatus = project.CustomerStatus,
-                CustomerStatusMessage = project.CustomerStatusMessage,
-                RequiresStaffSupport = project.RequiresStaffSupport
-            };
-        }).ToList();
-
-        return new OrderOverviewResult
-        {
-            TotalCount = totalCount,
-            ByStatus = byStatus,
-            RecentOrders = recentOrders
-        };
     }
 
     public Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default)

@@ -45,54 +45,16 @@ public sealed class AccountInvitationService
             return ApiResult<AccountInvitationResult>.Fail("Account email is required.");
         }
 
-        var created = await _invitationStore.ExecuteCreationTransactionAsync(
-            account.Id,
-            async transactionToken =>
-            {
-                var activeInvitations = await _invitationStore.GetActiveInvitationsByAccountIdAsync(
-                    account.Id, transactionToken);
-                var now = DateTimeOffset.UtcNow;
-                foreach (var activeInvitation in activeInvitations) activeInvitation.RevokedAt = now;
-
-                var rawToken = AccountInvitationTokenHelper.CreateToken();
-                var invitation = new AccountInvitation
-                {
-                    AccountId = account.Id,
-                    TokenHash = AccountInvitationTokenHelper.HashToken(rawToken),
-                    InvitedAt = now,
-                    ExpiresAt = now.Add(TokenLifetime),
-                    InvitedByAccountId = invitedByAccountId,
-                    Purpose = "AccountInvitation"
-                };
-                await _invitationStore.AddAsync(invitation, transactionToken);
-                await _invitationStore.SaveChangesAsync(transactionToken);
-                return (Invitation: invitation, RawToken: rawToken);
-            },
+        var created = await IssueInvitationRecordAsync(
+            account,
+            invitedByAccountId,
+            replaceActiveInvitation: true,
             cancellationToken);
         var invitation = created.Invitation;
         var rawToken = created.RawToken;
+        var invitationUrl = AccountInvitationUrlBuilder.BuildInvitationUrl(rawToken!, _emailOptions.Value.InvitationBaseUrl);
 
-        var invitationUrl = AccountInvitationUrlBuilder.BuildInvitationUrl(rawToken, _emailOptions.Value.InvitationBaseUrl);
-        var emailSent = false;
-
-        if (sendEmail)
-        {
-            try
-            {
-                await _emailSender.SendAsync(
-                    account.Email,
-                    "Complete your IceBot account setup",
-                    AccountInvitationEmailBuilder.BuildInvitationEmail(account.FullName, invitationUrl),
-                    cancellationToken);
-
-                emailSent = true;
-                invitation.EmailSentAt = DateTimeOffset.UtcNow;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to send invitation email to {Email}", account.Email);
-            }
-        }
+        var emailSent = await TrySendInvitationEmailAsync(account, invitation, rawToken!, sendEmail, cancellationToken);
 
         await _invitationStore.SaveChangesAsync(cancellationToken);
 
@@ -117,5 +79,99 @@ public sealed class AccountInvitationService
             : "Invitation link created.";
 
         return ApiResult<AccountInvitationResult>.Success(result, message, 201);
+    }
+
+    public async Task<ApiResult<InvitationEnsureResult>> EnsureActiveInvitationAsync(
+        Account account,
+        Guid? invitedByAccountId = null,
+        bool sendEmail = true,
+        CancellationToken cancellationToken = default)
+    {
+        var issued = await IssueInvitationRecordAsync(
+            account,
+            invitedByAccountId,
+            replaceActiveInvitation: false,
+            cancellationToken);
+
+        if (!issued.Created)
+            return ApiResult<InvitationEnsureResult>.Success(
+                new InvitationEnsureResult { Created = false },
+                "An active invitation already exists.");
+
+        var emailSent = await TrySendInvitationEmailAsync(account, issued.Invitation, issued.RawToken!, sendEmail, cancellationToken);
+        await _invitationStore.SaveChangesAsync(cancellationToken);
+
+        return ApiResult<InvitationEnsureResult>.Success(
+            new InvitationEnsureResult { Created = true },
+            emailSent || !sendEmail
+                ? "Invitation was created."
+                : "Invitation was created, but the email could not be sent.");
+    }
+
+    private async Task<bool> TrySendInvitationEmailAsync(
+        Account account,
+        AccountInvitation invitation,
+        string rawToken,
+        bool sendEmail,
+        CancellationToken cancellationToken)
+    {
+        if (!sendEmail)
+        {
+            return false;
+        }
+
+        try
+        {
+            var invitationUrl = AccountInvitationUrlBuilder.BuildInvitationUrl(rawToken, _emailOptions.Value.InvitationBaseUrl);
+            await _emailSender.SendAsync(
+                account.Email,
+                "Complete your IceBot account setup",
+                AccountInvitationEmailBuilder.BuildInvitationEmail(account.FullName, invitationUrl),
+                cancellationToken);
+            invitation.EmailSentAt = DateTimeOffset.UtcNow;
+            return true;
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            _logger.LogError(exception, "Failed to send invitation email to {Email}", account.Email);
+            return false;
+        }
+    }
+
+    private Task<(AccountInvitation Invitation, string? RawToken, bool Created)> IssueInvitationRecordAsync(
+        Account account,
+        Guid? invitedByAccountId,
+        bool replaceActiveInvitation,
+        CancellationToken cancellationToken)
+    {
+        return _invitationStore.ExecuteCreationTransactionAsync(
+            account.Id,
+            async transactionToken =>
+            {
+                var activeInvitations = await _invitationStore.GetActiveInvitationsByAccountIdAsync(account.Id, transactionToken);
+                var now = DateTimeOffset.UtcNow;
+                if (!replaceActiveInvitation)
+                {
+                    var usableInvitation = activeInvitations.FirstOrDefault(invitation => invitation.ExpiresAt > now);
+                    if (usableInvitation is not null)
+                        return (usableInvitation, (string?)null, false);
+                }
+
+                foreach (var activeInvitation in activeInvitations) activeInvitation.RevokedAt = now;
+                var rawToken = AccountInvitationTokenHelper.CreateToken();
+                var invitation = new AccountInvitation
+                {
+                    AccountId = account.Id,
+                    TokenHash = AccountInvitationTokenHelper.HashToken(rawToken),
+                    InvitedAt = now,
+                    ExpiresAt = now.Add(TokenLifetime),
+                    InvitedByAccountId = invitedByAccountId,
+                    Purpose = "AccountInvitation"
+                };
+                await _invitationStore.AddAsync(invitation, transactionToken);
+                await _invitationStore.SaveChangesAsync(transactionToken);
+                return (invitation, rawToken, true);
+            },
+            cancellationToken);
     }
 }

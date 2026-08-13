@@ -95,8 +95,16 @@ public sealed class IgnoreSyncDeadLetterCommandHandler
     {
         var item = await _store.GetAsync(command.Id, true, ct);
         if (item is null) return ApiResult<SyncDeadLetterResult>.Fail("Sync dead letter not found.", 404);
-        try { item.Ignore(command.UserContext.AccountId, DateTimeOffset.UtcNow, command.Reason); await _store.SaveChangesAsync(ct); return ApiResult<SyncDeadLetterResult>.Success(ListSyncDeadLettersQueryHandler.Map(item)); }
-        catch (DomainRuleException ex) { return ApiResult<SyncDeadLetterResult>.Fail(ex.Message, 400); }
+        try
+        {
+            item.Ignore(command.UserContext.AccountId, DateTimeOffset.UtcNow, command.Reason);
+            await _store.SaveChangesAsync(ct);
+            return ApiResult<SyncDeadLetterResult>.Success(ListSyncDeadLettersQueryHandler.Map(item));
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<SyncDeadLetterResult>.Fail(ex.Message, 400);
+        }
     }
 }
 
@@ -119,8 +127,16 @@ public sealed class RetrySyncDeadLetterCommandHandler
         if (endpoint is null) return ApiResult<SyncDeadLetterResult>.Fail("Execution endpoint for dead-letter source was not found.", 409);
 
         ExecutionReportReplayPayload? payload;
-        try { payload = JsonSerializer.Deserialize<ExecutionReportReplayPayload>(item.PayloadJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true }); }
-        catch (JsonException) { return ApiResult<SyncDeadLetterResult>.Fail("Dead-letter payload is not a valid execution report.", 422); }
+        try
+        {
+            payload = JsonSerializer.Deserialize<ExecutionReportReplayPayload>(
+                item.PayloadJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (JsonException)
+        {
+            return ApiResult<SyncDeadLetterResult>.Fail("Dead-letter payload is not a valid execution report.", 422);
+        }
         if (payload is null || !payload.CommandId.HasValue || !item.EventId.HasValue) return ApiResult<SyncDeadLetterResult>.Fail("Dead-letter execution report payload is incomplete.", 422);
 
         var started = await BeginRetryAsync(command, ct);

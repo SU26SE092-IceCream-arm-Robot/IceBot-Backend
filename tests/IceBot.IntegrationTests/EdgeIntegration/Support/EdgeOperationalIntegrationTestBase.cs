@@ -32,6 +32,7 @@ using Application.Orders.PlaceOrder.Queries;
 using Application.ProductionConfiguration.Releases.Commands;
 using Application.ProductionConfiguration.Deployments.Commands;
 using Application.ProductionConfiguration.Routes.Commands;
+using Application.ProductionConfiguration.Bindings;
 using Application.ProductionConfiguration.Releases.Services;
 using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration;
@@ -74,6 +75,7 @@ using Infrastructure.Inventory.Persistence;
 using Infrastructure.ProductionConfiguration.Persistence.Deployments;
 using Infrastructure.ProductionConfiguration.Persistence.Releases;
 using Infrastructure.ProductionConfiguration.Persistence.Routes;
+using Infrastructure.ProductionConfiguration.Persistence.Bindings;
 using Infrastructure.ProductionPackages;
 using Infrastructure.RobotConfiguration.Artifacts.Persistence;
 using Infrastructure.RobotConfiguration.ArtifactContracts;
@@ -192,7 +194,9 @@ public abstract class EdgeOperationalIntegrationTestBase
                 AckStatus = status,
                 AcknowledgedAt = DateTimeOffset.UtcNow,
                 RejectionCode = status == "Rejected" ? "ReadinessRejected" : null,
-                PhysicalOutputMayHaveOccurred = physicalOutputMayHaveOccurred
+                PhysicalOutputMayHaveOccurred = physicalOutputMayHaveOccurred,
+                // The smoke harness represents an Edge that persisted the pulled command before accepting it.
+                LocalStatePersisted = string.Equals(status, "Accepted", StringComparison.OrdinalIgnoreCase)
             });
         Assert.True(acknowledged.Succeeded, acknowledged.Message);
     }
@@ -717,6 +721,7 @@ public abstract class EdgeOperationalIntegrationTestBase
 
         Guid artifactId;
         Guid programId;
+        Guid productionProgramBindingId;
         await using (var dbContext = _fixture.CreateDbContext())
         {
             var robotArtifactStore = new RobotArtifactStore(dbContext);
@@ -810,6 +815,18 @@ public abstract class EdgeOperationalIntegrationTestBase
                     ProgramId = programId
                 });
             Assert.True(publishedProgram.Succeeded, publishedProgram.Message);
+
+            var productionBinding = await new ProductionProgramBindingHandlers(
+                new ProductionProgramBindingStore(dbContext)).CreateAsync(
+                new CreateProductionProgramBindingCommand(
+                    user,
+                    graph.OrganizationId,
+                    graph.RecipeId,
+                    programId,
+                    Array.Empty<string>()),
+                CancellationToken.None);
+            Assert.True(productionBinding.Succeeded, productionBinding.Message);
+            productionProgramBindingId = productionBinding.Data!.Id;
         }
 
         Guid releaseId;
@@ -848,7 +865,7 @@ public abstract class EdgeOperationalIntegrationTestBase
                             0,
                             [],
                             Array.Empty<string>(),
-                            [new ConfigurationReleaseRobotBindingInput(programId, 1, "ICE_CREAM")])
+                            [new ConfigurationReleaseRobotBindingInput(productionProgramBindingId, 1)])
                     ]
                 });
             Assert.True(routed.Succeeded, routed.Message);

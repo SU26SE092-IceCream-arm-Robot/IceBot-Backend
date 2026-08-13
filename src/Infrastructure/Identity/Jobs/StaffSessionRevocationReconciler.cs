@@ -1,11 +1,10 @@
-using Application.Identity.Abstractions;
 using Application.Identity.Workforce.Staff;
 using Microsoft.Extensions.Logging;
 
 namespace Infrastructure.Identity.Jobs;
 
 public sealed class StaffSessionRevocationReconciler(
-    IIdentityAccountStore accounts,
+    IStaffWorkforceStore accounts,
     IStaffSessionRevoker sessionRevoker,
     ILogger<StaffSessionRevocationReconciler> logger)
 {

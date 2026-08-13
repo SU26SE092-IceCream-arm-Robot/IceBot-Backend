@@ -1,4 +1,3 @@
-using Application.Identity.Abstractions;
 using Application.Identity.Workforce.Staff;
 using Application.Shared.Wrappers;
 using Domain.Identity.Entities;
@@ -14,7 +13,7 @@ public sealed class StaffWorkforceCommandTests
     {
         var organizationId = Guid.NewGuid();
         var account = StaffAccount(organizationId, workforceRevision: 2);
-        var accounts = Substitute.For<IIdentityAccountStore>();
+        var accounts = Substitute.For<IStaffWorkforceStore>();
         ExecuteTransactionsInline(accounts);
         accounts.GetByIdAsync(account.Id, false, Arg.Any<CancellationToken>()).Returns(account);
         var handler = new UpdateStaffWorkforceCommandHandler(accounts);
@@ -44,7 +43,7 @@ public sealed class StaffWorkforceCommandTests
             OrganizationId = organizationId,
             Role = new Role { Code = "Manager" }
         });
-        var accounts = Substitute.For<IIdentityAccountStore>();
+        var accounts = Substitute.For<IStaffWorkforceStore>();
         ExecuteTransactionsInline(accounts);
         accounts.GetByIdAsync(account.Id, false, Arg.Any<CancellationToken>()).Returns(account);
         var handler = new UpdateStaffWorkforceCommandHandler(accounts);
@@ -75,11 +74,11 @@ public sealed class StaffWorkforceCommandTests
         RoleScopes = [new UserRoleScope("Manager", organizationId, null, null)]
     };
 
-    private static void ExecuteTransactionsInline(IIdentityAccountStore accounts)
+    private static void ExecuteTransactionsInline(IStaffWorkforceStore accounts)
     {
-        accounts.ExecuteStaffWorkforceTransactionAsync(Arg.Any<Func<Task<ApiResult<StaffWorkforceResult>>>>(), Arg.Any<CancellationToken>())
+        accounts.ExecuteTransactionAsync(Arg.Any<Func<Task<ApiResult<StaffWorkforceResult>>>>(), Arg.Any<CancellationToken>())
             .Returns(call => call.Arg<Func<Task<ApiResult<StaffWorkforceResult>>>>()());
-        accounts.AcquireStaffWorkforceAccountLockAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
+        accounts.AcquireAccountLockAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
     }
 }

@@ -37,8 +37,17 @@ public sealed class ServiceRegistrationStore(IceBotDbContext db) : IServiceRegis
 
     public async Task<bool> TryAddAsync(ServiceRegistrationEntity registration, CancellationToken ct = default)
     {
-        try { await db.ServiceRegistrations.AddAsync(registration, ct); await db.SaveChangesAsync(ct); return true; }
-        catch (DbUpdateException) { db.ChangeTracker.Clear(); return false; }
+        try
+        {
+            await db.ServiceRegistrations.AddAsync(registration, ct);
+            await db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            db.ChangeTracker.Clear();
+            return false;
+        }
     }
 
     public Task SaveChangesAsync(CancellationToken ct = default) => db.SaveChangesAsync(ct);
@@ -161,7 +170,10 @@ public sealed class ServiceRegistrationProvisioner(
                 await db.SaveChangesAsync(ct);
                 emailSent = true;
             }
-            catch (Exception ex) { logger.LogError(ex, "Invitation delivery failed after provisioning service registration {RegistrationId}", registrationId); }
+            catch (Exception ex) when (!ct.IsCancellationRequested)
+            {
+                logger.LogError(ex, "Invitation delivery failed after provisioning service registration {RegistrationId}", registrationId);
+            }
         }
         return new(true, 201, emailSent ? "Service registration provisioned and invitation email sent." : "Service registration provisioned. Invitation delivery requires retry or manual delivery.", completed, invitationUrl, emailSent);
     }
