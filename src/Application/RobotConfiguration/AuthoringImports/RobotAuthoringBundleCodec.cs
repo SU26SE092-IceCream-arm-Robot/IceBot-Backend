@@ -17,7 +17,8 @@ public sealed record RobotAuthoringBundleItem(
     RobotAuthoringSidecar Sidecar,
     byte[] LuaBytes,
     string LuaChecksum,
-    string SidecarChecksum);
+    string SidecarChecksum,
+    bool HasTechnicalDeclaration);
 
 public sealed class RobotAuthoringExportManifest
 {
@@ -76,6 +77,8 @@ public sealed class RobotAuthoringSidecarConstraint
 
 public static class RobotAuthoringBundleCodec
 {
+    public const string DefaultRuntimeTargetCode = "FAIRINO_LUA_V1";
+    public const string DefaultMachineModelCode = "FR5";
     public const long MaximumArchiveBytes = 50 * 1024 * 1024;
     public const long MaximumExpandedBytes = 100 * 1024 * 1024;
     public const int MaximumEntries = 200;
@@ -100,11 +103,11 @@ public static class RobotAuthoringBundleCodec
         }
     };
 
-    public static RobotAuthoringBundle Parse(byte[] archiveBytes)
+    public static RobotAuthoringBundle Parse(byte[] archiveBytes, string? sourceFileName = null)
     {
         try
         {
-            return ParseCore(archiveBytes);
+            return ParseCore(archiveBytes, sourceFileName);
         }
         catch (RobotAuthoringBundleException)
         {
@@ -120,7 +123,7 @@ public static class RobotAuthoringBundleCodec
         }
     }
 
-    private static RobotAuthoringBundle ParseCore(byte[] archiveBytes)
+    private static RobotAuthoringBundle ParseCore(byte[] archiveBytes, string? sourceFileName)
     {
         if (archiveBytes.LongLength is <= 0 or > MaximumArchiveBytes)
             throw new RobotAuthoringBundleException($"Bundle must be between 1 and {MaximumArchiveBytes} bytes.");
@@ -131,6 +134,7 @@ public static class RobotAuthoringBundleCodec
             throw new RobotAuthoringBundleException($"Bundle must contain between 1 and {MaximumEntries} entries.");
 
         var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.OrdinalIgnoreCase);
+        var orderedEntries = new List<KeyValuePair<string, ZipArchiveEntry>>();
         long expandedBytes = 0;
         foreach (var entry in archive.Entries)
         {
@@ -138,6 +142,7 @@ public static class RobotAuthoringBundleCodec
             if (normalized.EndsWith('/')) continue;
             if (!entries.TryAdd(normalized, entry))
                 throw new RobotAuthoringBundleException($"Duplicate archive entry '{normalized}'.");
+            orderedEntries.Add(new KeyValuePair<string, ZipArchiveEntry>(normalized, entry));
             if (IsSymbolicLink(entry))
                 throw new RobotAuthoringBundleException($"Symbolic-link archive entry '{normalized}' is not allowed.");
             expandedBytes = checked(expandedBytes + entry.Length);
@@ -147,7 +152,10 @@ public static class RobotAuthoringBundleCodec
                 throw new RobotAuthoringBundleException($"Archive entry '{normalized}' has an unsafe compression ratio.");
         }
 
-        var manifestBytes = ReadEntry(entries, "export-manifest.json", MaximumManifestBytes);
+        if (!entries.TryGetValue("export-manifest.json", out var manifestEntry))
+            return ParseRawLuaArchive(orderedEntries, archiveBytes, sourceFileName);
+
+        var manifestBytes = ReadEntry(manifestEntry, "export-manifest.json", MaximumManifestBytes);
         RobotAuthoringExportManifest manifest;
         try
         {
@@ -179,10 +187,80 @@ public static class RobotAuthoringBundleCodec
             }
             ValidateSidecar(manifest.Program, manifestItem, sidecar);
             items.Add(new RobotAuthoringBundleItem(manifestItem, sidecar, luaBytes,
-                Sha256(luaBytes), Sha256(sidecarBytes)));
+                Sha256(luaBytes), Sha256(sidecarBytes), HasTechnicalDeclaration: true));
         }
 
         return new RobotAuthoringBundle(manifest, items);
+    }
+
+    private static RobotAuthoringBundle ParseRawLuaArchive(
+        IReadOnlyList<KeyValuePair<string, ZipArchiveEntry>> orderedEntries,
+        byte[] archiveBytes,
+        string? sourceFileName)
+    {
+        var luaEntries = orderedEntries
+            .Where(entry => entry.Key.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (luaEntries.Length is < 1 or > 50 || luaEntries.Length != orderedEntries.Count)
+        {
+            throw new RobotAuthoringBundleException(
+                "A ZIP without export-manifest.json must contain one to 50 non-empty .lua files only.");
+        }
+
+        var fileNames = luaEntries.Select(entry => NormalizeLeafName(entry.Key)).ToArray();
+        if (fileNames.Distinct(StringComparer.OrdinalIgnoreCase).Count() != fileNames.Length)
+            throw new RobotAuthoringBundleException("Raw Lua ZIP file names must be unique.");
+
+        var exportId = CreateDeterministicExportId(archiveBytes);
+        var artifacts = new List<RobotAuthoringManifestArtifact>(luaEntries.Length);
+        var items = new List<RobotAuthoringBundleItem>(luaEntries.Length);
+        for (var index = 0; index < luaEntries.Length; index++)
+        {
+            var fileName = fileNames[index];
+            var artifactCode = CreateRawCode(fileName, index + 1);
+            var luaBytes = ReadEntry(luaEntries[index].Value, luaEntries[index].Key, MaximumLuaBytes);
+            var manifestItem = new RobotAuthoringManifestArtifact
+            {
+                ArtifactCode = artifactCode,
+                FileName = fileName,
+                SidecarFileName = string.Empty,
+                RunOrder = index + 1
+            };
+            artifacts.Add(manifestItem);
+            items.Add(new RobotAuthoringBundleItem(
+                manifestItem,
+                new RobotAuthoringSidecar
+                {
+                    SchemaVersion = 1,
+                    ArtifactCode = artifactCode,
+                    ArtifactFileName = fileName,
+                    RuntimeTargetCode = DefaultRuntimeTargetCode,
+                    MachineModelCode = DefaultMachineModelCode,
+                    Effects = [],
+                    OrderingConstraints = []
+                },
+                luaBytes,
+                Sha256(luaBytes),
+                Sha256(Array.Empty<byte>()),
+                HasTechnicalDeclaration: false));
+        }
+
+        return new RobotAuthoringBundle(
+            new RobotAuthoringExportManifest
+            {
+                SchemaVersion = 1,
+                ExportId = exportId,
+                ExportedAt = DateTimeOffset.UnixEpoch,
+                Program = new RobotAuthoringManifestProgram
+                {
+                    Code = CreateRawProgramCode(sourceFileName, exportId),
+                    Name = CreateRawProgramName(sourceFileName, exportId),
+                    RuntimeTargetCode = DefaultRuntimeTargetCode,
+                    MachineModelCode = DefaultMachineModelCode,
+                    Artifacts = artifacts
+                }
+            },
+            items);
     }
 
     private static void ValidateManifest(RobotAuthoringExportManifest manifest)
@@ -318,6 +396,11 @@ public static class RobotAuthoringBundleCodec
     {
         if (!entries.TryGetValue(path, out var entry))
             throw new RobotAuthoringBundleException($"Required archive entry '{path}' was not found.");
+        return ReadEntry(entry, path, maximumBytes);
+    }
+
+    private static byte[] ReadEntry(ZipArchiveEntry entry, string path, long maximumBytes)
+    {
         if (entry.Length <= 0 || entry.Length > maximumBytes)
             throw new RobotAuthoringBundleException($"Archive entry '{path}' has an invalid size.");
         using var source = entry.Open();
@@ -364,6 +447,55 @@ public static class RobotAuthoringBundleCodec
 
     public static string Sha256(byte[] value) =>
         Convert.ToHexString(SHA256.HashData(value)).ToLowerInvariant();
+
+    private static Guid CreateDeterministicExportId(byte[] archiveBytes) =>
+        Guid.ParseExact(Sha256(archiveBytes)[..32], "N");
+
+    private static string CreateRawProgramCode(string? sourceFileName, Guid exportId)
+    {
+        var sourceCode = CreateNormalizedCode(Path.GetFileNameWithoutExtension(sourceFileName ?? string.Empty));
+        return string.IsNullOrWhiteSpace(sourceCode)
+            ? $"RAW-LUA-{exportId:N}"[..20]
+            : sourceCode[..Math.Min(sourceCode.Length, MaximumCodeLength)];
+    }
+
+    private static string CreateRawProgramName(string? sourceFileName, Guid exportId)
+    {
+        var name = Path.GetFileNameWithoutExtension(sourceFileName ?? string.Empty).Trim();
+        return string.IsNullOrWhiteSpace(name)
+            ? $"Raw Lua {exportId:N}"[..20]
+            : name[..Math.Min(name.Length, MaximumNameLength)];
+    }
+
+    private static string CreateRawCode(string fileName, int ordinal)
+    {
+        var stem = Path.GetFileNameWithoutExtension(fileName);
+        var code = CreateNormalizedCode(stem);
+        if (string.IsNullOrWhiteSpace(code)) code = "RAW-LUA";
+        var suffix = $"-{ordinal}";
+        return $"{code[..Math.Min(code.Length, MaximumCodeLength - suffix.Length)]}{suffix}";
+    }
+
+    private static string CreateNormalizedCode(string value)
+    {
+        var characters = new List<char>(value.Length);
+        var previousSeparator = false;
+        foreach (var character in value)
+        {
+            if (char.IsAsciiLetterOrDigit(character))
+            {
+                characters.Add(char.ToUpperInvariant(character));
+                previousSeparator = false;
+            }
+            else if (!previousSeparator)
+            {
+                characters.Add('-');
+                previousSeparator = true;
+            }
+        }
+
+        return new string(characters.ToArray()).Trim('-');
+    }
 
     private static ReadOnlySpan<byte> TrimUtf8Bom(byte[] value) =>
         value.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }) ? value.AsSpan(3) : value;

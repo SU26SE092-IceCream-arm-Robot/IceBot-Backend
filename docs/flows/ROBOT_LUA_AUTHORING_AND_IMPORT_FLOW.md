@@ -78,10 +78,9 @@ evidence owns reconciliation of actual execution and consumption.
 | Step | Actor | API / operation | Effect |
 | --- | --- | --- | --- |
 | 1. Edit project | Fairino-Studio user | No backend API | Saves Blockly/editor state in a local `.fairobot` project. |
-| 2. Export Lua | Fairino-Studio user | No backend API | The normal export produces one `*-export.zip` containing `export-manifest.json`, ordered `.lua` files under `artifacts/`, and matching `.icebot.json` declaration wrappers under `contracts/`. A wrapper may contain empty `effects` and `orderingConstraints`; Fairino does not invent production meaning. Explicit metadata remains an operator declaration. |
+| 2. Export Lua | Fairino-Studio user | No backend API | Fairino may export a full bundle with `export-manifest.json`, ordered `.lua` files, and optional `.icebot.json` declarations. It may also provide a raw ZIP that contains only `.lua` files. Full-bundle declarations are optional operator metadata; raw ZIP has no declarations. |
 | 2I. Find/resume import | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports` | Reads the durable, paged organization import inbox after reload or hand-off. Filters only narrow the authorized organization result. Select a returned `importId`, then read its workspace; the inbox never returns staged ZIP bytes, storage keys, raw Lua, or item checksums. |
-| 2A. Import authoring bundle | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports` | Uploads one bounded ZIP with `Idempotency-Key`, validates archive/file identity, checksums, explicit `RunOrder`, checks durable resource conflicts, and automatically materializes organization-scoped Draft artifacts and one ordered Draft RobotProgram when no blocker exists. Runtime target/model and declared effects are diagnostic declarations, not compatibility proof. |
-| 2AL. Import raw Lua into Draft program | Advanced API; not exposed by the normal WebApp | `POST /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/raw-lua-artifacts` | Compatibility API for deliberate technical repair. It is not a second normal authoring lifecycle. The normal WebApp accepts only the Fairino Production-aware bundle. |
+| 2A. Import Production-aware Lua | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports` | Uploads one bounded ZIP with `Idempotency-Key`, validates ZIP/file identity and checksums, checks durable resource conflicts, and automatically materializes organization-scoped Draft artifacts and one ordered Draft RobotProgram when no blocker exists. A full bundle keeps explicit `RunOrder` and optional declarations. A raw ZIP of 1-50 `.lua` files is accepted through this same route; backend uses ZIP entry order, creates an opaque Draft program/artifacts, and defaults runtime target/model to `FAIRINO_LUA_V1`/`FR5`. No contract, Recipe, ingredient, capability, or Lua behavior is inferred from raw files. |
 | 2B. Resume interrupted import | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/resume` | Idempotently resumes structural validation and Draft-resource materialization through one recovery action. It is shown only when an import did not reach `Materialized`; validation blockers remain visible for correction. |
 | 2C1. Adjust materialized Draft order | Management UI | `PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/artifacts` | The operator owns the full contiguous order. Stale edits return `409`; declaration phase/before/after metadata may warn but never silently reorders or blocks the manifest. |
 | 2P. Publish technical resources | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/publish-resources` | Publishes integrity-checked artifact bytes and the ordered RobotProgram independently of Recipe binding. Optional declarations are published/assigned when present and valid; artifacts without declarations remain publishable black boxes. The normal UI performs Recipe-to-Program binding afterward in the separate Bind Configuration lifecycle. |
@@ -113,7 +112,7 @@ evidence owns reconciliation of actual execution and consumption.
 
 ## Fairino Export Mapping
 
-The normal automation input is one ZIP with this fixed archive layout:
+Production-aware import accepts either a full bundle or a raw Lua ZIP. A full bundle uses this layout:
 
 ```text
 export-manifest.json
@@ -149,6 +148,8 @@ one position inside that program
 ```
 
 Filename prefixes are not execution authority. The management client must send explicit positive, unique `RunOrder` values. Cloud serializes that order into the program manifest, and Edge executes the manifest order.
+
+For a raw ZIP with no `export-manifest.json`, every non-directory entry must be a non-empty `.lua` file. Backend creates opaque Draft artifacts in ZIP entry order and a Draft program named/code-derived from the ZIP file name. The operator may replace the contiguous order while the program is Draft. Raw import does not manufacture sidecars or technical contracts.
 
 Sidecar schema behavior:
 

@@ -48,7 +48,7 @@ public sealed class RobotAuthoringImportHandlers(
         catch (RobotAuthoringBundleException ex) { return ApiResult<RobotAuthoringImportResult>.Fail(ex.Message, 400); }
         var checksum = RobotAuthoringBundleCodec.Sha256(bytes);
         RobotAuthoringBundle bundle;
-        try { bundle = RobotAuthoringBundleCodec.Parse(bytes); }
+        try { bundle = RobotAuthoringBundleCodec.Parse(bytes, command.FileName); }
         catch (RobotAuthoringBundleException ex) { return ApiResult<RobotAuthoringImportResult>.Fail(ex.Message, 400); }
 
         var existing = await store.GetByIdempotencyKeyAsync(command.OrganizationId, command.IdempotencyKey.Trim(), false, cancellationToken);
@@ -392,10 +392,11 @@ public sealed class RobotAuthoringImportHandlers(
                 var matchingContracts = existingContracts.Where(x => x.ContractCode == code).ToArray();
                 RobotArtifactTechnicalContract? contract = matchingContracts.Length == 1 &&
                     matchingContracts[0].Status != RobotArtifactContractStatus.Retired &&
+                    item.HasTechnicalDeclaration &&
                     RobotAuthoringImportValidator.DeclarationMatches(matchingContracts[0], item.Sidecar)
                         ? matchingContracts[0]
                         : null;
-                if (contract is null && matchingContracts.Length == 0 && item.Sidecar.Effects.Count > 0)
+                if (item.HasTechnicalDeclaration && contract is null && matchingContracts.Length == 0 && item.Sidecar.Effects.Count > 0)
                 {
                     contract = CreateDraftContract(session, item, command.UserContext.AccountId);
                     newContracts.Add(contract);

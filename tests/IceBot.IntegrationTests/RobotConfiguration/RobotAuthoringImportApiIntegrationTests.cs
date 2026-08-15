@@ -1,4 +1,6 @@
 using System.Net;
+using System.IO.Compression;
+using System.Text;
 using System.Text.Json;
 using Domain.Common.Enums;
 using Domain.Identity.Entities;
@@ -57,6 +59,73 @@ public sealed class RobotAuthoringImportApiIntegrationTests(IntegrationTestFixtu
         using var forbidden = await client.GetAsync(
             $"/api/v1/management/organizations/{foreignOrganization.Id:D}/robot-authoring-imports");
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+    }
+
+    [IntegrationFact]
+    public async Task RawLuaZip_UsesTheAuthoringImportLifecycleWithoutTechnicalContracts()
+    {
+        var actorId = Guid.NewGuid();
+        var organization = Organization("RAW-LUA-IMPORT");
+        await using (var seed = fixture.CreateDbContext())
+        {
+            seed.Add(new Account
+            {
+                Id = actorId,
+                UserName = $"raw-lua-{Guid.NewGuid():N}",
+                Email = $"raw-lua-{Guid.NewGuid():N}@example.test",
+                Status = AccountStatus.Active
+            });
+            seed.Add(organization);
+            await seed.SaveChangesAsync();
+        }
+
+        await using var factory = new PackageApiWebApplicationFactory(
+            fixture,
+            fixture.CreateObjectStorage(autoCreateBucket: true),
+            actorId,
+            "OrgAdmin",
+            [$"OrgAdmin|{organization.Id:D}|*|*"]);
+        using var client = factory.CreateAuthenticatedClient();
+        using var content = new MultipartFormDataContent();
+        var zipContent = new ByteArrayContent(CreateRawLuaZip());
+        zipContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/zip");
+        content.Add(zipContent, "bundle", "real-demo-1408.zip");
+        client.DefaultRequestHeaders.Add("Idempotency-Key", Guid.NewGuid().ToString("N"));
+
+        using var response = await client.PostAsync(
+            $"/api/v1/management/organizations/{organization.Id:D}/robot-authoring-imports", content);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        using var document = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+        var data = document.RootElement.GetProperty("data");
+        Assert.Equal("Materialized", data.GetProperty("status").GetString());
+        Assert.Equal("REAL-DEMO-1408", data.GetProperty("proposedProgramCode").GetString());
+        Assert.Equal("FAIRINO_LUA_V1", data.GetProperty("runtimeTargetCode").GetString());
+        Assert.Equal("FR5", data.GetProperty("machineModelCode").GetString());
+        Assert.All(data.GetProperty("items").EnumerateArray(), item =>
+            Assert.Equal(JsonValueKind.Null, item.GetProperty("technicalContractId").ValueKind));
+
+        await using var assertion = fixture.CreateDbContext();
+        var importId = data.GetProperty("id").GetGuid();
+        var import = await assertion.RobotAuthoringImports.FindAsync(importId);
+        Assert.NotNull(import);
+        Assert.Empty(assertion.RobotArtifactTechnicalContracts.Where(contract => contract.OrganizationId == organization.Id));
+    }
+
+    private static byte[] CreateRawLuaZip()
+    {
+        using var output = new MemoryStream();
+        using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var fileName in new[] { "real-demo-1408_step1.lua", "real-demo-1408_step2.lua" })
+            {
+                var entry = archive.CreateEntry(fileName);
+                using var writer = new StreamWriter(entry.Open(), Encoding.UTF8, leaveOpen: false);
+                writer.Write("-- raw Lua\nreturn 0");
+            }
+        }
+
+        return output.ToArray();
     }
 
     private static Organization Organization(string prefix) => new()

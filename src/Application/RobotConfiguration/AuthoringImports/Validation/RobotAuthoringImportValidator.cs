@@ -18,7 +18,9 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
         foreach (var item in bundle.Items)
         {
             var code = Normalize(item.ManifestItem.ArtifactCode);
-            var matchingContracts = contracts.Where(x => x.ContractCode == code).ToArray();
+            var matchingContracts = item.HasTechnicalDeclaration
+                ? contracts.Where(x => x.ContractCode == code).ToArray()
+                : [];
             var contract = matchingContracts.Length == 1 ? matchingContracts[0] : null;
             if (matchingContracts.Length > 1)
                 warnings.Add(new("TECHNICAL_DECLARATION_IDENTITY_CONFLICT",
@@ -41,7 +43,7 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
             if (artifact?.Status == RobotArtifactStatus.Retired)
                 errors.Add(new("ARTIFACT_NOT_REUSABLE",
                     "A retired robot artifact cannot be reused by a new authoring import.", code));
-            if (item.Sidecar.Effects.Count == 0 || item.Sidecar.Effects.All(x =>
+            if (!item.HasTechnicalDeclaration || item.Sidecar.Effects.Count == 0 || item.Sidecar.Effects.All(x =>
                     x.EffectKind is RobotArtifactEffectKind.System or RobotArtifactEffectKind.Motion))
                 warnings.Add(new("NO_PRODUCTION_DECLARATIONS",
                     "No ingredient or option declarations were supplied. Recipe selection remains an operator decision.", code));
@@ -70,7 +72,7 @@ public sealed class RobotAuthoringImportValidator(IRobotAuthoringImportStore sto
 
         var existingArtifactCount = bundle.Items.Count(item =>
             artifacts.Count(artifact => artifact.ArtifactCode == Normalize(item.ManifestItem.ArtifactCode)) == 1);
-        var existingContractCount = bundle.Items.Count(item =>
+        var existingContractCount = bundle.Items.Count(item => item.HasTechnicalDeclaration &&
             contracts.Count(contract => contract.ContractCode == Normalize(item.ManifestItem.ArtifactCode)) == 1);
         return new RobotAuthoringImportValidationReport(errors.Count == 0, errors, warnings,
             existingArtifactCount, bundle.Items.Count - existingArtifactCount,

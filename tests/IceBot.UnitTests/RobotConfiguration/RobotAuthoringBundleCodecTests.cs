@@ -129,6 +129,42 @@ public sealed class RobotAuthoringBundleCodecTests
     }
 
     [Fact]
+    public void Parse_RawLuaZip_CreatesOpaqueItemsWithDefaultsAndArchiveOrder()
+    {
+        var bytes = CreateRawLuaZip("first.lua", "second.lua");
+
+        var bundle = RobotAuthoringBundleCodec.Parse(bytes, "real-demo-1408.zip");
+
+        Assert.Equal("REAL-DEMO-1408", bundle.Manifest.Program.Code);
+        Assert.Equal(RobotAuthoringBundleCodec.DefaultRuntimeTargetCode, bundle.Manifest.Program.RuntimeTargetCode);
+        Assert.Equal(RobotAuthoringBundleCodec.DefaultMachineModelCode, bundle.Manifest.Program.MachineModelCode);
+        Assert.Collection(bundle.Items,
+            first =>
+            {
+                Assert.Equal("first.lua", first.ManifestItem.FileName);
+                Assert.Equal(1, first.ManifestItem.RunOrder);
+                Assert.False(first.HasTechnicalDeclaration);
+                Assert.Empty(first.Sidecar.Effects);
+            },
+            second =>
+            {
+                Assert.Equal("second.lua", second.ManifestItem.FileName);
+                Assert.Equal(2, second.ManifestItem.RunOrder);
+                Assert.False(second.HasTechnicalDeclaration);
+            });
+    }
+
+    [Fact]
+    public void Parse_RawLuaZip_WithNonLuaEntry_RejectsBundle()
+    {
+        var bytes = CreateRawLuaZip("first.lua", "notes.txt");
+
+        var exception = Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
+
+        Assert.Contains(".lua files only", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Parse_V2OptionEffectMayIdentifyItsConsumedIngredient()
     {
         var bytes = CreateSingleSemanticBundle(2, 10, "gram", "Option", "OREO_CRUMB", "OREO");
@@ -224,6 +260,18 @@ public sealed class RobotAuthoringBundleCodecTests
             WriteArtifact(archive, "DISPENSE", "02_dispense.lua", "02_dispense.icebot.json", "BASE", 2);
             if (extraEntry is not null) Write(archive, extraEntry, "return 0");
         }
+        return output.ToArray();
+    }
+
+    private static byte[] CreateRawLuaZip(params string[] fileNames)
+    {
+        using var output = new MemoryStream();
+        using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+        {
+            foreach (var fileName in fileNames)
+                Write(archive, fileName, "-- raw Lua\nreturn 0");
+        }
+
         return output.ToArray();
     }
 
