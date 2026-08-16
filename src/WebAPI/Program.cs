@@ -35,6 +35,10 @@ try
                                     .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
                                     .AddEnvironmentVariables();
 
+    ExecutionEndpointMutualTlsListenerConfigurationValidator.Validate(
+        builder.Configuration,
+        builder.Environment);
+
     if (builder.Environment.IsDevelopment())
     {
         builder.Configuration.AddUserSecrets<Program>(optional: true);
