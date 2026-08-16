@@ -209,7 +209,8 @@ public sealed class ConfigurationDeploymentPreviewHandler(
         if (endpoint.Status != KioskExecutionEndpointStatus.Active)
             blockers.Add(new("EndpointNotActive", "Execution endpoint is not Active."));
         if (readiness is null)
-            blockers.Add(new("ReadinessNotReported", "Execution endpoint has not reported readiness."));
+            warnings.Add(new("ReadinessNotReported",
+                "Execution endpoint has not reported readiness; deployment is allowed for bootstrap and must be verified by Edge."));
         else
         {
             if (readiness.Readiness != ExecutionReadinessState.Ready)
@@ -221,6 +222,9 @@ public sealed class ConfigurationDeploymentPreviewHandler(
             ValidateCapabilities(release, selections, readiness, blockers);
         }
 
+        if (inventory.Results.Any(result => !result.HasConfiguredInventoryTopology))
+            warnings.Add(new("InventoryTopologyNotConfigured",
+                "Kiosk inventory tracking is not configured; deployment is allowed and inventory remains operator-managed."));
         if (inventory.IsBlocked)
             blockers.Add(new("InventoryNotReady", "Kiosk inventory readiness policy blocks this deployment."));
 
