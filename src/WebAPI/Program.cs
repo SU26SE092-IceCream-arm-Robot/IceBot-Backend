@@ -2,6 +2,8 @@ using Application;
 using Infrastructure;
 using Infrastructure.Catalog.Bootstrap;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.HttpOverrides;
+using System.Net;
 using System.Threading.RateLimiting;
 using Serilog;
 using WebAPI.Authorization;
@@ -38,6 +40,41 @@ try
     }
 
     builder.AddIceBotObservability();
+
+    if (builder.Environment.IsProduction())
+    {
+        var trustedProxyNetworks = builder.Configuration
+            .GetSection("ReverseProxy:TrustedNetworks")
+            .Get<string[]>()?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .ToArray() ?? [];
+        if (trustedProxyNetworks.Length == 0)
+        {
+            throw new InvalidOperationException(
+                "ReverseProxy:TrustedNetworks is required in Production when HTTPS terminates at a reverse proxy.");
+        }
+
+        builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+
+            foreach (var cidr in trustedProxyNetworks)
+            {
+                var parts = cidr.Split('/', 2, StringSplitOptions.TrimEntries);
+                if (parts.Length != 2 ||
+                    !IPAddress.TryParse(parts[0], out var address) ||
+                    !int.TryParse(parts[1], out var prefixLength))
+                {
+                    throw new InvalidOperationException(
+                        $"ReverseProxy:TrustedNetworks contains an invalid CIDR: '{cidr}'.");
+                }
+
+                options.KnownIPNetworks.Add(new System.Net.IPNetwork(address, prefixLength));
+            }
+        });
+    }
 
     builder.Services.AddIceBotCors(builder.Configuration, builder.Environment);
     builder.Services.AddIceBotAuthentication(builder.Configuration, builder.Environment);
@@ -114,6 +151,7 @@ try
     // browser-facing self-signed HTTPS endpoint.
     if (!app.Environment.IsDevelopment())
     {
+        app.UseForwardedHeaders();
         app.UseHttpsRedirection();
     }
 
