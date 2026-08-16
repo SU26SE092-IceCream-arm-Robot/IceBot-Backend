@@ -60,22 +60,10 @@ namespace Application.Identity.Authentication.Services
                 return ApiResult<AuthenticatedAccountResult>.Fail("Local login is not enabled for this account.", 403);
             }
 
-            if (account.LockedUntil is not null && account.LockedUntil > DateTimeOffset.UtcNow)
-            {
-                return ApiResult<AuthenticatedAccountResult>.Fail("Account is temporarily locked.", 423);
-            }
-
             var passwordHash = account.Password?.Value;
             if (string.IsNullOrWhiteSpace(passwordHash) ||
                 !_passwordHasher.VerifyPassword(loginDto.Password, passwordHash))
             {
-                account.FailedLoginCount += 1;
-                if (account.FailedLoginCount >= 5)
-                {
-                    account.LockedUntil = DateTimeOffset.UtcNow.AddMinutes(15);
-                }
-
-                await _accounts.SaveChangesAsync();
                 _logger.LogWarning("Invalid credentials for AccountId: {AccountId}.", account.Id);
                 return ApiResult<AuthenticatedAccountResult>.Fail("Invalid credentials.", 401);
             }

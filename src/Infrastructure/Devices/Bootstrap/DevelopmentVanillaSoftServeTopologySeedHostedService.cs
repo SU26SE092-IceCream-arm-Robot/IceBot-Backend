@@ -13,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace Infrastructure.Devices.Bootstrap;
 
 /// <summary>
-/// Creates the minimum Development-only inventory topology for the vanilla
+/// Creates an explicitly enabled demo inventory topology for the vanilla
 /// soft-serve seed. It never overwrites operational quantities or tracking
 /// choices after the first successful seed.
 /// </summary>
@@ -47,7 +47,8 @@ public sealed class DevelopmentVanillaSoftServeTopologySeedHostedService : IHost
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!IceBotDemoTenantSeedHostedService.IsEnabled(_configuration))
+        if (!IceBotDemoTenantSeedHostedService.IsEnabled(_configuration) ||
+            !_configuration.GetValue<bool>("DemoCatalogSeed:SeedInventoryTopology"))
         {
             return;
         }

@@ -153,6 +153,7 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             KioskId = kiosk.Id,
             OrganizationId = kiosk.OrganizationId,
             StoreId = kiosk.StoreId,
+            HasConfiguredInventoryTopology = states.Count != 0,
             IsReady = baseReady && requiredOptionsReady,
             OverallStatus = overallStatus,
             Ingredients = results,
