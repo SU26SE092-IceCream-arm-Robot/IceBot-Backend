@@ -21,9 +21,13 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
 {
     private const string DevelopmentOrganizationCode = "ICEBOT-DEMO";
     private const string CategoryCode = "SOFT-SERVE";
+    private const string CategoryName = "Kem tuoi";
     private const string ProductCode = "KEM-TUOI-VANI";
+    private const string ProductName = "Kem tuoi vi vani";
     private const string VariantCode = "80G";
+    private const string VariantName = "Kem tuoi vani 80 g";
     private const string RecipeCode = "KEM-TUOI-VANI-80G-V1";
+    private const string RecipeName = "Kem tuoi vani 80 g";
     private const string OperationalMixIngredientCode = "VANILLA-SOFT-SERVE-MIX";
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -63,6 +67,23 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
                 candidate.Code == ProductCode,
                 cancellationToken);
 
+        var templateNameMatches = await dbContext.Products
+            .WhereNotDeleted()
+            .Where(candidate =>
+                candidate.OrganizationId == null &&
+                candidate.StoreId == null &&
+                candidate.KioskId == null &&
+                candidate.Name == ProductName)
+            .ToListAsync(cancellationToken);
+        EnsureNoNameCollision(
+            "global product template",
+            ProductCode,
+            ProductName,
+            template,
+            templateNameMatches,
+            candidate => candidate.Id,
+            candidate => candidate.Code);
+
         if (template is null)
         {
             template = new Product
@@ -70,8 +91,8 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
                 ScopeType = TenantScopeType.Global,
                 CategoryId = category.Id,
                 Code = ProductCode,
-                Name = "Kem tuoi vi vani",
-                DisplayName = "Kem tuoi vi vani",
+                Name = ProductName,
+                DisplayName = ProductName,
                 Description = "Kem tuoi vani 80 g. Seed ky thuat de cau hinh recipe va binding san xuat.",
                 ProductType = "IceCream",
                 BasePrice = 0m,
@@ -96,14 +117,22 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
         }
 
         var variant = template.ProductVariants.SingleOrDefault(candidate => candidate.Code == VariantCode);
+        EnsureNoNameCollision(
+            "product template variant",
+            VariantCode,
+            VariantName,
+            variant,
+            template.ProductVariants.Where(candidate => candidate.Name == VariantName).ToList(),
+            candidate => candidate.Id,
+            candidate => candidate.Code);
         if (variant is null)
         {
             variant = new ProductVariant
             {
                 ProductId = template.Id,
                 Code = VariantCode,
-                Name = "Kem tuoi vani 80 g",
-                DisplayName = "Kem tuoi vani 80 g",
+                Name = VariantName,
+                DisplayName = VariantName,
                 Description = "Mot phan kem tuoi vani 80 g.",
                 VariantType = "Serving",
                 FulfillmentType = FulfillmentType.MachineProduced,
@@ -125,6 +154,14 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
         }
 
         var recipe = variant.Recipes.SingleOrDefault(candidate => candidate.Code == RecipeCode && candidate.Version == 1);
+        EnsureNoNameCollision(
+            "product template recipe",
+            RecipeCode,
+            RecipeName,
+            recipe,
+            variant.Recipes.Where(candidate => candidate.Name == RecipeName && candidate.Version == 1).ToList(),
+            candidate => candidate.Id,
+            candidate => candidate.Code);
         if (recipe is null)
         {
             recipe = CreateRecipe(variant, ingredients, now);
@@ -153,6 +190,17 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
     {
         var category = await dbContext.ProductCategories
             .SingleOrDefaultAsync(candidate => candidate.Code == CategoryCode, cancellationToken);
+        var nameMatches = await dbContext.ProductCategories
+            .Where(candidate => candidate.Name == CategoryName)
+            .ToListAsync(cancellationToken);
+        EnsureNoNameCollision(
+            "product category",
+            CategoryCode,
+            CategoryName,
+            category,
+            nameMatches,
+            candidate => candidate.Id,
+            candidate => candidate.Code);
         if (category is not null)
         {
             return category;
@@ -161,7 +209,7 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
         category = new ProductCategory
         {
             Code = CategoryCode,
-            Name = "Kem tuoi",
+            Name = CategoryName,
             Description = "Kem tuoi va cac san pham soft serve.",
             ProductType = "IceCream",
             DisplayOrder = 1,
@@ -188,20 +236,32 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
                 true,
                 "Store and refill according to the machine and supplier instructions")
         };
-        var codes = definitions.Select(definition => definition.Code).ToArray();
-        var ingredients = await dbContext.Ingredients
-            .WhereNotDeleted()
-            .Where(candidate => codes.Contains(candidate.Code))
-            .ToDictionaryAsync(candidate => candidate.Code, StringComparer.Ordinal, cancellationToken);
+        var ingredients = new Dictionary<string, Ingredient>(StringComparer.Ordinal);
 
         foreach (var definition in definitions)
         {
-            if (ingredients.ContainsKey(definition.Code))
+            var ingredient = await dbContext.Ingredients
+                .WhereNotDeleted()
+                .SingleOrDefaultAsync(candidate => candidate.Code == definition.Code, cancellationToken);
+            var nameMatches = await dbContext.Ingredients
+                .WhereNotDeleted()
+                .Where(candidate => candidate.Name == definition.Name)
+                .ToListAsync(cancellationToken);
+            EnsureNoNameCollision(
+                "ingredient",
+                definition.Code,
+                definition.Name,
+                ingredient,
+                nameMatches,
+                candidate => candidate.Id,
+                candidate => candidate.Code);
+            if (ingredient is not null)
             {
+                ingredients.Add(definition.Code, ingredient);
                 continue;
             }
 
-            var ingredient = new Ingredient
+            ingredient = new Ingredient
             {
                 Code = definition.Code,
                 Name = definition.Name,
@@ -219,7 +279,7 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
                 CreatedAt = now
             };
             dbContext.Ingredients.Add(ingredient);
-            ingredients.Add(ingredient.Code, ingredient);
+            ingredients.Add(definition.Code, ingredient);
         }
 
         return ingredients;
@@ -248,6 +308,22 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
                 candidate.KioskId == null &&
                 candidate.Code == ProductCode,
                 cancellationToken);
+        var nameMatches = await dbContext.Products
+            .WhereNotDeleted()
+            .Where(candidate =>
+                candidate.OrganizationId == organization.Id &&
+                candidate.StoreId == null &&
+                candidate.KioskId == null &&
+                candidate.Name == ProductName)
+            .ToListAsync(cancellationToken);
+        EnsureNoNameCollision(
+            "development organization product",
+            ProductCode,
+            ProductName,
+            existing,
+            nameMatches,
+            candidate => candidate.Id,
+            candidate => candidate.Code);
         if (existing is not null)
         {
             if (existing.CategoryId != categoryId)
@@ -356,7 +432,7 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
             ScopeType = TenantScopeType.Global,
             ProductVariantId = variant.Id,
             Code = RecipeCode,
-            Name = "Kem tuoi vani 80 g",
+            Name = RecipeName,
             Version = 1,
             IsDefault = true,
             YieldQuantity = 1,
@@ -399,4 +475,33 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
         bool IsPerishable,
         bool IsAllergen,
         string? StorageRequirement);
+
+    private static void EnsureNoNameCollision<TEntity, TKey>(
+        string entityName,
+        string expectedCode,
+        string expectedName,
+        TEntity? codeMatch,
+        IReadOnlyCollection<TEntity> nameMatches,
+        Func<TEntity, TKey> getId,
+        Func<TEntity, string> getCode)
+        where TEntity : class
+        where TKey : notnull
+    {
+        var conflictingMatches = nameMatches
+            .Where(candidate =>
+                codeMatch is null ||
+                !EqualityComparer<TKey>.Default.Equals(getId(candidate), getId(codeMatch)))
+            .ToList();
+        if (conflictingMatches.Count == 0)
+        {
+            return;
+        }
+
+        var conflictingCodes = string.Join(", ", conflictingMatches.Select(getCode).OrderBy(code => code, StringComparer.Ordinal));
+        var reason = codeMatch is null
+            ? "the expected code is absent"
+            : "the expected code resolves to a different record";
+        throw new InvalidOperationException(
+            $"Cannot seed {entityName}. Name '{expectedName}' already exists with code(s) {conflictingCodes}, while expected code is '{expectedCode}' ({reason}). Reconcile the existing data before restarting.");
+    }
 }
