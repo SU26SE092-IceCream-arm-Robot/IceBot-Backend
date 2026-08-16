@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging;
 namespace IceBot.IntegrationTests.Catalog;
 
 [Collection(IntegrationTestFixture.CollectionName)]
-public sealed class DevelopmentVanillaSoftServeCatalogSeedIntegrationTests(IntegrationTestFixture fixture)
+public sealed class VanillaSoftServeCatalogTemplateSeedIntegrationTests(IntegrationTestFixture fixture)
 {
     [IntegrationFact]
     public async Task FreshDatabase_SeedsTemplateAndDemoRecipeWithOneOperationalMixIngredient_Once()
@@ -125,7 +125,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedIntegrationTests(Integ
         return services.BuildServiceProvider();
     }
 
-    private static DevelopmentVanillaSoftServeCatalogSeedHostedService CreateSeed(IServiceProvider services)
+    private static VanillaSoftServeCatalogTemplateSeedHostedService CreateSeed(IServiceProvider services)
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -133,11 +133,11 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedIntegrationTests(Integ
                 ["DevelopmentCatalogSeed:VanillaSoftServeEnabled"] = "true"
             })
             .Build();
-        return new DevelopmentVanillaSoftServeCatalogSeedHostedService(
+        return new VanillaSoftServeCatalogTemplateSeedHostedService(
             services.GetRequiredService<IServiceScopeFactory>(),
             configuration,
             services.GetRequiredService<IHostEnvironment>(),
-            services.GetRequiredService<ILogger<DevelopmentVanillaSoftServeCatalogSeedHostedService>>());
+            services.GetRequiredService<ILogger<VanillaSoftServeCatalogTemplateSeedHostedService>>());
     }
 
     private static DevelopmentVanillaSoftServeTopologySeedHostedService CreateTopologySeed(IServiceProvider services)

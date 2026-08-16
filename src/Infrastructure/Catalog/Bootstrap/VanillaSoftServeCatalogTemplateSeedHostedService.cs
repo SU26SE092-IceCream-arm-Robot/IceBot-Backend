@@ -12,7 +12,12 @@ using System.Text.Json;
 
 namespace Infrastructure.Catalog.Bootstrap;
 
-public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHostedService
+/// <summary>
+/// Ensures the global vanilla soft-serve catalog template exists in every environment.
+/// It only creates missing template data or repairs its category reference; it never
+/// creates tenant, kiosk, inventory, or account data outside Development.
+/// </summary>
+public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedService
 {
     private const string DevelopmentOrganizationCode = "ICEBOT-DEMO";
     private const string CategoryCode = "SOFT-SERVE";
@@ -24,13 +29,13 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _hostEnvironment;
-    private readonly ILogger<DevelopmentVanillaSoftServeCatalogSeedHostedService> _logger;
+    private readonly ILogger<VanillaSoftServeCatalogTemplateSeedHostedService> _logger;
 
-    public DevelopmentVanillaSoftServeCatalogSeedHostedService(
+    public VanillaSoftServeCatalogTemplateSeedHostedService(
         IServiceScopeFactory scopeFactory,
         IConfiguration configuration,
         IHostEnvironment hostEnvironment,
-        ILogger<DevelopmentVanillaSoftServeCatalogSeedHostedService> logger)
+        ILogger<VanillaSoftServeCatalogTemplateSeedHostedService> logger)
     {
         _scopeFactory = scopeFactory;
         _configuration = configuration;
@@ -134,7 +139,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
 
         await dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "Ensured vanilla soft-serve catalog template seed; development materialization enabled: {DevelopmentMaterializationEnabled}.",
+            "Ensured global vanilla soft-serve catalog template; development demo materialization enabled: {DevelopmentMaterializationEnabled}.",
             _hostEnvironment.IsDevelopment() &&
             _configuration.GetValue<bool>("DevelopmentCatalogSeed:VanillaSoftServeEnabled"));
     }

@@ -443,7 +443,7 @@ public sealed class DevelopmentIceBotDemoReset(
             .SingleOrDefaultAsync(product => product.OrganizationId == null && product.StoreId == null &&
                 product.KioskId == null && product.Code == ProductCode, cancellationToken)
             ?? throw new InvalidOperationException(
-                "The global vanilla soft-serve template is missing. Start the Development backend once with DevelopmentCatalogSeed:VanillaSoftServeEnabled=true.");
+                "The global vanilla soft-serve template is missing. Start the backend once so the catalog template seed can complete.");
 
         var product = new Product
         {

@@ -102,7 +102,7 @@ namespace Infrastructure
             services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure(config);
             services.AddScoped<DevelopmentIceBotDemoReset>();
-            services.AddHostedService<DevelopmentVanillaSoftServeCatalogSeedHostedService>();
+            services.AddHostedService<VanillaSoftServeCatalogTemplateSeedHostedService>();
             services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
             services.AddHostedService<DevelopmentVanillaSoftServeTopologySeedHostedService>();
             services.AddOrdersInfrastructure();
