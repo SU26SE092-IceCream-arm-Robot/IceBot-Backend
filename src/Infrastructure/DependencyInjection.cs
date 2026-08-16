@@ -38,6 +38,7 @@ using Infrastructure.Email;
 using Infrastructure.EdgeIntegration.Persistence;
 using Infrastructure.EdgeIntegration.Mqtt;
 using Infrastructure.Identity;
+using Infrastructure.Identity.Bootstrap;
 using Infrastructure.Inventory.Persistence;
 using Infrastructure.Operations.Persistence;
 using Infrastructure.Orders;
@@ -102,9 +103,11 @@ namespace Infrastructure
             services.AddCatalogInfrastructure();
             services.AddIdentityInfrastructure(config);
             services.AddScoped<DevelopmentIceBotDemoReset>();
+            services.AddHostedService<IceBotDemoTenantSeedHostedService>();
             services.AddHostedService<VanillaSoftServeCatalogTemplateSeedHostedService>();
             services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
             services.AddHostedService<DevelopmentVanillaSoftServeTopologySeedHostedService>();
+            services.AddHostedService<IceBotDemoRoleAccountsSeedHostedService>();
             services.AddOrdersInfrastructure();
             services.AddOptions<Application.Orders.Management.Automation.FulfillmentReminderOptions>()
                 .Bind(config.GetSection(Application.Orders.Management.Automation.FulfillmentReminderOptions.SectionName))

@@ -1,5 +1,7 @@
 using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
+using Domain.SalesCatalog.Entities;
+using Domain.SalesCatalog.Enums;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
@@ -19,7 +21,6 @@ namespace Infrastructure.Catalog.Bootstrap;
 /// </summary>
 public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedService
 {
-    private const string DevelopmentOrganizationCode = "ICEBOT-DEMO";
     private const string CategoryCode = "SOFT-SERVE";
     private const string CategoryName = "Kem tuoi";
     private const string ProductCode = "KEM-TUOI-VANI";
@@ -28,6 +29,8 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
     private const string VariantName = "Kem tuoi vani 80 g";
     private const string RecipeCode = "KEM-TUOI-VANI-80G-V1";
     private const string RecipeName = "Kem tuoi vani 80 g";
+    private const string DemoMenuCode = "ICEBOT-DEMO-MENU";
+    private const string DemoMenuItemCode = "KEM-TUOI-VANI-80G";
     private const string OperationalMixIngredientCode = "VANILLA-SOFT-SERVE-MIX";
 
     private readonly IServiceScopeFactory _scopeFactory;
@@ -168,17 +171,16 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
             variant.Recipes.Add(recipe);
         }
 
-        if (_hostEnvironment.IsDevelopment() &&
-            _configuration.GetValue<bool>("DevelopmentCatalogSeed:VanillaSoftServeEnabled"))
+        if (IceBotDemoTenantSeedHostedService.IsEnabled(_configuration))
         {
-            await EnsureDevelopmentProductAsync(dbContext, template, category.Id, now, cancellationToken);
+            var demoProduct = await EnsureDemoProductAsync(dbContext, template, category.Id, now, cancellationToken);
+            await EnsureDemoMenuAsync(dbContext, demoProduct, now, cancellationToken);
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "Ensured global vanilla soft-serve catalog template; development demo materialization enabled: {DevelopmentMaterializationEnabled}.",
-            _hostEnvironment.IsDevelopment() &&
-            _configuration.GetValue<bool>("DevelopmentCatalogSeed:VanillaSoftServeEnabled"));
+            "Ensured global vanilla soft-serve catalog template; ICEBOT-DEMO materialization enabled: {DemoMaterializationEnabled}.",
+            IceBotDemoTenantSeedHostedService.IsEnabled(_configuration));
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -285,7 +287,7 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
         return ingredients;
     }
 
-    private static async Task EnsureDevelopmentProductAsync(
+    private static async Task<Product> EnsureDemoProductAsync(
         IceBotDbContext dbContext,
         Product template,
         long categoryId,
@@ -294,14 +296,16 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
     {
         var organization = await dbContext.Organizations
             .WhereNotDeleted()
-            .SingleOrDefaultAsync(candidate => candidate.Code == DevelopmentOrganizationCode, cancellationToken);
+            .SingleOrDefaultAsync(candidate => candidate.Code == IceBotDemoTenantSeedHostedService.OrganizationCode, cancellationToken);
         if (organization is null)
         {
-            return;
+            throw new InvalidOperationException("ICEBOT-DEMO must exist before catalog materialization.");
         }
 
         var existing = await dbContext.Products
             .WhereNotDeleted()
+            .Include(candidate => candidate.ProductVariants)
+                .ThenInclude(candidate => candidate.Recipes)
             .SingleOrDefaultAsync(candidate =>
                 candidate.OrganizationId == organization.Id &&
                 candidate.StoreId == null &&
@@ -330,8 +334,8 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
             {
                 existing.CategoryId = categoryId;
             }
-
-            return;
+            existing.IsAvailable = true;
+            return existing;
         }
 
         var product = new Product
@@ -347,7 +351,7 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
             ProductType = template.ProductType,
             BasePrice = template.BasePrice,
             Currency = template.Currency,
-            IsAvailable = false,
+            IsAvailable = true,
             PreparationTimeSeconds = template.PreparationTimeSeconds,
             ImageUrl = template.ImageUrl,
             MetadataJson = template.MetadataJson,
@@ -368,7 +372,7 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
                 SizeCode = templateVariant.SizeCode,
                 BasePrice = templateVariant.BasePrice,
                 Currency = templateVariant.Currency,
-                IsAvailable = false,
+                IsAvailable = true,
                 DisplayOrder = templateVariant.DisplayOrder,
                 PreparationTimeSeconds = templateVariant.PreparationTimeSeconds,
                 ImageUrl = templateVariant.ImageUrl,
@@ -420,6 +424,68 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
         }
 
         dbContext.Products.Add(product);
+        return product;
+    }
+
+    private static async Task EnsureDemoMenuAsync(
+        IceBotDbContext dbContext,
+        Product product,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var kiosk = await dbContext.Kiosks.SingleAsync(
+            candidate => candidate.Code == IceBotDemoTenantSeedHostedService.KioskCode,
+            cancellationToken);
+        var menu = await dbContext.Menus
+            .Include(candidate => candidate.MenuItems)
+            .SingleOrDefaultAsync(candidate =>
+                candidate.OrganizationId == kiosk.OrganizationId &&
+                candidate.StoreId == kiosk.StoreId &&
+                candidate.KioskId == kiosk.Id &&
+                candidate.Code == DemoMenuCode,
+                cancellationToken);
+        if (menu is null)
+        {
+            menu = new Menu
+            {
+                OrganizationId = kiosk.OrganizationId,
+                StoreId = kiosk.StoreId,
+                KioskId = kiosk.Id,
+                ScopeType = TenantScopeType.Kiosk,
+                Code = DemoMenuCode,
+                Name = "IceBot Demo Menu",
+                Description = "Demo menu for the ICEBOT-DEMO kiosk.",
+                Status = MenuStatus.Active,
+                Currency = "VND",
+                DisplayOrder = 1,
+                EffectiveFrom = now,
+                CreatedAt = now
+            };
+            dbContext.Menus.Add(menu);
+        }
+
+        var variant = product.ProductVariants.Single(candidate => candidate.Code == VariantCode);
+        var recipe = variant.Recipes.Single(candidate => candidate.Code == RecipeCode && candidate.Version == 1);
+        var existingItem = menu.MenuItems.SingleOrDefault(candidate => candidate.Code == DemoMenuItemCode);
+        if (existingItem is null)
+        {
+            menu.MenuItems.Add(new MenuItem
+            {
+                ProductId = product.Id,
+                ProductVariantId = variant.Id,
+                RecipeId = recipe.Id,
+                Code = DemoMenuItemCode,
+                DisplayName = "Kem tuoi vani 80 g",
+                Description = "Vanilla soft-serve demo serving.",
+                Status = MenuItemStatus.Active,
+                Price = 35_000m,
+                Currency = "VND",
+                DisplayOrder = 1,
+                PreparationTimeSeconds = 90,
+                EffectiveFrom = now,
+                CreatedAt = now
+            });
+        }
     }
 
     private static Recipe CreateRecipe(

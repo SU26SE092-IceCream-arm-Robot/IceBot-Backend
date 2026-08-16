@@ -2,6 +2,7 @@ using Application.Devices.Catalog.Support;
 using Domain.Devices.Catalog;
 using Domain.Inventory.Entities;
 using Domain.Inventory.Enums;
+using Infrastructure.Catalog.Bootstrap;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -46,8 +47,7 @@ public sealed class DevelopmentVanillaSoftServeTopologySeedHostedService : IHost
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!_hostEnvironment.IsDevelopment() ||
-            !_configuration.GetValue<bool>("DevelopmentCatalogSeed:VanillaSoftServeEnabled"))
+        if (!IceBotDemoTenantSeedHostedService.IsEnabled(_configuration))
         {
             return;
         }

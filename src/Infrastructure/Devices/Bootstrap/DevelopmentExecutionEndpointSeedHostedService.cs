@@ -1,4 +1,5 @@
 using Domain.Devices.ExecutionEndpoints;
+using Infrastructure.Catalog.Bootstrap;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +15,6 @@ namespace Infrastructure.Devices.Bootstrap;
 /// </summary>
 public sealed class DevelopmentExecutionEndpointSeedHostedService(
     IServiceScopeFactory scopeFactory,
-    IHostEnvironment hostEnvironment,
     IConfiguration configuration,
     ILogger<DevelopmentExecutionEndpointSeedHostedService> logger) : IHostedService
 {
@@ -23,8 +23,7 @@ public sealed class DevelopmentExecutionEndpointSeedHostedService(
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        if (!hostEnvironment.IsDevelopment() ||
-            !configuration.GetValue<bool>("DevelopmentExecutionEndpointSeed:Enabled"))
+        if (!IceBotDemoTenantSeedHostedService.IsEnabled(configuration))
         {
             return;
         }
