@@ -49,7 +49,7 @@ public sealed class DeploymentIdempotencyTests
                 Preview(release, endpoint, isEligible: false)));
         var handler = new DeployFullEdgeConfigurationCommandHandler(
             deploymentStore, releaseStore, Substitute.For<IEdgeCommandStore>(),
-            Substitute.For<IEdgeCommandWakeUpPublisher>(), ReadinessGuard(),
+            Substitute.For<IEdgeCommandWakeUpPublisher>(),
             new FullEdgeReleaseBundleService(Substitute.For<IArtifactObjectStorage>()),
             preview,
             AuditWriter());
@@ -97,7 +97,6 @@ public sealed class DeploymentIdempotencyTests
             releaseStore,
             edgeStore,
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
-            ReadinessGuard(),
             new FullEdgeReleaseBundleService(storage),
             Substitute.For<IConfigurationDeploymentPreviewService>(),
             AuditWriter());
@@ -164,7 +163,6 @@ public sealed class DeploymentIdempotencyTests
                 MaxArtifactStorageBytes = 1024 * 1024
             }),
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
-            ReadinessGuard(),
             Substitute.For<IConfigurationDeploymentPreviewService>(),
             AuditWriter());
 
@@ -219,7 +217,6 @@ public sealed class DeploymentIdempotencyTests
             Substitute.For<IConfigurationReleaseStore>(),
             Substitute.For<IEdgeCommandStore>(),
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
-            ReadinessGuard(),
             new FullEdgeReleaseBundleService(Substitute.For<IArtifactObjectStorage>()),
             Substitute.For<IConfigurationDeploymentPreviewService>(),
             AuditWriter());
@@ -229,7 +226,6 @@ public sealed class DeploymentIdempotencyTests
             Substitute.For<IEdgeCommandStore>(),
             Options.Create(new LowCostControllerCapacityOptions()),
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
-            ReadinessGuard(),
             Substitute.For<IConfigurationDeploymentPreviewService>(),
             AuditWriter());
         var handler = new RollbackConfigurationDeploymentCommandHandler(deploymentStore, fullEdge, lowCost);
@@ -309,10 +305,6 @@ public sealed class DeploymentIdempotencyTests
         return new ConfigurationDeploymentPreview(
             release.Id, release.ReleaseChecksum!, endpoint.KioskId, false, [endpointPreview]);
     }
-
-    private static ProductionInventoryReadinessGuard ReadinessGuard() => new(
-        Substitute.For<IInventoryReadinessEvaluator>(),
-        Options.Create(new InventoryReadinessPolicyOptions()));
 
     private static DeploymentOperationAuditWriter AuditWriter() =>
         new(Substitute.For<IOperationLogStore>());

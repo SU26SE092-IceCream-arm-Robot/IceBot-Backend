@@ -226,7 +226,8 @@ public sealed class ConfigurationDeploymentPreviewHandler(
             warnings.Add(new("InventoryTopologyNotConfigured",
                 "Kiosk inventory tracking is not configured; deployment is allowed and inventory remains operator-managed."));
         if (inventory.IsBlocked)
-            blockers.Add(new("InventoryNotReady", "Kiosk inventory readiness policy blocks this deployment."));
+            warnings.Add(new("InventoryNotReady",
+                "Kiosk inventory is not ready. This does not block configuration deployment; selling and production remain subject to inventory checks."));
 
         ValidateEndpointTarget(release, endpoint, artifacts, blockers, allowRetiredRelease);
 

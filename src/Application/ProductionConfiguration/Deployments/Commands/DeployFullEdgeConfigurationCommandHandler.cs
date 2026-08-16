@@ -13,7 +13,6 @@ using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Domain.RobotConfiguration.Programs.Manifests;
 using Application.ProductionConfiguration.Releases.Services;
-using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration.Deployments.Services;
 
 namespace Application.ProductionConfiguration.Deployments.Commands;
@@ -24,7 +23,6 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
     private readonly IConfigurationReleaseStore _releaseStore;
     private readonly IEdgeCommandStore _edgeCommandStore;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
-    private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
     private readonly FullEdgeReleaseBundleService _bundleService;
     private readonly IConfigurationDeploymentPreviewService _deploymentPreview;
     private readonly DeploymentOperationAuditWriter _operationAudit;
@@ -34,7 +32,6 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         IConfigurationReleaseStore releaseStore,
         IEdgeCommandStore edgeCommandStore,
         IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        ProductionInventoryReadinessGuard inventoryReadiness,
         FullEdgeReleaseBundleService bundleService,
         IConfigurationDeploymentPreviewService deploymentPreview,
         DeploymentOperationAuditWriter operationAudit)
@@ -43,7 +40,6 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         _releaseStore = releaseStore;
         _edgeCommandStore = edgeCommandStore;
         _wakeUpPublisher = wakeUpPublisher;
-        _inventoryReadiness = inventoryReadiness;
         _bundleService = bundleService;
         _deploymentPreview = deploymentPreview;
         _operationAudit = operationAudit;
@@ -163,17 +159,6 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
         if (commandExpiryAt <= now)
         {
             return ApiResult<KioskConfigurationDeploymentResult>.Fail("Command expiry must be later than the deployment request time.", 400);
-        }
-
-        var readiness = await _inventoryReadiness.EvaluateDeployAsync(
-            release,
-            command.KioskId,
-            cancellationToken: cancellationToken);
-        if (readiness.IsBlocked)
-        {
-            return ApiResult<KioskConfigurationDeploymentResult>
-                .Fail("Configuration deployment blocked because kiosk inventory is not ready.", 409)
-                .AddDetail("InventoryReadiness", readiness.Results);
         }
 
         FullEdgeReleaseBundleDescriptor bundle;
@@ -299,12 +284,6 @@ public sealed class DeployFullEdgeConfigurationCommandHandler
             cancellationToken);
 
         await TryPublishWakeUpAsync(result, cancellationToken);
-
-        if (result.Succeeded && readiness.HasWarnings)
-        {
-            result.AddDetail("InventoryReadinessWarnings", readiness.Results.Where(item => !item.IsReady).ToArray());
-        }
-
         return result;
     }
 

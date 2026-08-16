@@ -937,7 +937,6 @@ public abstract class EdgeOperationalIntegrationTestBase
                 releaseStore,
                 edgeStore,
                 deploymentWakeUpPublisher,
-                inventoryReadiness,
                 new FullEdgeReleaseBundleService(_fixture.CreateObjectStorage(autoCreateBucket: true)),
                 deploymentPreview,
                 new DeploymentOperationAuditWriter(new OperationLogStore(dbContext))).HandleAsync(

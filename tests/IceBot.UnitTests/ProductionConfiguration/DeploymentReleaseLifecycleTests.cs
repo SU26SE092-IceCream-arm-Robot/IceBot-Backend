@@ -79,9 +79,6 @@ public sealed class DeploymentReleaseLifecycleTests
                 MaxArtifactStorageBytes = 1024 * 1024
             }),
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
-            new ProductionInventoryReadinessGuard(
-                Substitute.For<IInventoryReadinessEvaluator>(),
-                Options.Create(new InventoryReadinessPolicyOptions())),
             Substitute.For<IConfigurationDeploymentPreviewService>(),
             new DeploymentOperationAuditWriter(Substitute.For<IOperationLogStore>()));
 

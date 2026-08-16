@@ -25,7 +25,6 @@ using Domain.RobotConfiguration.Programs.Manifests;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
-using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration.Deployments.Services;
 
 namespace Application.ProductionConfiguration.Deployments.Commands;
@@ -37,7 +36,6 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private readonly IEdgeCommandStore _edgeCommandStore;
     private readonly LowCostControllerCapacityOptions _capacity;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
-    private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
     private readonly IConfigurationDeploymentPreviewService _deploymentPreview;
     private readonly DeploymentOperationAuditWriter _operationAudit;
 
@@ -47,7 +45,6 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         IEdgeCommandStore edgeCommandStore,
         IOptions<LowCostControllerCapacityOptions> capacity,
         IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        ProductionInventoryReadinessGuard inventoryReadiness,
         IConfigurationDeploymentPreviewService deploymentPreview,
         DeploymentOperationAuditWriter operationAudit)
     {
@@ -56,7 +53,6 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         _edgeCommandStore = edgeCommandStore;
         _capacity = capacity.Value;
         _wakeUpPublisher = wakeUpPublisher;
-        _inventoryReadiness = inventoryReadiness;
         _deploymentPreview = deploymentPreview;
         _operationAudit = operationAudit;
     }
@@ -213,18 +209,6 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         }
 
 
-        var readiness = await _inventoryReadiness.EvaluateDeployAsync(
-            release,
-            command.KioskId,
-            command.Selections.Select(selection => selection.ExecutionRouteId).Distinct().ToArray(),
-            cancellationToken);
-        if (readiness.IsBlocked)
-        {
-            return ApiResult<ControllerArtifactSetDeploymentResult>
-                .Fail("Artifact-set deployment blocked because kiosk inventory is not ready.", 409)
-                .AddDetail("InventoryReadiness", readiness.Results);
-        }
-
         var result = await _deploymentStore.ExecuteDeploymentCreationAsync(
             endpoint.ControllerId.Value,
             async ct =>
@@ -317,12 +301,6 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             cancellationToken);
 
         await TryPublishWakeUpAsync(result, cancellationToken);
-
-        if (result.Succeeded && readiness.HasWarnings)
-        {
-            result.AddDetail("InventoryReadinessWarnings", readiness.Results.Where(item => !item.IsReady).ToArray());
-        }
-
         return result;
     }
 
