@@ -2,6 +2,7 @@ using Application.Identity.Tokens.Claims;
 using Application.RobotConfiguration.AuthoringImports;
 using Application.RobotConfiguration.AuthoringImports.Queries;
 using Domain.RobotConfiguration.AuthoringImports;
+using Domain.RobotConfiguration.Artifacts;
 using NSubstitute;
 
 namespace IceBot.UnitTests.RobotConfiguration;
@@ -60,7 +61,8 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
                 "Make ice cream",
                 "FAIRINO_LUA_V1",
                 "FR5",
-                "{\"canMaterialize\":true,\"errors\":[],\"warnings\":[],\"existingArtifactCount\":0,\"newArtifactCount\":1,\"existingContractCount\":0,\"newContractCount\":1}",
+                RobotRuntimeProfileSource.SystemDefault,
+                "{\"canMaterialize\":true,\"errors\":[],\"warnings\":[],\"existingArtifactCount\":0,\"newArtifactCount\":1,\"existingContractCount\":0,\"newContractCount\":0}",
                 2,
                 Guid.NewGuid(),
                 null,
@@ -87,6 +89,7 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
         Assert.Equal("Materialized", item.Status);
         Assert.Equal(2, item.ItemCount);
         Assert.Equal("Org Admin", item.CreatedByDisplayName);
+        Assert.Equal("SystemDefault", item.RuntimeProfileSource);
         Assert.DoesNotContain("PreviewSemanticComposition", item.NextActions);
         Assert.Contains("PublishImportResources", item.NextActions);
         Assert.NotNull(item.Validation);
@@ -137,6 +140,7 @@ public sealed class ListRobotAuthoringImportsQueryHandlerTests
             "Make ice cream",
             "FAIRINO_LUA_V1",
             "FR5",
+            RobotRuntimeProfileSource.BundleDeclared,
             "{not-json}",
             1,
             null,

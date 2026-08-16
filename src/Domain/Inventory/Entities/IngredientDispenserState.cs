@@ -28,7 +28,11 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     public string? LevelToQuantityProfileJson { get; set; }
 
+    public InventoryTrackingMode TrackingMode { get; private set; } = InventoryTrackingMode.ManualEstimate;
+
     public DateTimeOffset LastMeasuredAt { get; set; }
+
+    public DateTimeOffset? LastSensorObservedAt { get; private set; }
 
     public DateTimeOffset? LastRefilledAt { get; set; }
 
@@ -87,7 +91,18 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         CurrentLevelStatus = levelStatus;
         EstimatedQuantity = estimatedQuantity;
         LastMeasuredAt = measuredAt;
+        LastSensorObservedAt = measuredAt;
         SensorPayloadJson = sensorPayloadJson;
+    }
+
+    public void ChangeTrackingMode(InventoryTrackingMode trackingMode)
+    {
+        if (!Enum.IsDefined(trackingMode))
+        {
+            throw new DomainRuleException("Inventory tracking mode is invalid.");
+        }
+
+        TrackingMode = trackingMode;
     }
 
     public StockMovement Refill(

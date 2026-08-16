@@ -11,7 +11,5 @@ public interface IConfigurationRouteStore
     Task<IReadOnlyList<RobotProgram>> ListRobotProgramsByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProductionProgramBinding>> ListProductionProgramBindingsByIdsAsync(IReadOnlyCollection<Guid> ids,
         CancellationToken cancellationToken = default);
-    Task<IReadOnlyList<ProductionProgramBinding>> ListActiveProductionProgramBindingsAsync(Guid organizationId,
-        IReadOnlyCollection<Guid> recipeIds, IReadOnlyCollection<Guid> robotProgramIds, CancellationToken cancellationToken = default);
     Task SaveReleaseReplacementAsync(IReadOnlyCollection<ExecutionRoute> removedRoutes, CancellationToken cancellationToken = default);
 }

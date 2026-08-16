@@ -16,7 +16,11 @@ public sealed class ExecutionEndpointResult
     public int? MqttCredentialVersion { get; init; }
     public ExecutionEndpointReadinessResult? Readiness { get; init; }
     public DateTimeOffset? ProvisionedAt { get; init; }
-    public IReadOnlyList<ExecutionEndpointRobotTargetResult> SupportedRobotTargets { get; init; } = [];
+    public Guid? ReportedDevicesSourceExecutorId { get; init; }
+    public long? ReportedDevicesSnapshotRevision { get; init; }
+    public DateTimeOffset? ReportedDevicesObservedAt { get; init; }
+    public DateTimeOffset? ReportedDevicesReceivedAt { get; init; }
+    public IReadOnlyList<ExecutionEndpointReportedDeviceResult> ReportedDevices { get; init; } = [];
 }
 
 public sealed class ExecutionEndpointReadinessResult
@@ -39,12 +43,11 @@ public sealed class ExecutionEndpointCapabilityResult
     public string? UnavailableReason { get; init; }
 }
 
-public sealed class ExecutionEndpointRobotTargetResult
+public sealed class ExecutionEndpointReportedDeviceResult
 {
     public Guid Id { get; init; }
+    public string SourceDeviceKey { get; init; } = null!;
+    public Guid? DeviceId { get; init; }
     public string RuntimeTargetCode { get; init; } = null!;
     public string MachineModelCode { get; init; } = null!;
-    public Guid? DeviceId { get; init; }
-    public string? DeviceCode { get; init; }
-    public string? DeviceName { get; init; }
 }

@@ -68,7 +68,7 @@ public sealed class ConfigurationDeploymentStore : IConfigurationDeploymentStore
     public Task<KioskExecutionEndpoint?> GetEndpointForDeploymentAsync(Guid endpointId, CancellationToken cancellationToken = default) =>
         _dbContext.KioskExecutionEndpoints.WhereNotDeleted().Include(endpoint => endpoint.Kiosk)
             .Include(endpoint => endpoint.CredentialBinding)
-            .Include(endpoint => endpoint.SupportedRobotTargets).ThenInclude(target => target.Device)
+            .Include(endpoint => endpoint.ReportedDevices)
             .FirstOrDefaultAsync(endpoint => endpoint.Id == endpointId && endpoint.Kiosk.DeletedAt == null, cancellationToken);
 
     public async Task<IReadOnlyList<KioskExecutionEndpoint>> ListEndpointsForDeploymentAsync(
@@ -77,7 +77,7 @@ public sealed class ConfigurationDeploymentStore : IConfigurationDeploymentStore
         await _dbContext.KioskExecutionEndpoints.WhereNotDeleted().AsNoTracking()
             .Include(endpoint => endpoint.Kiosk)
             .Include(endpoint => endpoint.CredentialBinding)
-            .Include(endpoint => endpoint.SupportedRobotTargets).ThenInclude(target => target.Device)
+            .Include(endpoint => endpoint.ReportedDevices)
             .Where(endpoint => endpoint.KioskId == kioskId && endpoint.Kiosk.DeletedAt == null)
             .OrderBy(endpoint => endpoint.EndpointCode)
             .ToListAsync(cancellationToken);

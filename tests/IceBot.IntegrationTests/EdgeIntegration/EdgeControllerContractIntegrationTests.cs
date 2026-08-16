@@ -266,7 +266,11 @@ public sealed class EdgeControllerContractIntegrationTests
             releaseChecksum,
             1,
             Guid.NewGuid().ToString("N"),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            null,
+            "validation-checksum",
+            "UnprovenPhysicalBehavior",
+            "[]");
         var payload = new JsonObject
         {
             ["DeploymentId"] = deployment.Id,

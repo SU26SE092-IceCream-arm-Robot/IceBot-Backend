@@ -243,6 +243,50 @@ public sealed class CreatePaymentSessionCommandHandlerTests
         Assert.Contains("payment window has expired", result.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task CashPayment_CreatesPendingStaffConfirmationWithoutCallingGateway()
+    {
+        var scenario = ProviderCreateScenario.Create();
+        var cashMethod = new PaymentMethod
+        {
+            Id = 2,
+            Code = "cash",
+            Name = "Cash",
+            Provider = "Cash",
+            IsOnline = false,
+            IsActive = true
+        };
+        scenario.Store.GetPaymentMethodByCodeAsync("cash", Arg.Any<CancellationToken>()).Returns(cashMethod);
+        scenario.Store.AddPaymentTransactionAsync(
+                Arg.Do<PaymentTransaction>(payment =>
+                {
+                    payment.Order = scenario.Order;
+                    payment.PaymentMethod = cashMethod;
+                    scenario.Payment = payment;
+                }),
+                Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        var result = await scenario.Handler.HandleAsync(new CreatePaymentSessionCommand
+        {
+            OrderId = scenario.Order.Id,
+            IdempotencyKey = "cash-payment",
+            Request = new CreatePaymentSessionRequest
+            {
+                PaymentMethodCode = "cash",
+                ExpectedAmount = 30_000,
+                ExpectedCurrency = "VND"
+            }
+        });
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(PaymentTransactionStatus.Pending, result.Data!.Status);
+        Assert.NotNull(scenario.Payment);
+        Assert.Equal("Cash", scenario.Payment!.Provider);
+        await scenario.Gateway.DidNotReceive().CreatePaymentSessionAsync(
+            Arg.Any<PaymentTransaction>(), Arg.Any<Order>(), Arg.Any<CancellationToken>());
+    }
+
     private sealed class ProviderCreateScenario
     {
         public required CreatePaymentSessionCommandHandler Handler { get; init; }

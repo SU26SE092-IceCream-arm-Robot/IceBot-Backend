@@ -15,6 +15,7 @@ public sealed class RobotArtifactResult
     public string Checksum { get; init; } = null!;
     public string RuntimeTargetCode { get; init; } = null!;
     public string MachineModelCode { get; init; } = null!;
+    public string RuntimeProfileSource { get; init; } = null!;
     public long ContentLengthBytes { get; init; }
     public string Status { get; init; } = null!;
     public DateTimeOffset ExportedAt { get; init; }
@@ -37,6 +38,7 @@ public sealed class RobotArtifactResult
             Checksum = artifact.Checksum,
             RuntimeTargetCode = artifact.RuntimeTargetCode,
             MachineModelCode = artifact.MachineModelCode,
+            RuntimeProfileSource = artifact.RuntimeProfileSource.ToString(),
             ContentLengthBytes = artifact.ContentLengthBytes,
             Status = artifact.Status.ToString(),
             ExportedAt = artifact.ExportedAt,

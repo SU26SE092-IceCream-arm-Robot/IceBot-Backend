@@ -23,7 +23,9 @@ internal static class DispenserStateResultMapper
             EstimatedQuantity = state.EstimatedQuantity,
             CapacityQuantity = state.CapacityQuantity,
             Unit = state.Unit,
+            TrackingMode = state.TrackingMode,
             LastMeasuredAt = state.LastMeasuredAt,
+            LastSensorObservedAt = state.LastSensorObservedAt,
             LastRefilledAt = state.LastRefilledAt,
             IsActive = state.IsActive,
             LevelToQuantityProfile = DispenserLevelQuantityProfileContract.Deserialize(state.LevelToQuantityProfileJson)

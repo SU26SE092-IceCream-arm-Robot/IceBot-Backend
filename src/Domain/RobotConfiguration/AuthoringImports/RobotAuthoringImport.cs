@@ -1,4 +1,5 @@
 using Domain.Common;
+using Domain.RobotConfiguration.Artifacts;
 using System.Text.Json;
 
 namespace Domain.RobotConfiguration.AuthoringImports;
@@ -38,6 +39,7 @@ public sealed class RobotAuthoringImport : BusinessEntity
     public string ProposedProgramName { get; private set; } = null!;
     public string RuntimeTargetCode { get; private set; } = null!;
     public string MachineModelCode { get; private set; } = null!;
+    public RobotRuntimeProfileSource RuntimeProfileSource { get; private set; }
     public string StagingStorageKey { get; private set; } = null!;
     public string? ValidationReportJson { get; private set; }
     public Guid? AppliedRobotProgramId { get; private set; }
@@ -71,7 +73,8 @@ public sealed class RobotAuthoringImport : BusinessEntity
         string runtimeTargetCode,
         string machineModelCode,
         string stagingStorageKey,
-        Guid actorId)
+        Guid actorId,
+        RobotRuntimeProfileSource runtimeProfileSource = RobotRuntimeProfileSource.ManagedConfiguration)
     {
         if (organizationId == Guid.Empty || clientExportId == Guid.Empty)
             throw new DomainRuleException("Organization and client export identities are required.");
@@ -92,6 +95,7 @@ public sealed class RobotAuthoringImport : BusinessEntity
             ProposedProgramName = RequireText(programName, "Program name"),
             RuntimeTargetCode = NormalizeCode(runtimeTargetCode),
             MachineModelCode = NormalizeCode(machineModelCode),
+            RuntimeProfileSource = runtimeProfileSource,
             StagingStorageKey = RequireText(stagingStorageKey, "Staging storage key"),
             Status = RobotAuthoringImportStatus.Uploaded,
             CreatedByAccountId = actorId

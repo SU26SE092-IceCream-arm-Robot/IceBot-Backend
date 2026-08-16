@@ -178,7 +178,6 @@ internal static class ProductionPackageInstallationScenarioSeed
                 $"EDGE-{Guid.NewGuid():N}",
                 KioskExecutionProfile.FullEdge,
                 ExecutionEndpointAuthenticationMode.MutualTls);
-            endpoint.ReplaceSupportedRobotTargets([("FAIRINO_LUA_V1", "FR5", null)]);
 
             dbContext.AddRange(
                 organization,
@@ -256,7 +255,7 @@ internal static class ProductionPackageInstallationScenarioSeed
                 "gram",
                 "ROBOT_ARM")],
             []);
-        contract.Publish(DateTimeOffset.UtcNow, actorId, parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, actorId);
         return contract;
     }
 

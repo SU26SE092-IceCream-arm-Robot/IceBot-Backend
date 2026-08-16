@@ -64,10 +64,10 @@ Rules:
 - Cloud verifies that the dispenser state is active, belongs to the endpoint kiosk, and is bound to the supplied device. Edge cannot report another kiosk's inventory by changing IDs.
 - V1 supports only `Low`, `Medium`, and `Full`. `Unknown` is not an observed physical level.
 - `observedAt` is evidence and can be at most five minutes ahead of Cloud receive time. Cloud receive time is timeout authority.
-- An observation at or below the latest applied sequence, or no newer than the current dispenser measurement, is stored as `OutOfOrder` audit evidence and does not overwrite the inventory projection.
+- An observation at or below the latest applied sequence, or no newer than the latest applied sensor observation, is stored as `OutOfOrder` audit evidence and does not overwrite the inventory projection. Manual refill and adjustment timestamps do not make sensor evidence stale.
 - If the dispenser has a configured Low/Medium/Full calibration profile, Cloud derives `EstimatedQuantity` from that profile. Without calibration, the level changes but quantity remains unknown.
 - Raw `sensorPayload` is bounded diagnostic evidence and is not exposed in normal inventory responses. The dispenser history exposes the observation level, disposition, time, derived estimate, and endpoint reference.
-- This channel describes physical inventory evidence. It does not prove a custom Lua program consumed the recipe quantity, does not create a stock movement, and does not change V1 menu sellability or checkout admission.
+- This channel describes physical inventory evidence. It does not prove a custom Lua program consumed the recipe quantity and does not create a stock movement. Sensor evidence is optional for `ManualEstimate` and `SensorAssisted`; only an explicitly configured `SensorRequired` dispenser uses fresh calibrated sensor evidence as a sellability gate.
 
 ### Telemetry Replay
 
@@ -267,6 +267,40 @@ are ignored, exact retries are duplicates, and reuse of one revision with
 different content returns conflict. `capabilities` is a complete replacement,
 not a patch. Cloud stores typed readiness and capability rows; it does not infer
 availability from heartbeat strings or generic summary payloads.
+
+### Reported Device Inventory
+
+```http
+PUT /api/v1/iot/execution-endpoints/{endpointId}/reported-devices
+```
+
+Hardware inventory is a separate full snapshot, sent at startup, reconnect, or
+hardware change. It does not share readiness freshness: an unchanged device
+inventory remains valid until a newer snapshot replaces it, while readiness is
+short-lived operational evidence.
+
+```json
+{
+  "sourceExecutorId": "uuid",
+  "snapshotRevision": 12,
+  "observedAt": "2026-07-01T12:00:00Z",
+  "devices": [
+    {
+      "sourceDeviceKey": "arm-left",
+      "deviceId": null,
+      "runtimeTargetCode": "FAIRINO_LUA_V1",
+      "machineModelCode": "FR5"
+    }
+  ]
+}
+```
+
+The authenticated Edge declares its observed device/runtime inventory. This is
+not operator configuration and does not certify Lua behavior. Cloud uses a
+known declared mismatch with RobotProgram runtime/model metadata to block
+deployment. No snapshot is `RuntimeProfileUnknown` and remains a warning for
+the FR5 MVP. Endpoint identity, lifecycle, readiness, command persistence, and
+delivery remain independent blocking routing gates.
 
 `localPersistenceHealth` is required. `Healthy` database state, writable storage,
 free space at or above the reported minimum, and event backlog at or below the

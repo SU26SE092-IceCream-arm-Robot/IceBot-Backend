@@ -49,7 +49,7 @@ public sealed class RobotArtifactTechnicalContractLifecycleTests
             "TOPPING", 1, "FAIRINO_LUA_V1", "FR5", organizationId);
         lockedPublished.Id = observedDraft.Id;
         lockedPublished.ReplaceDefinition([Effect("OLD")], []);
-        lockedPublished.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        lockedPublished.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
 
         var store = Substitute.For<IRobotArtifactTechnicalContractStore>();
         store.GetByIdentityAsync(organizationId, "TOPPING", 1, false, Arg.Any<CancellationToken>())
@@ -143,7 +143,7 @@ public sealed class RobotArtifactTechnicalContractLifecycleTests
     {
         var contract = RobotArtifactTechnicalContract.CreateDraft("PREPARE", 1, "FAIRINO_LUA_V1", "FR5");
         contract.ReplaceDefinition([Effect("PREPARE")], []);
-        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
         var store = Substitute.For<IRobotArtifactTechnicalContractStore>();
         store.GetAsync(contract.Id, true, Arg.Any<CancellationToken>()).Returns(contract);
         store.HasPublishedTemplateReferenceAsync(contract.Id, Arg.Any<CancellationToken>()).Returns(true);

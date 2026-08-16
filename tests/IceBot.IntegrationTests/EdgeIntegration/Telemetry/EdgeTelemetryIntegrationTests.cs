@@ -147,6 +147,47 @@ public sealed class EdgeTelemetryIntegrationTests(IntegrationTestFixture fixture
     }
 
     [IntegrationFact]
+    public async Task ReadinessIngestion_DoesNotCarryHardwareInventory()
+    {
+        var graph = await SeedPrerequisitesAsync();
+        var reportedAt = DateTimeOffset.UtcNow.AddSeconds(-2);
+
+        async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Connectivity.Results.ExecutionReadinessResult>> IngestAsync(long revision)
+        {
+            await using var dbContext = _fixture.CreateDbContext();
+            return await new IngestExecutionReadinessCommandHandler(
+                new ExecutionReadinessStore(dbContext),
+                new NoOpRealtimeNotificationPublisher(),
+                Options.Create(new EdgeTelemetryIngestionOptions()))
+                .HandleAsync(new IngestExecutionReadinessCommand
+                {
+                    KioskId = graph.KioskId,
+                    EndpointId = graph.EndpointId,
+                    SourceExecutorId = graph.SourceExecutorId,
+                    StateRevision = revision,
+                    ExecutorReportedAt = reportedAt,
+                    Readiness = ExecutionReadinessState.Ready,
+                    Activity = ExecutionActivityState.Idle,
+                    Safety = ExecutionSafetyState.Safe,
+                    LocalPersistenceHealth = HealthyLocalPersistence()
+                });
+        }
+
+        var applied = await IngestAsync(2);
+        var duplicate = await IngestAsync(2);
+
+        Assert.True(applied.Succeeded, applied.Message);
+        Assert.True(duplicate.Succeeded, duplicate.Message);
+        Assert.True(duplicate.Data!.DuplicateOrStale);
+
+        await using var assertionContext = _fixture.CreateDbContext();
+        var endpoint = await assertionContext.KioskExecutionEndpoints
+            .Include(item => item.ReportedDevices)
+            .SingleAsync(item => item.Id == graph.EndpointId);
+        Assert.Empty(endpoint.ReportedDevices);
+    }
+
+    [IntegrationFact]
     public async Task HeartbeatIngestion_DeduplicatesAndDoesNotLetStaleSequenceRewindConnectivity()
     {
         var graph = await SeedPrerequisitesAsync();

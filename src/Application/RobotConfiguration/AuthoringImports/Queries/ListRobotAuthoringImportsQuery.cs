@@ -3,6 +3,7 @@ using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
 using Application.Tenants;
 using Domain.RobotConfiguration.AuthoringImports;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace Application.RobotConfiguration.AuthoringImports.Queries;
 
@@ -39,6 +40,7 @@ public sealed record RobotAuthoringImportListRow(
     string ProposedProgramName,
     string RuntimeTargetCode,
     string MachineModelCode,
+    RobotRuntimeProfileSource RuntimeProfileSource,
     string? ValidationReportJson,
     int ItemCount,
     Guid? MaterializedRobotProgramId,
@@ -68,6 +70,7 @@ public sealed record RobotAuthoringImportListItemResult(
     string ProposedProgramName,
     string RuntimeTargetCode,
     string MachineModelCode,
+    string RuntimeProfileSource,
     int ItemCount,
     RobotAuthoringImportValidationSummary? Validation,
     Guid? MaterializedRobotProgramId,
@@ -100,6 +103,7 @@ public sealed record RobotAuthoringImportListItemResult(
             row.ProposedProgramName,
             row.RuntimeTargetCode,
             row.MachineModelCode,
+            row.RuntimeProfileSource.ToString(),
             row.ItemCount,
             validation,
             row.MaterializedRobotProgramId,

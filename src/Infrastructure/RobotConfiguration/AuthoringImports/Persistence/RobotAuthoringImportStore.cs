@@ -65,6 +65,7 @@ public sealed class RobotAuthoringImportStore(IceBotDbContext dbContext) : IRobo
                 importSession.ProposedProgramName,
                 importSession.RuntimeTargetCode,
                 importSession.MachineModelCode,
+                importSession.RuntimeProfileSource,
                 importSession.ValidationReportJson,
                 importSession.Items.Count,
                 importSession.AppliedRobotProgramId,

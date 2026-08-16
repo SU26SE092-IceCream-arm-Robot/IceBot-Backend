@@ -11,6 +11,18 @@ namespace Application.ProductionConfiguration.Deployments.Services;
 
 public static class DeploymentCommandFactory
 {
+    public static IReadOnlyCollection<(string RuntimeTargetCode, string MachineModelCode)>
+        ListFullEdgeRuntimeProfiles(ConfigurationRelease release) =>
+        release.ExecutionRoutes
+            .SelectMany(route => route.RobotBindings)
+            .SelectMany(binding => RobotProgramManifestBuilder.Parse(
+                binding.RobotProgram.ProgramManifestJson
+                    ?? throw new DomainRuleException("Published robot program manifest is missing."))
+                .Artifacts)
+            .Select(item => (item.RobotArtifact.RuntimeTargetCode, item.RobotArtifact.MachineModelCode))
+            .Distinct()
+            .ToArray();
+
     public static string BuildFullEdgePayload(
         KioskConfigurationDeployment deployment,
         ConfigurationRelease release,

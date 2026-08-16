@@ -36,41 +36,47 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
    - OrderItems
    - status PendingPayment / Unpaid
    - immutable `paymentDeadlineAt`
-10. Tablet calls Cloud Backend to create payment session for the order.
-11. Cloud creates:
+10. Tablet calls Cloud Backend to create a payment session for the order.
+11. For PayOS, Cloud creates:
    - PaymentTransaction
    - provider payment session
    Cloud persists the deterministic provider order code before calling the provider. A retry reconciles that same provider identity and must not create a second provider session.
-12. Cloud returns:
+12. For cash in Development only, Cloud creates a pending `PaymentTransaction`
+    with no gateway request. The kiosk remains in the active customer session
+    until a scoped Staff, Manager, or OrgAdmin confirms the physical cash receipt.
+    The confirmation action is auditable and applies the same paid-order dispatch
+    rule as a verified provider payment.
+13. PayOS returns:
    - checkoutUrl
    - qrCodePayload
    - expiresAt
-13. Tablet renders QR.
-14. Customer pays.
-15. Payment provider calls Cloud webhook.
-16. Cloud verifies provider callback and signature before payment/order lookup. A verified callback with no matching local provider transaction is acknowledged without creating callback/payment/order evidence or dispatching fulfillment.
-17. For a matching payment transaction, Cloud acquires the same kiosk session
+14. Tablet renders QR for PayOS, or directs the customer to Staff for cash.
+15. Customer pays.
+16. Payment provider calls Cloud webhook, or Staff confirms cash receipt.
+17. Cloud verifies a provider callback and signature before payment/order lookup. A verified callback with no matching local provider transaction is acknowledged without creating callback/payment/order evidence or dispatching fulfillment.
+18. For a matching payment transaction, Cloud acquires the same kiosk session
    lock, then updates PaymentTransaction = Paid and Order = ReadyForFulfillment
    in one DB transaction. A verified late payment received after another
    customer session began is retained as financial evidence but moves its Order
    to RefundRequired and never dispatches robot work.
-18. Cloud commits payment/order state.
-19. After the payment transaction commits, Cloud dispatches execution attempt `1`.
+19. Cloud commits payment/order state.
+20. After the payment transaction commits, Cloud dispatches execution attempt `1`.
    A reconciliation worker repairs any paid `ReadyForFulfillment` order whose required machine-execution command was not created.
    If the kiosk is not `Operational`, the paid order remains queued. Cloud neither creates/delivers a new `ExecuteOrder` command nor cancels/refunds the order. Existing accepted/running execution evidence continues through its normal report lifecycle.
-20. Tablet status flow updates payment/order screen.
-21. Edge dispatch resolves one active execution endpoint and the active configuration release, then maps every machine-produced order line to an execution route and ordered robot programs.
-22. Cloud publishes a best-effort MQTT `CommandAvailable` wake-up after commit. Edge still finds the durable `ExecuteOrder` command through authenticated pull; periodic polling recovers missed wake-ups.
-23. Edge pulls executable command from Cloud.
-24. Edge performs fast runtime check with 5-10 second timeout.
-25. If ready, Edge accepts command and creates its own local execution state.
-26. Robot executor runs the approved artifact plan through its local integration.
-27. Edge records:
+21. Tablet status flow updates payment/order screen.
+22. Edge dispatch resolves one active execution endpoint and the active configuration release, then maps every machine-produced order line to an execution route and ordered robot programs.
+23. Cloud publishes a best-effort MQTT `CommandAvailable` wake-up after commit. Edge still finds the durable `ExecuteOrder` command through authenticated pull; periodic polling recovers missed wake-ups.
+24. Edge pulls executable command from Cloud.
+25. Edge performs fast runtime check with 5-10 second timeout.
+26. If ready, Edge accepts command and creates its own local execution state.
+27. Robot executor runs the approved artifact plan through its local integration.
+28. Edge records:
    - execution status
-   - estimated inventory deduction
+   - optional physical stock-movement evidence when metering exists
    - telemetry/logs
-28. Edge syncs execution events/results to Cloud.
-29. Cloud finalizes:
+29. Edge syncs execution events/results to Cloud.
+30. Cloud finalizes:
+   - expected inventory consumption from the immutable order-item Recipe snapshot when a completed unit has no physical stock-movement evidence
    - Order = Completed
    - analytics
    - audit log
@@ -93,6 +99,20 @@ session. The endpoint active-command limit is a technical backstop, not a
 customer queue capacity setting.
 
 Payment success and robot execution are separate concerns. Tablet can show payment success before Edge accepts the executable command.
+
+Cash is a staff-confirmed settlement, not a payment-provider simulation. The
+public payment-session endpoint may create a pending `cash` transaction only
+while that method is active. It is seeded active in `Development` and absent or
+forced inactive in non-Development environments. Confirmation uses:
+
+```text
+POST /api/v1/management/orders/{orderId}/cash-payments/{paymentTransactionId}/confirm
+```
+
+The caller needs `cash-payments.confirm`; `Staff`, `Manager`, and `OrgAdmin`
+are rechecked against the order's organization/store/kiosk scope inside the
+handler. A retry after success returns the already-confirmed settlement without
+creating a second payment or dispatch.
 
 Store sales admission and active fulfillment are also separate concerns. Scheduled closing or an explicit sales pause stops runtime-menu access and new order placement, but does not cancel paid queue entries or stop accepted/running production. An Order placed before closure may create its payment session until its snapshotted `paymentDeadlineAt`; provider expiry is capped by that deadline. Once the deadline passes, no new session is created and the tablet must start a new Order. A verified late `Paid` webhook remains authoritative because money may already have moved.
 
@@ -293,6 +313,17 @@ and falls back to the organization OrgAdmin. The reminder does not advance or
 fail the item; management fulfillment commands remain authoritative.
 
 Event sync must be idempotent. Retrying a batch must not duplicate robot events, stock movements, or status transitions.
+
+## Inventory Evidence Modes
+
+Inventory does not require a sensor by default. A dispenser in `ManualEstimate`
+mode is sellable when staff has established a compatible, non-expired quantity
+estimate sufficient for the order. Successful completed production units reduce
+that estimate in Cloud. `SensorAssisted` accepts the same sales rule while
+retaining sensor observations for reconciliation. Only explicit
+`SensorRequired` configuration blocks sale for absent or stale calibrated sensor
+evidence. A sensor observation is physical evidence, not proof that Lua consumed
+the Recipe amount; it never changes tracking mode by itself.
 
 Production incident handling is a separate operational phase after evidence ingestion. Staff inspect possible output, then choose delivery, discard, exact-unit remake, technical review, no action, or explicitly acknowledged full-order refund/voucher. Remake and compensation identities are linked back to the incident. Successful-unit and stock evidence remain historical truth; resolution does not erase them. See [Production Incident Resolution Flow](PRODUCTION_INCIDENT_RESOLUTION_FLOW.md).
 

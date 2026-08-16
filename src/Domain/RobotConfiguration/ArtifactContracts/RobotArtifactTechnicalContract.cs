@@ -123,10 +123,10 @@ public sealed class RobotArtifactTechnicalContract : BusinessEntity
         }
     }
 
-    public void Publish(DateTimeOffset now, Guid? actorId, bool parameterizedRuntimeSupported)
+    public void Publish(DateTimeOffset now, Guid? actorId)
     {
         EnsureDraft();
-        ValidateForPublication(parameterizedRuntimeSupported);
+        ValidateForPublication();
 
         var document = new
         {
@@ -159,12 +159,11 @@ public sealed class RobotArtifactTechnicalContract : BusinessEntity
         UpdatedByAccountId = actorId;
     }
 
-    public void ValidateForPublication(bool parameterizedRuntimeSupported)
+    public void ValidateForPublication()
     {
         EnsureDraft();
         if (_effects.Count == 0)
             throw new DomainRuleException("A robot artifact technical contract requires effects before publication.");
-        _ = parameterizedRuntimeSupported; // Retained for source compatibility; declarations do not prove runtime support.
     }
 
     public void Retire(DateTimeOffset now, Guid? actorId)

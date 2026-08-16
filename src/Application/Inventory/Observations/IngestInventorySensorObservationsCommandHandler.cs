@@ -94,7 +94,7 @@ public sealed class IngestInventorySensorObservationsCommandHandler(
             var latestSequence = await observations.GetLatestAppliedSequenceAsync(
                 command.SourceExecutorId, state.Id, cancellationToken);
             var stale = latestSequence.HasValue && input.ObservationSequence <= latestSequence.Value ||
-                        state.LastMeasuredAt != default && input.ObservedAt <= state.LastMeasuredAt;
+                        state.LastSensorObservedAt.HasValue && input.ObservedAt <= state.LastSensorObservedAt.Value;
 
             var payloadJson = input.SensorPayload?.GetRawText();
             decimal? derivedEstimate = null;

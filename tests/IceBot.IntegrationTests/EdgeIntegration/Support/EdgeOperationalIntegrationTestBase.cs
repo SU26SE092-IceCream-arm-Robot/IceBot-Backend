@@ -31,6 +31,7 @@ using Application.Orders.Management.Commands;
 using Application.Orders.PlaceOrder.Queries;
 using Application.ProductionConfiguration.Releases.Commands;
 using Application.ProductionConfiguration.Deployments.Commands;
+using Application.ProductionConfiguration.Deployments.Services;
 using Application.ProductionConfiguration.Routes.Commands;
 using Application.ProductionConfiguration.Bindings;
 using Application.ProductionConfiguration.Releases.Services;
@@ -80,6 +81,7 @@ using Infrastructure.ProductionPackages;
 using Infrastructure.RobotConfiguration.Artifacts.Persistence;
 using Infrastructure.RobotConfiguration.ArtifactContracts;
 using Infrastructure.RobotConfiguration.Programs.Persistence;
+using Infrastructure.Operations.Persistence;
 using Infrastructure.Persistence.Jobs;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -229,7 +231,16 @@ public abstract class EdgeOperationalIntegrationTestBase
             1,
             recipeSnapshotJson: JsonSerializer.Serialize(new
             {
-                Ingredients = new[] { new { graph.IngredientId } }
+                Ingredients = new[]
+                {
+                    new
+                    {
+                        graph.IngredientId,
+                        Quantity = 10m,
+                        Unit = "gram",
+                        IsOptional = false
+                    }
+                }
             }));
         var now = DateTimeOffset.UtcNow;
         order.Place(now, now.AddMinutes(15));
@@ -294,7 +305,8 @@ public abstract class EdgeOperationalIntegrationTestBase
         Guid releaseId,
         string releaseChecksum,
         IReadOnlyCollection<StockMovementEvidenceInput>? stockMovements = null,
-        int productionUnitNo = 1)
+        int productionUnitNo = 1,
+        string? errorCode = null)
     {
         var result = await IngestProductionAsync(
             graph,
@@ -305,7 +317,8 @@ public abstract class EdgeOperationalIntegrationTestBase
             releaseId,
             releaseChecksum,
             stockMovements,
-            productionUnitNo);
+            productionUnitNo,
+            errorCode);
         Assert.True(result.Succeeded, result.Message);
     }
 
@@ -315,11 +328,12 @@ public abstract class EdgeOperationalIntegrationTestBase
             Guid commandId,
             Guid? productionJobId,
             long sequenceNumber,
-            string status,
-            Guid releaseId,
-            string releaseChecksum,
-            IReadOnlyCollection<StockMovementEvidenceInput>? stockMovements = null,
-            int productionUnitNo = 1)
+        string status,
+        Guid releaseId,
+        string releaseChecksum,
+        IReadOnlyCollection<StockMovementEvidenceInput>? stockMovements = null,
+        int productionUnitNo = 1,
+        string? errorCode = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
         Guid? orderItemId = null;
@@ -361,6 +375,7 @@ public abstract class EdgeOperationalIntegrationTestBase
                 SourceConfigurationReleaseId = releaseId,
                 ReleaseChecksum = releaseChecksum,
                 PhysicalOutputMayHaveOccurred = status is "Running" or "Completed",
+                ErrorCode = errorCode,
                 StockMovements = normalizedStockMovements
             });
     }
@@ -648,7 +663,6 @@ public abstract class EdgeOperationalIntegrationTestBase
             $"EDGE-{Guid.NewGuid():N}",
             KioskExecutionProfile.FullEdge,
             ExecutionEndpointAuthenticationMode.MutualTls);
-        endpoint.ReplaceSupportedRobotTargets([(RuntimeTargetCode, MachineModelCode, null)]);
 
         dbContext.AddRange(
             account,
@@ -680,6 +694,13 @@ public abstract class EdgeOperationalIntegrationTestBase
             CapabilityCode = "ICE_CREAM",
             IsAvailable = true
         });
+        var connectivity = KioskConnectivityProjection.Create(kiosk.Id, DateTimeOffset.UtcNow);
+        connectivity.Observe(
+            KioskConnectivityStatus.Online,
+            endpoint.FullEdgeRuntimeId!.Value,
+            heartbeatSequence: 1,
+            observedAt: DateTimeOffset.UtcNow);
+        dbContext.KioskConnectivityProjections.Add(connectivity);
         await dbContext.SaveChangesAsync();
 
         return new SmokeGraph(
@@ -734,9 +755,9 @@ public abstract class EdgeOperationalIntegrationTestBase
                 $"SMOKE-{Guid.NewGuid():N}", 1, RuntimeTargetCode, MachineModelCode, graph.OrganizationId);
             technicalContract.ReplaceDefinition(
                 [new RobotArtifactEffectDefinition("MAKE_ICE_CREAM", RobotArtifactEffectKind.System, null, null,
-                    RobotArtifactQuantityMode.None, null, null, null)],
+                    RobotArtifactQuantityMode.None, null, null, "ICE_CREAM")],
                 []);
-            technicalContract.Publish(DateTimeOffset.UtcNow, user.AccountId, parameterizedRuntimeSupported: false);
+            technicalContract.Publish(DateTimeOffset.UtcNow, user.AccountId);
             await technicalContractStore.AddAsync(technicalContract, CancellationToken.None);
             var objectStorage = _fixture.CreateObjectStorage(autoCreateBucket: true);
             var upload = new UploadRobotArtifactCommandHandler(
@@ -892,13 +913,34 @@ public abstract class EdgeOperationalIntegrationTestBase
 
             var edgeStore = new EdgeCommandStore(dbContext);
             var deploymentWakeUpPublisher = new NoOpEdgeCommandWakeUpPublisher { PublishResult = false };
+            var deploymentPreviewChecksum = new string('d', 64);
+            var deploymentPreview = new FixedDeploymentPreviewService(
+                new ConfigurationDeploymentPreview(
+                    releaseId,
+                    publishedRelease.Data!.ReleaseChecksum!,
+                    graph.KioskId,
+                    false,
+                    [new ConfigurationDeploymentEndpointPreview(
+                        graph.EndpointId,
+                        "SMOKE-ENDPOINT",
+                        "FullEdge",
+                        true,
+                        [], [], [], [], ["BundleInstall"], 0, 0, null, null,
+                        deploymentPreviewChecksum,
+                        new DeploymentValidationReport(
+                            deploymentPreviewChecksum,
+                            "UnprovenPhysicalBehavior",
+                            [],
+                            false))]));
             var deployed = await new DeployFullEdgeConfigurationCommandHandler(
                 deploymentStore,
                 releaseStore,
                 edgeStore,
                 deploymentWakeUpPublisher,
                 inventoryReadiness,
-                new FullEdgeReleaseBundleService(_fixture.CreateObjectStorage(autoCreateBucket: true))).HandleAsync(
+                new FullEdgeReleaseBundleService(_fixture.CreateObjectStorage(autoCreateBucket: true)),
+                deploymentPreview,
+                new DeploymentOperationAuditWriter(new OperationLogStore(dbContext))).HandleAsync(
                 new DeployFullEdgeConfigurationCommand
                 {
                     UserContext = user,
@@ -906,7 +948,8 @@ public abstract class EdgeOperationalIntegrationTestBase
                     ConfigurationReleaseId = releaseId,
                     KioskExecutionEndpointId = graph.EndpointId,
                     IdempotencyKey = Guid.NewGuid().ToString("N"),
-                    Reason = "Edge operational integration deployment"
+                    Reason = "Edge operational integration deployment",
+                    DeploymentPreviewChecksum = deploymentPreviewChecksum
                 });
             Assert.True(deployed.Succeeded, deployed.Message);
             deploymentId = deployed.Data!.Id;
@@ -939,4 +982,18 @@ public abstract class EdgeOperationalIntegrationTestBase
         Guid DeploymentId,
         Guid DeploymentCommandId,
         string ReleaseChecksum);
+
+    private sealed class FixedDeploymentPreviewService(ConfigurationDeploymentPreview preview)
+        : IConfigurationDeploymentPreviewService
+    {
+        public Task<Application.Shared.Wrappers.ApiResult<ConfigurationDeploymentPreview>> HandleAsync(
+            CurrentUserContext user,
+            Guid kioskId,
+            Guid releaseId,
+            Guid? endpointId,
+            IReadOnlyCollection<DeploymentPreviewSelection> requestedSelections,
+            CancellationToken cancellationToken,
+            bool allowRetiredRelease = false) =>
+            Task.FromResult(Application.Shared.Wrappers.ApiResult<ConfigurationDeploymentPreview>.Success(preview));
+    }
 }

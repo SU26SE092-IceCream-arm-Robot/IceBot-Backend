@@ -17,10 +17,16 @@ public interface IInventoryReadinessEvaluator
         InventoryReadinessEvaluationOptions? options = null);
 }
 
+public enum InventoryReadinessEvaluationPurpose
+{
+    TopologyValidation = 0,
+    RuntimeSellability = 1
+}
+
 public sealed record InventoryReadinessEvaluationOptions(
-    bool RequireQuantifiedEvidence = false,
+    InventoryReadinessEvaluationPurpose Purpose = InventoryReadinessEvaluationPurpose.TopologyValidation,
     DateTimeOffset? ObservedAt = null,
-    TimeSpan? MaximumEvidenceAge = null);
+    TimeSpan? MaximumSensorEvidenceAge = null);
 
 public sealed record InventoryIngredientRequirementInput(
     Guid IngredientId,

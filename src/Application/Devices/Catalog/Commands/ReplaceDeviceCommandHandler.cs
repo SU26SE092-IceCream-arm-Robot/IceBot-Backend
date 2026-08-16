@@ -113,6 +113,7 @@ public sealed class ReplaceDeviceCommandHandler(
                 sourceState.CapacityQuantity,
                 sourceState.Unit,
                 sourceState.LevelToQuantityProfileJson);
+            replacement.ChangeTrackingMode(sourceState.TrackingMode);
 
             var transferredQuantity = 0m;
             if (previousEstimate is > 0)

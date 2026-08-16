@@ -57,9 +57,9 @@ public class ControllerArtifactSetDeployment : AuditedEntity
         Guid? requestedByAccountId,
         DateTimeOffset requestedAt,
         IEnumerable<ControllerArtifactSetItemSnapshot> items,
-        string validationReportChecksum = "legacy",
-        string riskLevel = "Legacy",
-        string warningCodesJson = "[]",
+          string validationReportChecksum,
+          string riskLevel,
+          string warningCodesJson,
         Guid? riskAcknowledgedByAccountId = null,
         DateTimeOffset? riskAcknowledgedAt = null)
     {
@@ -68,6 +68,15 @@ public class ControllerArtifactSetDeployment : AuditedEntity
             activeSetVersion <= 0 || string.IsNullOrWhiteSpace(idempotencyKey) || maxArtifactCount <= 0 || maxArtifactStorageBytes <= 0)
         {
             throw new DomainRuleException("A published release, active low-cost endpoint, positive active-set version, and capacity limits are required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(validationReportChecksum) ||
+            string.IsNullOrWhiteSpace(riskLevel) ||
+            string.IsNullOrWhiteSpace(warningCodesJson) ||
+            string.Equals(validationReportChecksum, "legacy", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(riskLevel, "legacy", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new DomainRuleException("Controller artifact-set deployment requires non-legacy validation evidence.");
         }
 
         var deployment = new ControllerArtifactSetDeployment

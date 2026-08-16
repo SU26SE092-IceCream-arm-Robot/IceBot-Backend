@@ -282,7 +282,7 @@ public sealed class RobotArtifactTechnicalContractHandlers(
                 return ApiResult<RobotArtifactTechnicalContractResult>.Fail("Technical contract not found.", 404);
             try
             {
-                contract.Publish(DateTimeOffset.UtcNow, command.UserContext.AccountId, parameterizedRuntimeSupported: false);
+                contract.Publish(DateTimeOffset.UtcNow, command.UserContext.AccountId);
                 await store.SaveChangesAsync(ct);
                 return ApiResult<RobotArtifactTechnicalContractResult>.Success(RobotArtifactTechnicalContractResult.From(contract));
             }
@@ -321,7 +321,7 @@ public sealed class RobotArtifactTechnicalContractHandlers(
             return ApiResult<RobotArtifactTechnicalContractResult>.Fail("Technical contract not found.", 404);
         try
         {
-            contract.ValidateForPublication(parameterizedRuntimeSupported: false);
+            contract.ValidateForPublication();
             return ApiResult<RobotArtifactTechnicalContractResult>.Success(
                 RobotArtifactTechnicalContractResult.From(contract), "Technical contract is ready for publication.");
         }

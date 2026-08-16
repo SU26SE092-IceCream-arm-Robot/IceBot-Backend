@@ -266,7 +266,7 @@ public sealed class ProductionPackageDefinitionValidatorTests
             new RobotArtifactEffectDefinition(effectCode, effectKind, null, optionCode,
                 RobotArtifactQuantityMode.None, null, null, "ROBOT_ARM")
         ], []);
-        contract.Publish(DateTimeOffset.UtcNow, null, false);
+        contract.Publish(DateTimeOffset.UtcNow, null);
         return contract;
     }
 

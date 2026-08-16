@@ -163,6 +163,13 @@ public static class PermissionCatalog
         },
         new()
         {
+            Policy = "cash-payments.confirm",
+            Description = "Confirm staff-received cash payments for orders within assigned scope.",
+            Roles = new[] { "OrgAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "payment-methods.manage",
             Description = "Manage the global payment-method catalog status.",
             Roles = new[] { "SystemAdmin" },

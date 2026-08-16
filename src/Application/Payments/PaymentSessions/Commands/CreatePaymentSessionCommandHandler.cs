@@ -47,8 +47,11 @@ public sealed class CreatePaymentSessionCommandHandler
         var scopedIdempotencyKey = ScopedIdempotencyKey.ForOrder(orderId, idempotencyKey);
         var paymentMethodCode = request.PaymentMethodCode.Trim().ToLowerInvariant();
         var expectedCurrency = request.ExpectedCurrency.Trim().ToUpperInvariant();
+        var isCashPayment = CashPaymentMethodResolver.IsCash(paymentMethodCode);
+        var isPayOsPayment = string.Equals(paymentMethodCode, PayOsPaymentMethodResolver.MethodCode, StringComparison.Ordinal);
+        var providerCode = isCashPayment ? CashPaymentMethodResolver.ProviderCode : _paymentGateway.ProviderCode;
 
-        if (!string.Equals(paymentMethodCode, PayOsPaymentMethodResolver.MethodCode, StringComparison.Ordinal))
+        if (!isCashPayment && !isPayOsPayment)
         {
             return ApiResult<PaymentSessionResult>.Fail("Payment method is not supported.", 400);
         }
@@ -73,7 +76,7 @@ public sealed class CreatePaymentSessionCommandHandler
                 ct);
             if (existingByIdempotencyKey is not null)
             {
-                if (!MatchesRequest(existingByIdempotencyKey, orderId, paymentMethodCode, expectedCurrency, request.ExpectedAmount))
+                if (!MatchesRequest(existingByIdempotencyKey, orderId, paymentMethodCode, providerCode, expectedCurrency, request.ExpectedAmount))
                 {
                     return ApiResult<PaymentSessionResult>.Fail(
                         "Idempotency key was already used for a different payment request.",
@@ -95,7 +98,11 @@ public sealed class CreatePaymentSessionCommandHandler
                         409);
                 }
 
-                return !HasPaymentInstructions(existingByIdempotencyKey) &&
+                return isCashPayment && IsPendingCashConfirmation(existingByIdempotencyKey)
+                    ? ApiResult<PaymentSessionResult>.Success(
+                        PaymentSessionResultMapper.ToSessionResult(existingByIdempotencyKey),
+                        "Cash payment is awaiting staff confirmation.")
+                    : !HasPaymentInstructions(existingByIdempotencyKey) &&
                     existingByIdempotencyKey.Status is PaymentTransactionStatus.Pending or PaymentTransactionStatus.Authorized
                     ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry with the same idempotency key.", 409)
                     : ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(existingByIdempotencyKey));
@@ -149,7 +156,11 @@ public sealed class CreatePaymentSessionCommandHandler
             var activeSession = await _paymentStore.GetActivePaymentTransactionByOrderIdAsync(order.Id, ct);
             if (activeSession is not null)
             {
-                return !HasPaymentInstructions(activeSession)
+                return isCashPayment && IsPendingCashConfirmation(activeSession)
+                    ? ApiResult<PaymentSessionResult>.Success(
+                        PaymentSessionResultMapper.ToSessionResult(activeSession),
+                        "Existing cash payment is awaiting staff confirmation.")
+                    : !HasPaymentInstructions(activeSession)
                     ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry shortly.", 409)
                     : ApiResult<PaymentSessionResult>.Success(
                         PaymentSessionResultMapper.ToSessionResult(activeSession),
@@ -168,10 +179,18 @@ public sealed class CreatePaymentSessionCommandHandler
                     .AddDetail("orderCurrency", order.Currency);
             }
 
-            var paymentMethod = await PayOsPaymentMethodResolver.EnsurePayOsPaymentMethodAsync(_paymentStore, _paymentGateway.ProviderCode, ct);
+            var paymentMethod = isCashPayment
+                ? await CashPaymentMethodResolver.GetCashPaymentMethodAsync(_paymentStore, ct)
+                : await PayOsPaymentMethodResolver.EnsurePayOsPaymentMethodAsync(_paymentStore, _paymentGateway.ProviderCode, ct);
+            if (paymentMethod is null)
+            {
+                return ApiResult<PaymentSessionResult>.Fail("Cash payment method is not configured.", 409);
+            }
             if (!paymentMethod.IsActive)
             {
-                return ApiResult<PaymentSessionResult>.Fail("PayOS payment method is inactive.", 409);
+                return ApiResult<PaymentSessionResult>.Fail(
+                    isCashPayment ? "Cash payment method is inactive." : "PayOS payment method is inactive.",
+                    409);
             }
 
             var paymentTransaction = new PaymentTransaction
@@ -181,7 +200,7 @@ public sealed class CreatePaymentSessionCommandHandler
                 TransactionNumber = PaymentTransactionNumberGenerator.GenerateTransactionNumber(now),
                 IdempotencyKey = scopedIdempotencyKey,
                 CorrelationId = order.CorrelationId,
-                Provider = _paymentGateway.ProviderCode,
+                Provider = providerCode,
                 Amount = order.TotalAmount,
                 Currency = order.Currency,
                 Status = PaymentTransactionStatus.Pending,
@@ -194,7 +213,10 @@ public sealed class CreatePaymentSessionCommandHandler
                     idempotencyKey
                 })
             };
-            paymentTransaction.ProviderOrderCode = _paymentGateway.CreateProviderOrderCode(paymentTransaction.Id);
+            if (!isCashPayment)
+            {
+                paymentTransaction.ProviderOrderCode = _paymentGateway.CreateProviderOrderCode(paymentTransaction.Id);
+            }
 
             await _paymentStore.AddPaymentTransactionAsync(paymentTransaction, ct);
             await _paymentStore.SaveChangesAsync(ct);
@@ -208,9 +230,11 @@ public sealed class CreatePaymentSessionCommandHandler
             return createResult;
         }
 
-        if (!createdNewTransaction)
+        if (!createdNewTransaction || isCashPayment)
         {
-            return createResult;
+            return isCashPayment && createResult.Succeeded
+                ? ApiResult<PaymentSessionResult>.Success(createResult.Data!, "Cash payment is awaiting staff confirmation.")
+                : createResult;
         }
 
         var payment = await _paymentStore.GetPaymentTransactionByIdAsync(createResult.Data.PaymentTransactionId, cancellationToken);
@@ -280,18 +304,23 @@ public sealed class CreatePaymentSessionCommandHandler
         PaymentTransaction transaction,
         Guid orderId,
         string paymentMethodCode,
+        string providerCode,
         string expectedCurrency,
         decimal expectedAmount) =>
         transaction.OrderId == orderId &&
         transaction.PaymentMethod is not null &&
         string.Equals(transaction.PaymentMethod.Code, paymentMethodCode, StringComparison.OrdinalIgnoreCase) &&
-        string.Equals(transaction.Provider, _paymentGateway.ProviderCode, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(transaction.Provider, providerCode, StringComparison.OrdinalIgnoreCase) &&
         transaction.Amount == expectedAmount &&
         string.Equals(transaction.Currency, expectedCurrency, StringComparison.OrdinalIgnoreCase);
 
     private static bool HasPaymentInstructions(PaymentTransaction transaction) =>
         !string.IsNullOrWhiteSpace(transaction.CheckoutUrl) ||
         !string.IsNullOrWhiteSpace(transaction.QrCodePayload);
+
+    private static bool IsPendingCashConfirmation(PaymentTransaction transaction) =>
+        CashPaymentMethodResolver.IsCash(transaction.PaymentMethod?.Code) &&
+        transaction.Status is PaymentTransactionStatus.Pending or PaymentTransactionStatus.Authorized;
 
     private static bool HasExpiredOrderPaymentWindow(Order order, DateTimeOffset observedAt) =>
         order.PaymentDeadlineAt != default && order.PaymentDeadlineAt <= observedAt;

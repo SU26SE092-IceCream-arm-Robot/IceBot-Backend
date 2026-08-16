@@ -23,6 +23,7 @@ public static class DevicesModule
         services.AddScoped<IngestLocalOperationLogCommandHandler>();
         services.AddScoped<IngestBatchEventsCommandHandler>();
         services.AddScoped<IngestExecutionReadinessCommandHandler>();
+        services.AddScoped<ReplaceExecutionEndpointReportedDevicesCommandHandler>();
         services.AddScoped<ReconcileKioskConnectivityCommandHandler>();
 
         services.AddScoped<ListDevicesQueryHandler>();
@@ -45,7 +46,6 @@ public static class DevicesModule
         services.AddScoped<ListExecutionEndpointsQueryHandler>();
         services.AddScoped<GetExecutionEndpointQueryHandler>();
         services.AddScoped<CreateExecutionEndpointCommandHandler>();
-        services.AddScoped<ReplaceExecutionEndpointRobotTargetsCommandHandler>();
         services.AddScoped<ProvisionExecutionEndpointCommandHandler>();
         services.AddScoped<DisableExecutionEndpointCommandHandler>();
         services.AddScoped<ReactivateExecutionEndpointCommandHandler>();

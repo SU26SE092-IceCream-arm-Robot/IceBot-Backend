@@ -444,7 +444,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
             [new RobotArtifactEffectDefinition("MAKE_BASE", RobotArtifactEffectKind.Motion, null, null,
                 RobotArtifactQuantityMode.None, null, null, "ROBOT_ARM")],
             []);
-        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
         return contract;
     }
 

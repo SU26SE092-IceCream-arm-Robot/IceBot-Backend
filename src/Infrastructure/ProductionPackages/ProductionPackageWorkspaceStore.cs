@@ -123,7 +123,7 @@ public sealed class ProductionPackageWorkspaceStore(
             : null;
 
         var endpoints = installation.KioskId.HasValue
-            ? await db.KioskExecutionEndpoints.AsNoTracking().Include(x => x.SupportedRobotTargets)
+            ? await db.KioskExecutionEndpoints.AsNoTracking()
                 .Where(x => x.KioskId == installation.KioskId && x.Status == KioskExecutionEndpointStatus.Active)
                 .ToListAsync(cancellationToken)
             : [];

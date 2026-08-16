@@ -1,5 +1,5 @@
-using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.Catalog;
+using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Application.Devices.Connectivity.Abstractions;

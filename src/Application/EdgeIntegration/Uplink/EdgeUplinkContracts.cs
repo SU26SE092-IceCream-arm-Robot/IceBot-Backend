@@ -15,6 +15,7 @@ public static class EdgeUplinkMessageTypes
     public const string Heartbeat = "heartbeat";
     public const string TelemetryEvents = "telemetry-events";
     public const string Readiness = "readiness";
+    public const string ReportedDevices = "reported-devices";
     public const string ExecutionReport = "execution-report";
     public const string ProductionEvents = "production-events";
     public const string StateSummaries = "state-summaries";
@@ -25,6 +26,7 @@ public static class EdgeUplinkMessageTypes
             Heartbeat,
             TelemetryEvents,
             Readiness,
+            ReportedDevices,
             ExecutionReport,
             ProductionEvents,
             StateSummaries,
@@ -168,6 +170,23 @@ public sealed class EdgeExecutionCapabilityUplink
     public bool IsAvailable { get; init; }
     public string? UnavailableReason { get; init; }
 }
+
+public sealed class EdgeReportedDevicesUplink
+{
+    public Guid SourceExecutorId { get; init; }
+    public long SnapshotRevision { get; init; }
+    public DateTimeOffset ObservedAt { get; init; }
+    public IReadOnlyList<EdgeReportedDeviceUplink> Devices { get; init; } = [];
+}
+
+public sealed class EdgeReportedDeviceUplink
+{
+    public string SourceDeviceKey { get; init; } = string.Empty;
+    public Guid? DeviceId { get; init; }
+    public string RuntimeTargetCode { get; init; } = string.Empty;
+    public string MachineModelCode { get; init; } = string.Empty;
+}
+
 
 public sealed class EdgeExecutionReportUplink
 {

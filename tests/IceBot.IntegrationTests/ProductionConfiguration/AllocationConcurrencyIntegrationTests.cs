@@ -84,7 +84,11 @@ public sealed class AllocationConcurrencyIntegrationTests
                     graph.ReleaseChecksum,
                     attempt,
                     Guid.NewGuid().ToString("N"),
-                    DateTimeOffset.UtcNow);
+                    DateTimeOffset.UtcNow,
+                    null,
+                    "validation-checksum",
+                    "UnprovenPhysicalBehavior",
+                    "[]");
                 deployment.MarkCommandExpired(DateTimeOffset.UtcNow);
                 await store.AddFullEdgeDeploymentAsync(deployment, cancellationToken);
                 await store.SaveChangesAsync(cancellationToken);

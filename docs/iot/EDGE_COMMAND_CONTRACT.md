@@ -111,9 +111,9 @@ Rules:
 Before command pull, Cloud management must create and activate a `KioskExecutionEndpoint`:
 
 1. Create the endpoint in `Provisioning` for one kiosk and one execution profile.
-2. Replace its supported robot targets using runtime-target code, machine-model code, and optional same-kiosk device binding.
-3. Provision profile-specific authentication material and a profile identity.
-4. Activate the endpoint; only an Active endpoint with an Active credential may authenticate command pull or report execution state.
+2. Provision profile-specific authentication material and a profile identity.
+3. Activate the endpoint; only an Active endpoint with an Active credential may authenticate command pull or report execution state.
+4. On startup/reconnect, the authenticated Edge reports its observed device/runtime snapshot. Provisioning itself does not require a hardware report.
 
 Full Edge uses `FullEdgeRuntimeId` and requires `MutualTls`; provisioning accepts the client certificate SHA-256 fingerprint. Low-cost uses `ControllerId` and requires `SignedCommandTls`; provisioning accepts an ECDSA NIST P-256 public key PEM. The backend stores only the canonical public key and its SHA-256 fingerprint, never the controller private key. Disabling or retiring an endpoint blocks runtime authentication without deleting deployment or execution history.
 
@@ -141,7 +141,7 @@ All IoT routes require HTTPS. The authenticated `KioskExecutionEndpoint` is
 identified by `{endpointId}` in the route; Cloud derives `KioskId` from that
 endpoint instead of trusting a second route or header identity.
 
-Persistence uses the same boundary: readiness, supported-target, telemetry,
+Persistence uses the same boundary: readiness, reported-device, telemetry,
 alert, deployment, and execution projection rows cannot pair an endpoint or
 device with a different kiosk. Deployments also require the selected release
 and kiosk to belong to the same organization. Production execution reports

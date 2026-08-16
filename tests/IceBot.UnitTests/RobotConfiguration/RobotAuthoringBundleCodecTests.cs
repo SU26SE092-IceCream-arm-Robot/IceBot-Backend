@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 using Application.RobotConfiguration.AuthoringImports;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace IceBot.UnitTests.RobotConfiguration;
 
@@ -15,6 +16,7 @@ public sealed class RobotAuthoringBundleCodecTests
         var bundle = RobotAuthoringBundleCodec.Parse(bytes);
 
         Assert.Equal("MAKE_ICE_CREAM", bundle.Manifest.Program.Code);
+        Assert.Equal(RobotRuntimeProfileSource.BundleDeclared, bundle.RuntimeProfileSource);
         Assert.Collection(bundle.Items,
             first => { Assert.Equal(1, first.ManifestItem.RunOrder); Assert.Equal("PREPARE", first.Sidecar.ArtifactCode); },
             second => { Assert.Equal(2, second.ManifestItem.RunOrder); Assert.Equal("DISPENSE", second.Sidecar.ArtifactCode); });
@@ -57,24 +59,19 @@ public sealed class RobotAuthoringBundleCodecTests
     }
 
     [Fact]
-    public void Parse_V2FixedQuantityWithoutUnit_RejectsBundle()
+    public void Parse_V2FixedQuantityWithoutUnit_DoesNotTreatSemanticMetadataAsProof()
     {
         var bytes = CreateSingleV2Bundle(fixedQuantity: 100, unit: null);
 
-        var exception = Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
-
-        Assert.Contains("positive value and unit", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(RobotAuthoringBundleCodec.Parse(bytes));
     }
 
     [Fact]
-    public void Parse_V2SystemEffectWithOptionCode_RejectsBundle()
+    public void Parse_V2SystemEffectWithOptionCode_DoesNotGateBlackBoxLua()
     {
         var bytes = CreateSingleSemanticBundle(2, null, null, "System", null, "OREO", "None");
 
-        var exception = Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
-
-        Assert.Contains("cannot declare ingredientCode or optionCode", exception.Message,
-            StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(RobotAuthoringBundleCodec.Parse(bytes));
     }
 
     [Fact]
@@ -98,14 +95,11 @@ public sealed class RobotAuthoringBundleCodecTests
     }
 
     [Fact]
-    public void Parse_CompositeEffect_RejectsCurrentAuthoringSchema()
+    public void Parse_CompositeEffect_DoesNotGateBlackBoxLua()
     {
         var bytes = CreateSingleSemanticBundle(2, null, null, "Composite", null, null, "None");
 
-        var exception = Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
-
-        Assert.Contains("not supported by authoring schema V2", exception.Message,
-            StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(RobotAuthoringBundleCodec.Parse(bytes));
     }
 
     [Fact]
@@ -138,19 +132,18 @@ public sealed class RobotAuthoringBundleCodecTests
         Assert.Equal("REAL-DEMO-1408", bundle.Manifest.Program.Code);
         Assert.Equal(RobotAuthoringBundleCodec.DefaultRuntimeTargetCode, bundle.Manifest.Program.RuntimeTargetCode);
         Assert.Equal(RobotAuthoringBundleCodec.DefaultMachineModelCode, bundle.Manifest.Program.MachineModelCode);
+        Assert.Equal(RobotRuntimeProfileSource.SystemDefault, bundle.RuntimeProfileSource);
         Assert.Collection(bundle.Items,
             first =>
             {
                 Assert.Equal("first.lua", first.ManifestItem.FileName);
                 Assert.Equal(1, first.ManifestItem.RunOrder);
-                Assert.False(first.HasTechnicalDeclaration);
                 Assert.Empty(first.Sidecar.Effects);
             },
             second =>
             {
                 Assert.Equal("second.lua", second.ManifestItem.FileName);
                 Assert.Equal(2, second.ManifestItem.RunOrder);
-                Assert.False(second.HasTechnicalDeclaration);
             });
     }
 
@@ -188,23 +181,21 @@ public sealed class RobotAuthoringBundleCodecTests
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, true)]
-    public void Parse_NullSidecarCollections_RejectsBundleWithoutNullReference(
+    public void Parse_NullSidecarSemanticCollections_DoesNotGateHardwareMetadata(
         bool nullEffects, bool nullOrderingConstraints)
     {
         var bytes = CreateSingleSemanticBundle(2, 100, "gram",
             nullEffects: nullEffects, nullOrderingConstraints: nullOrderingConstraints);
 
-        Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
+        Assert.NotNull(RobotAuthoringBundleCodec.Parse(bytes));
     }
 
     [Fact]
-    public void Parse_V1IngredientEffect_RejectsProductionSemantics()
+    public void Parse_V1IngredientEffect_DoesNotCertifyOrRejectLuaBehavior()
     {
         var bytes = CreateSingleSemanticBundle(schemaVersion: 1, fixedQuantity: 100, unit: "gram");
 
-        var exception = Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
-
-        Assert.Contains("schema version 1 is opaque", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(RobotAuthoringBundleCodec.Parse(bytes));
     }
 
     [Fact]
@@ -218,21 +209,41 @@ public sealed class RobotAuthoringBundleCodecTests
     }
 
     [Fact]
-    public void Parse_OversizedEffectCode_RejectsBundleBeforeStaging()
+    public void Parse_OversizedEffectCode_DoesNotGateHardwareMetadata()
     {
         var bytes = CreateBundle(firstEffectCode: new string('E', 101));
 
+        Assert.NotNull(RobotAuthoringBundleCodec.Parse(bytes));
+    }
+
+    [Fact]
+    public void Parse_SidecarRuntimeProfileDiffersFromManifest_RejectsBundle()
+    {
+        var bytes = CreateBundle(firstMachineModelCode: "FR3");
+
         var exception = Assert.Throws<RobotAuthoringBundleException>(() => RobotAuthoringBundleCodec.Parse(bytes));
 
-        Assert.Contains("Effect code", exception.Message, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("at most 100", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("must match the program manifest", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Parse_ManifestWithoutSidecar_AcceptsHardwareOnlyBundle()
+    {
+        var bytes = CreateBundle(includeFirstSidecar: false);
+
+        var bundle = RobotAuthoringBundleCodec.Parse(bytes);
+
+        Assert.Equal("FR5", bundle.Manifest.Program.MachineModelCode);
+        Assert.Empty(bundle.Items.First().Sidecar.Effects);
     }
 
     private static byte[] CreateBundle(
         int secondRunOrder = 2,
         string? extraEntry = null,
         string firstLuaFileName = "01_prepare.lua",
-        string? firstEffectCode = null)
+        string? firstEffectCode = null,
+        string firstMachineModelCode = "FR5",
+        bool includeFirstSidecar = true)
     {
         using var output = new MemoryStream();
         using (var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
@@ -250,13 +261,18 @@ public sealed class RobotAuthoringBundleCodecTests
                     machineModelCode = "FR5",
                     artifacts = new[]
                     {
-                        new { artifactCode = "PREPARE", fileName = firstLuaFileName, sidecarFileName = "01_prepare.icebot.json", runOrder = 1 },
-                        new { artifactCode = "DISPENSE", fileName = "02_dispense.lua", sidecarFileName = "02_dispense.icebot.json", runOrder = secondRunOrder }
+                        new { artifactCode = "PREPARE", fileName = firstLuaFileName,
+                            sidecarFileName = includeFirstSidecar ? "01_prepare.icebot.json" : null, runOrder = 1 },
+                        new { artifactCode = "DISPENSE", fileName = "02_dispense.lua",
+                            sidecarFileName = (string?)"02_dispense.icebot.json", runOrder = secondRunOrder }
                     }
                 }
             }));
-            WriteArtifact(archive, "PREPARE", firstLuaFileName, "01_prepare.icebot.json", "PREPARE", 1,
-                firstEffectCode);
+            if (includeFirstSidecar)
+                WriteArtifact(archive, "PREPARE", firstLuaFileName, "01_prepare.icebot.json", "PREPARE", 1,
+                    firstEffectCode, firstMachineModelCode);
+            else
+                Write(archive, $"artifacts/{firstLuaFileName}", "-- generated\nreturn 0");
             WriteArtifact(archive, "DISPENSE", "02_dispense.lua", "02_dispense.icebot.json", "BASE", 2);
             if (extraEntry is not null) Write(archive, extraEntry, "return 0");
         }
@@ -276,7 +292,7 @@ public sealed class RobotAuthoringBundleCodecTests
     }
 
     private static void WriteArtifact(ZipArchive archive, string code, string luaName, string sidecarName,
-        string phase, int sortHint, string? effectCode = null)
+        string phase, int sortHint, string? effectCode = null, string machineModelCode = "FR5")
     {
         Write(archive, $"artifacts/{luaName}", "-- generated\nreturn 0");
         Write(archive, $"contracts/{sidecarName}", JsonSerializer.Serialize(new
@@ -285,7 +301,7 @@ public sealed class RobotAuthoringBundleCodecTests
             artifactCode = code,
             artifactFileName = luaName,
             runtimeTargetCode = "FAIRINO_LUA_V1",
-            machineModelCode = "FR5",
+            machineModelCode,
             effects = new[] { new { effectCode = effectCode ?? $"{code}_EXECUTE", effectKind = "Motion", quantityMode = "None" } },
             orderingConstraints = new[] { new { constraintType = "Phase", value = phase, sortHint } }
         }));

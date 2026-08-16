@@ -55,9 +55,9 @@ public sealed class MachineProductionInventoryGate(
                 selectedOptionIngredients)],
             cancellationToken,
             new InventoryReadinessEvaluationOptions(
-                RequireQuantifiedEvidence: true,
-                ObservedAt: observedAt,
-                MaximumEvidenceAge: TimeSpan.FromSeconds(_telemetryOptions.ReadinessTimeoutSeconds)));
+                InventoryReadinessEvaluationPurpose.RuntimeSellability,
+                observedAt,
+                TimeSpan.FromSeconds(_telemetryOptions.ReadinessTimeoutSeconds)));
 
         return result is { IsReady: true }
             ? MachineProductionInventoryGateResult.Sellable

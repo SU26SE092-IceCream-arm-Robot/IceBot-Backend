@@ -142,6 +142,7 @@ public static class ScopeRoleSets
     public static readonly string[] OrdersManage = ["OrgAdmin", "Manager", "Staff"];
     public static readonly string[] RefundsManage = ["Manager", "Staff"];
     public static readonly string[] PaymentsManage = ["Manager"];
+    public static readonly string[] CashPaymentsConfirm = ["OrgAdmin", "Manager", "Staff"];
     public static readonly string[] DevicesManage = ["SystemAdmin", "OrgAdmin", "Manager", "Technician"];
     public static readonly string[] DevicesView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];
     public static readonly string[] AlertsView = ["SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician"];

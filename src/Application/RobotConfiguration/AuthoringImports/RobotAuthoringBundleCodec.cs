@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Domain.RobotConfiguration.ArtifactContracts;
+using Domain.RobotConfiguration.Artifacts;
 
 namespace Application.RobotConfiguration.AuthoringImports;
 
@@ -10,15 +11,15 @@ public sealed class RobotAuthoringBundleException(string message) : Exception(me
 
 public sealed record RobotAuthoringBundle(
     RobotAuthoringExportManifest Manifest,
-    IReadOnlyList<RobotAuthoringBundleItem> Items);
+    IReadOnlyList<RobotAuthoringBundleItem> Items,
+    RobotRuntimeProfileSource RuntimeProfileSource);
 
 public sealed record RobotAuthoringBundleItem(
     RobotAuthoringManifestArtifact ManifestItem,
     RobotAuthoringSidecar Sidecar,
     byte[] LuaBytes,
     string LuaChecksum,
-    string SidecarChecksum,
-    bool HasTechnicalDeclaration);
+    string SidecarChecksum);
 
 public sealed class RobotAuthoringExportManifest
 {
@@ -41,7 +42,7 @@ public sealed class RobotAuthoringManifestArtifact
 {
     public required string ArtifactCode { get; init; }
     public required string FileName { get; init; }
-    public required string SidecarFileName { get; init; }
+    public string? SidecarFileName { get; init; }
     public int RunOrder { get; init; }
 }
 
@@ -52,8 +53,8 @@ public sealed class RobotAuthoringSidecar
     public required string ArtifactFileName { get; init; }
     public required string RuntimeTargetCode { get; init; }
     public required string MachineModelCode { get; init; }
-    public required IReadOnlyList<RobotAuthoringSidecarEffect> Effects { get; init; }
-    public required IReadOnlyList<RobotAuthoringSidecarConstraint> OrderingConstraints { get; init; }
+    public IReadOnlyList<RobotAuthoringSidecarEffect> Effects { get; init; } = [];
+    public IReadOnlyList<RobotAuthoringSidecarConstraint> OrderingConstraints { get; init; } = [];
 }
 
 public sealed class RobotAuthoringSidecarEffect
@@ -88,7 +89,6 @@ public static class RobotAuthoringBundleCodec
     private const int MaximumCodeLength = 100;
     private const int MaximumNameLength = 200;
     private const int MaximumFileNameLength = 255;
-    private const int MaximumUnitLength = 50;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -172,25 +172,34 @@ public static class RobotAuthoringBundleCodec
         foreach (var manifestItem in manifest.Program.Artifacts.OrderBy(x => x.RunOrder))
         {
             var luaPath = $"artifacts/{NormalizeLeafName(manifestItem.FileName)}";
-            var sidecarPath = $"contracts/{NormalizeLeafName(manifestItem.SidecarFileName)}";
             var luaBytes = ReadEntry(entries, luaPath, MaximumLuaBytes);
-            var sidecarBytes = ReadEntry(entries, sidecarPath, MaximumSidecarBytes);
             RobotAuthoringSidecar sidecar;
-            try
+            byte[] sidecarBytes;
+            if (string.IsNullOrWhiteSpace(manifestItem.SidecarFileName))
             {
-                sidecar = JsonSerializer.Deserialize<RobotAuthoringSidecar>(TrimUtf8Bom(sidecarBytes), JsonOptions)
-                    ?? throw new RobotAuthoringBundleException($"Sidecar '{sidecarPath}' is empty.");
+                sidecarBytes = [];
+                sidecar = CreateMinimalSidecar(manifest.Program, manifestItem);
             }
-            catch (JsonException ex)
+            else
             {
-                throw new RobotAuthoringBundleException($"Sidecar '{sidecarPath}' is invalid: {ex.Message}");
+                var sidecarPath = $"contracts/{NormalizeLeafName(manifestItem.SidecarFileName)}";
+                sidecarBytes = ReadEntry(entries, sidecarPath, MaximumSidecarBytes);
+                try
+                {
+                    sidecar = JsonSerializer.Deserialize<RobotAuthoringSidecar>(TrimUtf8Bom(sidecarBytes), JsonOptions)
+                        ?? throw new RobotAuthoringBundleException($"Sidecar '{sidecarPath}' is empty.");
+                }
+                catch (JsonException ex)
+                {
+                    throw new RobotAuthoringBundleException($"Sidecar '{sidecarPath}' is invalid: {ex.Message}");
+                }
+                ValidateSidecar(manifest.Program, manifestItem, sidecar);
             }
-            ValidateSidecar(manifest.Program, manifestItem, sidecar);
             items.Add(new RobotAuthoringBundleItem(manifestItem, sidecar, luaBytes,
-                Sha256(luaBytes), Sha256(sidecarBytes), HasTechnicalDeclaration: true));
+                Sha256(luaBytes), Sha256(sidecarBytes)));
         }
 
-        return new RobotAuthoringBundle(manifest, items);
+        return new RobotAuthoringBundle(manifest, items, RobotRuntimeProfileSource.BundleDeclared);
     }
 
     private static RobotAuthoringBundle ParseRawLuaArchive(
@@ -241,8 +250,7 @@ public static class RobotAuthoringBundleCodec
                 },
                 luaBytes,
                 Sha256(luaBytes),
-                Sha256(Array.Empty<byte>()),
-                HasTechnicalDeclaration: false));
+                Sha256(Array.Empty<byte>())));
         }
 
         return new RobotAuthoringBundle(
@@ -260,7 +268,8 @@ public static class RobotAuthoringBundleCodec
                     Artifacts = artifacts
                 }
             },
-            items);
+            items,
+            RobotRuntimeProfileSource.SystemDefault);
     }
 
     private static void ValidateManifest(RobotAuthoringExportManifest manifest)
@@ -284,18 +293,21 @@ public static class RobotAuthoringBundleCodec
 
         foreach (var artifact in manifest.Program.Artifacts)
         {
-            if (string.IsNullOrWhiteSpace(artifact.ArtifactCode) || string.IsNullOrWhiteSpace(artifact.FileName) ||
-                string.IsNullOrWhiteSpace(artifact.SidecarFileName))
-                throw new RobotAuthoringBundleException("Artifact code, Lua file name, and sidecar file name are required.");
+            if (string.IsNullOrWhiteSpace(artifact.ArtifactCode) || string.IsNullOrWhiteSpace(artifact.FileName))
+                throw new RobotAuthoringBundleException("Artifact code and Lua file name are required.");
             RequireLength(artifact.ArtifactCode, MaximumCodeLength, "Artifact code");
             RequireLength(artifact.FileName, MaximumFileNameLength, "Lua file name");
-            RequireLength(artifact.SidecarFileName, MaximumFileNameLength, "Sidecar file name");
             if (!artifact.FileName.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
                 throw new RobotAuthoringBundleException($"Artifact '{artifact.ArtifactCode}' must reference a .lua file.");
-            if (!artifact.SidecarFileName.EndsWith(".icebot.json", StringComparison.OrdinalIgnoreCase))
-                throw new RobotAuthoringBundleException($"Artifact '{artifact.ArtifactCode}' must reference an .icebot.json sidecar.");
             NormalizeLeafName(artifact.FileName);
-            NormalizeLeafName(artifact.SidecarFileName);
+            if (!string.IsNullOrWhiteSpace(artifact.SidecarFileName))
+            {
+                RequireLength(artifact.SidecarFileName, MaximumFileNameLength, "Sidecar file name");
+                if (!artifact.SidecarFileName.EndsWith(".icebot.json", StringComparison.OrdinalIgnoreCase))
+                    throw new RobotAuthoringBundleException(
+                        $"Artifact '{artifact.ArtifactCode}' sidecar must use the .icebot.json extension.");
+                NormalizeLeafName(artifact.SidecarFileName);
+            }
         }
 
         var ordered = manifest.Program.Artifacts.Select(x => x.RunOrder).Order().ToArray();
@@ -308,89 +320,27 @@ public static class RobotAuthoringBundleCodec
     private static void ValidateSidecar(RobotAuthoringManifestProgram program, RobotAuthoringManifestArtifact item,
         RobotAuthoringSidecar sidecar)
     {
-        if (sidecar.SchemaVersion is not 1 and not 2 || sidecar.Effects is null)
-            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' must use schema version 1 or 2 and declare effects as an array.");
-        if (sidecar.OrderingConstraints is null)
-            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' must declare orderingConstraints as an array.");
-        if (sidecar.Effects.Any(effect => effect is null) ||
-            sidecar.OrderingConstraints.Any(constraint => constraint is null))
-            throw new RobotAuthoringBundleException(
-                $"Sidecar '{item.SidecarFileName}' effects and orderingConstraints cannot contain null items.");
+        if (sidecar.SchemaVersion is not 1 and not 2)
+            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' must use schema version 1 or 2.");
         if (!EqualsCode(sidecar.ArtifactCode, item.ArtifactCode) ||
             !string.Equals(sidecar.ArtifactFileName, item.FileName, StringComparison.OrdinalIgnoreCase))
             throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' does not match its manifest artifact.");
-
-        if (sidecar.Effects.Any(effect => !Enum.IsDefined(effect.EffectKind) ||
-                !Enum.IsDefined(effect.QuantityMode)))
+        if (!EqualsCode(sidecar.RuntimeTargetCode, program.RuntimeTargetCode) ||
+            !EqualsCode(sidecar.MachineModelCode, program.MachineModelCode))
             throw new RobotAuthoringBundleException(
-                $"Sidecar '{item.SidecarFileName}' contains an unsupported effect kind or quantity mode.");
-        if (sidecar.Effects.Any(effect => string.IsNullOrWhiteSpace(effect.EffectCode)) ||
-            sidecar.Effects.GroupBy(effect => effect.EffectCode.Trim(), StringComparer.OrdinalIgnoreCase).Any(group => group.Count() > 1))
-            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' effect codes must be non-empty and unique.");
-        foreach (var effect in sidecar.Effects)
-            RequireLength(effect.EffectCode, MaximumCodeLength, "Effect code");
-
-        ValidateOrderingConstraints(item, sidecar);
-
-        if (sidecar.SchemaVersion == 1)
-        {
-            if (sidecar.Effects.Any(effect =>
-                    effect.EffectKind is not RobotArtifactEffectKind.System and not RobotArtifactEffectKind.Motion ||
-                    effect.IngredientCode is not null || effect.OptionCode is not null ||
-                    effect.QuantityMode != RobotArtifactQuantityMode.None || effect.FixedQuantity.HasValue ||
-                    effect.Unit is not null || effect.RequiredWorkcellCapabilityCode is not null))
-                throw new RobotAuthoringBundleException(
-                    $"Sidecar '{item.SidecarFileName}' schema version 1 is opaque and may declare only System/Motion effects without production semantics.");
-            return;
-        }
-
-        foreach (var effect in sidecar.Effects)
-        {
-            if (effect.EffectKind is not RobotArtifactEffectKind.System and
-                not RobotArtifactEffectKind.Motion and
-                not RobotArtifactEffectKind.Ingredient and
-                not RobotArtifactEffectKind.Option)
-                throw new RobotAuthoringBundleException(
-                    $"Sidecar '{item.SidecarFileName}' uses an effect kind that is not supported by authoring schema V2.");
-            if (effect.EffectKind == RobotArtifactEffectKind.Ingredient && string.IsNullOrWhiteSpace(effect.IngredientCode))
-                throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' ingredient effects require ingredientCode.");
-            if (effect.EffectKind == RobotArtifactEffectKind.Option && string.IsNullOrWhiteSpace(effect.OptionCode))
-                throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' option effects require optionCode.");
-            if (effect.EffectKind is RobotArtifactEffectKind.System or RobotArtifactEffectKind.Motion &&
-                (!string.IsNullOrWhiteSpace(effect.IngredientCode) || !string.IsNullOrWhiteSpace(effect.OptionCode)))
-                throw new RobotAuthoringBundleException(
-                    $"Sidecar '{item.SidecarFileName}' system and motion effects cannot declare ingredientCode or optionCode.");
-            if (effect.EffectKind is RobotArtifactEffectKind.System or RobotArtifactEffectKind.Motion &&
-                effect.QuantityMode != RobotArtifactQuantityMode.None)
-                throw new RobotAuthoringBundleException(
-                    $"Sidecar '{item.SidecarFileName}' system and motion effects cannot declare production quantities.");
-            if (effect.QuantityMode == RobotArtifactQuantityMode.FixedInArtifact &&
-                (!effect.FixedQuantity.HasValue || effect.FixedQuantity <= 0 || string.IsNullOrWhiteSpace(effect.Unit)))
-                throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' fixed quantities require a positive value and unit.");
-            if (effect.QuantityMode != RobotArtifactQuantityMode.FixedInArtifact && effect.FixedQuantity.HasValue)
-                throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' only permits fixedQuantity for FixedInArtifact effects.");
-            if (effect.QuantityMode == RobotArtifactQuantityMode.None && !string.IsNullOrWhiteSpace(effect.Unit))
-                throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' quantity-free effects cannot declare a unit.");
-            if (effect.QuantityMode == RobotArtifactQuantityMode.Parameterized && string.IsNullOrWhiteSpace(effect.Unit))
-                throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' parameterized quantities require a unit.");
-            RequireOptionalLength(effect.IngredientCode, MaximumCodeLength, "Ingredient code");
-            RequireOptionalLength(effect.OptionCode, MaximumCodeLength, "Option code");
-            RequireOptionalLength(effect.Unit, MaximumUnitLength, "Unit");
-            RequireOptionalLength(effect.RequiredWorkcellCapabilityCode, MaximumCodeLength, "Required workcell capability code");
-        }
-
+                $"Sidecar '{item.SidecarFileName}' runtime target and machine model must match the program manifest.");
     }
 
-    private static void ValidateOrderingConstraints(RobotAuthoringManifestArtifact item, RobotAuthoringSidecar sidecar)
+    private static RobotAuthoringSidecar CreateMinimalSidecar(
+        RobotAuthoringManifestProgram program,
+        RobotAuthoringManifestArtifact item) => new()
     {
-        if (sidecar.OrderingConstraints.Any(constraint => !Enum.IsDefined(constraint.ConstraintType)))
-            throw new RobotAuthoringBundleException(
-                $"Sidecar '{item.SidecarFileName}' contains an unsupported ordering constraint type.");
-        if (sidecar.OrderingConstraints.Any(constraint => string.IsNullOrWhiteSpace(constraint.Value)))
-            throw new RobotAuthoringBundleException($"Sidecar '{item.SidecarFileName}' ordering constraints require non-empty values.");
-        foreach (var constraint in sidecar.OrderingConstraints)
-            RequireLength(constraint.Value, MaximumCodeLength, "Ordering constraint value");
-    }
+        SchemaVersion = 1,
+        ArtifactCode = item.ArtifactCode,
+        ArtifactFileName = item.FileName,
+        RuntimeTargetCode = program.RuntimeTargetCode,
+        MachineModelCode = program.MachineModelCode
+    };
 
     private static byte[] ReadEntry(IReadOnlyDictionary<string, ZipArchiveEntry> entries, string path, long maximumBytes)
     {
@@ -438,11 +388,6 @@ public static class RobotAuthoringBundleCodec
     {
         if (value.Trim().Length > maximumLength)
             throw new RobotAuthoringBundleException($"{fieldName} must be at most {maximumLength} characters.");
-    }
-
-    private static void RequireOptionalLength(string? value, int maximumLength, string fieldName)
-    {
-        if (value is not null) RequireLength(value, maximumLength, fieldName);
     }
 
     public static string Sha256(byte[] value) =>

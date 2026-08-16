@@ -32,7 +32,7 @@ public sealed class RobotArtifactTemplateCommandTests
             [new RobotArtifactEffectDefinition("PREPARE_EXECUTE", RobotArtifactEffectKind.System, null, null,
                 RobotArtifactQuantityMode.None, null, null, null)],
             []);
-        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
         var template = RobotArtifactTemplate.CreateDraft(
             "PREPARE", "Prepare", "robot-artifact-templates/prepare.lua", "prepare.lua", checksum,
             "FAIRINO_LUA_V1", "FR5", bytes.Length, DateTimeOffset.UtcNow,
@@ -69,7 +69,7 @@ public sealed class RobotArtifactTemplateCommandTests
             [new RobotArtifactEffectDefinition("PREPARE_EXECUTE", RobotArtifactEffectKind.System, null, null,
                 RobotArtifactQuantityMode.None, null, null, null)],
             []);
-        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
         var template = TestData.DraftTemplate();
         template.AssignTechnicalContract(contract.Id, contract.ContractChecksum!);
         template.Publish();
@@ -131,7 +131,7 @@ public sealed class RobotArtifactTemplateCommandTests
             [new RobotArtifactEffectDefinition("PREPARE_EXECUTE", RobotArtifactEffectKind.System, null, null,
                 RobotArtifactQuantityMode.None, null, null, null)],
             []);
-        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
         var template = TestData.DraftTemplate();
         template.AssignTechnicalContract(contract.Id, contract.ContractChecksum!);
         template.Publish();
@@ -177,7 +177,7 @@ public sealed class RobotArtifactTemplateCommandTests
             [new RobotArtifactEffectDefinition("PREPARE_EXECUTE", RobotArtifactEffectKind.System, null, null,
                 RobotArtifactQuantityMode.None, null, null, null)],
             []);
-        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
 
         var observedTemplate = TestData.DraftTemplate();
         observedTemplate.AssignTechnicalContract(contract.Id, contract.ContractChecksum!);
@@ -225,7 +225,7 @@ public sealed class RobotArtifactTemplateCommandTests
             [new RobotArtifactEffectDefinition("PREPARE_EXECUTE", RobotArtifactEffectKind.System, null, null,
                 RobotArtifactQuantityMode.None, null, null, null)],
             []);
-        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid(), parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, Guid.NewGuid());
         var template = TestData.DraftTemplate();
         template.AssignTechnicalContract(contract.Id, contract.ContractChecksum!);
         var templateStore = Substitute.For<IRobotArtifactTemplateStore>();

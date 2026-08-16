@@ -1183,6 +1183,63 @@ namespace Infrastructure.Migrations
                     b.ToTable("ExecutionEndpointMqttCredentials", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointReportedDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("DeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskExecutionEndpointId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("MachineModelCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RuntimeTargetCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("SourceDeviceKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId", "KioskId");
+
+                    b.HasIndex("KioskExecutionEndpointId", "DeviceId")
+                        .IsUnique()
+                        .HasFilter("\"DeviceId\" IS NOT NULL");
+
+                    b.HasIndex("KioskExecutionEndpointId", "KioskId");
+
+                    b.HasIndex("KioskExecutionEndpointId", "SourceDeviceKey")
+                        .IsUnique();
+
+                    b.ToTable("ExecutionEndpointReportedDevices", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointRequestNonce", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1220,61 +1277,6 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ExecutionEndpointRequestNonces", (string)null);
-                });
-
-            modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointSupportedRobotTarget", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("CreatedByAccountId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("DeviceId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("KioskExecutionEndpointId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("KioskId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("MachineModelCode")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("RuntimeTargetCode")
-                        .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<DateTimeOffset?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("UpdatedByAccountId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("DeviceId", "KioskId");
-
-                    b.HasIndex("KioskExecutionEndpointId", "KioskId");
-
-                    b.HasIndex("KioskExecutionEndpointId", "RuntimeTargetCode", "MachineModelCode")
-                        .IsUnique()
-                        .HasDatabaseName("IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~1")
-                        .HasFilter("\"DeviceId\" IS NULL");
-
-                    b.HasIndex("KioskExecutionEndpointId", "RuntimeTargetCode", "MachineModelCode", "DeviceId")
-                        .IsUnique()
-                        .HasDatabaseName("IX_ExecutionEndpointSupportedRobotTargets_KioskExecutionEndpo~2")
-                        .HasFilter("\"DeviceId\" IS NOT NULL");
-
-                    b.ToTable("ExecutionEndpointSupportedRobotTargets", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", b =>
@@ -1364,6 +1366,18 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("ProvisionedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReportedDevicesObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("ReportedDevicesReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("ReportedDevicesSnapshotRevision")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid?>("ReportedDevicesSourceExecutorId")
+                        .HasColumnType("uuid");
 
                     b.Property<int>("Status")
                         .HasColumnType("integer");
@@ -2310,6 +2324,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("LastRefilledAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("LastSensorObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("LevelToQuantityProfileJson")
                         .HasMaxLength(500)
                         .HasColumnType("jsonb");
@@ -2326,6 +2343,11 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TrackingMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.Property<string>("Unit")
                         .IsRequired()
@@ -6635,6 +6657,9 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("OriginNodeId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("RuntimeProfileSource")
+                        .HasColumnType("integer");
+
                     b.Property<string>("RuntimeTargetCode")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -6784,6 +6809,9 @@ namespace Infrastructure.Migrations
 
                     b.Property<DateTimeOffset?>("ReleaseLinkedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("RuntimeProfileSource")
+                        .HasColumnType("integer");
 
                     b.Property<string>("RuntimeTargetCode")
                         .IsRequired()
@@ -8911,6 +8939,24 @@ namespace Infrastructure.Migrations
                     b.Navigation("KioskExecutionEndpoint");
                 });
 
+            modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointReportedDevice", b =>
+                {
+                    b.HasOne("Domain.Devices.Catalog.Device", null)
+                        .WithMany()
+                        .HasForeignKey("DeviceId", "KioskId")
+                        .HasPrincipalKey("Id", "KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", "KioskExecutionEndpoint")
+                        .WithMany("ReportedDevices")
+                        .HasForeignKey("KioskExecutionEndpointId", "KioskId")
+                        .HasPrincipalKey("Id", "KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("KioskExecutionEndpoint");
+                });
+
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointRequestNonce", b =>
                 {
                     b.HasOne("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", "KioskExecutionEndpoint")
@@ -8918,26 +8964,6 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("KioskExecutionEndpointId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("KioskExecutionEndpoint");
-                });
-
-            modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.ExecutionEndpointSupportedRobotTarget", b =>
-                {
-                    b.HasOne("Domain.Devices.Catalog.Device", "Device")
-                        .WithMany()
-                        .HasForeignKey("DeviceId", "KioskId")
-                        .HasPrincipalKey("Id", "KioskId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", "KioskExecutionEndpoint")
-                        .WithMany("SupportedRobotTargets")
-                        .HasForeignKey("KioskExecutionEndpointId", "KioskId")
-                        .HasPrincipalKey("Id", "KioskId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Device");
 
                     b.Navigation("KioskExecutionEndpoint");
                 });
@@ -10587,7 +10613,7 @@ namespace Infrastructure.Migrations
                 {
                     b.Navigation("MqttCredential");
 
-                    b.Navigation("SupportedRobotTargets");
+                    b.Navigation("ReportedDevices");
                 });
 
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.Projections.ExecutionEndpointReadinessProjection", b =>

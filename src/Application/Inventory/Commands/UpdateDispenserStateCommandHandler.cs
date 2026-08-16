@@ -50,6 +50,8 @@ public sealed class UpdateDispenserStateCommandHandler(IInventoryStore inventory
         var beforeUnit = state.Unit;
         state.ConfigureContainer(command.Request.CapacityQuantity, command.Request.Unit,
             DispenserLevelQuantityProfileContract.Serialize(command.Request.LevelToQuantityProfile));
+        if (command.Request.TrackingMode.HasValue)
+            state.ChangeTrackingMode(command.Request.TrackingMode.Value);
         state.UpdatedAt = DateTimeOffset.UtcNow;
         state.UpdatedByAccountId = command.UserContext.AccountId;
         await inventory.AddTopologyChangeRecordAsync(

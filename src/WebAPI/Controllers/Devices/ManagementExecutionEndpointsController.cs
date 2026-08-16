@@ -26,7 +26,6 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     private readonly ListExecutionEndpointsQueryHandler _listHandler;
     private readonly GetExecutionEndpointQueryHandler _getHandler;
     private readonly CreateExecutionEndpointCommandHandler _createHandler;
-    private readonly ReplaceExecutionEndpointRobotTargetsCommandHandler _replaceTargetsHandler;
     private readonly ProvisionExecutionEndpointCommandHandler _provisionHandler;
     private readonly DisableExecutionEndpointCommandHandler _disableHandler;
     private readonly ReactivateExecutionEndpointCommandHandler _reactivateHandler;
@@ -40,7 +39,6 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         ListExecutionEndpointsQueryHandler listHandler,
         GetExecutionEndpointQueryHandler getHandler,
         CreateExecutionEndpointCommandHandler createHandler,
-        ReplaceExecutionEndpointRobotTargetsCommandHandler replaceTargetsHandler,
         ProvisionExecutionEndpointCommandHandler provisionHandler,
         DisableExecutionEndpointCommandHandler disableHandler,
         ReactivateExecutionEndpointCommandHandler reactivateHandler,
@@ -53,7 +51,6 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         _listHandler = listHandler;
         _getHandler = getHandler;
         _createHandler = createHandler;
-        _replaceTargetsHandler = replaceTargetsHandler;
         _provisionHandler = provisionHandler;
         _disableHandler = disableHandler;
         _reactivateHandler = reactivateHandler;
@@ -107,18 +104,6 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
         var result = await _createHandler.HandleAsync(new CreateExecutionEndpointCommand
         {
             UserContext = User.GetUserContext(), KioskId = kioskId, Request = request
-        }, cancellationToken);
-        return StatusCode(result.StatusCode, result);
-    }
-
-    [HttpPut("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/supported-robot-targets")]
-    [Authorize(Policy = "devices.manage")]
-    public async Task<IActionResult> ReplaceSupportedRobotTargets(
-        Guid kioskId, Guid endpointId, [FromBody] ReplaceExecutionEndpointRobotTargetsRequest request, CancellationToken cancellationToken)
-    {
-        var result = await _replaceTargetsHandler.HandleAsync(new ReplaceExecutionEndpointRobotTargetsCommand
-        {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId, Request = request
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

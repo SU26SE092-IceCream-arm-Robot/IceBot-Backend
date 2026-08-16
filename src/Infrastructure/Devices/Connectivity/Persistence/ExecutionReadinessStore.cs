@@ -10,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Infrastructure.Devices.Connectivity.Persistence;
-public sealed class ExecutionReadinessStore : IExecutionReadinessStore
+public sealed class ExecutionReadinessStore : IExecutionReadinessStore, IExecutionEndpointReportedDeviceStore
 {
     private readonly IceBotDbContext _db;
     public ExecutionReadinessStore(IceBotDbContext db) => _db = db;
@@ -21,7 +21,11 @@ public sealed class ExecutionReadinessStore : IExecutionReadinessStore
         var result = await action(ct); await tx.CommitAsync(ct); return result;
     }
     public Task<KioskExecutionEndpoint?> GetEndpointAsync(Guid id, CancellationToken ct = default) =>
-        _db.KioskExecutionEndpoints.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+        _db.KioskExecutionEndpoints
+            .Include(x => x.ReportedDevices)
+            .FirstOrDefaultAsync(x => x.Id == id, ct);
+    public Task<Device?> GetDeviceByKioskIdAsync(Guid kioskId, Guid deviceId, CancellationToken ct = default) =>
+        _db.Devices.WhereNotDeleted().FirstOrDefaultAsync(item => item.Id == deviceId && item.KioskId == kioskId, ct);
     public Task<ExecutionEndpointReadinessProjection?> GetProjectionAsync(Guid id, bool tracked, CancellationToken ct = default)
     {
         var q = _db.ExecutionEndpointReadinessProjections.Include(x => x.Capabilities).AsQueryable();
@@ -35,5 +39,7 @@ public sealed class ExecutionReadinessStore : IExecutionReadinessStore
         foreach (var item in capabilities) item.ExecutionEndpointReadinessProjectionId = projection.Id;
         _db.ExecutionEndpointCapabilityProjections.AddRange(capabilities);
     }
+    public void RemoveReportedDevices(IEnumerable<ExecutionEndpointReportedDevice> devices) =>
+        _db.ExecutionEndpointReportedDevices.RemoveRange(devices);
     public Task SaveChangesAsync(CancellationToken ct = default) => _db.SaveChangesAsync(ct);
 }

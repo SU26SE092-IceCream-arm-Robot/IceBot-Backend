@@ -11,6 +11,7 @@ public static class PaymentSessionsModule
     public static IServiceCollection AddPaymentSessionsModule(this IServiceCollection services)
     {
         services.AddScoped<CreatePaymentSessionCommandHandler>();
+        services.AddScoped<ConfirmCashPaymentCommandHandler>();
         services.AddScoped<HandlePaymentProviderNotificationCommandHandler>();
         services.AddScoped<ReconcilePendingPaymentSessionCommandHandler>();
         services.AddScoped<ManuallyReconcilePaymentSessionCommandHandler>();

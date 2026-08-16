@@ -139,10 +139,9 @@ public sealed class ManagementConfigurationReleasesController : ControllerBase
                     requirement.Code,
                     requirement.Required)).ToArray(),
                 route.SupportedOptionCodes,
-                route.RobotBindings.Select(binding => binding.ProductionProgramBindingId != Guid.Empty
-                    ? new ConfigurationReleaseRobotBindingInput(binding.ProductionProgramBindingId, binding.BindingOrder)
-                    : new ConfigurationReleaseRobotBindingInput(binding.RobotProgramId, binding.BindingOrder,
-                        binding.RequiredWorkcellCapabilityCode)).ToArray())).ToArray()
+                route.RobotBindings.Select(binding => new ConfigurationReleaseRobotBindingInput(
+                    binding.ProductionProgramBindingId,
+                    binding.BindingOrder)).ToArray())).ToArray()
         };
         var result = await _replaceConfigurationReleaseRoutesHandler.HandleAsync(command, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -234,9 +233,7 @@ public sealed class ConfigurationReleaseCapabilityRequirementRequest
 public sealed class ConfigurationReleaseRobotBindingRequest
 {
     public Guid ProductionProgramBindingId { get; init; }
-    public Guid RobotProgramId { get; init; }
 
     [Range(1, int.MaxValue)]
     public int BindingOrder { get; init; }
-    public string RequiredWorkcellCapabilityCode { get; init; } = string.Empty;
 }

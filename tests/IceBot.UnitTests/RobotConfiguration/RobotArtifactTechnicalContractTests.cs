@@ -84,7 +84,7 @@ public sealed class RobotArtifactTechnicalContractTests
                 RobotArtifactQuantityMode.Parameterized, null, "g", "DISPENSER")
         ], []);
 
-        contract.Publish(DateTimeOffset.UtcNow, null, parameterizedRuntimeSupported: false);
+        contract.Publish(DateTimeOffset.UtcNow, null);
 
         Assert.Equal(RobotArtifactContractStatus.Published, contract.Status);
     }

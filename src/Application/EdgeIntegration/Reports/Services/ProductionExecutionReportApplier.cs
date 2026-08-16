@@ -51,7 +51,10 @@ internal static class ProductionExecutionReportApplier
         var stockApplied = command.StockMovements.Count > 0 &&
             await ExecutionStockEvidenceApplier.ApplyAsync(
                 unitOfWork, context, cancellationToken);
-        return productionApplied || orderApplied || stockApplied;
+        var expectedStockApplied = command.StockMovements.Count == 0 && productionApplied &&
+            status == ProductionExecutionStatus.Completed &&
+            await ExpectedProductionConsumptionApplier.ApplyAsync(unitOfWork, context, cancellationToken);
+        return productionApplied || orderApplied || stockApplied || expectedStockApplied;
     }
 
     private static async Task<bool> ApplyProductionRecordAsync(

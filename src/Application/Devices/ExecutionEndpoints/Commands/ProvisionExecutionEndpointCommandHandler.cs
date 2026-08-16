@@ -22,8 +22,6 @@ public sealed class ProvisionExecutionEndpointCommandHandler
         var endpoint = loaded.Endpoint!;
         if (endpoint.Status != KioskExecutionEndpointStatus.Provisioning)
             return ApiResult<ExecutionEndpointResult>.Fail("Only provisioning endpoints can be provisioned.", 400);
-        if (endpoint.SupportedRobotTargets.Count == 0)
-            return ApiResult<ExecutionEndpointResult>.Fail("At least one supported robot target is required before provisioning.", 400);
         if (command.Request.ProfileIdentity == Guid.Empty)
             return ApiResult<ExecutionEndpointResult>.Fail("Profile identity is required.", 400);
         if (await _store.ProfileIdentityExistsAsync(command.Request.ProfileIdentity, cancellationToken))

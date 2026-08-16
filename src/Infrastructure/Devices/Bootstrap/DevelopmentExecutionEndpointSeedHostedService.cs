@@ -54,7 +54,6 @@ public sealed class DevelopmentExecutionEndpointSeedHostedService(
             EndpointCode,
             KioskExecutionProfile.FullEdge,
             ExecutionEndpointAuthenticationMode.MutualTls);
-        endpoint.ReplaceSupportedRobotTargets([("FAIRINO_LUA_V1", "FR5", null)]);
         dbContext.KioskExecutionEndpoints.Add(endpoint);
         await dbContext.SaveChangesAsync(cancellationToken);
 

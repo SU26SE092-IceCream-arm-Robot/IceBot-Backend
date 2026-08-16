@@ -87,17 +87,11 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
         var recipeIds = command.Routes.Select(route => route.RecipeId).Distinct().ToArray();
         var productionBindingIds = command.Routes.SelectMany(route => route.RobotBindings)
             .Select(binding => binding.ProductionProgramBindingId).Where(id => id != Guid.Empty).Distinct().ToArray();
-        var directProgramIds = command.Routes.SelectMany(route => route.RobotBindings)
-            .Select(binding => binding.RobotProgramId).Where(id => id != Guid.Empty).Distinct().ToArray();
 
         var recipes = await _routeStore.ListRecipesByIdsAsync(recipeIds, cancellationToken);
         var variantIds = recipes.Select(recipe => recipe.ProductVariantId).Distinct().ToArray();
         var variants = await _routeStore.ListProductVariantsByIdsAsync(variantIds, cancellationToken);
         var productionBindings = await _routeStore.ListProductionProgramBindingsByIdsAsync(productionBindingIds, cancellationToken);
-        var legacyResolvedBindings = directProgramIds.Length == 0
-            ? []
-            : await _routeStore.ListActiveProductionProgramBindingsAsync(release.OrganizationId, recipeIds, directProgramIds, cancellationToken);
-        productionBindings = productionBindings.Concat(legacyResolvedBindings).DistinctBy(binding => binding.Id).ToArray();
         var programIds = productionBindings.Select(binding => binding.RobotProgramId).Distinct().ToArray();
         var programs = await _routeStore.ListRobotProgramsByIdsAsync(programIds, cancellationToken);
         if (variants.Count != variantIds.Length || recipes.Count != recipeIds.Length ||
@@ -152,7 +146,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
 
             foreach (var binding in route.RobotBindings)
             {
-                var productionBinding = ResolveProductionBinding(binding, route, productionBindingsById);
+                var productionBinding = productionBindingsById.GetValueOrDefault(binding.ProductionProgramBindingId);
                 if (productionBinding is null)
                     return ApiResult<ConfigurationReleaseResult>.Fail(
                         "Create an active Recipe-to-Robot Program binding before adding this program to a release route.", 409);
@@ -178,7 +172,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
 
             var requiredCapabilitiesError = ExecutionRouteRequiredCapabilitiesContract.Validate(
                 ExecutionRouteCapabilityRequirementContractCodec.ToStorageJson(route.RequiredCapabilities),
-                route.RobotBindings.Select(binding => ResolveProductionBinding(binding, route, productionBindingsById)
+                route.RobotBindings.Select(binding => productionBindingsById.GetValueOrDefault(binding.ProductionProgramBindingId)
                     ?.GetRequiredCapabilityCodes() ?? []).SelectMany(codes => codes).ToArray());
             if (requiredCapabilitiesError is not null)
                 return ApiResult<ConfigurationReleaseResult>.Fail(requiredCapabilitiesError, 400);
@@ -199,7 +193,7 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
                         .OrderBy(binding => binding.BindingOrder)
                         .Select(binding =>
                         {
-                            var productionBinding = ResolveProductionBinding(binding, route, productionBindingsById)
+                            var productionBinding = productionBindingsById.GetValueOrDefault(binding.ProductionProgramBindingId)
                                 ?? throw new DomainRuleException("Production binding was not found.");
                             return (productionBinding.Id, productionBinding.BindingChecksum, productionBinding.RobotProgramId,
                                 binding.BindingOrder, productionBinding.GetRequiredCapabilityCodes());
@@ -241,11 +235,10 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
 
         foreach (var route in routes)
         {
-            if (route.RobotBindings.Any(binding => (binding.ProductionProgramBindingId == Guid.Empty &&
-                    (binding.RobotProgramId == Guid.Empty || string.IsNullOrWhiteSpace(binding.RequiredWorkcellCapabilityCode))) ||
-                binding.BindingOrder <= 0))
+            if (route.RobotBindings.Any(binding =>
+                binding.ProductionProgramBindingId == Guid.Empty || binding.BindingOrder <= 0))
             {
-                return "Every robot binding requires a production binding and positive binding order.";
+                return "Every robot binding requires a production-program binding and positive binding order.";
             }
 
             if (route.RobotBindings.GroupBy(binding => binding.BindingOrder).Any(group => group.Count() > 1))
@@ -256,18 +249,5 @@ public sealed class ReplaceConfigurationReleaseRoutesCommandHandler
         }
 
         return null;
-    }
-
-    private static Domain.ProductionConfiguration.Entities.ProductionProgramBinding? ResolveProductionBinding(
-        ConfigurationReleaseRobotBindingInput input,
-        ConfigurationReleaseRouteInput route,
-        IReadOnlyDictionary<Guid, Domain.ProductionConfiguration.Entities.ProductionProgramBinding> bindings)
-    {
-        if (input.ProductionProgramBindingId != Guid.Empty)
-            return bindings.GetValueOrDefault(input.ProductionProgramBindingId);
-        var options = route.SupportedOptionCodes.Select(code => code.Trim().ToUpperInvariant()).Order(StringComparer.Ordinal);
-        return bindings.Values.SingleOrDefault(binding => binding.RecipeId == route.RecipeId &&
-            binding.RobotProgramId == input.RobotProgramId &&
-            binding.GetSupportedOptionCodes().Order(StringComparer.Ordinal).SequenceEqual(options, StringComparer.Ordinal));
     }
 }

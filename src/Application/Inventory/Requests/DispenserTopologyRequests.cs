@@ -19,6 +19,9 @@ public sealed class CreateDispenserStateRequest
 
     [MaxLength(10)]
     public IReadOnlyList<DispenserLevelQuantityPointRequest> LevelToQuantityProfile { get; set; } = [];
+
+    [EnumDataType(typeof(InventoryTrackingMode))]
+    public InventoryTrackingMode? TrackingMode { get; set; }
 }
 
 public sealed class UpdateDispenserStateRequest
@@ -31,6 +34,9 @@ public sealed class UpdateDispenserStateRequest
 
     [MaxLength(10)]
     public IReadOnlyList<DispenserLevelQuantityPointRequest> LevelToQuantityProfile { get; set; } = [];
+
+    [EnumDataType(typeof(InventoryTrackingMode))]
+    public InventoryTrackingMode? TrackingMode { get; set; }
 
     [Required, StringLength(500, MinimumLength = 3)]
     public string Reason { get; set; } = null!;

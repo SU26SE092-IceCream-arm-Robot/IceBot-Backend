@@ -25,7 +25,6 @@ using Domain.RobotConfiguration.Programs.Manifests;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
 using Microsoft.Extensions.Options;
-using Application.ProductionConfiguration.Releases.Services;
 using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration.Deployments.Services;
 
@@ -39,9 +38,8 @@ public sealed class DeployLowCostArtifactSetCommandHandler
     private readonly LowCostControllerCapacityOptions _capacity;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
     private readonly ProductionInventoryReadinessGuard _inventoryReadiness;
-    private readonly DeploymentValidationService? _deploymentValidation;
-    private readonly IConfigurationDeploymentPreviewService? _deploymentPreview;
-    private readonly DeploymentOperationAuditWriter? _operationAudit;
+    private readonly IConfigurationDeploymentPreviewService _deploymentPreview;
+    private readonly DeploymentOperationAuditWriter _operationAudit;
 
     public DeployLowCostArtifactSetCommandHandler(
         IConfigurationDeploymentStore deploymentStore,
@@ -49,7 +47,9 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         IEdgeCommandStore edgeCommandStore,
         IOptions<LowCostControllerCapacityOptions> capacity,
         IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        ProductionInventoryReadinessGuard inventoryReadiness)
+        ProductionInventoryReadinessGuard inventoryReadiness,
+        IConfigurationDeploymentPreviewService deploymentPreview,
+        DeploymentOperationAuditWriter operationAudit)
     {
         _deploymentStore = deploymentStore;
         _releaseStore = releaseStore;
@@ -57,49 +57,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
         _capacity = capacity.Value;
         _wakeUpPublisher = wakeUpPublisher;
         _inventoryReadiness = inventoryReadiness;
-    }
-
-    public DeployLowCostArtifactSetCommandHandler(
-        IConfigurationDeploymentStore deploymentStore,
-        IConfigurationReleaseStore releaseStore,
-        IEdgeCommandStore edgeCommandStore,
-        IOptions<LowCostControllerCapacityOptions> capacity,
-        IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        ProductionInventoryReadinessGuard inventoryReadiness,
-        DeploymentValidationService deploymentValidation)
-        : this(deploymentStore, releaseStore, edgeCommandStore, capacity, wakeUpPublisher, inventoryReadiness)
-    {
-        _deploymentValidation = deploymentValidation;
-    }
-
-    public DeployLowCostArtifactSetCommandHandler(
-        IConfigurationDeploymentStore deploymentStore,
-        IConfigurationReleaseStore releaseStore,
-        IEdgeCommandStore edgeCommandStore,
-        IOptions<LowCostControllerCapacityOptions> capacity,
-        IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        ProductionInventoryReadinessGuard inventoryReadiness,
-        DeploymentValidationService deploymentValidation,
-        IConfigurationDeploymentPreviewService deploymentPreview)
-        : this(deploymentStore, releaseStore, edgeCommandStore, capacity, wakeUpPublisher,
-            inventoryReadiness, deploymentValidation)
-    {
         _deploymentPreview = deploymentPreview;
-    }
-
-    public DeployLowCostArtifactSetCommandHandler(
-        IConfigurationDeploymentStore deploymentStore,
-        IConfigurationReleaseStore releaseStore,
-        IEdgeCommandStore edgeCommandStore,
-        IOptions<LowCostControllerCapacityOptions> capacity,
-        IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        ProductionInventoryReadinessGuard inventoryReadiness,
-        DeploymentValidationService deploymentValidation,
-        IConfigurationDeploymentPreviewService deploymentPreview,
-        DeploymentOperationAuditWriter operationAudit)
-        : this(deploymentStore, releaseStore, edgeCommandStore, capacity, wakeUpPublisher,
-            inventoryReadiness, deploymentValidation, deploymentPreview)
-    {
         _operationAudit = operationAudit;
     }
 
@@ -169,9 +127,7 @@ public sealed class DeployLowCostArtifactSetCommandHandler
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail("Access denied.", 403);
         }
 
-        var expectedValidationChecksum = _deploymentPreview is null
-            ? "legacy"
-            : command.DeploymentPreviewChecksum.Trim();
+        var expectedValidationChecksum = command.DeploymentPreviewChecksum.Trim();
         var idempotentResult = await GetIdempotentResultAsync(
             command,
             expectedValidationChecksum,
@@ -190,51 +146,63 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                 400);
         }
 
-        ConfigurationDeploymentEndpointPreview? endpointPreview = null;
-        if (_deploymentPreview is not null)
-        {
-            var selections = command.Selections.Select(item => new DeploymentPreviewSelection(
-                item.ExecutionRouteId, item.RobotProgramId)).ToArray();
-            var previewResult = await _deploymentPreview.HandleAsync(
-                command.UserContext, command.KioskId, release.Id, endpoint.Id, selections, cancellationToken,
-                allowRetiredRelease: command.IsRollback);
-            if (!previewResult.Succeeded || previewResult.Data is null)
-                return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
-                    previewResult.Message ?? "Deployment preview could not be rebuilt.",
-                    previewResult.StatusCode);
-            endpointPreview = previewResult.Data.Endpoints.SingleOrDefault(item => item.KioskExecutionEndpointId == endpoint.Id);
-            if (endpointPreview is null || !endpointPreview.IsEligible)
-                return ApiResult<ControllerArtifactSetDeploymentResult>
-                    .Fail("Deployment is no longer eligible. Preview the deployment again.", 409)
-                    .AddDetail("DeploymentPreview", (object?)endpointPreview ?? previewResult.Data);
-            if (command.IsRollback && string.IsNullOrWhiteSpace(command.DeploymentPreviewChecksum))
-                expectedValidationChecksum = endpointPreview.DeploymentChecksum;
-            else if (!string.Equals(endpointPreview.DeploymentChecksum,
-                         command.DeploymentPreviewChecksum.Trim(), StringComparison.Ordinal))
-                return ApiResult<ControllerArtifactSetDeploymentResult>
-                    .Fail("Deployment preview is missing or stale. Preview the deployment again.", 409)
-                    .AddDetail("DeploymentPreview", endpointPreview);
-        }
-
-        var validationReport = endpointPreview?.Validation ?? _deploymentValidation?.Build(release, endpoint);
         try
         {
-            if (validationReport is not null)
-            {
-                if (endpointPreview is null)
-                    DeploymentValidationService.ValidateAcknowledgement(validationReport,
-                        command.DeploymentPreviewChecksum,
-                        command.AcknowledgeRemainingRisk || command.IsRollback);
-                else if (validationReport.RequiresAcknowledgement &&
-                         !command.AcknowledgeRemainingRisk && !command.IsRollback)
-                    throw new DomainRuleException(
-                        "Authorized organization acknowledgement is required for the remaining deployment risk.");
-            }
+            var deploymentItems = DeploymentCommandFactory.MaterializeLowCostItems(
+                endpoint, release, command.Selections);
+            DeploymentRuntimeCompatibilityRules.EnsureCompatibleWhenReported(
+                deploymentItems.Select(item => (item.RuntimeTargetCode, item.MachineModelCode)),
+                endpoint.ReportedDevices);
+        }
+        catch (DomainRuleException ex)
+        {
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(ex.Message, 409);
+        }
+
+        var selections = command.Selections.Select(item => new DeploymentPreviewSelection(
+            item.ExecutionRouteId, item.RobotProgramId)).ToArray();
+        var previewResult = await _deploymentPreview.HandleAsync(
+            command.UserContext, command.KioskId, release.Id, endpoint.Id, selections, cancellationToken,
+            allowRetiredRelease: command.IsRollback);
+        if (!previewResult.Succeeded || previewResult.Data is null)
+            return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(
+                previewResult.Message ?? "Deployment preview could not be rebuilt.",
+                previewResult.StatusCode);
+
+        var endpointPreview = previewResult.Data.Endpoints.SingleOrDefault(item => item.KioskExecutionEndpointId == endpoint.Id);
+        if (endpointPreview is null)
+            return ApiResult<ControllerArtifactSetDeploymentResult>
+                .Fail("Deployment is no longer eligible. Preview the deployment again.", 409)
+                .AddDetail("DeploymentPreview", previewResult.Data);
+        if (!endpointPreview.IsEligible)
+            return ApiResult<ControllerArtifactSetDeploymentResult>
+                .Fail("Deployment is no longer eligible. Preview the deployment again.", 409)
+                .AddDetail("DeploymentPreview", endpointPreview);
+        if (command.IsRollback && string.IsNullOrWhiteSpace(command.DeploymentPreviewChecksum))
+            expectedValidationChecksum = endpointPreview.DeploymentChecksum;
+        else if (!string.Equals(endpointPreview.DeploymentChecksum,
+                     command.DeploymentPreviewChecksum.Trim(), StringComparison.Ordinal))
+            return ApiResult<ControllerArtifactSetDeploymentResult>
+                .Fail("Deployment preview is missing or stale. Preview the deployment again.", 409)
+                .AddDetail("DeploymentPreview", endpointPreview);
+
+        if (endpointPreview.Validation is null)
+            return ApiResult<ControllerArtifactSetDeploymentResult>
+                .Fail("Deployment preview is missing validation evidence. Preview the deployment again.", 409)
+                .AddDetail("DeploymentPreview", endpointPreview);
+
+        var validationReport = endpointPreview.Validation;
+        try
+        {
+            if (validationReport.RequiresAcknowledgement &&
+                !command.AcknowledgeRemainingRisk && !command.IsRollback)
+                throw new DomainRuleException(
+                    "Authorized organization acknowledgement is required for the remaining deployment risk.");
         }
         catch (DomainRuleException ex)
         {
             return ApiResult<ControllerArtifactSetDeploymentResult>.Fail(ex.Message, 409)
-                .AddDetail("DeploymentValidation", validationReport!);
+                .AddDetail("DeploymentValidation", validationReport);
         }
 
         var now = DateTimeOffset.UtcNow;
@@ -295,8 +263,8 @@ public sealed class DeployLowCostArtifactSetCommandHandler
                         now,
                         items,
                         expectedValidationChecksum,
-                        validationReport?.RiskLevel ?? "Legacy",
-                        JsonSerializer.Serialize(validationReport?.WarningCodes ?? []),
+                        validationReport.RiskLevel,
+                        JsonSerializer.Serialize(validationReport.WarningCodes),
                         command.UserContext.AccountId,
                         now);
 
@@ -317,26 +285,23 @@ public sealed class DeployLowCostArtifactSetCommandHandler
 
                     await _deploymentStore.AddControllerArtifactSetDeploymentAsync(deployment, ct);
                     await _edgeCommandStore.AddAsync(edgeCommand, ct);
-                    if (_operationAudit is not null)
-                    {
-                        await _operationAudit.WriteRequestedAsync(
-                            command.UserContext,
-                            command.IsRollback ? ScopeRoleSets.ReleaseRollback : ScopeRoleSets.ReleaseDeploy,
-                            command.IsRollback ? "ConfigurationRollbackRequested" : "ConfigurationDeploymentRequested",
-                            reason,
-                            endpoint.Kiosk.OrganizationId,
-                            endpoint.Kiosk.StoreId,
-                            deployment.KioskId,
-                            deployment.KioskExecutionEndpointId,
-                            deployment.Id,
-                            edgeCommand.Id,
-                            deployment.SourceConfigurationReleaseId,
-                            deployment.ReleaseChecksum,
-                            endpoint.ActiveArtifactSetDeploymentId,
-                            command.RollbackTargetDeploymentId,
-                            now,
-                            ct);
-                    }
+                    await _operationAudit.WriteRequestedAsync(
+                        command.UserContext,
+                        command.IsRollback ? ScopeRoleSets.ReleaseRollback : ScopeRoleSets.ReleaseDeploy,
+                        command.IsRollback ? "ConfigurationRollbackRequested" : "ConfigurationDeploymentRequested",
+                        reason,
+                        endpoint.Kiosk.OrganizationId,
+                        endpoint.Kiosk.StoreId,
+                        deployment.KioskId,
+                        deployment.KioskExecutionEndpointId,
+                        deployment.Id,
+                        edgeCommand.Id,
+                        deployment.SourceConfigurationReleaseId,
+                        deployment.ReleaseChecksum,
+                        endpoint.ActiveArtifactSetDeploymentId,
+                        command.RollbackTargetDeploymentId,
+                        now,
+                        ct);
                     await _deploymentStore.SaveChangesAsync(ct);
 
                     return ApiResult<ControllerArtifactSetDeploymentResult>.Success(

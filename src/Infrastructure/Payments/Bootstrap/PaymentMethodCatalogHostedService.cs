@@ -9,11 +9,14 @@ namespace Infrastructure.Payments.Bootstrap;
 public sealed class PaymentMethodCatalogHostedService : IHostedService
 {
     private const string PayOsMethodCode = "payos";
+    private const string CashMethodCode = "cash";
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly IHostEnvironment _environment;
 
-    public PaymentMethodCatalogHostedService(IServiceScopeFactory scopeFactory)
+    public PaymentMethodCatalogHostedService(IServiceScopeFactory scopeFactory, IHostEnvironment environment)
     {
         _scopeFactory = scopeFactory;
+        _environment = environment;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
@@ -50,6 +53,34 @@ public sealed class PaymentMethodCatalogHostedService : IHostedService
             paymentMethod.MethodType = "BankTransferQr";
             paymentMethod.IsOnline = true;
             paymentMethod.UpdatedAt = DateTimeOffset.UtcNow;
+        }
+
+        var cashPaymentMethod = await dbContext.PaymentMethods
+            .SingleOrDefaultAsync(method => method.Code == CashMethodCode, cancellationToken);
+        if (cashPaymentMethod is null && _environment.IsDevelopment())
+        {
+            cashPaymentMethod = new PaymentMethod
+            {
+                Code = CashMethodCode,
+                Name = "Cash",
+                Description = "Staff-confirmed cash payment for local development.",
+                Provider = "Cash",
+                MethodType = "Cash",
+                IsOnline = false,
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow
+            };
+            dbContext.PaymentMethods.Add(cashPaymentMethod);
+        }
+        else if (cashPaymentMethod is not null)
+        {
+            cashPaymentMethod.Name = "Cash";
+            cashPaymentMethod.Description = "Staff-confirmed cash payment.";
+            cashPaymentMethod.Provider = "Cash";
+            cashPaymentMethod.MethodType = "Cash";
+            cashPaymentMethod.IsOnline = false;
+            cashPaymentMethod.IsActive = _environment.IsDevelopment();
+            cashPaymentMethod.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

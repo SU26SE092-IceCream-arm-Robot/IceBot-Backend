@@ -46,6 +46,7 @@ public sealed record ConfigurationDeploymentEndpointPreview(
     string ExecutionProfile,
     bool IsEligible,
     IReadOnlyCollection<DeploymentPreviewBlocker> Blockers,
+    IReadOnlyCollection<DeploymentPreviewBlocker> Warnings,
     IReadOnlyCollection<DeploymentPreviewSelection> Selections,
     IReadOnlyCollection<DeploymentPreviewArtifact> Artifacts,
     IReadOnlyCollection<string> InstallationModes,
@@ -197,11 +198,13 @@ public sealed class ConfigurationDeploymentPreviewHandler(
         bool allowRetiredRelease)
     {
         var blockers = new List<DeploymentPreviewBlocker>();
+        var warnings = new List<DeploymentPreviewBlocker>();
         var selectionResolution = ConfigurationDeploymentPreviewRules.ResolveSelections(
             release, endpoint.ExecutionProfile, requestedSelections);
         blockers.AddRange(selectionResolution.Blockers);
         var selections = selectionResolution.Selections;
         var artifacts = MaterializeArtifacts(release, selections, blockers);
+        ValidateRuntimeProfiles(endpoint, artifacts, blockers, warnings);
 
         if (endpoint.Status != KioskExecutionEndpointStatus.Active)
             blockers.Add(new("EndpointNotActive", "Execution endpoint is not Active."));
@@ -250,6 +253,7 @@ public sealed class ConfigurationDeploymentPreviewHandler(
             endpoint.ExecutionProfile.ToString(),
             blockers.Count == 0,
             blockers.DistinctBy(item => (item.Code, item.Message)).ToArray(),
+            warnings.DistinctBy(item => (item.Code, item.Message)).ToArray(),
             selections,
             artifacts,
             modes,
@@ -259,6 +263,29 @@ public sealed class ConfigurationDeploymentPreviewHandler(
             maximumBytes,
             checksum,
             report);
+    }
+
+    private static void ValidateRuntimeProfiles(
+        KioskExecutionEndpoint endpoint,
+        IReadOnlyCollection<DeploymentPreviewArtifact> artifacts,
+        ICollection<DeploymentPreviewBlocker> blockers,
+        ICollection<DeploymentPreviewBlocker> warnings)
+    {
+        var required = artifacts.Select(item => (item.RuntimeTargetCode, item.MachineModelCode)).ToArray();
+        if (required.Length == 0)
+            return;
+        if (!endpoint.ReportedDevicesSnapshotRevision.HasValue)
+        {
+            warnings.Add(new("RuntimeProfileUnknown",
+                "Execution endpoint has not reported a runtime target and machine model; MVP deployment remains allowed."));
+            return;
+        }
+
+        var mismatches = DeploymentRuntimeCompatibilityRules.FindMismatches(required, endpoint.ReportedDevices);
+        if (mismatches.Count > 0)
+            blockers.Add(new("RuntimeProfileMismatch",
+                $"Execution endpoint does not report the required runtime profiles: " +
+                $"{DeploymentRuntimeCompatibilityRules.Format(mismatches)}."));
     }
 
     private static IReadOnlyCollection<DeploymentPreviewArtifact> MaterializeArtifacts(
@@ -386,6 +413,12 @@ public sealed class ConfigurationDeploymentPreviewHandler(
             release.ReleaseChecksum,
             KioskExecutionEndpointId = endpoint.Id,
             endpoint.ExecutionProfile,
+            ReportedDevicesSnapshotRevision = endpoint.ReportedDevicesSnapshotRevision,
+            endpoint.ReportedDevicesObservedAt,
+            endpoint.ReportedDevicesReceivedAt,
+            ReportedDevices = endpoint.ReportedDevices
+                .OrderBy(item => item.SourceDeviceKey)
+                .Select(item => new { item.SourceDeviceKey, item.DeviceId, item.RuntimeTargetCode, item.MachineModelCode }),
             Selections = selections.OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId),
             Artifacts = artifacts.OrderBy(item => item.ExecutionRouteId).ThenBy(item => item.RobotProgramId)
                 .ThenBy(item => item.RunOrder).ThenBy(item => item.RobotArtifactId)

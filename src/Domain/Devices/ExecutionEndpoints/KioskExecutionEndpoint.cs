@@ -1,13 +1,12 @@
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Common;
-using Domain.Devices.Catalog;
 using Domain.Tenants.Entities;
 
 namespace Domain.Devices.ExecutionEndpoints;
 
 public class KioskExecutionEndpoint : BusinessEntity
 {
-    private readonly List<ExecutionEndpointSupportedRobotTarget> _supportedRobotTargets = [];
+    private readonly List<ExecutionEndpointReportedDevice> _reportedDevices = [];
 
     public Guid KioskId { get; private set; }
     public string EndpointCode { get; private set; } = null!;
@@ -18,6 +17,13 @@ public class KioskExecutionEndpoint : BusinessEntity
     public Guid? FullEdgeRuntimeId { get; private set; }
     public Guid? ControllerId { get; private set; }
     public DateTimeOffset? ProvisionedAt { get; private set; }
+
+    // Latest complete device inventory observed by this authenticated endpoint.
+    // Unlike readiness, this snapshot remains current until a newer discovery replaces it.
+    public Guid? ReportedDevicesSourceExecutorId { get; private set; }
+    public long? ReportedDevicesSnapshotRevision { get; private set; }
+    public DateTimeOffset? ReportedDevicesObservedAt { get; private set; }
+    public DateTimeOffset? ReportedDevicesReceivedAt { get; private set; }
 
     // Full Edge observed active-release snapshot. Deployment history remains in Production Configuration.
     public Guid? ActiveConfigurationDeploymentId { get; private set; }
@@ -41,7 +47,8 @@ public class KioskExecutionEndpoint : BusinessEntity
     public virtual ExecutionEndpointCredentialBinding? CredentialBinding { get; private set; }
     public virtual ExecutionEndpointMqttCredential? MqttCredential { get; private set; }
 
-    public IReadOnlyCollection<ExecutionEndpointSupportedRobotTarget> SupportedRobotTargets => _supportedRobotTargets;
+    // Edge-owned current hardware observation. It does not certify Lua behavior.
+    public IReadOnlyCollection<ExecutionEndpointReportedDevice> ReportedDevices => _reportedDevices;
 
     private KioskExecutionEndpoint()
     {
@@ -118,74 +125,78 @@ public class KioskExecutionEndpoint : BusinessEntity
         }
     }
 
-    private void AddSupportedRobotTarget(
-        string runtimeTargetCode,
-        string machineModelCode,
-        Device? device = null)
+    public ReportedDeviceSnapshotApplyDisposition ApplyReportedDevicesSnapshot(
+        Guid sourceExecutorId,
+        long snapshotRevision,
+        DateTimeOffset observedAt,
+        DateTimeOffset receivedAt,
+        IEnumerable<ReportedDeviceSnapshotItem> devices)
     {
-        if (Status is KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Retired)
+        if (sourceExecutorId == Guid.Empty || snapshotRevision <= 0 || observedAt == default || receivedAt == default || devices is null)
         {
-            throw new DomainRuleException("Only non-active endpoints can change supported robot targets.");
+            throw new DomainRuleException("Reported-device snapshot identity, revision, timestamps, and devices are required.");
         }
 
-        var normalizedRuntimeTargetCode = runtimeTargetCode?.Trim();
-        var normalizedMachineModelCode = machineModelCode?.Trim();
-        if (string.IsNullOrWhiteSpace(normalizedRuntimeTargetCode) ||
-            string.IsNullOrWhiteSpace(normalizedMachineModelCode))
+        var normalized = devices
+            .Select(item => new ReportedDeviceSnapshotItem(
+                item.SourceDeviceKey?.Trim() ?? string.Empty,
+                item.DeviceId,
+                item.RuntimeTargetCode?.Trim() ?? string.Empty,
+                item.MachineModelCode?.Trim() ?? string.Empty))
+            .ToArray();
+        if (normalized.Length > 50 ||
+            normalized.Any(item => string.IsNullOrWhiteSpace(item.SourceDeviceKey) ||
+                                   string.IsNullOrWhiteSpace(item.RuntimeTargetCode) ||
+                                   string.IsNullOrWhiteSpace(item.MachineModelCode) ||
+                                   item.SourceDeviceKey.Length > 100 || item.RuntimeTargetCode.Length > 100 || item.MachineModelCode.Length > 100) ||
+            normalized.Select(item => item.SourceDeviceKey).Distinct(StringComparer.OrdinalIgnoreCase).Count() != normalized.Length ||
+            normalized.Where(item => item.DeviceId.HasValue).Select(item => item.DeviceId!.Value).Distinct().Count() != normalized.Count(item => item.DeviceId.HasValue))
         {
-            throw new DomainRuleException("Runtime target code and machine model code are required.");
+            throw new DomainRuleException("Reported devices must use unique source keys and device mappings with valid runtime profiles.");
         }
 
-        if (device is not null && device.KioskId != KioskId)
+        if (ReportedDevicesSnapshotRevision.HasValue)
         {
-            throw new DomainRuleException("A supported robot target device must belong to the endpoint kiosk.");
+            if (snapshotRevision < ReportedDevicesSnapshotRevision.Value)
+                return ReportedDeviceSnapshotApplyDisposition.Stale;
+            if (snapshotRevision == ReportedDevicesSnapshotRevision.Value)
+            {
+                if (ReportedDevicesSourceExecutorId == sourceExecutorId &&
+                    ReportedDevicesObservedAt == observedAt &&
+                    SameReportedDevices(normalized))
+                    return ReportedDeviceSnapshotApplyDisposition.Duplicate;
+                throw new DomainRuleException("Reported-device snapshot revision was reused with different content.");
+            }
         }
 
-        if (_supportedRobotTargets.Any(target =>
-                string.Equals(target.RuntimeTargetCode, normalizedRuntimeTargetCode, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(target.MachineModelCode, normalizedMachineModelCode, StringComparison.OrdinalIgnoreCase) &&
-                target.DeviceId == device?.Id))
+        _reportedDevices.Clear();
+        foreach (var device in normalized)
         {
-            throw new DomainRuleException("The endpoint already supports this robot runtime target and machine model.");
+            _reportedDevices.Add(ExecutionEndpointReportedDevice.Create(
+                Id, KioskId, device.SourceDeviceKey, device.DeviceId,
+                device.RuntimeTargetCode, device.MachineModelCode));
         }
 
-        _supportedRobotTargets.Add(ExecutionEndpointSupportedRobotTarget.Create(
-            Id,
-            KioskId,
-            normalizedRuntimeTargetCode,
-            normalizedMachineModelCode,
-            device));
+        ReportedDevicesSourceExecutorId = sourceExecutorId;
+        ReportedDevicesSnapshotRevision = snapshotRevision;
+        ReportedDevicesObservedAt = observedAt;
+        ReportedDevicesReceivedAt = receivedAt;
+        return ReportedDeviceSnapshotApplyDisposition.Applied;
     }
 
-    private void ClearSupportedRobotTargets()
+    private bool SameReportedDevices(IReadOnlyCollection<ReportedDeviceSnapshotItem> expected)
     {
-        if (Status is KioskExecutionEndpointStatus.Active or KioskExecutionEndpointStatus.Retired)
-        {
-            throw new DomainRuleException("Only non-active endpoints can change supported robot targets.");
-        }
-
-        _supportedRobotTargets.Clear();
-    }
-
-    public IReadOnlyCollection<ExecutionEndpointSupportedRobotTarget> ReplaceSupportedRobotTargets(
-        IEnumerable<(string RuntimeTargetCode, string MachineModelCode, Device? Device)> replacements)
-    {
-        if (replacements is null)
-        {
-            throw new DomainRuleException("Supported robot targets are required.");
-        }
-
-        var removed = _supportedRobotTargets.ToArray();
-        ClearSupportedRobotTargets();
-        foreach (var replacement in replacements)
-        {
-            AddSupportedRobotTarget(
-                replacement.RuntimeTargetCode,
-                replacement.MachineModelCode,
-                replacement.Device);
-        }
-
-        return removed;
+        var actual = _reportedDevices
+            .OrderBy(item => item.SourceDeviceKey, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var normalized = expected
+            .OrderBy(item => item.SourceDeviceKey, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return actual.Length == normalized.Length && actual.Zip(normalized).All(pair =>
+            string.Equals(pair.First.SourceDeviceKey, pair.Second.SourceDeviceKey, StringComparison.OrdinalIgnoreCase) &&
+            pair.First.DeviceId == pair.Second.DeviceId &&
+            string.Equals(pair.First.RuntimeTargetCode, pair.Second.RuntimeTargetCode, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(pair.First.MachineModelCode, pair.Second.MachineModelCode, StringComparison.OrdinalIgnoreCase));
     }
 
     public ExecutionEndpointCredentialBinding ProvisionCredential(
@@ -239,14 +250,6 @@ public class KioskExecutionEndpoint : BusinessEntity
         }
 
         return credential;
-    }
-
-    public bool SupportsRobotTarget(string runtimeTargetCode, string machineModelCode, Guid? deviceId = null)
-    {
-        return _supportedRobotTargets.Any(target =>
-            string.Equals(target.RuntimeTargetCode, runtimeTargetCode, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(target.MachineModelCode, machineModelCode, StringComparison.OrdinalIgnoreCase) &&
-            (!deviceId.HasValue || target.DeviceId == deviceId));
     }
 
     public void Activate(Guid profileIdentity, DateTimeOffset provisionedAt)

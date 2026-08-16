@@ -105,6 +105,27 @@ public sealed class RobotProgramManifestTests
     }
 
     [Fact]
+    public void Publish_RejectsArtifactsWithDifferentRuntimeProfiles()
+    {
+        var organizationId = Guid.NewGuid();
+        var fr5 = TestData.PublishedArtifact(organizationId, "FR5_STEP", "fr5.lua", 'a');
+        var fr3 = RobotArtifact.CreateDraft(
+            organizationId, "FR3_STEP", "FR3 step", $"robot-artifacts/{organizationId:D}/fr3.lua",
+            "fr3.lua", new string('b', 64), "FAIRINO_LUA_V1", "FR3", 128, DateTimeOffset.UtcNow);
+        fr3.Publish();
+        var program = RobotProgram.CreateDraft(
+            "MIXED_PROFILE", "Mixed profile", TenantScopeType.Organization, organizationId);
+        program.AddArtifact(fr5.Id, 1);
+        program.AddArtifact(fr3.Id, 2);
+
+        var exception = Assert.Throws<Domain.Common.DomainRuleException>(() =>
+            program.Publish(DateTimeOffset.UtcNow, [Snapshot(fr5), Snapshot(fr3)]));
+
+        Assert.Contains("only one runtime target and machine model", exception.Message,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Parse_ReturnsTypedPublishedManifest()
     {
         var organizationId = Guid.NewGuid();
@@ -175,5 +196,6 @@ public sealed class RobotProgramManifestTests
         artifact.MachineModelCode,
         artifact.ContentLengthBytes,
         artifact.TechnicalContractId,
-        artifact.TechnicalContractChecksum);
+        artifact.TechnicalContractChecksum,
+        artifact.RuntimeProfileSource);
 }

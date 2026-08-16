@@ -6,6 +6,7 @@ using Application.ProductionConfiguration.Deployments.Abstractions;
 using Application.ProductionConfiguration.Deployments.Commands;
 using Application.ProductionConfiguration.Deployments.ReadModels;
 using Application.ProductionConfiguration.Deployments.Services;
+using Application.Operations.OperationLogs.Abstractions;
 using Application.ProductionConfiguration.Readiness;
 using Application.ProductionConfiguration.Readiness.Services;
 using Application.ProductionConfiguration.Releases.Abstractions;
@@ -50,7 +51,8 @@ public sealed class DeploymentIdempotencyTests
             deploymentStore, releaseStore, Substitute.For<IEdgeCommandStore>(),
             Substitute.For<IEdgeCommandWakeUpPublisher>(), ReadinessGuard(),
             new FullEdgeReleaseBundleService(Substitute.For<IArtifactObjectStorage>()),
-            new DeploymentValidationService(), preview);
+            preview,
+            AuditWriter());
 
         var result = await handler.HandleAsync(new DeployFullEdgeConfigurationCommand
         {
@@ -78,7 +80,7 @@ public sealed class DeploymentIdempotencyTests
         var idempotencyKey = Guid.NewGuid().ToString("N");
         var deployment = KioskConfigurationDeployment.CreatePending(
             kioskId, organizationId, endpointId, runtimeId, release.Id, release.ReleaseChecksum!, 1,
-            idempotencyKey, DateTimeOffset.UtcNow, validationReportChecksum: "legacy");
+            idempotencyKey, DateTimeOffset.UtcNow, null, PreviewChecksum, "UnprovenPhysicalBehavior", "[]");
         var edgeCommand = DeploymentCommand(
             kioskId, endpointId, deployment.Id, DeploymentCommandTargetKind.FullEdgeConfiguration);
         var deploymentStore = Substitute.For<IConfigurationDeploymentStore>();
@@ -96,7 +98,9 @@ public sealed class DeploymentIdempotencyTests
             edgeStore,
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
             ReadinessGuard(),
-            new FullEdgeReleaseBundleService(storage));
+            new FullEdgeReleaseBundleService(storage),
+            Substitute.For<IConfigurationDeploymentPreviewService>(),
+            AuditWriter());
 
         var result = await handler.HandleAsync(new DeployFullEdgeConfigurationCommand
         {
@@ -105,7 +109,8 @@ public sealed class DeploymentIdempotencyTests
             ConfigurationReleaseId = release.Id,
             KioskExecutionEndpointId = endpointId,
             IdempotencyKey = idempotencyKey,
-            Reason = "Test deployment retry"
+            Reason = "Test deployment retry",
+            DeploymentPreviewChecksum = PreviewChecksum
         });
 
         Assert.True(result.Succeeded);
@@ -138,7 +143,7 @@ public sealed class DeploymentIdempotencyTests
                 routeId, programId, new string('p', 64), Guid.NewGuid(), new string('a', 64),
                 "robot-artifacts/test.lua", "FAIRINO_LUA_V1", "FR5", null,
                 128, 1, 1, null)],
-            validationReportChecksum: "legacy");
+            PreviewChecksum, "UnprovenPhysicalBehavior", "[]");
         var edgeCommand = DeploymentCommand(
             kioskId, endpointId, deployment.Id, DeploymentCommandTargetKind.LowCostArtifactSet);
         var deploymentStore = Substitute.For<IConfigurationDeploymentStore>();
@@ -159,7 +164,9 @@ public sealed class DeploymentIdempotencyTests
                 MaxArtifactStorageBytes = 1024 * 1024
             }),
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
-            ReadinessGuard());
+            ReadinessGuard(),
+            Substitute.For<IConfigurationDeploymentPreviewService>(),
+            AuditWriter());
 
         var result = await handler.HandleAsync(new DeployLowCostArtifactSetCommand
         {
@@ -169,6 +176,7 @@ public sealed class DeploymentIdempotencyTests
             KioskExecutionEndpointId = endpointId,
             IdempotencyKey = idempotencyKey,
             Reason = "Test deployment retry",
+            DeploymentPreviewChecksum = PreviewChecksum,
             Selections = [new DeployLowCostArtifactSelection(routeId, programId)]
         });
 
@@ -212,14 +220,18 @@ public sealed class DeploymentIdempotencyTests
             Substitute.For<IEdgeCommandStore>(),
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
             ReadinessGuard(),
-            new FullEdgeReleaseBundleService(Substitute.For<IArtifactObjectStorage>()));
+            new FullEdgeReleaseBundleService(Substitute.For<IArtifactObjectStorage>()),
+            Substitute.For<IConfigurationDeploymentPreviewService>(),
+            AuditWriter());
         var lowCost = new DeployLowCostArtifactSetCommandHandler(
             deploymentStore,
             Substitute.For<IConfigurationReleaseStore>(),
             Substitute.For<IEdgeCommandStore>(),
             Options.Create(new LowCostControllerCapacityOptions()),
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
-            ReadinessGuard());
+            ReadinessGuard(),
+            Substitute.For<IConfigurationDeploymentPreviewService>(),
+            AuditWriter());
         var handler = new RollbackConfigurationDeploymentCommandHandler(deploymentStore, fullEdge, lowCost);
 
         var result = await handler.HandleAsync(new RollbackConfigurationDeploymentCommand
@@ -292,7 +304,8 @@ public sealed class DeploymentIdempotencyTests
         var endpointPreview = new ConfigurationDeploymentEndpointPreview(
             endpoint.Id, endpoint.EndpointCode, endpoint.ExecutionProfile.ToString(), isEligible,
             isEligible ? [] : [new DeploymentPreviewBlocker("EndpointNotReady", "Endpoint is not ready.")],
-            [], [], ["BundleInstall"], 0, 0, null, null, new string('a', 64), null);
+            [], [], [], ["BundleInstall"], 0, 0, null, null, PreviewChecksum,
+            new DeploymentValidationReport(PreviewChecksum, "UnprovenPhysicalBehavior", [], false));
         return new ConfigurationDeploymentPreview(
             release.Id, release.ReleaseChecksum!, endpoint.KioskId, false, [endpointPreview]);
     }
@@ -300,4 +313,9 @@ public sealed class DeploymentIdempotencyTests
     private static ProductionInventoryReadinessGuard ReadinessGuard() => new(
         Substitute.For<IInventoryReadinessEvaluator>(),
         Options.Create(new InventoryReadinessPolicyOptions()));
+
+    private static DeploymentOperationAuditWriter AuditWriter() =>
+        new(Substitute.For<IOperationLogStore>());
+
+    private const string PreviewChecksum = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 }

@@ -30,6 +30,7 @@ internal sealed class IngredientDispenserStateConfiguration : IEntityTypeConfigu
         entity.HasIndex(x => new { x.DeviceId, x.ContainerCode }).IsUnique()
             .HasFilter("\"IsActive\" = TRUE AND \"DeletedAt\" IS NULL");
         entity.Property(x => x.IsActive).HasDefaultValue(true);
+        entity.Property(x => x.TrackingMode).HasDefaultValue(Domain.Inventory.Enums.InventoryTrackingMode.ManualEstimate);
         entity.HasOne(x => x.Device).WithMany(x => x.IngredientDispenserStates).HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Restrict);

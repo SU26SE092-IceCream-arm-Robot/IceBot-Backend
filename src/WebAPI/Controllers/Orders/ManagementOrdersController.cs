@@ -1,5 +1,7 @@
 using Application.Orders.Management.Commands;
 using Application.Orders.Management.Requests;
+using Application.Payments.PaymentSessions.Commands;
+using Application.Payments.PaymentSessions.Requests;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +20,7 @@ public sealed class ManagementOrdersController : ControllerBase
     private readonly RequestOrderItemProductionRemakeCommandHandler _productionRemakeHandler;
     private readonly RecordManualOrderItemFulfillmentEventCommandHandler _manualItemFulfillmentHandler;
     private readonly SetPackagedOrderItemFulfillmentCommandHandler _packagedItemFulfillmentHandler;
+    private readonly ConfirmCashPaymentCommandHandler _confirmCashPaymentHandler;
 
     public ManagementOrdersController(
         CancelManagementOrderCommandHandler cancelHandler,
@@ -25,7 +28,8 @@ public sealed class ManagementOrdersController : ControllerBase
         RedispatchOrderExecutionCommandHandler redispatchHandler,
         RequestOrderItemProductionRemakeCommandHandler productionRemakeHandler,
         RecordManualOrderItemFulfillmentEventCommandHandler manualItemFulfillmentHandler,
-        SetPackagedOrderItemFulfillmentCommandHandler packagedItemFulfillmentHandler)
+        SetPackagedOrderItemFulfillmentCommandHandler packagedItemFulfillmentHandler,
+        ConfirmCashPaymentCommandHandler confirmCashPaymentHandler)
     {
         _cancelHandler = cancelHandler;
         _refundRequiredHandler = refundRequiredHandler;
@@ -33,6 +37,28 @@ public sealed class ManagementOrdersController : ControllerBase
         _productionRemakeHandler = productionRemakeHandler;
         _manualItemFulfillmentHandler = manualItemFulfillmentHandler;
         _packagedItemFulfillmentHandler = packagedItemFulfillmentHandler;
+        _confirmCashPaymentHandler = confirmCashPaymentHandler;
+    }
+
+    [HttpPost("{orderId:guid}/cash-payments/{paymentTransactionId:guid}/confirm")]
+    [Authorize(Policy = "cash-payments.confirm")]
+    public async Task<IActionResult> ConfirmCashPayment(
+        Guid orderId,
+        Guid paymentTransactionId,
+        [FromBody] ConfirmCashPaymentRequest request,
+        CancellationToken cancellationToken)
+    {
+        request ??= new ConfirmCashPaymentRequest();
+        var result = await _confirmCashPaymentHandler.HandleAsync(
+            new ConfirmCashPaymentCommand
+            {
+                OrderId = orderId,
+                PaymentTransactionId = paymentTransactionId,
+                UserContext = User.GetUserContext(),
+                Request = request
+            },
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 
     [HttpPost("{orderId:guid}/items/{orderItemId:guid}/manual-fulfillment-events")]

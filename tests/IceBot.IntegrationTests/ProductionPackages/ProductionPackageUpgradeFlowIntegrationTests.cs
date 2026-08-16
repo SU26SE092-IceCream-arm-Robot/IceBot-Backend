@@ -757,7 +757,6 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
             var lowCostEndpoint = KioskExecutionEndpoint.CreateProvisioning(
                 scenario.KioskId, $"LOW-{Guid.NewGuid():N}", KioskExecutionProfile.LowCostController,
                 ExecutionEndpointAuthenticationMode.SignedCommandTls);
-            lowCostEndpoint.ReplaceSupportedRobotTargets([("FAIRINO_LUA_V1", "FR5", null)]);
             setupContext.KioskExecutionEndpoints.Add(lowCostEndpoint);
             await setupContext.SaveChangesAsync();
             var lowCostCredential = lowCostEndpoint.ProvisionCredential(
@@ -1329,7 +1328,11 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
             releaseChecksum,
             1,
             $"upgrade-test-{deploymentId:N}",
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            null,
+            "validation-checksum",
+            "UnprovenPhysicalBehavior",
+            "[]");
         deployment.Id = deploymentId;
         deployment.MarkInstalled(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         deployment.MarkActive(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
@@ -1361,7 +1364,10 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
             [new ControllerArtifactSetItemSnapshot(
                 Guid.NewGuid(), Guid.NewGuid(), new string('p', 64), Guid.NewGuid(), new string('a', 64),
                 "robot-artifacts/upgrade-test.lua", "FAIRINO_LUA_V1", "FR5", null,
-                128, 1, 1, null)]);
+                128, 1, 1, null)],
+            "validation-checksum",
+            "UnprovenPhysicalBehavior",
+            "[]");
         deployment.Id = deploymentId;
         deployment.MarkInstalled(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         deployment.MarkActive(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);

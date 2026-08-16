@@ -1,5 +1,4 @@
 using Domain.Devices.ExecutionEndpoints;
-using Domain.Devices.Catalog;
 using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Application.Devices.ExecutionEndpoints.Abstractions;
@@ -43,13 +42,6 @@ public interface IExecutionEndpointStore
 
     Task<Domain.Tenants.Entities.Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
 
-    Task<Device?> GetDeviceByIdAsync(Guid deviceId, CancellationToken cancellationToken = default);
-
-    Task<Device?> GetDeviceByKioskIdAsync(
-        Guid kioskId,
-        Guid deviceId,
-        CancellationToken cancellationToken = default);
-
     Task<bool> EndpointCodeExistsAsync(Guid kioskId, string endpointCode, CancellationToken cancellationToken = default);
 
     Task<bool> ProfileIdentityExistsAsync(Guid profileIdentity, CancellationToken cancellationToken = default);
@@ -81,8 +73,6 @@ public interface IExecutionEndpointStore
     Task AddMqttCredentialAsync(
         ExecutionEndpointMqttCredential credential,
         CancellationToken cancellationToken = default);
-
-    void RemoveSupportedRobotTargets(IEnumerable<ExecutionEndpointSupportedRobotTarget> targets);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

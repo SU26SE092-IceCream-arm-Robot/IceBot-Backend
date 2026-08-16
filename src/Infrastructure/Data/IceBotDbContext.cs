@@ -142,7 +142,7 @@ public class IceBotDbContext : DbContext
     public DbSet<ExecutionEndpointReadinessProjection> ExecutionEndpointReadinessProjections => Set<ExecutionEndpointReadinessProjection>();
     public DbSet<ExecutionEndpointCapabilityProjection> ExecutionEndpointCapabilityProjections => Set<ExecutionEndpointCapabilityProjection>();
     public DbSet<ExecutionEndpointRequestNonce> ExecutionEndpointRequestNonces => Set<ExecutionEndpointRequestNonce>();
-    public DbSet<ExecutionEndpointSupportedRobotTarget> ExecutionEndpointSupportedRobotTargets => Set<ExecutionEndpointSupportedRobotTarget>();
+    public DbSet<ExecutionEndpointReportedDevice> ExecutionEndpointReportedDevices => Set<ExecutionEndpointReportedDevice>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<Product> Products => Set<Product>();

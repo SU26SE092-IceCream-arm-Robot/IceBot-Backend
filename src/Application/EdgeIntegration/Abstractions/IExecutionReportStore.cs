@@ -70,5 +70,11 @@ public interface IExecutionStockEvidenceStore
     Task<IngredientDispenserState?> GetDispenserStateAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<bool> IsIngredientExpectedForOrderItemAsync(Guid orderId, Guid orderItemId, Guid ingredientId, CancellationToken cancellationToken = default);
     Task<StockMovement?> GetStockMovementBySourceEventIdAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<ExpectedInventoryRequirement>> ListExpectedInventoryRequirementsAsync(
+        Guid orderId, Guid orderItemId, CancellationToken cancellationToken = default);
+    Task<List<IngredientDispenserState>> ListActiveDispenserStatesForExpectedConsumptionAsync(
+        Guid kioskId, Guid ingredientId, string unit, CancellationToken cancellationToken = default);
     Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
 }
+
+public sealed record ExpectedInventoryRequirement(Guid IngredientId, decimal Quantity, string Unit);

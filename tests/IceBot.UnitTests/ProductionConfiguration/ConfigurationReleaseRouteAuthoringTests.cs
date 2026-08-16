@@ -77,7 +77,7 @@ public sealed class ConfigurationReleaseRouteAuthoringTests
                     0,
                     [new ExecutionRouteCapabilityRequirementContract("ROBOT_ARM", true)],
                     [],
-                    [new ConfigurationReleaseRobotBindingInput(Guid.NewGuid(), 1, "ROBOT_ARM")])
+                    [new ConfigurationReleaseRobotBindingInput(Guid.NewGuid(), 1)])
             ]
         });
 

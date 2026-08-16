@@ -4,7 +4,6 @@ using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Connectivity.Abstractions;
 using Application.Devices.Credentials.Abstractions;
-using Domain.Devices.Catalog;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Domain.Devices.ExecutionEndpoints.Projections;
@@ -108,21 +107,6 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
         return _dbContext.Kiosks.WhereNotDeleted().AsNoTracking().FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
     }
 
-    public Task<Device?> GetDeviceByIdAsync(Guid deviceId, CancellationToken cancellationToken = default)
-    {
-        return _dbContext.Devices.WhereNotDeleted().FirstOrDefaultAsync(device => device.Id == deviceId, cancellationToken);
-    }
-
-    public Task<Device?> GetDeviceByKioskIdAsync(
-        Guid kioskId,
-        Guid deviceId,
-        CancellationToken cancellationToken = default)
-    {
-        return _dbContext.Devices.WhereNotDeleted().FirstOrDefaultAsync(
-            device => device.Id == deviceId && device.KioskId == kioskId,
-            cancellationToken);
-    }
-
     public Task<bool> EndpointCodeExistsAsync(Guid kioskId, string endpointCode, CancellationToken cancellationToken = default)
     {
         var normalized = endpointCode.Trim().ToUpperInvariant();
@@ -209,11 +193,6 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
         CancellationToken cancellationToken = default) =>
         _dbContext.ExecutionEndpointMqttCredentials.AddAsync(credential, cancellationToken).AsTask();
 
-    public void RemoveSupportedRobotTargets(IEnumerable<ExecutionEndpointSupportedRobotTarget> targets)
-    {
-        _dbContext.ExecutionEndpointSupportedRobotTargets.RemoveRange(targets);
-    }
-
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return _dbContext.SaveChangesAsync(cancellationToken);
@@ -225,8 +204,7 @@ public sealed class ExecutionEndpointStore : IExecutionEndpointStore
             .Include(endpoint => endpoint.Kiosk)
             .Include(endpoint => endpoint.CredentialBinding)
             .Include(endpoint => endpoint.MqttCredential)
-            .Include(endpoint => endpoint.SupportedRobotTargets)
-                .ThenInclude(target => target.Device)
+            .Include(endpoint => endpoint.ReportedDevices)
             .Where(endpoint => endpoint.Kiosk.DeletedAt == null);
     }
 

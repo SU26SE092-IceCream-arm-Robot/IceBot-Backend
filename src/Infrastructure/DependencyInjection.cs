@@ -104,6 +104,7 @@ namespace Infrastructure
             services.AddScoped<DevelopmentIceBotDemoReset>();
             services.AddHostedService<DevelopmentVanillaSoftServeCatalogSeedHostedService>();
             services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
+            services.AddHostedService<DevelopmentVanillaSoftServeTopologySeedHostedService>();
             services.AddOrdersInfrastructure();
             services.AddOptions<Application.Orders.Management.Automation.FulfillmentReminderOptions>()
                 .Bind(config.GetSection(Application.Orders.Management.Automation.FulfillmentReminderOptions.SectionName))
@@ -140,6 +141,8 @@ namespace Infrastructure
             services.AddScoped<IBatchEventSyncStore, BatchEventSyncStore>();
             services.AddScoped<IProductionEventSyncStore, ProductionEventSyncStore>();
             services.AddScoped<IExecutionReadinessStore, ExecutionReadinessStore>();
+            services.AddScoped<IExecutionEndpointReportedDeviceStore>(provider =>
+                (ExecutionReadinessStore)provider.GetRequiredService<IExecutionReadinessStore>());
             services.AddScoped<Application.Sync.Abstractions.ISyncDeadLetterStore, SyncDeadLetterStore>();
             services.AddOptions<Application.Devices.Telemetry.EdgeTelemetryIngestionOptions>()
                 .Bind(config.GetSection(Application.Devices.Telemetry.EdgeTelemetryIngestionOptions.SectionName))

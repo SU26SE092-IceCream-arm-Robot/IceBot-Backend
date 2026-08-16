@@ -28,6 +28,14 @@ using Application.Operations.Alerts.Notifications;
 using Application.Identity.Tokens.Claims;
 using Application.Orders.Management.Queries;
 using Application.Orders.Management.Commands;
+using Application.Orders.PlaceOrder;
+using Application.Orders.PlaceOrder.Commands;
+using Application.Orders.PlaceOrder.Requests;
+using Application.Orders.PlaceOrder.Services;
+using Application.Orders.Admission;
+using Application.Payments.Abstractions;
+using Application.Payments.PaymentSessions.Commands;
+using Application.Payments.PaymentSessions.Requests;
 using Application.Orders.PlaceOrder.Queries;
 using Application.ProductionConfiguration.Releases.Commands;
 using Application.ProductionConfiguration.Deployments.Commands;
@@ -40,6 +48,7 @@ using Application.ProductionConfiguration.Readiness;
 using Application.ProductionPackages.Ownership;
 using Application.Inventory.Services;
 using Application.Inventory.Commands;
+using Application.SalesCatalog.Availability;
 using Application.RobotConfiguration.Artifacts.Commands;
 using Application.RobotConfiguration.Storage.Services;
 using Domain.Catalog.Entities;
@@ -71,6 +80,8 @@ using Infrastructure.Devices.ExecutionEndpoints.Persistence;
 using Infrastructure.Devices.Telemetry.Persistence;
 using Infrastructure.Orders.Persistence;
 using Infrastructure.Inventory.Persistence;
+using Infrastructure.Payments.Persistence;
+using Infrastructure.SalesCatalog.Persistence;
 using Infrastructure.ProductionConfiguration.Persistence.Deployments;
 using Infrastructure.ProductionConfiguration.Persistence.Releases;
 using Infrastructure.ProductionConfiguration.Persistence.Routes;
@@ -93,7 +104,60 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
     : EdgeOperationalIntegrationTestBase(fixture)
 {
     [IntegrationFact]
-    public async Task InventoryReadiness_BlocksDispatchForInvalidTopology()
+    public async Task CustomerCheckout_CashConfirmation_DispatchesAndCompletesWithSimulatedExecution()
+    {
+        var runtime = await CreateActiveRuntimeAsync();
+        var graph = runtime.Graph;
+        await EnsureCashPaymentMethodAsync();
+
+        var order = await PlaceCustomerOrderAsync(graph);
+        Assert.Equal(OrderStatus.PendingPayment, order.Status);
+
+        var paymentSession = await CreateCashPaymentSessionAsync(order);
+        Assert.Equal(Domain.Payments.Enums.PaymentTransactionStatus.Pending, paymentSession.Status);
+        Assert.Equal(order.Id, paymentSession.OrderId);
+
+        var staff = new CurrentUserContext
+        {
+            AccountId = runtime.User.AccountId,
+            RoleScopes = [new UserRoleScope("Staff", graph.OrganizationId, graph.StoreId, null)]
+        };
+        await ConfirmCashPaymentAsync(staff, order.Id, paymentSession.PaymentTransactionId);
+
+        Guid commandId;
+        await using (var dispatchedContext = _fixture.CreateDbContext())
+        {
+            var paidOrder = await dispatchedContext.Orders.SingleAsync(candidate => candidate.Id == order.Id);
+            Assert.Equal(OrderStatus.ReadyForFulfillment, paidOrder.Status);
+            Assert.Equal(Domain.Orders.Enums.PaymentStatus.Paid, paidOrder.PaymentStatus);
+            commandId = await dispatchedContext.EdgeCommands
+                .Where(candidate => candidate.OrderId == order.Id && candidate.CommandType == EdgeCommandType.ExecuteOrder)
+                .Select(candidate => candidate.Id)
+                .SingleAsync();
+        }
+
+        await PullAndAcknowledgeAsync(graph, commandId, "Accepted");
+        await ReportProductionAsync(
+            graph,
+            commandId,
+            Guid.NewGuid(),
+            sequenceNumber: 1,
+            status: "Completed",
+            runtime.ReleaseId,
+            runtime.ReleaseChecksum);
+
+        await using var completedContext = _fixture.CreateDbContext();
+        var completedOrder = await completedContext.Orders.SingleAsync(candidate => candidate.Id == order.Id);
+        Assert.Equal(OrderStatus.Completed, completedOrder.Status);
+        Assert.Equal(Domain.Orders.Enums.PaymentStatus.Paid, completedOrder.PaymentStatus);
+        Assert.Equal(90m, await completedContext.IngredientDispenserStates
+            .Where(candidate => candidate.Id == graph.DispenserStateId)
+            .Select(candidate => candidate.EstimatedQuantity)
+            .SingleAsync());
+    }
+
+    [IntegrationFact]
+    public async Task InventoryReadiness_BlocksDispatchForInactiveTopology()
     {
         var runtime = await CreateActiveRuntimeAsync();
         var graph = runtime.Graph;
@@ -101,8 +165,134 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var releaseId = runtime.ReleaseId;
 
         await AssertInventoryDispatchBlockedAsync(graph, "inactive");
-        await AssertInventoryDispatchBlockedAsync(graph, "calibration");
-        await AssertInventoryDispatchBlockedAsync(graph, "device");
+    }
+
+    private async Task<Application.Orders.PlaceOrder.Results.OrderResult> PlaceCustomerOrderAsync(SmokeGraph graph)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var telemetryOptions = Options.Create(new EdgeTelemetryIngestionOptions());
+        var orders = new OrderStore(dbContext);
+        var availability = new MenuItemOperationalAvailabilityReader(new MenuStore(dbContext));
+        var inventory = new MachineProductionInventoryGate(
+            new InventoryReadinessEvaluator(new InventoryStore(dbContext)),
+            telemetryOptions);
+        var handler = new PlaceOrderCommandHandler(
+            orders,
+            new NoOpRealtimeNotificationPublisher(),
+            new PlaceOrderItemAppender(orders, availability, telemetryOptions, inventory),
+            Options.Create(new OrderPaymentWindowOptions()));
+        var result = await handler.HandleAsync(new PlaceOrderCommand
+        {
+            IdempotencyKey = $"customer-attended-{Guid.NewGuid():N}",
+            Request = new PlaceOrderRequest
+            {
+                KioskId = graph.KioskId,
+                ClientOrderId = $"customer-{Guid.NewGuid():N}",
+                Items = [new PlaceOrderItemRequest { MenuItemId = graph.MenuItemId, Quantity = 1 }]
+            }
+        });
+
+        Assert.True(result.Succeeded, result.Message);
+        return result.Data!;
+    }
+
+    private async Task<Application.Payments.PaymentSessions.Results.PaymentSessionResult> CreateCashPaymentSessionAsync(
+        Application.Orders.PlaceOrder.Results.OrderResult order)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var telemetryOptions = Options.Create(new EdgeTelemetryIngestionOptions());
+        var orders = new OrderStore(dbContext);
+        var availability = new MenuItemOperationalAvailabilityReader(new MenuStore(dbContext));
+        var inventory = new MachineProductionInventoryGate(
+            new InventoryReadinessEvaluator(new InventoryStore(dbContext)),
+            telemetryOptions);
+        var handler = new CreatePaymentSessionCommandHandler(
+            new PaymentStore(dbContext),
+            new UnusedPaymentGateway(),
+            new OrderPaymentSellabilityGuard(orders, availability, inventory, telemetryOptions));
+        var result = await handler.HandleAsync(new CreatePaymentSessionCommand
+        {
+            OrderId = order.Id,
+            IdempotencyKey = $"cash-payment-{Guid.NewGuid():N}",
+            Request = new CreatePaymentSessionRequest
+            {
+                PaymentMethodCode = "cash",
+                ExpectedAmount = order.TotalAmount,
+                ExpectedCurrency = order.Currency
+            }
+        });
+
+        Assert.True(result.Succeeded, result.Message);
+        return result.Data!;
+    }
+
+    private async Task ConfirmCashPaymentAsync(
+        CurrentUserContext user,
+        Guid orderId,
+        Guid paymentTransactionId)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var paymentStore = new PaymentStore(dbContext);
+        var handler = new ConfirmCashPaymentCommandHandler(
+            paymentStore,
+            new NoOpRealtimeNotificationPublisher(),
+            new DispatchOrderExecutionCommandHandler(
+                new OrderExecutionDispatchStore(dbContext),
+                Options.Create(new OrderExecutionDispatchOptions()),
+                new NoOpEdgeCommandWakeUpPublisher()),
+            NullLogger<ConfirmCashPaymentCommandHandler>.Instance);
+        var result = await handler.HandleAsync(new ConfirmCashPaymentCommand
+        {
+            OrderId = orderId,
+            PaymentTransactionId = paymentTransactionId,
+            UserContext = user,
+            Request = new ConfirmCashPaymentRequest { Note = "Integration-test cash confirmation." }
+        });
+
+        Assert.True(result.Succeeded, result.Message);
+        Assert.False(result.Data!.AlreadyConfirmed);
+    }
+
+    private async Task EnsureCashPaymentMethodAsync()
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        if (await dbContext.PaymentMethods.AnyAsync(candidate => candidate.Code == "cash"))
+        {
+            return;
+        }
+
+        dbContext.PaymentMethods.Add(new Domain.Payments.Entities.PaymentMethod
+        {
+            Code = "cash",
+            Name = "Cash",
+            Provider = "Cash",
+            MethodType = "Cash",
+            IsOnline = false,
+            IsActive = true,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        await dbContext.SaveChangesAsync();
+    }
+
+    private sealed class UnusedPaymentGateway : IPaymentGateway
+    {
+        public string ProviderCode => "Test";
+
+        public string CreateProviderOrderCode(Guid paymentTransactionId) => throw new NotSupportedException();
+
+        public Task<Application.Payments.Providers.ProviderPaymentSession> CreatePaymentSessionAsync(
+            Domain.Payments.Entities.PaymentTransaction paymentTransaction,
+            Order order,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<Application.Payments.Providers.ProviderPaymentSession?> GetPaymentSessionAsync(
+            string providerOrderCode,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public Task<Application.Payments.Providers.ProviderPaymentNotification> ParseAndVerifyNotificationAsync(
+            string rawPayload,
+            string? signature,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 
     [IntegrationFact]
@@ -218,7 +408,12 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
                     .SingleAsync(),
                 movement.ReferenceId);
             Assert.Equal(orderId, movement.CorrelationId);
-            Assert.Equal(90, (await completedContext.IngredientDispenserStates
+            var expectedMovement = await completedContext.StockMovements.SingleAsync(x =>
+                x.ReasonCode == "EXPECTED_PRODUCTION_CONSUMPTION" &&
+                x.ReferenceType == "OrderItemProductionUnit");
+            Assert.Equal(-10, expectedMovement.Quantity);
+            Assert.True(expectedMovement.IsEstimated);
+            Assert.Equal(80, (await completedContext.IngredientDispenserStates
                 .SingleAsync(x => x.Id == graph.DispenserStateId)).EstimatedQuantity);
 
             var attempts = await new GetOrderExecutionAttemptsQueryHandler(new OrderStore(completedContext))
@@ -412,6 +607,12 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         Assert.True(rejectedDispatch.Succeeded, rejectedDispatch.Message);
         await PullAndAcknowledgeAsync(graph, rejectedDispatch.Data!.EdgeCommandId, "Rejected", false);
 
+        // An unresolved customer session intentionally blocks the kiosk. Use isolated
+        // runtimes for the following independent failure scenarios.
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var supportOrderId = await CreatePaidOrderAsync(graph);
         var supportDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -421,6 +622,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         Assert.True(supportDispatch.Succeeded, supportDispatch.Message);
         await PullAndAcknowledgeAsync(graph, supportDispatch.Data!.EdgeCommandId, "Rejected", true);
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var busyOrderId = await CreatePaidOrderAsync(graph);
         var busyDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -443,6 +648,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             Assert.Equal(2, busyCommandBeforeRedelivery.DeliveryAttempts.Count);
         }
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var failedOrderId = await CreatePaidOrderAsync(graph);
         var failedDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -460,6 +669,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             releaseId,
             runtime.ReleaseChecksum);
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var interventionOrderId = await CreatePaidOrderAsync(graph);
         var interventionDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -475,8 +688,13 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             1,
             "RequiresManualIntervention",
             releaseId,
-            runtime.ReleaseChecksum);
+            runtime.ReleaseChecksum,
+            errorCode: "ControllerFault");
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var concurrentEvidenceOrderId = await CreatePaidOrderAsync(graph, quantity: 2);
         var concurrentEvidenceDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -490,7 +708,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             sharedStockEvidenceId,
             graph.DispenserStateId,
             5,
-            83,
+            95,
             DateTimeOffset.UtcNow,
             false);
         await Task.WhenAll(
@@ -515,6 +733,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
                 [sharedEvidence],
                 productionUnitNo: 2));
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var reusedEvidenceOrderId = await CreatePaidOrderAsync(graph);
         var reusedEvidenceDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -531,13 +753,17 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             "Completed",
             releaseId,
             runtime.ReleaseChecksum,
-            [sharedEvidence with { QuantityConsumed = 1, BalanceAfter = 82 }]);
+            [sharedEvidence with { QuantityConsumed = 1, BalanceAfter = 94 }]);
         Assert.False(reusedEvidence.Succeeded);
         Assert.Equal(400, reusedEvidence.StatusCode);
         Assert.Equal(
             "Stock movement source event id was reused with different evidence.",
             reusedEvidence.Message);
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var inconsistentBalanceOrderId = await CreatePaidOrderAsync(graph);
         var inconsistentBalanceDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -570,7 +796,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
 
         await using (var inconsistentBalanceContext = _fixture.CreateDbContext())
         {
-            Assert.Equal(83, (await inconsistentBalanceContext.IngredientDispenserStates
+            Assert.Equal(100, (await inconsistentBalanceContext.IngredientDispenserStates
                 .SingleAsync(state => state.Id == graph.DispenserStateId)).EstimatedQuantity);
             Assert.False(await inconsistentBalanceContext.StockMovements
                 .AnyAsync(movement => movement.SourceEventId == inconsistentBalanceEvidenceId));
@@ -588,6 +814,14 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
                 .AnyAsync(record => record.SourceCommandId == reusedEvidenceDispatch.Data.EdgeCommandId));
         }
 
+        await using (var refillArrangeContext = _fixture.CreateDbContext())
+        {
+            var state = await refillArrangeContext.IngredientDispenserStates
+                .SingleAsync(item => item.Id == graph.DispenserStateId);
+            state.EstimatedQuantity = 83;
+            await refillArrangeContext.SaveChangesAsync();
+        }
+
         var refillReasonOne = $"CONCURRENT_REFILL_{Guid.NewGuid():N}";
         var refillReasonTwo = $"CONCURRENT_REFILL_{Guid.NewGuid():N}";
         await Task.WhenAll(
@@ -601,6 +835,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
                 movement.ReasonCode == refillReasonOne || movement.ReasonCode == refillReasonTwo));
         }
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var releaseMismatchOrderId = await CreatePaidOrderAsync(graph);
         var releaseMismatchDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -674,6 +912,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var graph = runtime.Graph;
         var user = runtime.User;
         var releaseId = runtime.ReleaseId;
+        var expiryUser = user;
         await using var dispatchContext = _fixture.CreateDbContext();
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             new OrderExecutionDispatchStore(dispatchContext),
@@ -691,6 +930,11 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         Assert.True(expiryDispatch.Succeeded, expiryDispatch.Message);
         await ReconcileTimeoutAsync(graph, expiryDispatch.Data!.EdgeCommandId, expiryBase.AddMinutes(2));
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
+        var unreachableGraph = graph;
         var unreachableOrderId = await CreatePaidOrderAsync(graph);
         var unreachableDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -707,6 +951,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         Assert.Single(unreachablePublisher.OrderExecutionObservationEvents);
         Assert.Equal("PendingRecovery", unreachablePublisher.OrderExecutionObservationEvents[0].CustomerStatus);
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var staleOrderId = await CreatePaidOrderAsync(graph);
         var staleDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -773,7 +1021,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         Assert.Equal(CustomerExecutionStatus.Delayed, staleRecord.CustomerExecutionStatus);
 
         var supportPublisher = await ReconcileTimeoutAsync(
-            graph,
+            unreachableGraph,
             unreachableDispatch.Data.EdgeCommandId,
             staleObservedAt.AddMinutes(10));
         var supportEvent = Assert.Single(supportPublisher.OrderExecutionObservationEvents);
@@ -795,11 +1043,11 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             Assert.True(customerResult.Data.RequiresStaffSupport);
         }
 
-        var redispatch = await RedispatchAsync(expiryOrderId, user, "Operator confirmed safe retry after expiry.");
+        var redispatch = await RedispatchAsync(expiryOrderId, expiryUser, "Operator confirmed safe retry after expiry.");
         Assert.True(redispatch.Succeeded, redispatch.Message);
         Assert.Equal(2, redispatch.Data!.DispatchAttemptNo);
         Assert.False(redispatch.Data.Existing);
-        var repeatedRedispatch = await RedispatchAsync(expiryOrderId, user, "Repeated client request.");
+        var repeatedRedispatch = await RedispatchAsync(expiryOrderId, expiryUser, "Repeated client request.");
         Assert.True(repeatedRedispatch.Succeeded, repeatedRedispatch.Message);
         Assert.True(repeatedRedispatch.Data!.Existing);
         Assert.Equal(redispatch.Data.EdgeCommandId, repeatedRedispatch.Data.EdgeCommandId);
@@ -812,7 +1060,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
                 {
                     OrderId = expiryOrderId,
                     SourceCommandId = expiryDispatch.Data.EdgeCommandId,
-                    UserContext = user
+                    UserContext = expiryUser
                 });
             Assert.True(expiredAttemptDetail.Succeeded, expiredAttemptDetail.Message);
             Assert.True(expiredAttemptDetail.Data!.Provenance.TimedOutBeforeAcceptance);
@@ -823,7 +1071,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
                 {
                     OrderId = expiryOrderId,
                     SourceCommandId = redispatch.Data.EdgeCommandId,
-                    UserContext = user
+                    UserContext = expiryUser
                 });
             Assert.True(redispatchDetail.Succeeded, redispatchDetail.Message);
             Assert.True(redispatchDetail.Data!.Provenance.IsRedispatch);
@@ -832,6 +1080,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             Assert.Contains("Operator confirmed safe retry after expiry.", redispatchDetail.Data.Provenance.RedispatchReason);
         }
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var unsafeOrderId = await CreatePaidOrderAsync(graph);
         var unsafeDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -845,6 +1097,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         Assert.False(unsafeRedispatch.Succeeded);
         Assert.Equal(409, unsafeRedispatch.StatusCode);
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var deliveryFailureOrderId = await CreatePaidOrderAsync(graph);
         var deliveryFailureDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -860,6 +1116,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         Assert.True(deliveryRedispatch.Succeeded, deliveryRedispatch.Message);
         Assert.Equal(2, deliveryRedispatch.Data!.DispatchAttemptNo);
 
+        runtime = await CreateActiveRuntimeAsync();
+        graph = runtime.Graph;
+        user = runtime.User;
+        releaseId = runtime.ReleaseId;
         var maxAttemptOrderId = await CreatePaidOrderAsync(graph);
         var maxAttemptDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
@@ -879,9 +1139,9 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         await using var redispatchAssertionContext = _fixture.CreateDbContext();
         var redispatchedCommand = await redispatchAssertionContext.EdgeCommands
             .SingleAsync(x => x.Id == redispatch.Data.EdgeCommandId);
-        Assert.Equal(user.AccountId, redispatchedCommand.CreatedByAccountId);
+        Assert.Equal(expiryUser.AccountId, redispatchedCommand.CreatedByAccountId);
         Assert.Contains(await redispatchAssertionContext.OrderStatusHistories
-            .Where(x => x.OrderId == expiryOrderId && x.ChangedByAccountId == user.AccountId)
+            .Where(x => x.OrderId == expiryOrderId && x.ChangedByAccountId == expiryUser.AccountId)
             .Select(x => x.Reason!)
             .ToListAsync(), reason => reason.Contains("Operator confirmed safe retry after expiry."));
     }

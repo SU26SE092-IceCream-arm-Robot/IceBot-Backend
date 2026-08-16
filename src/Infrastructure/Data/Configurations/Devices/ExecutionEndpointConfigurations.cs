@@ -42,12 +42,12 @@ internal sealed class KioskExecutionEndpointConfiguration : IEntityTypeConfigura
             .WithMany()
             .HasForeignKey(x => x.CredentialBindingId)
             .OnDelete(DeleteBehavior.Restrict);
-        entity.HasMany(x => x.SupportedRobotTargets)
+        entity.HasMany(x => x.ReportedDevices)
             .WithOne(x => x.KioskExecutionEndpoint)
             .HasForeignKey(x => new { x.KioskExecutionEndpointId, x.KioskId })
             .HasPrincipalKey(x => new { x.Id, x.KioskId })
             .OnDelete(DeleteBehavior.Restrict);
-        entity.Navigation(x => x.SupportedRobotTargets).UsePropertyAccessMode(PropertyAccessMode.Field);
+        entity.Navigation(x => x.ReportedDevices).UsePropertyAccessMode(PropertyAccessMode.Field);
 
     }
 }
@@ -133,21 +133,19 @@ internal sealed class ExecutionEndpointRequestNonceConfiguration : IEntityTypeCo
     }
 }
 
-internal sealed class ExecutionEndpointSupportedRobotTargetConfiguration : IEntityTypeConfiguration<ExecutionEndpointSupportedRobotTarget>
+internal sealed class ExecutionEndpointReportedDeviceConfiguration : IEntityTypeConfiguration<ExecutionEndpointReportedDevice>
 {
-    public void Configure(EntityTypeBuilder<ExecutionEndpointSupportedRobotTarget> entity)
+    public void Configure(EntityTypeBuilder<ExecutionEndpointReportedDevice> entity)
     {
-        entity.ToTable("ExecutionEndpointSupportedRobotTargets");
-        entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.RuntimeTargetCode, x.MachineModelCode })
-            .IsUnique()
-            .HasFilter("\"DeviceId\" IS NULL");
-        entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.RuntimeTargetCode, x.MachineModelCode, x.DeviceId })
-            .IsUnique()
-            .HasFilter("\"DeviceId\" IS NOT NULL");
-        entity.HasOne(x => x.Device).WithMany()
-            .HasForeignKey(x => new { x.DeviceId, x.KioskId })
-            .HasPrincipalKey(x => new { x.Id, x.KioskId })
-            .OnDelete(DeleteBehavior.Restrict);
-
+        entity.ToTable("ExecutionEndpointReportedDevices");
+        entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.SourceDeviceKey })
+            .IsUnique();
+        entity.HasIndex(x => new { x.KioskExecutionEndpointId, x.DeviceId })
+            .IsUnique().HasFilter("\"DeviceId\" IS NOT NULL");
+        entity.HasOne<Device>().WithMany().HasForeignKey(x => new { x.DeviceId, x.KioskId })
+            .HasPrincipalKey(x => new { x.Id, x.KioskId }).OnDelete(DeleteBehavior.Restrict);
+        entity.Property(x => x.SourceDeviceKey).HasMaxLength(100);
+        entity.Property(x => x.RuntimeTargetCode).HasMaxLength(100);
+        entity.Property(x => x.MachineModelCode).HasMaxLength(100);
     }
 }

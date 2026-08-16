@@ -10,14 +10,6 @@ public sealed class CreateExecutionEndpointCommand
     public required CreateExecutionEndpointRequest Request { get; init; }
 }
 
-public sealed class ReplaceExecutionEndpointRobotTargetsCommand
-{
-    public required CurrentUserContext UserContext { get; init; }
-    public Guid KioskId { get; init; }
-    public Guid EndpointId { get; init; }
-    public required ReplaceExecutionEndpointRobotTargetsRequest Request { get; init; }
-}
-
 public sealed class ProvisionExecutionEndpointCommand
 {
     public required CurrentUserContext UserContext { get; init; }

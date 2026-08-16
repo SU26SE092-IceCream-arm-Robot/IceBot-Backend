@@ -149,7 +149,8 @@ public sealed class RobotArtifactStore : IRobotArtifactStore
                 artifact.MachineModelCode,
                 artifact.ContentLengthBytes,
                 artifact.TechnicalContractId,
-                artifact.TechnicalContractChecksum))
+                artifact.TechnicalContractChecksum,
+                artifact.RuntimeProfileSource))
             .ToListAsync(cancellationToken);
     }
 

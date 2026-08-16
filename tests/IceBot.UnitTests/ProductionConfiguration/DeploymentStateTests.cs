@@ -7,6 +7,15 @@ namespace IceBot.UnitTests.ProductionConfiguration;
 public sealed class DeploymentStateTests
 {
     [Fact]
+    public void CreatePending_RejectsLegacyValidationEvidence()
+    {
+        Assert.Throws<DomainRuleException>(() => KioskConfigurationDeployment.CreatePending(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            new string('d', 64), 1, Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow,
+            null, "legacy", "Legacy", "[]"));
+    }
+
+    [Fact]
     public void DuplicateInstalledReport_IsIdempotent()
     {
         var deployment = CreatePending();
@@ -45,5 +54,9 @@ public sealed class DeploymentStateTests
             new string('d', 64),
             1,
             Guid.NewGuid().ToString("N"),
-            DateTimeOffset.UtcNow);
+            DateTimeOffset.UtcNow,
+            null,
+            "validation-checksum",
+            "UnprovenPhysicalBehavior",
+            "[]");
 }

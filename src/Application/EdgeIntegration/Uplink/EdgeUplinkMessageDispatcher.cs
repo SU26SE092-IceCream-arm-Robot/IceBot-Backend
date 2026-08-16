@@ -24,6 +24,7 @@ public sealed class EdgeUplinkMessageDispatcher(
     IngestKioskHeartbeatCommandHandler heartbeatHandler,
     IngestBatchEventsCommandHandler telemetryHandler,
     IngestExecutionReadinessCommandHandler readinessHandler,
+    ReplaceExecutionEndpointReportedDevicesCommandHandler reportedDevicesHandler,
     IngestExecutionReportCommandHandler executionReportHandler,
     IngestProductionEventsBatchCommandHandler productionEventsHandler,
     IngestEdgeStateSummariesCommandHandler stateSummariesHandler,
@@ -66,6 +67,11 @@ public sealed class EdgeUplinkMessageDispatcher(
                     endpointId, messageType, envelope.MessageId,
                     await readinessHandler.HandleAsync(
                         MapReadiness(endpoint.KioskId, endpointId, Deserialize<EdgeReadinessUplink>(envelope)),
+                        cancellationToken)),
+                EdgeUplinkMessageTypes.ReportedDevices => FromApiResult(
+                    endpointId, messageType, envelope.MessageId,
+                    await reportedDevicesHandler.HandleAsync(
+                        MapReportedDevices(endpoint.KioskId, endpointId, Deserialize<EdgeReportedDevicesUplink>(envelope)),
                         cancellationToken)),
                 EdgeUplinkMessageTypes.ExecutionReport => FromApiResult(
                     endpointId, messageType, envelope.MessageId,
@@ -254,6 +260,23 @@ public sealed class EdgeUplinkMessageDispatcher(
                 item.UnavailableReason)).ToArray()
         };
     }
+
+    private static ReplaceExecutionEndpointReportedDevicesCommand MapReportedDevices(
+        Guid kioskId,
+        Guid endpointId,
+        EdgeReportedDevicesUplink payload) => new()
+    {
+        KioskId = kioskId,
+        EndpointId = endpointId,
+        SourceExecutorId = payload.SourceExecutorId,
+        SnapshotRevision = payload.SnapshotRevision,
+        ObservedAt = payload.ObservedAt,
+        Devices = payload.Devices.Select(item => new Domain.Devices.ExecutionEndpoints.ReportedDeviceSnapshotItem(
+            item.SourceDeviceKey,
+            item.DeviceId,
+            item.RuntimeTargetCode,
+            item.MachineModelCode)).ToArray()
+    };
 
     private static IngestExecutionReportCommand MapExecutionReport(
         Guid kioskId,

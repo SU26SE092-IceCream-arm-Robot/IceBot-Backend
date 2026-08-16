@@ -17,7 +17,9 @@ public sealed class DispenserStateResult
     public decimal? EstimatedQuantity { get; set; }
     public decimal? CapacityQuantity { get; set; }
     public string Unit { get; set; } = "gram";
+    public InventoryTrackingMode TrackingMode { get; set; }
     public DateTimeOffset LastMeasuredAt { get; set; }
+    public DateTimeOffset? LastSensorObservedAt { get; set; }
     public DateTimeOffset? LastRefilledAt { get; set; }
     public bool IsActive { get; set; }
     public IReadOnlyList<DispenserLevelQuantityPointResult> LevelToQuantityProfile { get; set; } = [];

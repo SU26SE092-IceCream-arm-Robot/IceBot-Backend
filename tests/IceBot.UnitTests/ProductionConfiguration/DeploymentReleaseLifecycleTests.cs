@@ -14,6 +14,8 @@ using IceBot.UnitTests.TestSupport;
 using Application.Inventory.Abstractions;
 using Application.ProductionConfiguration.Releases.Services;
 using Application.ProductionConfiguration.Readiness.Services;
+using Application.ProductionConfiguration.Deployments.Services;
+using Application.Operations.OperationLogs.Abstractions;
 
 namespace IceBot.UnitTests.ProductionConfiguration;
 
@@ -79,7 +81,9 @@ public sealed class DeploymentReleaseLifecycleTests
             Substitute.For<IEdgeCommandWakeUpPublisher>(),
             new ProductionInventoryReadinessGuard(
                 Substitute.For<IInventoryReadinessEvaluator>(),
-                Options.Create(new InventoryReadinessPolicyOptions())));
+                Options.Create(new InventoryReadinessPolicyOptions())),
+            Substitute.For<IConfigurationDeploymentPreviewService>(),
+            new DeploymentOperationAuditWriter(Substitute.For<IOperationLogStore>()));
 
     private static DeployLowCostArtifactSetCommand Command(Guid releaseId, Guid? rollbackTargetId) => new()
     {

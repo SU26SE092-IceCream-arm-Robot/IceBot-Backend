@@ -65,11 +65,13 @@ status values. It exposes `materializedRobotProgramId`, `materializedAt`, and
 validation `canMaterialize`. The persistence aggregate retains its internal
 `Applied` naming; that storage detail is not part of the API contract.
 
-Lua is a black box to Cloud in every authoring path. A sidecar or published
-technical contract is an optional operator declaration, not a certificate that
-describes Lua behavior. Contract validation proves only that the referenced
-declaration exists, is immutable/published, belongs to the correct scope, and
-has not been corrupted. It does not prove that the declaration describes Lua.
+Lua is a black box to Cloud in every authoring path. Authoring import verifies
+archive structure, file identity, checksums, and a declared runtime profile; it
+does not inspect, infer, or certify Lua behavior. A separately managed technical
+contract remains an optional operator declaration. Its validation proves only
+that the declaration exists, is immutable/published, belongs to the correct
+scope, and has not been corrupted. It does not prove that the declaration
+describes Lua.
 Recipe expectation is not a runtime consumption fact; Edge/device/sensor
 evidence owns reconciliation of actual execution and consumption.
 
@@ -83,8 +85,8 @@ evidence owns reconciliation of actual execution and consumption.
 | 2A. Import Production-aware Lua | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports` | Uploads one bounded ZIP with `Idempotency-Key`, validates ZIP/file identity and checksums, checks durable resource conflicts, and automatically materializes organization-scoped Draft artifacts and one ordered Draft RobotProgram when no blocker exists. A full bundle keeps explicit `RunOrder` and optional declarations. A raw ZIP of 1-50 `.lua` files is accepted through this same route; backend uses ZIP entry order, creates an opaque Draft program/artifacts, and defaults runtime target/model to `FAIRINO_LUA_V1`/`FR5`. No contract, Recipe, ingredient, capability, or Lua behavior is inferred from raw files. |
 | 2B. Resume interrupted import | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/resume` | Idempotently resumes structural validation and Draft-resource materialization through one recovery action. It is shown only when an import did not reach `Materialized`; validation blockers remain visible for correction. |
 | 2C1. Adjust materialized Draft order | Management UI | `PUT /api/v1/management/organizations/{organizationId}/robot-programs/{programId}/artifacts` | The operator owns the full contiguous order. Stale edits return `409`; declaration phase/before/after metadata may warn but never silently reorders or blocks the manifest. |
-| 2P. Publish technical resources | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/publish-resources` | Publishes integrity-checked artifact bytes and the ordered RobotProgram independently of Recipe binding. Optional declarations are published/assigned when present and valid; artifacts without declarations remain publishable black boxes. The normal UI performs Recipe-to-Program binding afterward in the separate Bind Configuration lifecycle. |
-| 2W. Read authoring workspace | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/workspace` | Aggregates import progress and optional Recipe suggestions matched only from operator-declared metadata. Zero, one, or multiple matches always require explicit Recipe selection/confirmation; lack of a suggestion does not block manual binding. |
+| 2P. Publish technical resources | Management UI | `POST /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/publish-resources` | Publishes integrity-checked artifact bytes and the ordered RobotProgram independently of Recipe binding. Authoring import does not create or assign a technical contract from sidecar content. The normal UI performs Recipe-to-Program binding afterward in the separate Bind Configuration lifecycle. |
+| 2W. Read authoring workspace | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-authoring-imports/{importId}/workspace` | Aggregates import progress and the available manual binding actions. Runtime/model metadata is not Recipe evidence, so the workspace does not infer a Recipe from Lua or from the declared runtime profile. |
 | 2D. Read/discard import | Management UI | `GET .../robot-authoring-imports/{importId}` and `POST .../{importId}/discard` | Returns import status and lifecycle actions. Only imports that have not reached `Materialized` may be discarded; staged ZIP deletion is best effort. Cleanup retains staging bytes while an import remains `Uploaded`, `Validated`, or `Failed` so its advertised retry actions remain executable. `Materialized`, `ResourcesPublished`, or `Discarded` staging bytes may be removed by retention cleanup. |
 | 2T. Manage global templates | SystemAdmin | `POST /api/v1/management/robot-artifact-templates`, then `PATCH /api/v1/management/robot-artifact-templates/{templateId}/publish` | Uploads reusable Lua templates as Draft and publishes reviewed templates. Templates may be listed, inspected, reviewed through a short-lived URL, and retired, but never execute directly. An incorrect unreferenced Draft may be discarded with `DELETE /api/v1/management/robot-artifact-templates/{templateId}`. Platform-owned technical contracts use the distinct `/api/v1/management/robot-artifact-template-contracts` collection. |
 | 3. Find existing artifacts | Management UI | `GET /api/v1/management/organizations/{organizationId}/robot-artifacts` | Returns a tenant-scoped, paged artifact list with optional `search` and `status`. |
@@ -151,13 +153,14 @@ Filename prefixes are not execution authority. The management client must send e
 
 For a raw ZIP with no `export-manifest.json`, every non-directory entry must be a non-empty `.lua` file. Backend creates opaque Draft artifacts in ZIP entry order and a Draft program named/code-derived from the ZIP file name. The operator may replace the contiguous order while the program is Draft. Raw import does not manufacture sidecars or technical contracts.
 
-Sidecar schema behavior:
+Runtime-profile metadata rules:
 
-- V1 remains valid for existing projects and declares generic `System`/`Motion` effects plus phase order.
-- V2 is emitted only when the Fairino step has explicit IceBot semantics. It may declare `IngredientCode`, `OptionCode`, `FixedInArtifact` quantity/unit, workcell capability, phase, and before/after effect constraints.
-- Sidecar enum fields use string names; numeric enum values and the currently unsupported `Composite` effect kind are rejected.
-- Fairino and Cloud never infer ingredient, option, or physical quantity from a display label or Lua filename.
-- `Parameterized` quantity is rejected during bundle validation for the current Fairino runtime.
+- A raw ZIP has no declared profile. Backend assigns the explicit MVP default `FAIRINO_LUA_V1` + `FR5` and records `runtimeProfileSource = SystemDefault`.
+- A manifest bundle must declare one runtime target and machine model for the whole program and records `runtimeProfileSource = BundleDeclared`.
+- `contracts/*.icebot.json` is optional. When present, only artifact/file identity and the runtime target/model agreement with `export-manifest.json` are validated by this import flow.
+- Ingredient, option, quantity, effect, and ordering declarations in a sidecar are not used to prove behavior, bind a Recipe, or create a technical contract.
+- A published RobotProgram contains exactly one runtime target/model pair. Mixed profiles require separate RobotPrograms.
+- The profile remains uploader/tool-declared metadata. It is not signed evidence and does not prove that the Lua bytes actually support that runtime or model.
 
 ## Artifact Upload Contract
 
@@ -172,11 +175,11 @@ Each manifest item contains:
 | `fileName` | Basename matching exactly one uploaded non-empty `.lua` file. |
 | `artifactCode` | Stable management code within the organization. |
 | `artifactName` | Human-readable name. |
-| `runtimeTargetCode` | Runtime compatibility gate, for example a Fairino Lua runtime target. |
-| `machineModelCode` | Robot/machine model compatibility gate. |
+| `runtimeTargetCode` | Declared executor/runtime family, for example `FAIRINO_LUA_V1`. |
+| `machineModelCode` | Declared robot/machine model, for example `FR5`. |
 | `exportedAt` | Optional design-time export timestamp. |
 | `description` | Optional management description. |
-| `metadataJson` | Optional valid JSON metadata; not a compatibility authority. |
+| `metadataJson` | Optional valid JSON metadata; not behavior or compatibility proof. |
 
 Cloud computes the checksum from uploaded bytes. Clients do not provide or choose the authoritative checksum or storage key.
 

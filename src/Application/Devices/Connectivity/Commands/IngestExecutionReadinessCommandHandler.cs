@@ -37,7 +37,6 @@ public sealed class IngestExecutionReadinessCommandHandler
         var codes = command.Capabilities.Select(x => x.CapabilityCode?.Trim().ToUpperInvariant()).ToArray();
         if (codes.Any(string.IsNullOrWhiteSpace) || codes.Distinct(StringComparer.Ordinal).Count() != codes.Length)
             return ApiResult<ExecutionReadinessResult>.Fail("Capability codes must be non-empty and unique.", 400);
-
         var result = await _store.ExecuteSerializedAsync(command.EndpointId, async innerCt =>
         {
             var endpoint = await _store.GetEndpointAsync(command.EndpointId, innerCt);
@@ -88,7 +87,9 @@ public sealed class IngestExecutionReadinessCommandHandler
     { EndpointId = x.KioskExecutionEndpointId, StateRevision = x.StateRevision, Applied = applied, DuplicateOrStale = duplicate,
       Readiness = x.Readiness.ToString(), Activity = x.Activity.ToString(), Safety = x.Safety.ToString(), CloudReceivedAt = x.CloudReceivedAt };
 
-    private static bool Matches(ExecutionEndpointReadinessProjection current, IngestExecutionReadinessCommand command)
+    private static bool Matches(
+        ExecutionEndpointReadinessProjection current,
+        IngestExecutionReadinessCommand command)
     {
         var effective = LocalPersistenceReadinessRules.Apply(
             command.LocalPersistenceHealth,

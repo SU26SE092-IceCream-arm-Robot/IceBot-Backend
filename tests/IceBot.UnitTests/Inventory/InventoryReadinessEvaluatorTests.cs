@@ -53,7 +53,7 @@ public sealed class InventoryReadinessEvaluatorTests
             [new InventoryReadinessRouteInput(Guid.NewGuid(), "ROUTE-1", Guid.NewGuid(), recipeId,
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase), kiosk.OrganizationId, null, null,
                 kiosk.OrganizationId, null, null)],
-            options: new InventoryReadinessEvaluationOptions(RequireQuantifiedEvidence: true));
+            options: new InventoryReadinessEvaluationOptions(InventoryReadinessEvaluationPurpose.RuntimeSellability));
 
         Assert.NotNull(result);
         Assert.False(result.IsReady);
@@ -137,5 +137,69 @@ public sealed class InventoryReadinessEvaluatorTests
         Assert.True(result.IsReady);
         Assert.Equal(InventoryReadinessStatus.Ready, result.OverallStatus);
         Assert.Equal(InventoryReadinessStatus.Ready, Assert.Single(result.Ingredients).Status);
+    }
+
+    [Fact]
+    public async Task ManualEstimate_DoesNotRequireOnlineDeviceOrCalibration()
+    {
+        var store = Substitute.For<IInventoryStore>();
+        var kiosk = new Kiosk { OrganizationId = Guid.NewGuid(), StoreId = Guid.NewGuid(), Code = "KIOSK-1", Name = "Kiosk 1" };
+        var ingredient = new Ingredient { Code = "MIX", Name = "Mix", IsActive = true };
+        var recipeId = Guid.NewGuid();
+        var device = Device.CreateProvisioning(1, null, kiosk.Id, "MIXER", "Mixer", null, null, null, null);
+        var state = new IngredientDispenserState
+        {
+            DeviceId = device.Id, Device = device, KioskId = kiosk.Id, Kiosk = kiosk,
+            IngredientId = ingredient.Id, Ingredient = ingredient, ContainerCode = "MIX-HOPPER",
+            EstimatedQuantity = 100, Unit = "gram", IsActive = true
+        };
+        store.GetKioskForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(kiosk);
+        store.ListRequiredRecipeItemsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([
+            new RecipeItem { RecipeId = recipeId, IngredientId = ingredient.Id, Ingredient = ingredient, Quantity = 10, Unit = "gram" }]);
+        store.ListSupportedProductOptionsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns([]);
+        store.ListStatesForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([state]);
+
+        var result = await new InventoryReadinessEvaluator(store).EvaluateKioskAsync(kiosk.Id,
+            [new InventoryReadinessRouteInput(Guid.NewGuid(), "ROUTE-1", Guid.NewGuid(), recipeId,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase), kiosk.OrganizationId, null, null,
+                kiosk.OrganizationId, null, null)],
+            options: new InventoryReadinessEvaluationOptions(InventoryReadinessEvaluationPurpose.RuntimeSellability));
+
+        Assert.True(result!.IsReady);
+    }
+
+    [Fact]
+    public async Task SensorRequired_RejectsMissingSensorEvidence()
+    {
+        var store = Substitute.For<IInventoryStore>();
+        var kiosk = new Kiosk { OrganizationId = Guid.NewGuid(), StoreId = Guid.NewGuid(), Code = "KIOSK-1", Name = "Kiosk 1" };
+        var ingredient = new Ingredient { Code = "MIX", Name = "Mix", IsActive = true };
+        var recipeId = Guid.NewGuid();
+        var device = Device.CreateProvisioning(1, null, kiosk.Id, "SENSOR", "Sensor", null, null, null, null);
+        device.SetStatus(DeviceStatus.Online);
+        var state = new IngredientDispenserState
+        {
+            DeviceId = device.Id, Device = device, KioskId = kiosk.Id, Kiosk = kiosk,
+            IngredientId = ingredient.Id, Ingredient = ingredient, ContainerCode = "MIX-HOPPER",
+            EstimatedQuantity = 100, Unit = "gram", IsActive = true, LevelToQuantityProfileJson = "[]"
+        };
+        state.ChangeTrackingMode(InventoryTrackingMode.SensorRequired);
+        store.GetKioskForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(kiosk);
+        store.ListRequiredRecipeItemsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([
+            new RecipeItem { RecipeId = recipeId, IngredientId = ingredient.Id, Ingredient = ingredient, Quantity = 10, Unit = "gram" }]);
+        store.ListSupportedProductOptionsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns([]);
+        store.ListStatesForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([state]);
+
+        var result = await new InventoryReadinessEvaluator(store).EvaluateKioskAsync(kiosk.Id,
+            [new InventoryReadinessRouteInput(Guid.NewGuid(), "ROUTE-1", Guid.NewGuid(), recipeId,
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase), kiosk.OrganizationId, null, null,
+                kiosk.OrganizationId, null, null)],
+            options: new InventoryReadinessEvaluationOptions(
+                InventoryReadinessEvaluationPurpose.RuntimeSellability,
+                DateTimeOffset.UtcNow,
+                TimeSpan.FromMinutes(5)));
+
+        Assert.False(result!.IsReady);
+        Assert.Equal(InventoryReadinessStatus.InventoryEvidenceStale, result.OverallStatus);
     }
 }

@@ -153,6 +153,7 @@ public sealed class RebindDispenserStateCommandHandler(IInventoryStore inventory
             request.CapacityQuantity,
             unit,
             DispenserLevelQuantityProfileContract.Serialize(request.LevelToQuantityProfile));
+        replacement.ChangeTrackingMode(source.TrackingMode);
 
         var transferredQuantity = 0m;
         if (previousEstimate is > 0)

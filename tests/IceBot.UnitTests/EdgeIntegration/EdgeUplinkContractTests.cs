@@ -16,6 +16,7 @@ public sealed class EdgeUplinkContractTests
             null!,
             null!,
             null!,
+            null!,
             null!);
         var result = await dispatcher.DispatchAsync(
             Guid.NewGuid(),
@@ -45,6 +46,7 @@ public sealed class EdgeUplinkContractTests
                 "inventory-observations",
                 "production-events",
                 "readiness",
+                "reported-devices",
                 "state-summaries",
                 "telemetry-events"
             },
@@ -62,5 +64,33 @@ public sealed class EdgeUplinkContractTests
         Assert.Throws<JsonException>(() => JsonSerializer.Deserialize<EdgeHeartbeatUplink>(
             """{"originNodeId":"00000000-0000-0000-0000-000000000001","unexpected":true}""",
             options));
+    }
+
+    [Fact]
+    public void Reported_devices_contract_round_trips_edge_reported_hardware_snapshot()
+    {
+        var payload = new EdgeReportedDevicesUplink
+        {
+            SourceExecutorId = Guid.NewGuid(),
+            SnapshotRevision = 1,
+            ObservedAt = DateTimeOffset.UtcNow,
+            Devices =
+            [
+                new EdgeReportedDeviceUplink
+                {
+                    SourceDeviceKey = "arm-left",
+                    RuntimeTargetCode = "FAIRINO_LUA_V1",
+                    MachineModelCode = "FR5"
+                }
+            ]
+        };
+
+        var json = JsonSerializer.Serialize(payload, EdgeUplinkJson.CreateSerializerOptions());
+        var restored = JsonSerializer.Deserialize<EdgeReportedDevicesUplink>(json, EdgeUplinkJson.CreateSerializerOptions());
+
+        var device = Assert.Single(restored!.Devices);
+        Assert.Equal("arm-left", device.SourceDeviceKey);
+        Assert.Equal("FAIRINO_LUA_V1", device.RuntimeTargetCode);
+        Assert.Equal("FR5", device.MachineModelCode);
     }
 }

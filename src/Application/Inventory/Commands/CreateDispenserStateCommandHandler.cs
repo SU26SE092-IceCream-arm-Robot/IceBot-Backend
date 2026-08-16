@@ -63,6 +63,7 @@ public sealed class CreateDispenserStateCommandHandler(IInventoryStore inventory
             CreatedAt = now,
             CreatedByAccountId = command.UserContext.AccountId
         };
+        state.ChangeTrackingMode(request.TrackingMode ?? InventoryTrackingMode.ManualEstimate);
         state.ConfigureContainer(request.CapacityQuantity, request.Unit,
             DispenserLevelQuantityProfileContract.Serialize(request.LevelToQuantityProfile));
         await inventory.AddDispenserStateAsync(state, ct);

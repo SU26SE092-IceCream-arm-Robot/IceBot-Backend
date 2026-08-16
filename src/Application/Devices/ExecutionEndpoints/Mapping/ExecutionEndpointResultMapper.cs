@@ -1,6 +1,5 @@
 using Domain.Devices.ExecutionEndpoints;
 using Application.Devices.ExecutionEndpoints.Results;
-using Domain.Devices.Catalog;
 using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Application.Devices.ExecutionEndpoints.Mapping;
@@ -44,17 +43,19 @@ public static class ExecutionEndpointResultMapper
                 }).ToArray()
             },
             ProvisionedAt = endpoint.ProvisionedAt,
-            SupportedRobotTargets = endpoint.SupportedRobotTargets
-                .OrderBy(target => target.RuntimeTargetCode)
-                .ThenBy(target => target.MachineModelCode)
-                .Select(target => new ExecutionEndpointRobotTargetResult
+            ReportedDevicesSourceExecutorId = endpoint.ReportedDevicesSourceExecutorId,
+            ReportedDevicesSnapshotRevision = endpoint.ReportedDevicesSnapshotRevision,
+            ReportedDevicesObservedAt = endpoint.ReportedDevicesObservedAt,
+            ReportedDevicesReceivedAt = endpoint.ReportedDevicesReceivedAt,
+            ReportedDevices = endpoint.ReportedDevices
+                .OrderBy(device => device.SourceDeviceKey)
+                .Select(device => new ExecutionEndpointReportedDeviceResult
                 {
-                    Id = target.Id,
-                    RuntimeTargetCode = target.RuntimeTargetCode,
-                    MachineModelCode = target.MachineModelCode,
-                    DeviceId = target.DeviceId,
-                    DeviceCode = target.Device?.Code,
-                    DeviceName = target.Device?.Name
+                    Id = device.Id,
+                    SourceDeviceKey = device.SourceDeviceKey,
+                    DeviceId = device.DeviceId,
+                    RuntimeTargetCode = device.RuntimeTargetCode,
+                    MachineModelCode = device.MachineModelCode
                 })
                 .ToList()
         };

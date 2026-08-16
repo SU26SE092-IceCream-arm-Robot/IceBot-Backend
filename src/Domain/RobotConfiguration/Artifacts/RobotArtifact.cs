@@ -22,6 +22,8 @@ public class RobotArtifact : RobotConfigurationEntity
 
     public string MachineModelCode { get; private set; } = null!;
 
+    public RobotRuntimeProfileSource RuntimeProfileSource { get; private set; }
+
     public long ContentLengthBytes { get; private set; }
 
     public RobotArtifactStatus Status { get; private set; } = RobotArtifactStatus.Draft;
@@ -53,7 +55,8 @@ public class RobotArtifact : RobotConfigurationEntity
         string? metadataJson = null,
         Guid? sourceRobotArtifactTemplateId = null,
         Guid? technicalContractId = null,
-        string? technicalContractChecksum = null)
+        string? technicalContractChecksum = null,
+        RobotRuntimeProfileSource runtimeProfileSource = RobotRuntimeProfileSource.ManagedConfiguration)
     {
         if (organizationId == Guid.Empty)
         {
@@ -78,6 +81,7 @@ public class RobotArtifact : RobotConfigurationEntity
             Checksum = RequireSha256Checksum(checksum, "Robot artifact checksum"),
             RuntimeTargetCode = RequireText(runtimeTargetCode, "Robot artifact runtime target code"),
             MachineModelCode = RequireText(machineModelCode, "Robot artifact machine model code"),
+            RuntimeProfileSource = runtimeProfileSource,
             ContentLengthBytes = contentLengthBytes,
             ExportedAt = exportedAt,
             Description = string.IsNullOrWhiteSpace(description) ? null : description.Trim(),

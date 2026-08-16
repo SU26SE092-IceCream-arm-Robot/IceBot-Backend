@@ -61,10 +61,10 @@ public class KioskConfigurationDeployment : BusinessEntity
         int attemptNo,
         string idempotencyKey,
         DateTimeOffset requestedAt,
-        Guid? requestedByAccountId = null,
-        string validationReportChecksum = "legacy",
-        string riskLevel = "Legacy",
-        string warningCodesJson = "[]",
+        Guid? requestedByAccountId,
+        string validationReportChecksum,
+        string riskLevel,
+        string warningCodesJson,
         Guid? riskAcknowledgedByAccountId = null,
         DateTimeOffset? riskAcknowledgedAt = null)
     {
@@ -77,6 +77,15 @@ public class KioskConfigurationDeployment : BusinessEntity
         if (attemptNo <= 0 || string.IsNullOrWhiteSpace(idempotencyKey))
         {
             throw new DomainRuleException("Configuration deployment attempt number must be greater than zero.");
+        }
+
+        if (string.IsNullOrWhiteSpace(validationReportChecksum) ||
+            string.IsNullOrWhiteSpace(riskLevel) ||
+            string.IsNullOrWhiteSpace(warningCodesJson) ||
+            string.Equals(validationReportChecksum, "legacy", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(riskLevel, "legacy", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new DomainRuleException("Configuration deployment requires non-legacy validation evidence.");
         }
 
         return new KioskConfigurationDeployment

@@ -256,6 +256,90 @@ public sealed class ExecutionReportStore :
             select optionRequirement.Id).AnyAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ExpectedInventoryRequirement>> ListExpectedInventoryRequirementsAsync(
+        Guid orderId,
+        Guid orderItemId,
+        CancellationToken cancellationToken = default)
+    {
+        var item = await _dbContext.OrderItems.AsNoTracking()
+            .Where(candidate => candidate.Id == orderItemId && candidate.OrderId == orderId)
+            .Select(candidate => new { candidate.RecipeId, candidate.RecipeSnapshotSchemaVersion, candidate.RecipeSnapshotJson })
+            .FirstOrDefaultAsync(cancellationToken);
+        if (item is null) return [];
+
+        var requirements = new List<ExpectedInventoryRequirement>();
+        var snapshotDeclaresIngredients = false;
+        if (item.RecipeSnapshotSchemaVersion >= 2 && !string.IsNullOrWhiteSpace(item.RecipeSnapshotJson))
+        {
+            try
+            {
+                using var document = JsonDocument.Parse(item.RecipeSnapshotJson);
+                if (document.RootElement.TryGetProperty("Ingredients", out var ingredients) &&
+                    ingredients.ValueKind == JsonValueKind.Array)
+                {
+                    snapshotDeclaresIngredients = true;
+                    foreach (var entry in ingredients.EnumerateArray())
+                    {
+                        if (entry.TryGetProperty("IsOptional", out var optional) && optional.GetBoolean()) continue;
+                        if (!entry.TryGetProperty("IngredientId", out var ingredientId) || !ingredientId.TryGetGuid(out var id) ||
+                            !entry.TryGetProperty("Quantity", out var quantity) || !quantity.TryGetDecimal(out var amount) ||
+                            !entry.TryGetProperty("Unit", out var unit) || string.IsNullOrWhiteSpace(unit.GetString()))
+                            continue;
+                        requirements.Add(new ExpectedInventoryRequirement(id, amount, unit.GetString()!));
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                return [];
+            }
+        }
+
+        // Some pre-snapshot order items retained RecipeId but have no ingredient
+        // snapshot. Preserve the historical fallback without overriding an
+        // explicit snapshot that intentionally declares no required ingredients.
+        if (!snapshotDeclaresIngredients && item.RecipeId.HasValue)
+        {
+            requirements.AddRange(await _dbContext.RecipeItems.AsNoTracking()
+                .Where(recipeItem => recipeItem.RecipeId == item.RecipeId.Value && !recipeItem.IsOptional)
+                .Select(recipeItem => new ExpectedInventoryRequirement(
+                    recipeItem.IngredientId, recipeItem.Quantity, recipeItem.Unit))
+                .ToListAsync(cancellationToken));
+        }
+
+        var selectedOptionRequirements = await (
+            from optionRequirement in _dbContext.OrderItemOptionIngredientRequirements.AsNoTracking()
+            join option in _dbContext.OrderItemOptions.AsNoTracking() on optionRequirement.OrderItemOptionId equals option.Id
+            where option.OrderItemId == orderItemId
+            select new ExpectedInventoryRequirement(
+                optionRequirement.IngredientId,
+                optionRequirement.QuantityPerOption * option.Quantity,
+                optionRequirement.Unit)
+        ).ToListAsync(cancellationToken);
+        requirements.AddRange(selectedOptionRequirements);
+
+        return requirements
+            .Where(requirement => requirement.Quantity > 0 && !string.IsNullOrWhiteSpace(requirement.Unit))
+            .GroupBy(requirement => new { requirement.IngredientId, Unit = requirement.Unit.Trim().ToUpperInvariant() })
+            .Select(group => new ExpectedInventoryRequirement(
+                group.Key.IngredientId, group.Sum(requirement => requirement.Quantity), group.First().Unit.Trim()))
+            .ToArray();
+    }
+
+    public Task<List<IngredientDispenserState>> ListActiveDispenserStatesForExpectedConsumptionAsync(
+        Guid kioskId,
+        Guid ingredientId,
+        string unit,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.WhereNotDeleted()
+            .Include(state => state.Kiosk)
+            .Include(state => state.Ingredient)
+            .Where(state => state.KioskId == kioskId && state.IngredientId == ingredientId && state.IsActive &&
+                state.Ingredient.IsActive && state.Unit.ToUpper() == unit.Trim().ToUpper())
+            .OrderBy(state => state.ContainerCode)
+            .ThenBy(state => state.Id)
+            .ToListAsync(cancellationToken);
+
     public Task<StockMovement?> GetStockMovementBySourceEventIdAsync(
         Guid sourceEventId,
         CancellationToken cancellationToken = default)

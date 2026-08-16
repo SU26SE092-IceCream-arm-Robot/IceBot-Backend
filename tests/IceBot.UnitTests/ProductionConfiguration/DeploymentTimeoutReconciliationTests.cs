@@ -17,7 +17,8 @@ public sealed class DeploymentTimeoutReconciliationTests
         var observedAt = new DateTimeOffset(2026, 7, 21, 9, 0, 0, TimeSpan.Zero);
         var deployment = KioskConfigurationDeployment.CreatePending(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
-            "release-checksum", 1, "deployment-key", observedAt.AddMinutes(-2));
+            "release-checksum", 1, "deployment-key", observedAt.AddMinutes(-2), null,
+            "validation-checksum", "UnprovenPhysicalBehavior", "[]");
         var unsupported = DeploymentCommand(
             Guid.NewGuid(), (DeploymentCommandTargetKind)999, observedAt);
         var valid = DeploymentCommand(

@@ -19,6 +19,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
     private const string ProductCode = "KEM-TUOI-VANI";
     private const string VariantCode = "80G";
     private const string RecipeCode = "KEM-TUOI-VANI-80G-V1";
+    private const string OperationalMixIngredientCode = "VANILLA-SOFT-SERVE-MIX";
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IConfiguration _configuration;
@@ -74,12 +75,10 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
                 PreparationTimeSeconds = 90,
                 MetadataJson = JsonSerializer.Serialize(new
                 {
-                    source = "Vanilla soft-serve formulation sheet",
-                    sourceBatchInputGrams = 6100,
-                    expectedOutputGrams = 6000,
+                    source = "Vanilla soft-serve operational mix",
                     servings = 75,
                     servingGrams = 80,
-                    expectedProcessLossGrams = 100,
+                    inventoryModel = "One pre-mixed hopper consumable",
                     sellingPrice = "not-provided"
                 }),
                 CreatedAt = now
@@ -113,8 +112,7 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
                 {
                     servingQuantity = 80,
                     servingUnit = "gram",
-                    expectedInputQuantity = 81.333333m,
-                    expectedInputUnit = "gram"
+                    operationalConsumableCode = OperationalMixIngredientCode
                 }),
                 CreatedAt = now
             };
@@ -177,9 +175,13 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
     {
         var definitions = new[]
         {
-            new IngredientDefinition("FRESH-MILK", "Fresh Milk", "Dairy", true, true, "Refrigerated"),
-            new IngredientDefinition("COMPRITAL-SOFT-PREMIUM", "Comprital Soft Premium", "SoftServeBase", false, true, "Store according to supplier label"),
-            new IngredientDefinition("PURIFIED-WATER", "Nuoc loc", "Water", false, false, null)
+            new IngredientDefinition(
+                OperationalMixIngredientCode,
+                "Vanilla soft-serve mix",
+                "PreMixedSoftServe",
+                true,
+                true,
+                "Store and refill according to the machine and supplier instructions")
         };
         var codes = definitions.Select(definition => definition.Code).ToArray();
         var ingredients = await dbContext.Ingredients
@@ -204,7 +206,11 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
                 IsPerishable = definition.IsPerishable,
                 IsAllergen = definition.IsAllergen,
                 IsActive = true,
-                MetadataJson = JsonSerializer.Serialize(new { source = "Vanilla soft-serve formulation sheet" }),
+                MetadataJson = JsonSerializer.Serialize(new
+                {
+                    source = "Vanilla soft-serve operational mix",
+                    inventoryModel = "One pre-mixed hopper consumable"
+                }),
                 CreatedAt = now
             };
             dbContext.Ingredients.Add(ingredient);
@@ -354,58 +360,25 @@ public sealed class DevelopmentVanillaSoftServeCatalogSeedHostedService : IHoste
             InstructionsSchemaVersion = 1,
             InstructionsJson = JsonSerializer.Serialize(new
             {
-                sourceBatch = new
+                operationalConsumption = new
                 {
-                    inputQuantity = 6100,
-                    inputUnit = "gram",
-                    expectedOutputQuantity = 6000,
-                    expectedOutputUnit = "gram",
-                    servings = 75,
-                    servingQuantity = 80,
-                    servingUnit = "gram",
-                    expectedProcessLossQuantity = 100,
-                    expectedProcessLossUnit = "gram"
+                    ingredientCode = OperationalMixIngredientCode,
+                    quantity = 80,
+                    unit = "gram"
                 },
-                perServing = new
-                {
-                    expectedInputQuantity = 81.333333m,
-                    expectedInputUnit = "gram",
-                    expectedProcessLossQuantity = 1.333333m,
-                    expectedProcessLossUnit = "gram"
-                },
-                note = "Recipe item quantities are per 80 g serving, not the full source batch."
+                note = "This recipe models the pre-mixed hopper consumable. The supplier batch formulation is not runtime inventory evidence."
             }),
             CreatedAt = now
         };
 
         recipe.RecipeItems.Add(new RecipeItem
         {
-            IngredientId = ingredients["FRESH-MILK"].Id,
-            Ingredient = ingredients["FRESH-MILK"],
-            Quantity = 13.333333m,
+            IngredientId = ingredients[OperationalMixIngredientCode].Id,
+            Ingredient = ingredients[OperationalMixIngredientCode],
+            Quantity = 80m,
             Unit = "gram",
             StepOrder = 1,
-            Notes = "1000 g / 75 servings from source batch.",
-            CreatedAt = now
-        });
-        recipe.RecipeItems.Add(new RecipeItem
-        {
-            IngredientId = ingredients["COMPRITAL-SOFT-PREMIUM"].Id,
-            Ingredient = ingredients["COMPRITAL-SOFT-PREMIUM"],
-            Quantity = 21.333333m,
-            Unit = "gram",
-            StepOrder = 2,
-            Notes = "1600 g / 75 servings from source batch.",
-            CreatedAt = now
-        });
-        recipe.RecipeItems.Add(new RecipeItem
-        {
-            IngredientId = ingredients["PURIFIED-WATER"].Id,
-            Ingredient = ingredients["PURIFIED-WATER"],
-            Quantity = 46.666667m,
-            Unit = "gram",
-            StepOrder = 3,
-            Notes = "3500 g / 75 servings from source batch.",
+            Notes = "Operational hopper consumption per 80 g serving.",
             CreatedAt = now
         });
 

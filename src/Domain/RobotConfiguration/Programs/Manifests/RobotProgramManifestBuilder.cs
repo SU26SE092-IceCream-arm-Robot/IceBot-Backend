@@ -32,6 +32,18 @@ public static class RobotProgramManifestBuilder
             throw new DomainRuleException("Robot program publication artifact snapshots do not match program membership.");
         }
 
+        var runtimeProfiles = artifacts
+            .Select(item => (
+                item.RobotArtifact.RuntimeTargetCode.Trim().ToUpperInvariant(),
+                item.RobotArtifact.MachineModelCode.Trim().ToUpperInvariant()))
+            .Distinct()
+            .ToArray();
+        if (runtimeProfiles.Length != 1)
+        {
+            throw new DomainRuleException(
+                "A robot program can contain artifacts for only one runtime target and machine model.");
+        }
+
         var document = new RobotProgramManifestDocument(
             program.Id,
             program.Code,
@@ -98,7 +110,8 @@ public static class RobotProgramManifestBuilder
                 artifact.MachineModelCode,
                 artifact.ContentLengthBytes,
                 artifact.TechnicalContractId,
-                artifact.TechnicalContractChecksum),
+                artifact.TechnicalContractChecksum,
+                artifact.RuntimeProfileSource),
             membership.RequiredOptionCode);
     }
 
@@ -143,7 +156,8 @@ public sealed record RobotArtifactManifestSnapshot(
     string MachineModelCode,
     long ContentLengthBytes,
     Guid? TechnicalContractId = null,
-    string? TechnicalContractChecksum = null);
+    string? TechnicalContractChecksum = null,
+    RobotRuntimeProfileSource RuntimeProfileSource = RobotRuntimeProfileSource.ManagedConfiguration);
 
 public sealed record RobotProgramManifestDocument(
     Guid Id,
@@ -168,7 +182,8 @@ public sealed record RobotProgramManifestArtifact(
     string MachineModelCode,
     long ContentLengthBytes,
     Guid? TechnicalContractId,
-    string? TechnicalContractChecksum);
+    string? TechnicalContractChecksum,
+    RobotRuntimeProfileSource RuntimeProfileSource = RobotRuntimeProfileSource.ManagedConfiguration);
 
 public sealed record RobotProgramManifest(
     RobotProgramManifestDocument Document,

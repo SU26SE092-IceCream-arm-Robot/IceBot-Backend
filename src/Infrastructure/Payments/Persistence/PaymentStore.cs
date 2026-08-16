@@ -66,6 +66,8 @@ public sealed class PaymentStore : IPaymentStore
     {
         return _dbContext.PaymentTransactions.WhereNotDeleted()
             .Include(payment => payment.Order)
+                .ThenInclude(order => order.OrderItems)
+            .Include(payment => payment.PaymentMethod)
             .FirstOrDefaultAsync(payment => payment.Id == id, cancellationToken);
     }
 

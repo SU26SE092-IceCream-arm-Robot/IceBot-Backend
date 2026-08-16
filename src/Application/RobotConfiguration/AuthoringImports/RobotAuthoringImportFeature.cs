@@ -80,11 +80,12 @@ public sealed class RobotAuthoringImportHandlers(
                 command.DeviceId, bundle.Manifest.ExportId, checksum, command.IdempotencyKey,
                 bundle.Manifest.SchemaVersion, bundle.Manifest.Program.Code, bundle.Manifest.Program.Name,
                 bundle.Manifest.Program.RuntimeTargetCode, bundle.Manifest.Program.MachineModelCode, storageKey,
-                command.UserContext.AccountId);
+                command.UserContext.AccountId, bundle.RuntimeProfileSource);
             session.Id = importId;
             foreach (var item in bundle.Items)
                 session.AddItem(item.ManifestItem.ArtifactCode, item.ManifestItem.FileName,
-                    item.ManifestItem.SidecarFileName, item.ManifestItem.RunOrder, item.LuaChecksum, item.SidecarChecksum);
+                    item.ManifestItem.SidecarFileName ?? string.Empty, item.ManifestItem.RunOrder,
+                    item.LuaChecksum, item.SidecarChecksum);
             var insert = await store.InsertOrGetExistingAsync(session, cancellationToken);
             if (!insert.Created)
             {
@@ -303,7 +304,6 @@ public sealed class RobotAuthoringImportHandlers(
         if (currentReport?.CanMaterialize != true)
             return ApiResult<RobotAuthoringImportResult>.Fail("Import has unresolved validation conflicts.", 409);
 
-        var newContracts = new List<RobotArtifactTechnicalContract>();
         var newArtifacts = new List<RobotArtifact>();
         var writtenKeys = new List<string>();
         var usedKeys = new HashSet<string>(StringComparer.Ordinal);
@@ -356,15 +356,12 @@ public sealed class RobotAuthoringImportHandlers(
                 session.OrganizationId, session.StoreId, session.KioskId,
                 session.DeviceId, session.ProposedProgramCode, artifactCodes, cancellationToken);
 
-            var observedContracts = await store.GetContractsAsync(session.OrganizationId,
-                artifactCodes, false, cancellationToken);
             var observedArtifacts = await store.GetArtifactsAsync(session.OrganizationId,
                 artifactCodes, false, cancellationToken);
             var observedProgram = await store.GetProgramAsync(session.OrganizationId, session.StoreId,
                 session.KioskId, session.DeviceId, session.ProposedProgramCode, false, cancellationToken);
-            var existingResourceLocks = observedContracts
-                .Select(contract => TechnicalResourceMutationIdentity.Contract(contract.Id))
-                .Concat(observedArtifacts.Select(artifact => TechnicalResourceMutationIdentity.Artifact(artifact.Id)))
+            var existingResourceLocks = observedArtifacts
+                .Select(artifact => TechnicalResourceMutationIdentity.Artifact(artifact.Id))
                 .Concat(observedProgram is null
                     ? []
                     : new[] { TechnicalResourceMutationIdentity.Program(observedProgram.Id) })
@@ -379,8 +376,6 @@ public sealed class RobotAuthoringImportHandlers(
                     ApiResult<RobotAuthoringImportResult>.Fail(
                         "Authoring resources changed after validation; validate again.", 409));
 
-            var existingContracts = await store.GetContractsAsync(session.OrganizationId,
-                artifactCodes, true, cancellationToken);
             var existingArtifacts = await store.GetArtifactsAsync(session.OrganizationId,
                 artifactCodes, true, cancellationToken);
             var program = await store.GetProgramAsync(session.OrganizationId, session.StoreId, session.KioskId,
@@ -389,19 +384,6 @@ public sealed class RobotAuthoringImportHandlers(
             foreach (var item in bundle.Items.OrderBy(x => x.ManifestItem.RunOrder))
             {
                 var code = Normalize(item.ManifestItem.ArtifactCode);
-                var matchingContracts = existingContracts.Where(x => x.ContractCode == code).ToArray();
-                RobotArtifactTechnicalContract? contract = matchingContracts.Length == 1 &&
-                    matchingContracts[0].Status != RobotArtifactContractStatus.Retired &&
-                    item.HasTechnicalDeclaration &&
-                    RobotAuthoringImportValidator.DeclarationMatches(matchingContracts[0], item.Sidecar)
-                        ? matchingContracts[0]
-                        : null;
-                if (item.HasTechnicalDeclaration && contract is null && matchingContracts.Length == 0 && item.Sidecar.Effects.Count > 0)
-                {
-                    contract = CreateDraftContract(session, item, command.UserContext.AccountId);
-                    newContracts.Add(contract);
-                }
-
                 var artifact = existingArtifacts.SingleOrDefault(x => x.ArtifactCode == code);
                 var created = false;
                 if (artifact is null)
@@ -410,14 +392,12 @@ public sealed class RobotAuthoringImportHandlers(
                         return await RollbackMaterializationAndReturnAsync(
                             ApiResult<RobotAuthoringImportResult>.Fail(
                                 $"Artifact '{code}' changed while the import was being prepared; validate again.", 409));
-                    artifact = CreateDraftArtifact(session, item, stagedObject,
-                        contract?.Status == RobotArtifactContractStatus.Published ? contract : null,
-                        command.UserContext.AccountId);
+                    artifact = CreateDraftArtifact(session, item, stagedObject, command.UserContext.AccountId);
                     usedKeys.Add(artifact.StorageKey);
                     newArtifacts.Add(artifact);
                     created = true;
                 }
-                session.Items.Single(x => x.ArtifactCode == code).MarkResolved(artifact.Id, contract?.Id, created);
+                session.Items.Single(x => x.ArtifactCode == code).MarkResolved(artifact.Id, null, created);
             }
 
             if (program is null)
@@ -432,7 +412,7 @@ public sealed class RobotAuthoringImportHandlers(
             }
 
             session.MarkApplied(program.Id, DateTimeOffset.UtcNow, command.UserContext.AccountId);
-            await store.PrepareMaterializationAsync(newContracts, newArtifacts, program, cancellationToken);
+            await store.PrepareMaterializationAsync([], newArtifacts, program, cancellationToken);
             commitAttempted = true;
             // Once metadata is prepared, client cancellation must not interrupt the commit boundary.
             await store.CommitPreparedMutationAsync(CancellationToken.None);
@@ -693,36 +673,17 @@ public sealed class RobotAuthoringImportHandlers(
     }
 
     private static RobotArtifact CreateDraftArtifact(RobotAuthoringImport session,
-        RobotAuthoringBundleItem item, StagedArtifactObject stagedObject,
-        RobotArtifactTechnicalContract? publishedContract, Guid actorId)
+        RobotAuthoringBundleItem item, StagedArtifactObject stagedObject, Guid actorId)
     {
         var artifact = RobotArtifact.CreateDraft(session.OrganizationId, item.ManifestItem.ArtifactCode,
             item.ManifestItem.ArtifactCode, stagedObject.Object.StorageKey, item.ManifestItem.FileName,
             stagedObject.Object.Checksum, session.RuntimeTargetCode, session.MachineModelCode,
             stagedObject.Object.ContentLengthBytes,
             DateTimeOffset.UtcNow, $"Created from robot authoring import {session.Id:D}.",
-            technicalContractId: publishedContract?.Id,
-            technicalContractChecksum: publishedContract?.ContractChecksum);
+            runtimeProfileSource: session.RuntimeProfileSource);
         artifact.Id = stagedObject.ArtifactId;
         artifact.CreatedByAccountId = actorId;
         return artifact;
-    }
-
-    private static RobotArtifactTechnicalContract CreateDraftContract(RobotAuthoringImport session,
-        RobotAuthoringBundleItem item, Guid actorId)
-    {
-        var contract = RobotArtifactTechnicalContract.CreateDraft(item.ManifestItem.ArtifactCode, 1,
-            session.RuntimeTargetCode, session.MachineModelCode, session.OrganizationId,
-            schemaVersion: item.Sidecar.SchemaVersion);
-        contract.Id = Guid.NewGuid();
-        contract.CreatedByAccountId = actorId;
-        contract.ReplaceDefinition(
-            item.Sidecar.Effects.Select(x => new RobotArtifactEffectDefinition(x.EffectCode, x.EffectKind,
-                x.IngredientCode, x.OptionCode, x.QuantityMode, x.FixedQuantity, x.Unit,
-                x.RequiredWorkcellCapabilityCode)).ToArray(),
-            item.Sidecar.OrderingConstraints.Select(x => new RobotArtifactOrderingConstraintDefinition(
-                x.ConstraintType, x.Value, x.SortHint)).ToArray());
-        return contract;
     }
 
     private static TenantScopeType ResolveScope(RobotAuthoringImport session) => session.DeviceId.HasValue

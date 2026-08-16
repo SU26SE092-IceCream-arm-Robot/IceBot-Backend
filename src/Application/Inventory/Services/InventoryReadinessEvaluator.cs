@@ -178,10 +178,10 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             IngredientId = ingredientId,
             IngredientCode = ingredientCode,
             IngredientName = ingredientName,
-            RequiredQuantity = includeRequirementInResult && options.RequireQuantifiedEvidence
+            RequiredQuantity = includeRequirementInResult && options.Purpose == InventoryReadinessEvaluationPurpose.RuntimeSellability
                 ? requiredQuantity
                 : null,
-            RequiredUnit = includeRequirementInResult && options.RequireQuantifiedEvidence
+            RequiredUnit = includeRequirementInResult && options.Purpose == InventoryReadinessEvaluationPurpose.RuntimeSellability
                 ? requiredUnit
                 : null,
             Status = ResolveStatus(matching, options, requiredQuantity, requiredUnit),
@@ -210,35 +210,17 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             return InventoryReadinessStatus.ContainerInactive;
         }
 
-        var online = active.Where(state => state.Device.Status == DeviceStatus.Online).ToArray();
-        if (online.Length == 0)
-        {
-            return InventoryReadinessStatus.DeviceUnavailable;
-        }
-
-        var calibrated = online.Where(state => !string.IsNullOrWhiteSpace(state.LevelToQuantityProfileJson)).ToArray();
-        if (calibrated.Length == 0)
-        {
-            return InventoryReadinessStatus.CalibrationMissing;
-        }
-
-        if (!options.RequireQuantifiedEvidence)
+        if (options.Purpose == InventoryReadinessEvaluationPurpose.TopologyValidation)
         {
             return InventoryReadinessStatus.Ready;
         }
 
         var observedAt = options.ObservedAt ?? DateTimeOffset.UtcNow;
-        var usable = calibrated.Where(state =>
+        var usable = active.Where(state =>
             !state.ExpiresAt.HasValue || state.ExpiresAt.Value >= observedAt).ToArray();
         if (usable.Length == 0)
         {
             return InventoryReadinessStatus.IngredientExpired;
-        }
-
-        if (options.MaximumEvidenceAge.HasValue && usable.All(state =>
-                state.LastMeasuredAt < observedAt - options.MaximumEvidenceAge.Value))
-        {
-            return InventoryReadinessStatus.InventoryEvidenceStale;
         }
 
         var sameUnit = usable.Where(state =>
@@ -248,15 +230,45 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             return InventoryReadinessStatus.UnitMismatch;
         }
 
-        if (sameUnit.Any(state => !state.EstimatedQuantity.HasValue))
+        var sensorEligible = sameUnit.Where(state =>
+            state.TrackingMode != InventoryTrackingMode.SensorRequired ||
+            IsSensorRequiredStateReady(state, observedAt, options.MaximumSensorEvidenceAge)).ToArray();
+        if (sensorEligible.Length == 0)
+        {
+            var strictSensorStates = sameUnit.Where(state => state.TrackingMode == InventoryTrackingMode.SensorRequired).ToArray();
+            if (strictSensorStates.All(state => state.Device.Status != DeviceStatus.Online))
+            {
+                return InventoryReadinessStatus.DeviceUnavailable;
+            }
+
+            if (strictSensorStates.Where(state => state.Device.Status == DeviceStatus.Online)
+                .All(state => string.IsNullOrWhiteSpace(state.LevelToQuantityProfileJson)))
+            {
+                return InventoryReadinessStatus.CalibrationMissing;
+            }
+
+            return InventoryReadinessStatus.InventoryEvidenceStale;
+        }
+
+        if (sensorEligible.Any(state => !state.EstimatedQuantity.HasValue))
         {
             return InventoryReadinessStatus.QuantityUnavailable;
         }
 
-        return sameUnit.Sum(state => state.EstimatedQuantity!.Value) >= requiredQuantity
+        return sensorEligible.Sum(state => state.EstimatedQuantity!.Value) >= requiredQuantity
             ? InventoryReadinessStatus.Ready
             : InventoryReadinessStatus.QuantityInsufficient;
     }
+
+    private static bool IsSensorRequiredStateReady(
+        IngredientDispenserState state,
+        DateTimeOffset observedAt,
+        TimeSpan? maximumSensorEvidenceAge) =>
+        state.Device.Status == DeviceStatus.Online &&
+        !string.IsNullOrWhiteSpace(state.LevelToQuantityProfileJson) &&
+        maximumSensorEvidenceAge.HasValue &&
+        state.LastSensorObservedAt.HasValue &&
+        state.LastSensorObservedAt.Value >= observedAt - maximumSensorEvidenceAge.Value;
 
     private static InventoryReadinessStatus ResolveOverallStatus(
         IReadOnlyCollection<InventoryIngredientReadinessResult> ingredients)
