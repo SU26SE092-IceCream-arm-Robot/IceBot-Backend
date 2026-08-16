@@ -9,7 +9,8 @@ public static class KioskSalesAvailabilityRules
 {
     public static string? ValidateOnlineSalesAvailability(
         Kiosk kiosk,
-        KioskConnectivityProjection? connectivity)
+        KioskConnectivityProjection? connectivity,
+        bool requireConnectivity = true)
     {
         if (kiosk.Status != KioskStatus.Active)
         {
@@ -36,7 +37,8 @@ public static class KioskSalesAvailabilityRules
             return "Organization is not active for sales.";
         }
 
-        if (connectivity?.Status is not (KioskConnectivityStatus.Online or KioskConnectivityStatus.Degraded))
+        if (requireConnectivity &&
+            connectivity?.Status is not (KioskConnectivityStatus.Online or KioskConnectivityStatus.Degraded))
         {
             return "Kiosk is not currently reachable for online sales.";
         }

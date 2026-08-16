@@ -38,6 +38,7 @@ using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
 using Application.Orders.PlaceOrder.Queries;
 using Application.ProductionConfiguration.Releases.Commands;
+using Application.Tenants.Kiosks.Rules;
 using Application.ProductionConfiguration.Deployments.Commands;
 using Application.ProductionConfiguration.Routes.Commands;
 using Application.ProductionConfiguration.Releases.Services;
@@ -180,7 +181,8 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             orders,
             new NoOpRealtimeNotificationPublisher(),
             new PlaceOrderItemAppender(orders, availability, telemetryOptions, inventory),
-            Options.Create(new OrderPaymentWindowOptions()));
+            Options.Create(new OrderPaymentWindowOptions()),
+            Options.Create(new KioskSalesAdmissionOptions()));
         var result = await handler.HandleAsync(new PlaceOrderCommand
         {
             IdempotencyKey = $"customer-attended-{Guid.NewGuid():N}",
@@ -209,7 +211,8 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var handler = new CreatePaymentSessionCommandHandler(
             new PaymentStore(dbContext),
             new UnusedPaymentGateway(),
-            new OrderPaymentSellabilityGuard(orders, availability, inventory, telemetryOptions));
+            new OrderPaymentSellabilityGuard(orders, availability, inventory, telemetryOptions),
+            Options.Create(new KioskSalesAdmissionOptions()));
         var result = await handler.HandleAsync(new CreatePaymentSessionCommand
         {
             OrderId = order.Id,

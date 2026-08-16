@@ -12,6 +12,7 @@ using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
 using System.Text.Json;
+using Microsoft.Extensions.Options;
 
 namespace Application.Payments.PaymentSessions.Commands;
 
@@ -21,15 +22,18 @@ public sealed class CreatePaymentSessionCommandHandler
     private readonly IPaymentGateway _paymentGateway;
 
     private readonly OrderPaymentSellabilityGuard _sellabilityGuard;
+    private readonly KioskSalesAdmissionOptions _salesAdmission;
 
     public CreatePaymentSessionCommandHandler(
         IPaymentStore paymentStore,
         IPaymentGateway paymentGateway,
-        OrderPaymentSellabilityGuard sellabilityGuard)
+        OrderPaymentSellabilityGuard sellabilityGuard,
+        IOptions<KioskSalesAdmissionOptions> salesAdmission)
     {
         _paymentStore = paymentStore;
         _paymentGateway = paymentGateway;
         _sellabilityGuard = sellabilityGuard;
+        _salesAdmission = salesAdmission.Value;
     }
 
     public async Task<ApiResult<PaymentSessionResult>> HandleAsync(
@@ -123,7 +127,8 @@ public sealed class CreatePaymentSessionCommandHandler
             }
 
             var connectivity = await _paymentStore.GetKioskConnectivityAsync(order.KioskId, ct);
-            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(order.Kiosk, connectivity);
+            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(
+                order.Kiosk, connectivity, _salesAdmission.RequireConnectivity);
             if (salesAvailabilityError is not null)
             {
                 return ApiResult<PaymentSessionResult>.Fail(salesAvailabilityError, 409);

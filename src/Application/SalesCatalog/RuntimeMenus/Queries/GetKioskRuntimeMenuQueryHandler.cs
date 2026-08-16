@@ -7,6 +7,7 @@ using Application.Tenants.Stores;
 using Application.SalesCatalog.RuntimeMenus.Services;
 using Application.SalesCatalog.RuntimeMenus.Support;
 using Application.SalesCatalog.Availability;
+using Microsoft.Extensions.Options;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
 
@@ -16,17 +17,20 @@ public sealed class GetKioskRuntimeMenuQueryHandler
     private readonly RuntimeMenuProjectionBuilder _projectionBuilder;
     private readonly IRuntimeMenuProjectionCache _cache;
     private readonly IMenuItemOperationalAvailabilityReader _operationalAvailability;
+    private readonly KioskSalesAdmissionOptions _salesAdmission;
 
     public GetKioskRuntimeMenuQueryHandler(
         IMenuStore menus,
         RuntimeMenuProjectionBuilder projectionBuilder,
         IRuntimeMenuProjectionCache cache,
-        IMenuItemOperationalAvailabilityReader operationalAvailability)
+        IMenuItemOperationalAvailabilityReader operationalAvailability,
+        IOptions<KioskSalesAdmissionOptions> salesAdmission)
     {
         _menus = menus;
         _projectionBuilder = projectionBuilder;
         _cache = cache;
         _operationalAvailability = operationalAvailability;
+        _salesAdmission = salesAdmission.Value;
     }
 
     public async Task<ApiResult<RuntimeMenuResult>> HandleAsync(
@@ -41,7 +45,8 @@ public sealed class GetKioskRuntimeMenuQueryHandler
         }
 
         var connectivity = await _menus.GetKioskConnectivityAsync(kioskId, cancellationToken);
-        var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk, connectivity);
+        var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(
+            kiosk, connectivity, _salesAdmission.RequireConnectivity);
         if (salesAvailabilityError is not null)
         {
             return ApiResult<RuntimeMenuResult>.Fail(salesAvailabilityError, 409);

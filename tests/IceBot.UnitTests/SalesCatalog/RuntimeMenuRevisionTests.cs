@@ -7,6 +7,7 @@ using Application.SalesCatalog.RuntimeMenus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Abstractions;
 using Application.SalesCatalog.RuntimeMenus.Results;
 using Application.SalesCatalog.RuntimeMenus.Services;
+using Application.Tenants.Kiosks.Rules;
 using Domain.Common.Enums;
 using Domain.Devices.Connectivity;
 using Domain.SalesCatalog.Entities;
@@ -49,7 +50,8 @@ public sealed class RuntimeMenuRevisionTests
             store,
             new RuntimeMenuProjectionBuilder(store, CreateInventoryGate(), CreateTelemetryOptions()),
             new PassthroughRuntimeMenuCache(),
-            availability);
+            availability,
+            Options.Create(new KioskSalesAdmissionOptions()));
 
         var first = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
         var second = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
@@ -79,7 +81,8 @@ public sealed class RuntimeMenuRevisionTests
             store,
             new RuntimeMenuProjectionBuilder(store, CreateInventoryGate(), CreateTelemetryOptions()),
             cache,
-            availability);
+            availability,
+            Options.Create(new KioskSalesAdmissionOptions()));
 
         var result = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
 

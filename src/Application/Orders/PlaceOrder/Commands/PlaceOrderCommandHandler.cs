@@ -24,17 +24,20 @@ public sealed class PlaceOrderCommandHandler
     private readonly IRealtimeNotificationPublisher _publisher;
     private readonly PlaceOrderItemAppender _itemAppender;
     private readonly OrderPaymentWindowOptions _paymentWindow;
+    private readonly KioskSalesAdmissionOptions _salesAdmission;
 
     public PlaceOrderCommandHandler(
         IOrderStore orderStore,
         IRealtimeNotificationPublisher publisher,
         PlaceOrderItemAppender itemAppender,
-        IOptions<OrderPaymentWindowOptions> paymentWindow)
+        IOptions<OrderPaymentWindowOptions> paymentWindow,
+        IOptions<KioskSalesAdmissionOptions> salesAdmission)
     {
         _orderStore = orderStore;
         _publisher = publisher;
         _itemAppender = itemAppender;
         _paymentWindow = paymentWindow.Value;
+        _salesAdmission = salesAdmission.Value;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
@@ -101,7 +104,8 @@ public sealed class PlaceOrderCommandHandler
             await _orderStore.AcquireKioskOperationalLockAsync(kiosk.Id, ct);
 
             var connectivity = await _orderStore.GetKioskConnectivityAsync(kiosk.Id, ct);
-            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk, connectivity);
+            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(
+                kiosk, connectivity, _salesAdmission.RequireConnectivity);
             if (salesAvailabilityError is not null)
             {
                 return ApiResult<OrderResult>.Fail(salesAvailabilityError, 409);

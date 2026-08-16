@@ -1,5 +1,6 @@
 using Application.Tenants.Kiosks.Rules;
 using Domain.Common;
+using Domain.Common.Enums;
 using Domain.Devices.Connectivity;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
@@ -74,5 +75,48 @@ public sealed class KioskOperationalStateTests
         var error = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(kiosk, connectivity);
 
         Assert.Contains("not accepting orders", error);
+    }
+
+    [Fact]
+    public void ConnectivityBypass_DoesNotBypassKioskOperationalState()
+    {
+        var kiosk = new Kiosk
+        {
+            Id = Guid.NewGuid(),
+            Status = KioskStatus.Active,
+            Store = new Store(),
+            Organization = new Organization()
+        };
+        kiosk.ChangeOperationalState(
+            KioskOperationalState.Maintenance,
+            "Repair",
+            Guid.NewGuid(),
+            DateTimeOffset.UtcNow);
+
+        var error = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(
+            kiosk,
+            connectivity: null,
+            requireConnectivity: false);
+
+        Assert.Contains("not accepting orders", error);
+    }
+
+    [Fact]
+    public void ConnectivityBypass_AllowsOtherwiseActiveKioskWithoutHeartbeat()
+    {
+        var kiosk = new Kiosk
+        {
+            Id = Guid.NewGuid(),
+            Status = KioskStatus.Active,
+            Store = new Store { Status = EntityStatus.Active },
+            Organization = new Organization { Status = EntityStatus.Active }
+        };
+
+        var error = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(
+            kiosk,
+            connectivity: null,
+            requireConnectivity: false);
+
+        Assert.Null(error);
     }
 }

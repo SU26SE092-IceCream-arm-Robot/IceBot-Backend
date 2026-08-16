@@ -15,6 +15,7 @@ using WebAPI.Configuration.Security;
 using WebAPI.GraphQL;
 using WebAPI.Middlewares;
 using WebAPI.SignalR;
+using Application.Tenants.Kiosks.Rules;
 
 
 Log.Logger = new LoggerConfiguration()
@@ -77,6 +78,8 @@ try
     }
 
     builder.Services.AddIceBotCors(builder.Configuration, builder.Environment);
+    builder.Services.AddOptions<KioskSalesAdmissionOptions>()
+        .Bind(builder.Configuration.GetSection(KioskSalesAdmissionOptions.SectionName));
     builder.Services.AddIceBotAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddAuthorization(options => options.AddIceBotAuthorizationPolicies());
     builder.Services.AddRateLimiter(options =>

@@ -17,6 +17,7 @@ using Domain.Devices.Connectivity;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Application.SalesCatalog.Availability;
+using Application.Tenants.Kiosks.Rules;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -396,6 +397,10 @@ public sealed class CreatePaymentSessionCommandHandlerTests
             Substitute.For<IMenuItemOperationalAvailabilityReader>(),
             inventoryGate,
             Options.Create(new EdgeTelemetryIngestionOptions()));
-        return new CreatePaymentSessionCommandHandler(paymentStore, paymentGateway, sellabilityGuard);
+        return new CreatePaymentSessionCommandHandler(
+            paymentStore,
+            paymentGateway,
+            sellabilityGuard,
+            Options.Create(new KioskSalesAdmissionOptions()));
     }
 }
