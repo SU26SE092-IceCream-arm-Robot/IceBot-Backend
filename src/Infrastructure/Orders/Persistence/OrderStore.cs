@@ -183,16 +183,20 @@ public sealed partial class OrderStore : IOrderStore
                         : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
                     release.Status == ConfigurationReleaseStatus.Published &&
                     release.ExecutionRoutes.Any(route => route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
-                        route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
-                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
+                        route.RobotBindings.Any() && route.RobotBindings.All(binding =>
+                            binding.RequiredWorkcellCapabilityCode == string.Empty ||
+                            readiness.Capabilities.Any(capability =>
+                                capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
             .SelectMany(readiness => _dbContext.ConfigurationReleases.WhereNotDeleted()
                 .Where(release => release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
                     ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
                     : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId))
                 .SelectMany(release => release.ExecutionRoutes.Where(route =>
                     route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
-                    route.RobotBindings.Any() && route.RobotBindings.All(binding => readiness.Capabilities.Any(capability =>
-                        capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
+                    route.RobotBindings.Any() && route.RobotBindings.All(binding =>
+                        binding.RequiredWorkcellCapabilityCode == string.Empty ||
+                        readiness.Capabilities.Any(capability =>
+                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
             .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
             .Select(route => new { route.Id, route.SupportedOptionCodesJson, route.RequiredCapabilitiesJson })
             .ToListAsync(cancellationToken);
