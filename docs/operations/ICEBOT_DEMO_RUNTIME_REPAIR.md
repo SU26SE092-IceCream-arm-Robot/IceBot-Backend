@@ -42,7 +42,9 @@ the repair command is still required once when older records already exist in
 an inactive or stale state.
 
 For the current demo deployment, `DemoCatalogSeed:RepairExistingDataOnStartup`
-is temporarily enabled in production configuration. Therefore a normal
-application startup after CI/CD deployment runs the same scoped repair without
-requiring shell access. After the production demo data has been verified, set
-this flag back to `false` in the deployment configuration and deploy again.
+is temporarily enabled in production configuration. The repair runs from a
+hosted service after the demo tenant, catalog, and topology seed services have
+completed; it does not execute before Kestrel startup. If the repair fails, the
+failure is logged and the API host remains available. After the production demo
+data has been verified, set this flag back to `false` in the deployment
+configuration and deploy again.

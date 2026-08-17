@@ -109,6 +109,7 @@ namespace Infrastructure
             services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
             services.AddHostedService<DevelopmentVanillaSoftServeTopologySeedHostedService>();
             services.AddHostedService<IceBotDemoRoleAccountsSeedHostedService>();
+            services.AddHostedService<IceBotDemoRuntimeRepairHostedService>();
             services.AddOrdersInfrastructure();
             services.AddOptions<Application.Orders.Management.Automation.FulfillmentReminderOptions>()
                 .Bind(config.GetSection(Application.Orders.Management.Automation.FulfillmentReminderOptions.SectionName))

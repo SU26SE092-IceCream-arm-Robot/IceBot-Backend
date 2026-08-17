@@ -68,7 +68,9 @@ public sealed class IceBotDemoRuntimeRepair(IceBotDbContext dbContext)
             {
                 recipe.Status = RecipeStatus.Active;
                 recipe.EffectiveFrom = recipe.EffectiveFrom ?? now;
-                var existingRecipeItem = recipe.RecipeItems.SingleOrDefault();
+                var existingRecipeItem = recipe.RecipeItems.Count == 1
+                    ? recipe.RecipeItems.First()
+                    : null;
                 var hasExpectedRecipeItem = recipe.RecipeItems.Count == 1 &&
                     existingRecipeItem?.IngredientId == ingredient.Id &&
                     existingRecipeItem.Quantity == 80m &&
