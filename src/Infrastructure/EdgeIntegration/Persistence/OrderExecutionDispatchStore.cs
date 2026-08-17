@@ -240,6 +240,13 @@ public sealed class OrderExecutionDispatchStore : IOrderExecutionDispatchStore
             (command.Status == EdgeCommandStatus.PendingDelivery ||
                 command.Status == EdgeCommandStatus.Delivered ||
                 (command.Status == EdgeCommandStatus.Accepted &&
+                    // A legacy/missing execution projection must not permanently consume
+                    // the endpoint slot after the order itself is authoritatively completed.
+                    // Keep all non-completed accepted commands serialized until their
+                    // execution projection reaches a terminal state.
+                    !_dbContext.Orders.Any(order =>
+                        order.Id == command.OrderId &&
+                        order.Status == OrderStatus.Completed) &&
                     !_dbContext.OrderExecutionRecords.Any(record =>
                         record.SourceCommandId == command.Id &&
                         (record.Status == ProductionExecutionStatus.Completed ||
