@@ -216,6 +216,40 @@ public sealed class PayOsResilienceTests
         Assert.Equal(deadline, session.ExpiresAt);
     }
 
+    [Fact]
+    public async Task GatewayUsesShortProviderOrderDescriptionForPayOs()
+    {
+        const string responseJson = """
+            {
+              "code": "00",
+              "data": {
+                "orderCode": 1234567890123,
+                "paymentLinkId": "link-1",
+                "status": "PENDING",
+                "checkoutUrl": "https://pay.test/link-1"
+              }
+            }
+            """;
+        var handler = new CapturingJsonResponseHandler(responseJson);
+        var gateway = CreateGateway(handler);
+        var payment = new PaymentTransaction
+        {
+            Id = Guid.NewGuid(),
+            Amount = 10_000,
+            ProviderOrderCode = "1234567890123"
+        };
+
+        await gateway.CreatePaymentSessionAsync(
+            payment,
+            new Order { OrderNumber = "ORD-20260817023611-71C49D167E53437FB" });
+
+        using var request = JsonDocument.Parse(handler.RequestJson!);
+        var description = request.RootElement.GetProperty("description").GetString();
+        Assert.Equal("IceBot #1234567890123", description);
+        Assert.True(description!.Length <= 25);
+        Assert.Equal(description, request.RootElement.GetProperty("items")[0].GetProperty("name").GetString());
+    }
+
     private static PaymentTransaction Payment(PayOsPaymentGateway gateway)
     {
         var payment = new PaymentTransaction { Id = Guid.NewGuid(), Amount = 10_000 };

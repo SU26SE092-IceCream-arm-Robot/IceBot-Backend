@@ -19,6 +19,7 @@ namespace Infrastructure.Payments.Providers.PayOS;
 
 public sealed class PayOsPaymentGateway : IPaymentGateway
 {
+    private const int PayOsDescriptionMaxLength = 25;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private readonly PayOsOptions _options;
@@ -53,7 +54,7 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         {
             throw new InvalidOperationException("Payment transaction provider order code is invalid.");
         }
-        var description = SanitizeDescription($"IceBot {order.OrderNumber}");
+        var description = SanitizeDescription($"IceBot #{orderCode}");
         var providerExpiresAt = _options.ExpireMinutes > 0
             ? DateTimeOffset.UtcNow.AddMinutes(_options.ExpireMinutes)
             : (DateTimeOffset?)null;
@@ -379,7 +380,9 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
     private static string SanitizeDescription(string input)
     {
         var sanitized = string.IsNullOrWhiteSpace(input) ? "IceBot payment" : input.Trim();
-        return sanitized.Length <= 255 ? sanitized : sanitized[..255];
+        return sanitized.Length <= PayOsDescriptionMaxLength
+            ? sanitized
+            : sanitized[..PayOsDescriptionMaxLength];
     }
 
     private static string? GetString(JsonElement element, string propertyName)
