@@ -1,5 +1,7 @@
 using Application.ContentManagement;
 using Application.Email;
+using Application.Identity.Abstractions;
+using Application.Identity.Provisioning;
 using Application.ServiceRegistration;
 using Application.ServiceRegistration.Abstractions;
 using Domain.ContentManagement.Entities;
@@ -52,10 +54,13 @@ public sealed class ServiceRegistrationPersistenceIntegrationTests(IntegrationTe
         }
 
         var logger = new CaptureLogger();
+        var emailSender = new RecordingEmailSender();
         var provisioner = new ServiceRegistrationProvisioner(
             db,
-            new RecordingEmailSender(),
-            Options.Create(new EmailOptions { InvitationBaseUrl = "https://portal.example.test/invitations/accept" }),
+            new TenantAccountCredentialService(
+                new TestPasswordHasher(),
+                emailSender,
+                Microsoft.Extensions.Logging.Abstractions.NullLogger<TenantAccountCredentialService>.Instance),
             logger);
         var organizationCode = $"SR-{Guid.NewGuid():N}"[..20];
         var outcome = await provisioner.ProvisionAsync(submitted.Data.Id, actorId, new ServiceRegistrationProvisioningRequest
@@ -78,7 +83,12 @@ public sealed class ServiceRegistrationPersistenceIntegrationTests(IntegrationTe
         Assert.NotNull(registration.ProvisionedOrganizationId);
         Assert.Equal(registration.ProvisionedOrganizationId, assignment.OrganizationId);
         Assert.Equal(orgAdmin.Id, assignment.RoleId);
-        Assert.Equal(1, await db.AccountInvitations.CountAsync(x => x.AccountId == account.Id));
+        Assert.Equal(AccountStatus.Active, account.Status);
+        Assert.True(account.LocalLoginEnabled);
+        Assert.True(account.EmailConfirmed);
+        Assert.NotNull(account.Password);
+        Assert.Equal(0, await db.AccountInvitations.CountAsync(x => x.AccountId == account.Id));
+        Assert.Contains("Temporary password", emailSender.HtmlBody);
     }
 
     private async Task<Guid> CreatePublishedPrivacyPolicyAsync(Guid actorId)
@@ -110,7 +120,18 @@ public sealed class ServiceRegistrationPersistenceIntegrationTests(IntegrationTe
 
     private sealed class RecordingEmailSender : IEmailSender
     {
-        public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default) => Task.CompletedTask;
+        public string HtmlBody { get; private set; } = string.Empty;
+        public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default)
+        {
+            HtmlBody = htmlBody;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class TestPasswordHasher : IPasswordHasher
+    {
+        public string HashPassword(string password) => $"hashed:{password}";
+        public bool VerifyPassword(string providedPassword, string passwordHash) => passwordHash == $"hashed:{providedPassword}";
     }
 
     private sealed class NoopProvisioner : IServiceRegistrationProvisioner

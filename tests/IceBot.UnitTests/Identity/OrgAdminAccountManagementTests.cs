@@ -1,9 +1,12 @@
 using Application.Identity.Abstractions;
 using Application.Identity.InternalAccounts.Commands;
 using Application.Identity.InternalAccounts.Requests;
+using Application.Identity.Provisioning;
+using Application.Email;
 using Application.Identity.Tokens.Claims;
 using Domain.Identity.Entities;
 using NSubstitute;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace IceBot.UnitTests.Identity;
 
@@ -23,7 +26,10 @@ public sealed class OrgAdminAccountManagementTests
         Assert.True(result.Succeeded, result.Message);
         await accounts.Received(1).AddAsync(
             Arg.Is<Account>(account => account.AccountRoles.Single().OrganizationId == organizationId &&
-                account.AccountRoles.Single().Role.Code == "OrgAdmin"),
+                account.AccountRoles.Single().Role.Code == "OrgAdmin" &&
+                account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+                account.LocalLoginEnabled &&
+                account.Password != null),
             Arg.Any<CancellationToken>());
         await accounts.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
     }
@@ -106,8 +112,16 @@ public sealed class OrgAdminAccountManagementTests
         return accounts;
     }
 
-    private static CreateInternalAccountCommandHandler CreateHandler(IIdentityAccountStore accounts) =>
-        new(accounts, null!, null!);
+    private static CreateInternalAccountCommandHandler CreateHandler(IIdentityAccountStore accounts)
+    {
+        var hasher = Substitute.For<IPasswordHasher>();
+        hasher.HashPassword(Arg.Any<string>()).Returns("hashed-password");
+        var credentials = new TenantAccountCredentialService(
+            hasher,
+            Substitute.For<IEmailSender>(),
+            NullLogger<TenantAccountCredentialService>.Instance);
+        return new CreateInternalAccountCommandHandler(accounts, credentials);
+    }
 
     private static CreateInternalAccountCommand CreateCommand(
         Guid actorOrganizationId,

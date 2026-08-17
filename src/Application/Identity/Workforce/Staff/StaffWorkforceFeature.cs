@@ -1,5 +1,6 @@
 using Application.Identity.Invitations.Services;
 using Application.Identity.Invitations.Results;
+using Application.Identity.Provisioning;
 using Application.Identity.Tokens.Services;
 using Application.Shared.Wrappers;
 using Application.Tenants;
@@ -43,8 +44,13 @@ public sealed class GetStaffWorkforceQueryHandler(IStaffWorkforceStore accounts)
 }
 
 public sealed class CreateStaffWorkforceCommandHandler(
-    IStaffWorkforceStore accounts, ITenantTreeStore tenantTree, AccountInvitationService invitations)
+    IStaffWorkforceStore accounts, ITenantTreeStore tenantTree, TenantAccountCredentialService credentials)
 {
+    /* TARGET FLOW - temporarily disabled for the demo.
+     * Restore AccountInvitationService as a constructor dependency. New Staff accounts should
+     * be Invited, and replay should call EnsureActiveInvitationAsync so partial invitation
+     * creation can recover without duplicating the account.
+     */
     public async Task<ApiResult<StaffWorkforceResult>> HandleAsync(CreateStaffWorkforceCommand command, CancellationToken cancellationToken = default)
     {
         var request = command.Request;
@@ -54,14 +60,13 @@ public sealed class CreateStaffWorkforceCommandHandler(
         var fingerprint = StaffWorkforceRules.CreateFingerprint(request);
         if (string.IsNullOrWhiteSpace(request.UserName) || string.IsNullOrWhiteSpace(request.Email))
             return ApiResult<StaffWorkforceResult>.Fail("User name and email are required.");
-        if (!request.LocalLoginEnabled && !request.GoogleLoginEnabled)
-            return ApiResult<StaffWorkforceResult>.Fail("At least one authentication method must be enabled.");
         if (request.GoogleLoginEnabled && string.IsNullOrWhiteSpace(request.GoogleEmail))
             return ApiResult<StaffWorkforceResult>.Fail("Google email is required when Google login is enabled.");
 
         var email = Application.Identity.InternalAccounts.InternalAccountNormalizer.NormalizeEmail(request.Email);
         var userName = Application.Identity.InternalAccounts.InternalAccountNormalizer.NormalizeUserName(request.UserName);
         var googleEmail = request.GoogleLoginEnabled ? Application.Identity.InternalAccounts.InternalAccountNormalizer.NormalizeEmail(request.GoogleEmail!) : null;
+        TenantAccountCredentials? issuedCredentials = null;
         var persisted = await accounts.ExecuteTransactionAsync<StaffCreatePersistence>(async () =>
         {
             await accounts.AcquireCreateLockAsync(command.OrganizationId, key, cancellationToken);
@@ -97,9 +102,11 @@ public sealed class CreateStaffWorkforceCommandHandler(
             var account = new Account
             {
                 UserName = userName, Email = email, FullName = request.FullName?.Trim(), PhoneNumber = request.PhoneNumber?.Trim(),
-                Status = AccountStatus.Invited, LocalLoginEnabled = request.LocalLoginEnabled, GoogleLoginEnabled = request.GoogleLoginEnabled,
+                Status = AccountStatus.Active, LocalLoginEnabled = true, GoogleLoginEnabled = request.GoogleLoginEnabled,
                 GoogleEmail = googleEmail, CreatedAt = now, CreatedByAccountId = command.ActorAccountId
             };
+            // Temporary demo override; the Staff invitation handler remains available.
+            issuedCredentials = credentials.Prepare(account, now);
             foreach (var scope in request.StaffScopes)
                 account.AccountRoles.Add(new AccountRole { Role = staffRole, RoleId = staffRole.Id, OrganizationId = command.OrganizationId,
                     StoreId = scope.StoreId, KioskId = scope.KioskId, AssignedAt = now, AssignedByAccountId = command.ActorAccountId });
@@ -112,22 +119,32 @@ public sealed class CreateStaffWorkforceCommandHandler(
         if (persisted.Account is null) return ApiResult<StaffWorkforceResult>.Fail("Staff persistence did not return an account.", 500);
         var account = persisted.Account;
         if (!persisted.CreatedNow)
-        {
-            var ensuredInvitation = await invitations.EnsureActiveInvitationAsync(
-                account,
-                command.ActorAccountId,
-                request.SendInvitationEmail,
-                cancellationToken);
-            if (!ensuredInvitation.Succeeded || ensuredInvitation.Data is null)
-                return ApiResult<StaffWorkforceResult>.Fail(ensuredInvitation.Message ?? "Staff invitation could not be recovered.", ensuredInvitation.StatusCode);
             return ApiResult<StaffWorkforceResult>.Success(
                 StaffWorkforceRules.ToResult(account),
-                ensuredInvitation.Data.Created ? "Staff request replay recovered a missing invitation." : "Staff request was already completed.");
-        }
+                "Staff request was already completed.");
 
-        var invitation = await invitations.CreateInvitationAsync(account, command.ActorAccountId, request.SendInvitationEmail, cancellationToken);
-        if (!invitation.Succeeded || invitation.Data is null) return ApiResult<StaffWorkforceResult>.Fail(invitation.Message ?? "Staff invitation could not be created.", invitation.StatusCode);
-        return ApiResult<StaffWorkforceResult>.Success(StaffWorkforceRules.ToResult(account, invitation.Data), invitation.Message ?? "Staff invited.", 201);
+        /* TARGET FLOW - after persistence:
+         * if (!persisted.CreatedNow)
+         *     return the result of invitations.EnsureActiveInvitationAsync(...);
+         * var invitation = await invitations.CreateInvitationAsync(
+         *     account, command.ActorAccountId, request.SendInvitationEmail, cancellationToken);
+         * return invitation.Succeeded && invitation.Data is not null
+         *     ? ApiResult<StaffWorkforceResult>.Success(
+         *         StaffWorkforceRules.ToResult(account, invitation.Data),
+         *         invitation.Message ?? "Staff invited.", 201)
+         *     : ApiResult<StaffWorkforceResult>.Fail(
+         *         invitation.Message ?? "Staff invitation could not be created.",
+         *         invitation.StatusCode);
+         */
+
+        var emailSent = issuedCredentials is not null &&
+            await credentials.TrySendAsync(account, issuedCredentials, cancellationToken);
+        return ApiResult<StaffWorkforceResult>.Success(
+            StaffWorkforceRules.ToResult(account),
+            emailSent
+                ? "Staff account created and credentials emailed."
+                : "Staff account created, but credentials email failed. Reset the password before handing over the account.",
+            201);
     }
 
     private sealed record StaffCreatePersistence(Account? Account, bool CreatedNow, string? Error, int StatusCode)

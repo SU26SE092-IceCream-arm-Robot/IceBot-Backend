@@ -47,11 +47,16 @@ Submitted -> UnderReview -> Provisioning -> Provisioned
 Provisioning -> ProvisioningFailed -> Provisioning (retry)
 ```
 
-Approval creates exactly one Organization, one invited Account, one OrgAdmin
-role assignment scoped to that Organization, and one invitation in one database
-transaction. Invitation delivery happens after commit. Email failure does not
-roll back the tenant; the persisted invitation remains recoverable through the
-Identity invitation workflow.
+As a temporary demo override, approval creates exactly one Organization, one
+active OrgAdmin Account with a generated local password, and one OrgAdmin role
+assignment scoped to that Organization in one database transaction. Credential
+email delivery happens after commit. Failure does not roll back the tenant;
+management must reset the password before account handoff.
+
+The target flow remains invitation-based: create an invited account and durable
+invitation in the provisioning transaction, then deliver the invitation after
+commit. Its entities, acceptance API, and identity service are intentionally
+retained for restoration.
 
 Do not implement approval in a frontend by chaining organization, account, role,
 and invitation APIs.
@@ -70,7 +75,7 @@ trusted as already safe.
 - A provisioning conflict is retained as `ProvisioningFailed` with a safe
   management message. Correct the external conflict, then retry using the stored
   approved input.
-- Never log raw registration bodies or invitation tokens.
+- Never log raw registration bodies, invitation tokens, or generated passwords.
 - Retention/deletion policy for rejected and cancelled registrations is a future
   operations decision; do not delete records ad hoc while it is unresolved.
 

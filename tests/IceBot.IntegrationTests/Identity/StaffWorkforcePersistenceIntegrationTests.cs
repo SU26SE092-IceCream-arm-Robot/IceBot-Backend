@@ -1,5 +1,6 @@
 using Application.Email;
-using Application.Identity.Invitations.Services;
+using Application.Identity.Provisioning;
+using Application.Identity.Abstractions;
 using Application.Identity.Tokens.Claims;
 using Application.Identity.Tokens.Services;
 using Application.Identity.Workforce.Staff;
@@ -15,7 +16,6 @@ using Infrastructure.Identity.Persistence;
 using Infrastructure.Tenants.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 
 namespace IceBot.IntegrationTests.Identity;
 
@@ -51,7 +51,11 @@ public sealed class StaffWorkforcePersistenceIntegrationTests(IntegrationTestFix
         var accountId = results[0].Data!.AccountId;
         Assert.Equal(1, await assertion.Accounts.CountAsync(account => account.Id == accountId));
         Assert.Equal(1, await assertion.StaffWorkforceCreateReplays.CountAsync(replay => replay.OrganizationId == graph.OrganizationId && replay.IdempotencyKey == key));
-        Assert.Equal(1, await assertion.AccountInvitations.CountAsync(invitation => invitation.AccountId == accountId));
+        var account = await assertion.Accounts.SingleAsync(candidate => candidate.Id == accountId);
+        Assert.Equal(AccountStatus.Active, account.Status);
+        Assert.True(account.LocalLoginEnabled);
+        Assert.NotNull(account.Password);
+        Assert.Equal(0, await assertion.AccountInvitations.CountAsync(invitation => invitation.AccountId == accountId));
     }
 
     [IntegrationFact]
@@ -116,7 +120,7 @@ public sealed class StaffWorkforcePersistenceIntegrationTests(IntegrationTestFix
     }
 
     [IntegrationFact]
-    public async Task CreateReplay_RecreatesMissingInvitationWithoutDuplicatingStaffAccount()
+    public async Task CreateReplay_DoesNotRotatePasswordOrCreateInvitation()
     {
         var graph = await SeedGraphAsync();
         var key = $"staff-invitation-replay-{Guid.NewGuid():N}";
@@ -132,20 +136,17 @@ public sealed class StaffWorkforcePersistenceIntegrationTests(IntegrationTestFix
         Assert.Equal(201, created.StatusCode);
         var accountId = created.Data!.AccountId;
 
-        await using (var mutation = fixture.CreateDbContext())
-        {
-            var invitation = await mutation.AccountInvitations.SingleAsync(candidate => candidate.AccountId == accountId);
-            mutation.AccountInvitations.Remove(invitation);
-            await mutation.SaveChangesAsync();
-        }
+        await using var beforeReplay = fixture.CreateDbContext();
+        var originalPassword = (await beforeReplay.Accounts.AsNoTracking().SingleAsync(candidate => candidate.Id == accountId)).Password;
 
         var replays = await Task.WhenAll(CreateAsync(graph, request, key), CreateAsync(graph, request, key));
         Assert.All(replays, replay => Assert.True(replay.Succeeded, replay.Message));
         Assert.All(replays, replay => Assert.Equal(200, replay.StatusCode));
         Assert.All(replays, replay => Assert.Equal(accountId, replay.Data!.AccountId));
         await using var assertion = fixture.CreateDbContext();
-        Assert.Equal(1, await assertion.Accounts.CountAsync(candidate => candidate.Id == accountId));
-        Assert.Equal(1, await assertion.AccountInvitations.CountAsync(candidate => candidate.AccountId == accountId));
+        var persisted = await assertion.Accounts.SingleAsync(candidate => candidate.Id == accountId);
+        Assert.Equal(originalPassword, persisted.Password);
+        Assert.Equal(0, await assertion.AccountInvitations.CountAsync(candidate => candidate.AccountId == accountId));
     }
 
     [IntegrationFact]
@@ -309,13 +310,12 @@ public sealed class StaffWorkforcePersistenceIntegrationTests(IntegrationTestFix
         Graph graph, CreateStaffWorkforceRequest request, string key)
     {
         await using var db = fixture.CreateDbContext();
-        var invitationService = new AccountInvitationService(
-            new AccountInvitationStore(db),
+        var credentialService = new TenantAccountCredentialService(
+            new TestPasswordHasher(),
             new NoopEmailSender(),
-            Options.Create(new EmailOptions { InvitationBaseUrl = "https://example.test/invitations" }),
-            NullLogger<AccountInvitationService>.Instance);
+            NullLogger<TenantAccountCredentialService>.Instance);
         return await new CreateStaffWorkforceCommandHandler(
-            new IdentityAccountStore(db), new TenantTreeStore(db), invitationService)
+            new IdentityAccountStore(db), new TenantTreeStore(db), credentialService)
             .HandleAsync(new CreateStaffWorkforceCommand
             {
                 OrganizationId = graph.OrganizationId,
@@ -373,6 +373,12 @@ public sealed class StaffWorkforcePersistenceIntegrationTests(IntegrationTestFix
     private sealed class NoopEmailSender : IEmailSender
     {
         public Task SendAsync(string to, string subject, string htmlBody, CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    private sealed class TestPasswordHasher : IPasswordHasher
+    {
+        public string HashPassword(string password) => $"hashed:{password}";
+        public bool VerifyPassword(string password, string passwordHash) => passwordHash == $"hashed:{password}";
     }
 
     private sealed class ThrowingSessionRevoker : IStaffSessionRevoker

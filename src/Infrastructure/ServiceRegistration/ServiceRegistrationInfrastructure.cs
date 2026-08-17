@@ -1,9 +1,7 @@
 using System.Data;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Application.ContentManagement;
-using Application.Email;
+using Application.Identity.Provisioning;
 using Application.ServiceRegistration;
 using Application.ServiceRegistration.Abstractions;
 using Domain.Common.Enums;
@@ -17,7 +15,6 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 
 namespace Infrastructure.ServiceRegistration;
 
@@ -76,19 +73,24 @@ public sealed class ServiceRegistrationStore(IceBotDbContext db) : IServiceRegis
 
 public sealed class ServiceRegistrationProvisioner(
     IceBotDbContext db,
-    IEmailSender emailSender,
-    IOptions<EmailOptions> emailOptions,
+    TenantAccountCredentialService credentials,
     ILogger<ServiceRegistrationProvisioner> logger) : IServiceRegistrationProvisioner
 {
+    /* TARGET FLOW - temporarily disabled for the demo.
+     * Provisioning originally created Account(Status = Invited) and AccountInvitation in the
+     * same serializable transaction. After commit it built the invitation URL from
+     * EmailOptions.InvitationBaseUrl and sent that URL through IEmailSender. Restore those two
+     * dependencies and that transaction-owned invitation record when direct password delivery
+     * is removed. AccountInvitation and invitation acceptance persistence remain intact.
+     */
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<ServiceRegistrationProvisioningOutcome> ProvisionAsync(Guid registrationId, Guid actorId, ServiceRegistrationProvisioningRequest request, bool retry, CancellationToken ct = default)
     {
         if (!Validate(request, out var error)) return new(false, 400, error!, null, null, false);
         ServiceRegistrationEntity? completed = null;
-        AccountInvitation? invitation = null;
         Account? account = null;
-        string? rawToken = null;
+        TenantAccountCredentials? issuedCredentials = null;
         try
         {
             var strategy = db.Database.CreateExecutionStrategy();
@@ -126,20 +128,32 @@ public sealed class ServiceRegistrationProvisioner(
                 account = new Account
                 {
                     UserName = adminUserName, Email = adminEmail, FullName = TrimOrNull(request.AdminFullName) ?? registration.ContactName,
-                    Status = AccountStatus.Invited, LocalLoginEnabled = request.LocalLoginEnabled, GoogleLoginEnabled = request.GoogleLoginEnabled,
+                    Status = AccountStatus.Active,
+                    LocalLoginEnabled = true,
+                    GoogleLoginEnabled = request.GoogleLoginEnabled,
                     GoogleEmail = request.GoogleLoginEnabled ? adminEmail : null, CreatedAt = now, CreatedByAccountId = actorId
                 };
                 account.AccountRoles.Add(new AccountRole { RoleId = orgAdmin.Id, Role = orgAdmin, OrganizationId = organization.Id, AssignedAt = now, AssignedByAccountId = actorId });
-                rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-                invitation = new AccountInvitation
-                {
-                    AccountId = account.Id, TokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken))),
-                    InvitedAt = now, ExpiresAt = now.AddDays(7), InvitedByAccountId = actorId, Purpose = "AccountInvitation"
-                };
+                // Temporary demo override. Durable invitation entities and acceptance APIs
+                // are intentionally retained for restoring the target onboarding flow.
+                issuedCredentials = credentials.Prepare(account, now);
                 await db.Organizations.AddAsync(organization, ct);
                 await db.Accounts.AddAsync(account, ct);
-                await db.AccountInvitations.AddAsync(invitation, ct);
-                registration.CompleteProvisioning(organization.Id, account.Id, invitation.Id, now);
+
+                /* TARGET FLOW - persist with the tenant transaction:
+                 * rawToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+                 * invitation = new AccountInvitation {
+                 *     AccountId = account.Id,
+                 *     TokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken))),
+                 *     InvitedAt = now,
+                 *     ExpiresAt = now.AddDays(7),
+                 *     InvitedByAccountId = actorId,
+                 *     Purpose = "AccountInvitation"
+                 * };
+                 * await db.AccountInvitations.AddAsync(invitation, ct);
+                 * registration.CompleteProvisioning(organization.Id, account.Id, invitation.Id, now);
+                 */
+                registration.CompleteProvisioning(organization.Id, account.Id, invitationId: null, now);
                 await db.SaveChangesAsync(ct);
                 await transaction.CommitAsync(ct);
                 completed = registration;
@@ -158,24 +172,23 @@ public sealed class ServiceRegistrationProvisioner(
         }
 
         if (completed is null) return new(false, 500, "Provisioning did not return a result.", null, null, false);
-        if (invitation is null || account is null || rawToken is null) return new(true, 200, "Service registration was already provisioned.", completed, null, false);
-        var invitationUrl = BuildInvitationUrl(rawToken);
-        var emailSent = false;
-        if (invitationUrl is not null)
+        if (account is null) return new(true, 200, "Service registration was already provisioned.", completed, null, false);
+        if (issuedCredentials is not null)
         {
-            try
-            {
-                await emailSender.SendAsync(account.Email, "Complete your IceBot account setup", $"<p>Hello {System.Net.WebUtility.HtmlEncode(account.FullName)},</p><p>Complete your account setup: <a href=\"{System.Net.WebUtility.HtmlEncode(invitationUrl)}\">Accept invitation</a></p>", ct);
-                invitation.EmailSentAt = DateTimeOffset.UtcNow;
-                await db.SaveChangesAsync(ct);
-                emailSent = true;
-            }
-            catch (Exception ex) when (!ct.IsCancellationRequested)
-            {
-                logger.LogError(ex, "Invitation delivery failed after provisioning service registration {RegistrationId}", registrationId);
-            }
+            var credentialsEmailSent = await credentials.TrySendAsync(account, issuedCredentials, ct);
+
+            return new(
+                true,
+                201,
+                credentialsEmailSent
+                    ? "Service registration provisioned and temporary credentials emailed."
+                    : "Service registration provisioned. Temporary credential delivery failed; reset the account password before handoff.",
+                completed,
+                null,
+                credentialsEmailSent);
         }
-        return new(true, 201, emailSent ? "Service registration provisioned and invitation email sent." : "Service registration provisioned. Invitation delivery requires retry or manual delivery.", completed, invitationUrl, emailSent);
+
+        return new(true, 200, "Service registration was already provisioned.", completed, null, false);
     }
 
     private async Task RecordFailureAsync(Guid registrationId, string message, string code, CancellationToken ct)
@@ -189,7 +202,6 @@ public sealed class ServiceRegistrationProvisioner(
         }
     }
 
-    private string? BuildInvitationUrl(string token) => string.IsNullOrWhiteSpace(emailOptions.Value.InvitationBaseUrl) ? null : $"{emailOptions.Value.InvitationBaseUrl.TrimEnd('/')}?token={Uri.EscapeDataString(token)}";
     private static bool Validate(ServiceRegistrationProvisioningRequest request, out string? error)
     {
         error = null;

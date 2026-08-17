@@ -114,10 +114,10 @@ public sealed class ServiceRegistration : BusinessEntity
         Revision++;
     }
 
-    public void CompleteProvisioning(Guid organizationId, Guid accountId, Guid invitationId, DateTimeOffset now)
+    public void CompleteProvisioning(Guid organizationId, Guid accountId, Guid? invitationId, DateTimeOffset now)
     {
         if (Status != ServiceRegistrationStatus.Provisioning) throw new DomainRuleException("Only active provisioning can complete.");
-        if (organizationId == Guid.Empty || accountId == Guid.Empty || invitationId == Guid.Empty) throw new DomainRuleException("Provisioning references are required.");
+        if (organizationId == Guid.Empty || accountId == Guid.Empty || invitationId == Guid.Empty) throw new DomainRuleException("Provisioning references are invalid.");
         Status = ServiceRegistrationStatus.Provisioned;
         ProvisionedOrganizationId = organizationId;
         ProvisionedOrgAdminAccountId = accountId;

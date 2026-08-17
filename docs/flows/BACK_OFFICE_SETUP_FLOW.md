@@ -12,9 +12,9 @@ This document describes the setup flow that prepares a tenant, kiosk, users, cat
 1. SystemAdmin creates Organization.
 2. SystemAdmin or scoped OrgAdmin creates Stores under the Organization.
 3. SystemAdmin or scoped manager creates Kiosks under Stores.
-4. SystemAdmin creates internal Accounts.
-5. System generates invitation link.
-6. User accepts invitation and becomes Active.
+4. SystemAdmin or scoped tenant management creates internal Accounts.
+5. Temporary demo behavior generates a password and emails account credentials.
+6. User logs in and may change the password.
 7. SystemAdmin assigns role scopes:
    - organization
    - store
@@ -47,7 +47,8 @@ This document describes the setup flow that prepares a tenant, kiosk, users, cat
 ## Rules
 
 - Organization/Store/Kiosk hierarchy is tenant scope, not just UI navigation.
-- Internal account onboarding uses invitation links; do not send admin-generated permanent passwords as the default flow.
+- Current demo onboarding emails backend-generated temporary credentials for tenant roles; `SystemAdmin` remains bootstrap-only.
+- Target onboarding uses invitation links and user-owned credential setup. The invitation implementation is retained and should replace the temporary behavior when time permits.
 - Role scopes decide which management data a user can read or manage.
 - Menu sellability in Cloud is not the same as live machine readiness at Edge.
 - Cloud manages immutable robot artifacts and ordered program manifests; it does not parse or control motion steps inside exported `.lua` files.

@@ -10,7 +10,26 @@ This document is the backend source of truth for internal account onboarding, in
 
 Internal accounts are created by authorized management users. Public signup is disabled for internal system accounts. Account management is organization-owned: `SystemAdmin` may create and administer accounts for any selected organization, while `OrgAdmin` may do so only in its own organization scope. Either actor may assign `OrgAdmin`, `Manager`, `Staff`, and `Technician` within that route organization; neither organization route can assign the global `SystemAdmin` role. Initial/recovery `SystemAdmin` provisioning remains bootstrap-only.
 
-The default onboarding method is:
+## Temporary Demo Override
+
+Current implementation temporarily creates every tenant account role
+(`OrgAdmin`, `Manager`, `Staff`, and `Technician`) as `Active`, enables local
+login, generates a random temporary password, stores only its hash, and emails
+the username, email, and plaintext temporary password to the account mailbox.
+`SystemAdmin` remains excluded and bootstrap-only.
+
+The user may change the password after login, but forced password change is not
+implemented. Email failure does not roll back the account; management must reset
+the password before handing over an account whose credential email failed.
+Retry/idempotency must not rotate an already-created account password.
+
+This is a time-constrained demo workaround, not the target security model. It
+exposes reusable credentials through email and marks email as confirmed without
+proof through invitation acceptance. Restore the retained invitation flow below
+when implementation time permits, then remove
+`TenantAccountCredentialService` from account creation paths.
+
+The retained target onboarding method is:
 
 ```text
 admin creates account
@@ -20,7 +39,7 @@ admin creates account
   -> account becomes Active
 ```
 
-Do not use username + password delivery as the default onboarding flow.
+The current temporary override is the explicit exception to this target rule.
 
 ## Authentication Method Ownership
 
@@ -38,9 +57,9 @@ The invited user only supplies credential material for an enabled method, such a
 
 The management password-reset/set-password command also changes credential material only. It does not implicitly enable local login; management must change `LocalLoginEnabled` through the account policy update contract.
 
-## Default Flow
+## Retained Invitation Flow
 
-Default request behavior:
+The API fields and invitation implementation are retained for restoration:
 
 ```text
 CreateInvitation = true
@@ -242,7 +261,10 @@ as the backend-email delivery proof for invitation acceptance. If `EmailSentAt` 
 
 ## Temporary Password Fallback
 
-Temporary password creation is not the default flow.
+The rules below describe the retained target contract. They are temporarily
+superseded by `Temporary Demo Override` for tenant-account creation.
+
+Temporary password creation is not the target default flow.
 
 It is allowed only when:
 
@@ -266,9 +288,9 @@ Reason: if admin creates the password, admin knows the user's password. That con
 
 Current backend behavior does not force password change for active accounts created with `InitialPassword`. Therefore, do not use active account + temporary password as the normal onboarding method.
 
-Temporary-password onboarding is not part of the current contract. It requires
-a separate forced-password-change lifecycle and restricted authenticated access;
-do not infer that behavior from `InitialPassword`.
+Before making temporary-password onboarding permanent, add a forced-password-
+change lifecycle, restrict authenticated access until completion, define secure
+delivery and expiry, and stop treating email dispatch as mailbox proof.
 
 ## Account Status Rules
 

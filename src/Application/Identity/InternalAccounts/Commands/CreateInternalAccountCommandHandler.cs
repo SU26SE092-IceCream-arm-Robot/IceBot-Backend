@@ -1,8 +1,7 @@
 using Application.Identity.Abstractions;
 using Application.Identity.InternalAccounts.Requests;
 using Application.Identity.InternalAccounts.Results;
-using Application.Identity.Invitations.Results;
-using Application.Identity.Invitations.Services;
+using Application.Identity.Provisioning;
 using Application.Shared.Wrappers;
 using Domain.Identity.Entities;
 using Domain.Identity.Enums;
@@ -13,17 +12,20 @@ namespace Application.Identity.InternalAccounts.Commands;
 public sealed class CreateInternalAccountCommandHandler
 {
     private readonly IIdentityAccountStore _accounts;
-    private readonly IPasswordHasher _passwordHasher;
-    private readonly AccountInvitationService _invitationService;
+    private readonly TenantAccountCredentialService _credentials;
+
+    /* TARGET FLOW - temporarily disabled for the demo.
+     * Restore AccountInvitationService as a constructor dependency, create the account with
+     * Status = Invited, and call CreateInvitationAsync after account persistence. The complete
+     * invitation implementation remains in AccountInvitationService and AcceptInvitationCommandHandler.
+     */
 
     public CreateInternalAccountCommandHandler(
         IIdentityAccountStore accounts,
-        IPasswordHasher passwordHasher,
-        AccountInvitationService invitationService)
+        TenantAccountCredentialService credentials)
     {
         _accounts = accounts;
-        _passwordHasher = passwordHasher;
-        _invitationService = invitationService;
+        _credentials = credentials;
     }
 
     public async Task<ApiResult<InternalAccountResult>> HandleAsync(
@@ -105,13 +107,10 @@ public sealed class CreateInternalAccountCommandHandler
             PhoneNumber = request.PhoneNumber?.Trim(),
             Address = request.Address?.Trim(),
             Gender = string.IsNullOrWhiteSpace(request.Gender) ? "Other" : request.Gender.Trim(),
-            Status = request.CreateInvitation ? AccountStatus.Invited : AccountStatus.Active,
-            LocalLoginEnabled = request.LocalLoginEnabled,
+            Status = AccountStatus.Active,
+            LocalLoginEnabled = true,
             GoogleLoginEnabled = request.GoogleLoginEnabled,
             GoogleEmail = googleEmail,
-            Password = (request.LocalLoginEnabled && !request.CreateInvitation && !string.IsNullOrWhiteSpace(request.InitialPassword))
-                ? HashedPassword.From(_passwordHasher.HashPassword(request.InitialPassword))
-                : null,
             CreatedAt = now,
             CreatedByAccountId = createdByAccountId
         };
@@ -130,31 +129,27 @@ public sealed class CreateInternalAccountCommandHandler
             });
         }
 
+        // Temporary override. AccountInvitationService and its endpoints remain available
+        // for restoring token-based onboarding after the demo.
+        var credentials = _credentials.Prepare(account, now);
         await _accounts.AddAsync(account, cancellationToken);
         await _accounts.SaveChangesAsync(cancellationToken);
 
-        AccountInvitationResult? invitation = null;
-        string message = "Internal account created.";
-
-        if (request.CreateInvitation)
-        {
-            var invitationResult = await _invitationService.CreateInvitationAsync(
-                account,
-                createdByAccountId,
-                request.SendInvitationEmail,
-                cancellationToken);
-
-            if (!invitationResult.Succeeded || invitationResult.Data is null)
-            {
-                return ApiResult<InternalAccountResult>.Fail(
-                    invitationResult.Message ?? "Invitation could not be created.",
-                    invitationResult.StatusCode);
-            }
-
-            invitation = invitationResult.Data;
-            message = invitationResult.Message ?? message;
-        }
-
-        return ApiResult<InternalAccountResult>.Success(InternalAccountResultMapper.ToResult(account, invitation), message, 201);
+        /* TARGET FLOW - replace temporary credential delivery with:
+         * var invitationResult = await _invitationService.CreateInvitationAsync(
+         *     account, createdByAccountId, request.SendInvitationEmail, cancellationToken);
+         * if (!invitationResult.Succeeded || invitationResult.Data is null)
+         *     return ApiResult<InternalAccountResult>.Fail(
+         *         invitationResult.Message ?? "Invitation could not be created.",
+         *         invitationResult.StatusCode);
+         * return ApiResult<InternalAccountResult>.Success(
+         *     InternalAccountResultMapper.ToResult(account, invitationResult.Data),
+         *     invitationResult.Message ?? "Internal account invited.", 201);
+         */
+        var emailSent = await _credentials.TrySendAsync(account, credentials, cancellationToken);
+        var message = emailSent
+            ? "Internal account created and credentials emailed."
+            : "Internal account created, but credentials email failed. Reset the password before handing over the account.";
+        return ApiResult<InternalAccountResult>.Success(InternalAccountResultMapper.ToResult(account, null), message, 201);
     }
 }

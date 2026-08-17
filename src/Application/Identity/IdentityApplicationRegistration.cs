@@ -10,6 +10,7 @@ using Application.Identity.InternalAccounts.Queries;
 using Application.Identity.Invitations.Commands;
 using Application.Identity.Invitations.Services;
 using Application.Identity.PasswordReset.Commands;
+using Application.Identity.Provisioning;
 using Application.Identity.Roles.Queries;
 using Application.Identity.Tokens.Services;
 using Application.Identity.Workforce.Staff;
@@ -67,6 +68,7 @@ public static class IdentityApplicationRegistration
         services.AddScoped<RefreshTokenService>();
         services.AddScoped<AccountTokenService>();
         services.AddScoped<AccountInvitationService>();
+        services.AddScoped<TenantAccountCredentialService>();
         return services;
     }
 }
