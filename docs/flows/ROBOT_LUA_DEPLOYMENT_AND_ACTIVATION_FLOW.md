@@ -32,6 +32,8 @@ This document owns release authoring, execution endpoint provisioning, deploymen
 | 18. Acknowledge command | Execution endpoint | `POST /api/v1/iot/execution-endpoints/{endpointId}/commands/{commandId}/ack` | Reports transport/dispatch state: `Received`, `Accepted`, `Rejected`, `ExecutorBusy`, or `DeliveryFailed`. `ExecutorBusy` is temporary and permits redelivery. It does not report installation completion. |
 | 19. Report deployment | Execution endpoint | `POST /api/v1/iot/execution-endpoints/{endpointId}/commands/{commandId}/reports` | Reports `Installed`, then `Active`, or reports `Failed`. Installed/Active must echo the command's release id/checksum; Low-cost must also echo active-set version/checksum. Cloud rejects mismatched command, deployment, profile, or provenance before changing observed state. Direct `Pending -> Active` is invalid. |
 
+For Full Edge, these IoT endpoints require a dedicated HTTPS mTLS transport to Kestrel. Public browser HTTPS may terminate at a reverse proxy, but an Edge mTLS route must be direct TLS or TCP TLS passthrough so the client certificate reaches Kestrel. This transport setup is an environment prerequisite; it is not configured through the Management UI.
+
 ## Download And Activation Contract
 
 - The object-storage bucket is private.

@@ -145,6 +145,26 @@ try
         return;
     }
 
+    if (args.Contains("--repair-icebot-demo-runtime", StringComparer.OrdinalIgnoreCase))
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var repair = scope.ServiceProvider.GetRequiredService<IceBotDemoRuntimeRepair>();
+        await repair.RepairAsync(CancellationToken.None);
+        Log.Information("Repaired ICEBOT-DEMO runtime catalog and inventory fixture.");
+        return;
+    }
+
+    if (app.Configuration.GetValue<bool>("DemoCatalogSeed:RepairExistingDataOnStartup"))
+    {
+        await using var scope = app.Services.CreateAsyncScope();
+        var repair = scope.ServiceProvider.GetRequiredService<IceBotDemoRuntimeRepair>();
+        var repaired = await repair.RepairAsync(CancellationToken.None, requireExistingFixture: false);
+        Log.Information(
+            repaired
+                ? "Repaired ICEBOT-DEMO runtime catalog and inventory fixture during startup."
+                : "Skipped ICEBOT-DEMO runtime repair because the fixture does not exist yet.");
+    }
+
     // Configure the HTTP request pipeline.
     if (app.Environment.IsDevelopment())
     {

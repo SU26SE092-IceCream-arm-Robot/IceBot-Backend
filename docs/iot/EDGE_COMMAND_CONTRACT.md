@@ -151,6 +151,19 @@ authorization checks.
 
 **Full Edge:** Kestrel requests a client certificate and the application compares its SHA-256 fingerprint with the active credential binding using constant-time comparison. Certificate-chain trust is not used as endpoint identity; the provisioned fingerprint is the pinning boundary.
 
+### Full Edge mTLS Transport Topology
+
+Full Edge mTLS is a separate transport concern from the browser-facing API:
+
+```text
+Browser -> public HTTPS reverse proxy -> Backend HTTP is permitted
+Edge    -> NetBird private HTTPS -> Kestrel mTLS listener is required
+```
+
+The Edge route must reach Kestrel as TLS or use TCP TLS passthrough. An HTTP reverse proxy that terminates Edge TLS cannot carry the client certificate to `GetClientCertificateAsync()` and is not a valid Full Edge transport. The direct listener is configured by deployment environment, not by a management API or Web UI. Production startup fails when `ExecutionEndpointTransport:MutualTlsListener:Required=true` but the named Kestrel endpoint is not HTTPS or no server certificate source is configured.
+
+The endpoint's client PFX/private key remains on Edge. Cloud provisions and stores only its SHA-256 fingerprint. A trusted server certificate and a reachable object-storage download endpoint are independently required for Edge installation.
+
 **Low-cost controller:** every request includes:
 
 ```text
