@@ -62,7 +62,7 @@ public sealed class ManagementOrdersController : ControllerBase
     }
 
     [HttpPost("{orderId:guid}/items/{orderItemId:guid}/manual-fulfillment-events")]
-    [Authorize(Policy = "orders.manage")]
+    [Authorize(Policy = "orders.fulfillment.manage")]
     public async Task<IActionResult> RecordManualItemFulfillmentEvent(
         Guid orderId,
         Guid orderItemId,
@@ -76,7 +76,7 @@ public sealed class ManagementOrdersController : ControllerBase
     }
 
     [HttpPost("{orderId:guid}/items/{orderItemId:guid}/fulfill")]
-    [Authorize(Policy = "orders.manage")]
+    [Authorize(Policy = "orders.fulfillment.manage")]
     public async Task<IActionResult> FulfillPackagedItem(
         Guid orderId,
         Guid orderItemId,
@@ -95,7 +95,7 @@ public sealed class ManagementOrdersController : ControllerBase
     }
 
     [HttpPost("{orderId:guid}/items/{orderItemId:guid}/fail")]
-    [Authorize(Policy = "orders.manage")]
+    [Authorize(Policy = "orders.fulfillment.manage")]
     public async Task<IActionResult> FailPackagedItem(
         Guid orderId,
         Guid orderItemId,
@@ -115,7 +115,7 @@ public sealed class ManagementOrdersController : ControllerBase
     }
 
     [HttpPost("{orderId:guid}/execution-attempts")]
-    [Authorize(Policy = "orders.manage")]
+    [Authorize(Policy = "orders.intervention.manage")]
     public async Task<IActionResult> RedispatchOrderExecution(
         Guid orderId,
         [FromBody] ManagementOrderReasonRequest request,
@@ -131,7 +131,7 @@ public sealed class ManagementOrdersController : ControllerBase
     }
 
     [HttpPost("{orderId:guid}/items/{orderItemId:guid}/production-remakes")]
-    [Authorize(Policy = "orders.manage")]
+    [Authorize(Policy = "orders.intervention.manage")]
     public async Task<IActionResult> RequestProductionRemake(
         Guid orderId,
         Guid orderItemId,
@@ -152,7 +152,7 @@ public sealed class ManagementOrdersController : ControllerBase
     }
 
     [HttpPatch("{orderId:guid}/cancel")]
-    [Authorize(Policy = "orders.manage")]
+    [Authorize(Policy = "orders.intervention.manage")]
     public async Task<IActionResult> CancelOrder(
         Guid orderId,
         [FromBody] ManagementOrderReasonRequest request,
@@ -170,7 +170,7 @@ public sealed class ManagementOrdersController : ControllerBase
     }
 
     [HttpPatch("{orderId:guid}/refund-required")]
-    [Authorize(Policy = "orders.manage")]
+    [Authorize(Policy = "orders.refund-flag")]
     public async Task<IActionResult> MarkRefundRequired(
         Guid orderId,
         [FromBody] ManagementOrderReasonRequest request,

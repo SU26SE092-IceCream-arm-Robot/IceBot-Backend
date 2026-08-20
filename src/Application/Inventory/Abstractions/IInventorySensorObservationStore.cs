@@ -14,6 +14,7 @@ public interface IInventorySensorObservationStore
     Task<IngredientDispenserState?> GetDispenserStateAsync(
         Guid dispenserStateId,
         CancellationToken cancellationToken = default);
+    Task AcquireKioskIngredientInventoryMutationLockAsync(Guid inventoryId, CancellationToken cancellationToken = default);
 
     Task<InventorySensorObservation?> GetObservationBySourceEventAsync(
         Guid sourceExecutorId,
@@ -28,6 +29,8 @@ public interface IInventorySensorObservationStore
     Task AddObservationAsync(
         InventorySensorObservation observation,
         CancellationToken cancellationToken = default);
+
+    Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
 
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

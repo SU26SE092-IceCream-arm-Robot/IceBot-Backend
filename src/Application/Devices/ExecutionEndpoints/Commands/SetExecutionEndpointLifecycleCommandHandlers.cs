@@ -4,6 +4,7 @@ using Application.Devices.ExecutionEndpoints.Mapping;
 using Application.Devices.ExecutionEndpoints.Results;
 using Application.Identity.Tokens.Claims;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Domain.Common;
 using Domain.Devices.Catalog;
 
@@ -14,9 +15,11 @@ internal static class ExecutionEndpointLifecycleHandler
     public static async Task<ApiResult<ExecutionEndpointResult>> HandleAsync(
         IExecutionEndpointStore store, CurrentUserContext userContext, Guid kioskId, Guid endpointId,
         Action<Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint> transition, string message,
+        IReadOnlyCollection<string> allowedRoles,
         CancellationToken cancellationToken)
     {
-        var loaded = await ExecutionEndpointCommandRules.LoadAccessibleAsync(store, userContext, kioskId, endpointId, cancellationToken);
+        var loaded = await ExecutionEndpointCommandRules.LoadAccessibleAsync(
+            store, userContext, kioskId, endpointId, allowedRoles, cancellationToken);
         if (loaded.Error is not null) return loaded.Error;
         try
         {
@@ -37,7 +40,7 @@ public sealed class DisableExecutionEndpointCommandHandler
     private readonly IExecutionEndpointStore _store;
     public DisableExecutionEndpointCommandHandler(IExecutionEndpointStore store) => _store = store;
     public Task<ApiResult<ExecutionEndpointResult>> HandleAsync(DisableExecutionEndpointCommand command, CancellationToken cancellationToken = default) =>
-        ExecutionEndpointLifecycleHandler.HandleAsync(_store, command.UserContext, command.KioskId, command.EndpointId, endpoint => endpoint.Disable(), "Execution endpoint disabled successfully.", cancellationToken);
+        ExecutionEndpointLifecycleHandler.HandleAsync(_store, command.UserContext, command.KioskId, command.EndpointId, endpoint => endpoint.Disable(), "Execution endpoint disabled successfully.", ScopeRoleSets.ExecutionEndpointsOperationsManage, cancellationToken);
 }
 
 public sealed class ReactivateExecutionEndpointCommandHandler
@@ -45,7 +48,7 @@ public sealed class ReactivateExecutionEndpointCommandHandler
     private readonly IExecutionEndpointStore _store;
     public ReactivateExecutionEndpointCommandHandler(IExecutionEndpointStore store) => _store = store;
     public Task<ApiResult<ExecutionEndpointResult>> HandleAsync(ReactivateExecutionEndpointCommand command, CancellationToken cancellationToken = default) =>
-        ExecutionEndpointLifecycleHandler.HandleAsync(_store, command.UserContext, command.KioskId, command.EndpointId, endpoint => endpoint.ReactivateWithCurrentCredential(DateTimeOffset.UtcNow), "Execution endpoint reactivated successfully.", cancellationToken);
+        ExecutionEndpointLifecycleHandler.HandleAsync(_store, command.UserContext, command.KioskId, command.EndpointId, endpoint => endpoint.ReactivateWithCurrentCredential(DateTimeOffset.UtcNow), "Execution endpoint reactivated successfully.", ScopeRoleSets.ExecutionEndpointsOperationsManage, cancellationToken);
 }
 
 public sealed class RetireExecutionEndpointCommandHandler
@@ -58,5 +61,5 @@ public sealed class RetireExecutionEndpointCommandHandler
             if (endpoint.MqttCredential is not null && endpoint.MqttCredential.Status != ExecutionEndpointMqttCredentialStatus.Revoked)
                 throw new DomainRuleException("Revoke the MQTT credential before retiring the execution endpoint.");
             endpoint.Retire();
-        }, "Execution endpoint retired successfully.", cancellationToken);
+        }, "Execution endpoint retired successfully.", ScopeRoleSets.ExecutionEndpointsManage, cancellationToken);
 }

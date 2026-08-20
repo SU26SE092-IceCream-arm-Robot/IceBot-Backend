@@ -21,6 +21,4 @@ public sealed record PaymentSessionDiagnosticsResult(
     int RetryCount,
     int MaxRetries,
     string? LastErrorCode,
-    string? LastErrorMessage,
-    string? RawRequestJson,
-    string? RawResponseJson);
+    string? LastErrorMessage);

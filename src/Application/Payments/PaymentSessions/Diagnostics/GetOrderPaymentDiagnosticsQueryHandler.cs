@@ -19,7 +19,7 @@ public sealed class GetOrderPaymentDiagnosticsQueryHandler(IPaymentStore payment
         }
 
         if (!ScopeAccessRules.CanAccessScopedRow(
-                ScopeRoleSets.OperationsDiagnostics,
+                ScopeRoleSets.PaymentDiagnosticsView,
                 userContext,
                 order.OrganizationId,
                 order.StoreId,
@@ -49,8 +49,6 @@ public sealed class GetOrderPaymentDiagnosticsQueryHandler(IPaymentStore payment
                 payment.RetryCount,
                 payment.MaxRetries,
                 payment.LastErrorCode,
-                payment.LastErrorMessage,
-                payment.RawRequestJson,
-                payment.RawResponseJson)).ToArray());
+                payment.LastErrorMessage)).ToArray());
     }
 }

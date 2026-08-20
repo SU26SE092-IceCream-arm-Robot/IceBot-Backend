@@ -56,7 +56,7 @@ public sealed class RefillDispenserCommandHandler
                 var storeId = state.Kiosk?.StoreId;
                 var kioskId = state.KioskId;
 
-                if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryManage,
+                if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.InventoryRefillManage,
                     command.UserContext,
                     orgId,
                     storeId,

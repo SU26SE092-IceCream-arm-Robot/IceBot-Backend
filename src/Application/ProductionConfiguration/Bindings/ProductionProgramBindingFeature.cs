@@ -29,7 +29,7 @@ public interface IProductionProgramBindingStore
 }
 
 public sealed record ProductionProgramCapabilityProposal(
-    IReadOnlyCollection<string> DeclaredRequiredCapabilityCodes,
+    IReadOnlyCollection<string> RequiredCapabilityCodes,
     ProductionProgramBindingCapabilityEvidenceStatus Status);
 
 public sealed record CreateProductionProgramBindingCommand(
@@ -120,14 +120,14 @@ public sealed class ProductionProgramBindingHandlers(IProductionProgramBindingSt
             return ApiResult<ProductionProgramBindingResult>.Fail(exception.Message, 400);
         }
         var existing = await store.FindActiveEquivalentAsync(command.OrganizationId, recipe.Id, program.Id,
-            capabilityProposal.DeclaredRequiredCapabilityCodes, capabilityProposal.Status,
+            capabilityProposal.RequiredCapabilityCodes, capabilityProposal.Status,
             ProductionProgramBindingAssurance.OperatorDeclared, requestedOptions, cancellationToken);
         if (existing is not null)
             return ApiResult<ProductionProgramBindingResult>.Success(ProductionProgramBindingResult.From(existing),
                 "Equivalent production binding already exists.");
 
         var binding = ProductionProgramBinding.Create(command.OrganizationId, recipe.ProductVariantId, recipe.Id,
-            recipe.Version, program.Id, program.ProgramManifestChecksum, capabilityProposal.DeclaredRequiredCapabilityCodes,
+            recipe.Version, program.Id, program.ProgramManifestChecksum, capabilityProposal.RequiredCapabilityCodes,
             capabilityProposal.Status, ProductionProgramBindingAssurance.OperatorDeclared,
             requestedOptions, command.UserContext.AccountId);
         await store.AddAsync(binding, cancellationToken);

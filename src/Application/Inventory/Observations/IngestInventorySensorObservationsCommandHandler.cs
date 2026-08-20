@@ -98,13 +98,55 @@ public sealed class IngestInventorySensorObservationsCommandHandler(
 
             var payloadJson = input.SensorPayload?.GetRawText();
             decimal? derivedEstimate = null;
+            var disposition = InventorySensorObservationDisposition.OutOfOrder;
             if (!stale)
             {
                 DispenserLevelQuantityProfileContract.TryResolveEstimatedQuantity(
                     state.LevelToQuantityProfileJson,
                     input.ObservedLevelStatus,
                     out derivedEstimate);
+                var previousContribution = state.LastObservedEstimatedQuantity;
+                var establishesRebaseline = state.SensorRebaselineRequired;
                 state.RecordSensorLevel(input.ObservedLevelStatus, input.ObservedAt, payloadJson, derivedEstimate);
+                if (establishesRebaseline)
+                {
+                    state.ConsumeSensorRebaseline();
+                }
+                var balance = state.KioskIngredientInventory;
+                disposition = balance is null
+                    ? InventorySensorObservationDisposition.Unbound
+                    : balance.TrackingMode == InventoryTrackingMode.ManualEstimate
+                        ? InventorySensorObservationDisposition.EvidenceOnly
+                        : InventorySensorObservationDisposition.Applied;
+                if (!establishesRebaseline && balance is not null &&
+                    balance.TrackingMode is (InventoryTrackingMode.SensorAssisted or InventoryTrackingMode.SensorRequired) &&
+                    derivedEstimate.HasValue)
+                {
+                    await observations.AcquireKioskIngredientInventoryMutationLockAsync(balance.Id, cancellationToken);
+                    var before = balance.EstimatedQuantity;
+                    balance.ReconcileSensorDelta(derivedEstimate.Value, previousContribution, receivedAt);
+                    var delta = derivedEstimate.Value - (previousContribution ?? derivedEstimate.Value);
+                    if (delta != 0 && before.HasValue && balance.EstimatedQuantity.HasValue)
+                    {
+                        await observations.AddStockMovementAsync(StockMovement.CreateForKioskInventory(
+                            balance.Id,
+                            balance.OrganizationId,
+                            balance.StoreId,
+                            balance.KioskId,
+                            balance.IngredientId,
+                            "SensorReconciliation",
+                            delta,
+                            before,
+                            balance.EstimatedQuantity,
+                            balance.Unit,
+                            receivedAt,
+                            "SENSOR_DELTA",
+                            "InventorySensorObservation",
+                            input.SourceEventId,
+                            input.SourceEventId,
+                            isEstimated: true), cancellationToken);
+                    }
+                }
                 applied++;
                 notifications.Add(new InventoryChangedEvent
                 {
@@ -141,7 +183,7 @@ public sealed class IngestInventorySensorObservationsCommandHandler(
                 CloudReceivedAt = receivedAt,
                 Disposition = stale
                     ? InventorySensorObservationDisposition.OutOfOrder
-                    : InventorySensorObservationDisposition.Applied,
+                    : disposition,
                 SensorPayloadJson = payloadJson,
                 OriginNodeId = command.SourceExecutorId,
                 Version = input.ObservationSequence,

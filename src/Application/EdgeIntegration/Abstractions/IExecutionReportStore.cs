@@ -67,6 +67,7 @@ public interface IExecutionStockEvidenceStore
 {
     Task AcquireStockMovementLocksAsync(IEnumerable<Guid> sourceEventIds, CancellationToken cancellationToken = default);
     Task AcquireDispenserMutationLocksAsync(IEnumerable<Guid> dispenserStateIds, CancellationToken cancellationToken = default);
+    Task AcquireKioskIngredientInventoryMutationLocksAsync(IEnumerable<Guid> inventoryIds, CancellationToken cancellationToken = default);
     Task<IngredientDispenserState?> GetDispenserStateAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
     Task<bool> IsIngredientExpectedForOrderItemAsync(Guid orderId, Guid orderItemId, Guid ingredientId, CancellationToken cancellationToken = default);
     Task<StockMovement?> GetStockMovementBySourceEventIdAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
@@ -74,7 +75,12 @@ public interface IExecutionStockEvidenceStore
         Guid orderId, Guid orderItemId, CancellationToken cancellationToken = default);
     Task<List<IngredientDispenserState>> ListActiveDispenserStatesForExpectedConsumptionAsync(
         Guid kioskId, Guid ingredientId, string unit, CancellationToken cancellationToken = default);
+    Task<KioskIngredientInventory?> GetKioskIngredientInventoryForExpectedConsumptionAsync(
+        Guid kioskId, Guid ingredientId, string unit, CancellationToken cancellationToken = default);
+    Task<InventoryReconciliationCase?> GetInventoryReconciliationCaseAsync(
+        Guid sourceEventId, Guid ingredientId, string unit, string reasonCode, CancellationToken cancellationToken = default);
     Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default);
+    Task AddInventoryReconciliationCaseAsync(InventoryReconciliationCase reconciliationCase, CancellationToken cancellationToken = default);
 }
 
 public sealed record ExpectedInventoryRequirement(Guid IngredientId, decimal Quantity, string Unit);

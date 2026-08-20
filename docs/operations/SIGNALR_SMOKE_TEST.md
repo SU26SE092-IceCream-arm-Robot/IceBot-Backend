@@ -53,8 +53,8 @@ Extract the `token` from the response.
 4. Trigger a maintenance ticket update:
    - Example: Call `POST /api/v1/management/maintenance-tickets` to create a ticket for that kiosk.
    - Expected: You should receive a `MaintenanceTicketChanged` event.
-5. Trigger an inventory operation:
-   - Example: Call `POST /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states/{id}/refill`.
+5. Complete an inventory refill task:
+   - Example: Call `POST /api/v1/management/kiosks/{kioskId}/inventory/refill-tasks/{taskId}/complete`.
    - Expected: You should receive an `InventoryChanged` event.
 
 ## 5. Test ManagementDashboardHub

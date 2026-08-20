@@ -222,9 +222,9 @@ public sealed class ConfigurationDeploymentPreviewHandler(
             ValidateCapabilities(release, selections, readiness, blockers);
         }
 
-        if (inventory.Results.Any(result => !result.HasConfiguredInventoryTopology))
-            warnings.Add(new("InventoryTopologyNotConfigured",
-                "Kiosk inventory tracking is not configured; deployment is allowed and inventory remains operator-managed."));
+        if (inventory.Results.Any(result => !result.HasConfiguredInventoryBalance))
+            warnings.Add(new("InventoryBalanceNotConfigured",
+                "Kiosk inventory balance tracking is not configured; deployment is allowed and inventory remains operator-managed."));
         if (inventory.IsBlocked)
             warnings.Add(new("InventoryNotReady",
                 "Kiosk inventory is not ready. This does not block configuration deployment; selling and production remain subject to inventory checks."));

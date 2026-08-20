@@ -128,22 +128,36 @@ public sealed class RobotAuthoringRecipeResolverTests
         var product = new Product { Id = Guid.NewGuid(), OrganizationId = organizationId, Code = $"PRODUCT-{code}", Name = name };
         var variant = new ProductVariant
         {
-            Id = Guid.NewGuid(), ProductId = product.Id, Product = product, Code = "STANDARD", Name = "Standard",
+            Id = Guid.NewGuid(),
+            ProductId = product.Id,
+            Product = product,
+            Code = "STANDARD",
+            Name = "Standard",
             FulfillmentType = FulfillmentType.MachineProduced
         };
         product.ProductVariants.Add(variant);
         var recipe = new Recipe
         {
-            Id = Guid.NewGuid(), OrganizationId = organizationId, ProductVariantId = variant.Id,
-            ProductVariant = variant, Code = code, Name = name, Status = RecipeStatus.Active
+            Id = Guid.NewGuid(),
+            OrganizationId = organizationId,
+            ProductVariantId = variant.Id,
+            ProductVariant = variant,
+            Code = code,
+            Name = name,
+            Status = RecipeStatus.Active
         };
         foreach (var item in items)
         {
             var ingredient = new Ingredient { Id = Guid.NewGuid(), Code = item.IngredientCode, Name = item.IngredientCode };
             recipe.RecipeItems.Add(new RecipeItem
             {
-                Id = Guid.NewGuid(), RecipeId = recipe.Id, IngredientId = ingredient.Id, Ingredient = ingredient,
-                Quantity = item.Quantity, Unit = "gram", StepOrder = recipe.RecipeItems.Count + 1
+                Id = Guid.NewGuid(),
+                RecipeId = recipe.Id,
+                IngredientId = ingredient.Id,
+                Ingredient = ingredient,
+                Quantity = item.Quantity,
+                Unit = "gram",
+                StepOrder = recipe.RecipeItems.Count + 1
             });
         }
         return recipe;

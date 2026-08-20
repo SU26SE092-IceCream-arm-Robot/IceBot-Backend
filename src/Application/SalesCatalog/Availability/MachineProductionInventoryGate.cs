@@ -59,11 +59,11 @@ public sealed class MachineProductionInventoryGate(
                 observedAt,
                 TimeSpan.FromSeconds(_telemetryOptions.ReadinessTimeoutSeconds)));
 
-        // Inventory is optional for a kiosk. Once an operator creates a
-        // dispenser topology, its evidence becomes authoritative and missing
-        // or stale evidence blocks the sale. Without any topology, robot and
+        // Inventory is optional for a kiosk. Once an operator creates a Cloud
+        // balance, that balance becomes authoritative. Physical topology is
+        // optional evidence only. Without any balance, robot and
         // operational readiness gates still apply elsewhere in the flow.
-        return result is { HasConfiguredInventoryTopology: false }
+        return result is { HasConfiguredInventoryBalance: false }
             ? MachineProductionInventoryGateResult.Sellable
             : result is { IsReady: true }
             ? MachineProductionInventoryGateResult.Sellable

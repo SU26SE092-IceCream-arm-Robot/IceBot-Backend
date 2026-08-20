@@ -31,11 +31,19 @@ public sealed class ManagementDashboardHub : Hub
                     : throw new HubException("Access denied: you do not have SystemAdmin access.");
                 break;
             case "organization":
-                groupKey = organizationId.HasValue &&
-                    await _organizationAccess.IsActiveAsync(organizationId.Value, Context.ConnectionAborted) &&
-                    ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, organizationId.Value, null, null)
-                    ? $"dashboard:organization:{organizationId.Value}"
-                    : throw new HubException("Access denied: you do not have access to this organization dashboard.");
+                if (!organizationId.HasValue ||
+                    !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, organizationId.Value, null, null))
+                {
+                    throw new HubException("Access denied: you do not have access to this organization dashboard.");
+                }
+
+                if (!await _organizationAccess.IsActiveAsync(organizationId.Value, Context.ConnectionAborted))
+                {
+                    Context.Abort();
+                    throw new HubException("Organization access is unavailable.");
+                }
+
+                groupKey = $"dashboard:organization:{organizationId.Value}";
                 break;
             case "store":
                 if (!storeId.HasValue)
@@ -44,11 +52,19 @@ public sealed class ManagementDashboardHub : Hub
                 }
 
                 var store = await _storeStore.GetByIdAsync(storeId.Value, Context.ConnectionAborted);
-                groupKey = store is not null &&
-                    await _organizationAccess.IsActiveAsync(store.OrganizationId, Context.ConnectionAborted) &&
-                    ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, store.OrganizationId, store.Id, null)
-                    ? $"dashboard:store:{store.Id}"
-                    : throw new HubException("Access denied: you do not have access to this store dashboard.");
+                if (store is null ||
+                    !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DashboardView, user, store.OrganizationId, store.Id, null))
+                {
+                    throw new HubException("Access denied: you do not have access to this store dashboard.");
+                }
+
+                if (!await _organizationAccess.IsActiveAsync(store.OrganizationId, Context.ConnectionAborted))
+                {
+                    Context.Abort();
+                    throw new HubException("Organization access is unavailable.");
+                }
+
+                groupKey = $"dashboard:store:{store.Id}";
                 break;
             default:
                 throw new HubException($"Invalid dashboard scope: '{scope}'. Allowed values are 'system', 'organization', 'store'.");

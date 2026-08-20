@@ -74,7 +74,8 @@ Creation is intentionally part of authenticated device-event ingestion rather th
 | Policy | Roles | Behavior |
 | --- | --- | --- |
 | `alerts.view` | SystemAdmin, OrgAdmin, Manager, Staff, Technician | Read alerts inside assigned tenant scope |
-| `alerts.manage` | SystemAdmin, OrgAdmin, Manager, Technician | Acknowledge or resolve alerts inside assigned tenant scope |
+| `alerts.acknowledge` | SystemAdmin, OrgAdmin, Manager, Staff, Technician | Acknowledge alerts inside assigned tenant scope |
+| `alerts.resolve` | SystemAdmin, OrgAdmin, Manager, Technician | Resolve alerts with an outcome inside assigned tenant scope |
 
 ## Realtime
 
@@ -188,14 +189,12 @@ use Error severity and do not trigger the Critical Firebase notification policy.
 
 ## Inventory Alert Automation
 
-The reconciliation job maps active dispenser state to `INVENTORY_LOW` or
-`INVENTORY_EMPTY`. It serializes each dispenser with a PostgreSQL advisory lock,
+The reconciliation job maps active kiosk ingredient balances to `INVENTORY_LOW`
+or `INVENTORY_EMPTY`. It serializes each balance with a PostgreSQL advisory lock,
 keeps one active alert for the current threshold, resolves stale/duplicate active
-alerts, and publishes SignalR only for committed transitions. When
-`InventoryAlertAutomation:CreateMaintenanceTicketForEmpty` is enabled, Empty
-creates one linked maintenance ticket. Empty also creates a durable push for the
-scoped operational recipients. Healthy recovery resolves the alert; it does not
-close the maintenance ticket automatically.
+alerts, and publishes SignalR only for committed transitions. A new active alert
+creates one audited refill task. Healthy recovery resolves the alert; it does not
+close an existing refill task automatically.
 
 ## Related Docs
 

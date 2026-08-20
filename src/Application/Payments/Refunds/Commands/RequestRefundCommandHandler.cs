@@ -52,7 +52,7 @@ public sealed class RequestRefundCommandHandler
                 return ApiResult<RefundResult>.Fail("Order not found.", 404);
             }
 
-            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
+            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsRequest,
                 command.UserContext,
                 order.OrganizationId,
                 order.StoreId,
@@ -142,8 +142,7 @@ public sealed class RequestRefundCommandHandler
                 return ApiResult<RefundResult>.Fail("A refund has already been requested/processed for this transaction.", 409);
             }
 
-            if (!string.Equals(command.RefundMethod, "FullMoneyRefund", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(command.RefundMethod, "Voucher", StringComparison.OrdinalIgnoreCase))
+            if (!TryParseCompensationMethod(command.RefundMethod, out var compensationMethod))
             {
                 return ApiResult<RefundResult>.Fail("Invalid refund method. Supported methods: FullMoneyRefund, Voucher.", 400);
             }
@@ -157,7 +156,7 @@ public sealed class RequestRefundCommandHandler
             storeId = order.StoreId;
 
             decimal refundAmount = order.TotalAmount;
-            if (string.Equals(command.RefundMethod, "Voucher", StringComparison.OrdinalIgnoreCase))
+            if (compensationMethod == RefundCompensationMethod.Voucher)
             {
                 if (command.VoucherValue.HasValue)
                 {
@@ -180,9 +179,9 @@ public sealed class RequestRefundCommandHandler
 
             var metadata = new
             {
-                Method = command.RefundMethod,
+                Method = compensationMethod.ToString(),
                 Code = command.VoucherCode,
-                Value = string.Equals(command.RefundMethod, "Voucher", StringComparison.OrdinalIgnoreCase)
+                Value = compensationMethod == RefundCompensationMethod.Voucher
                     ? command.VoucherValue
                     : null,
                 Note = note,
@@ -202,6 +201,7 @@ public sealed class RequestRefundCommandHandler
                 IdempotencyKey = scopedIdempotencyKey,
                 Amount = refundAmount,
                 Currency = transaction.Currency,
+                CompensationMethod = compensationMethod,
                 Reason = serializedReason,
                 Status = RefundStatus.Requested,
                 RequestedAt = now,
@@ -232,5 +232,23 @@ public sealed class RequestRefundCommandHandler
         }
 
         return result;
+    }
+
+    private static bool TryParseCompensationMethod(string? value, out RefundCompensationMethod method)
+    {
+        if (string.Equals(value, nameof(RefundCompensationMethod.FullMoneyRefund), StringComparison.OrdinalIgnoreCase))
+        {
+            method = RefundCompensationMethod.FullMoneyRefund;
+            return true;
+        }
+
+        if (string.Equals(value, nameof(RefundCompensationMethod.Voucher), StringComparison.OrdinalIgnoreCase))
+        {
+            method = RefundCompensationMethod.Voucher;
+            return true;
+        }
+
+        method = default;
+        return false;
     }
 }

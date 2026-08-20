@@ -52,6 +52,7 @@ public sealed class OrganizationSalesSummaryStore : IOrganizationSalesSummarySto
 
         var processedRefunds = _dbContext.Refunds.WhereNotDeleted().AsNoTracking()
             .Where(refund => refund.Status == RefundStatus.Processed && refund.ProcessedAt != null &&
+                refund.CompensationMethod == RefundCompensationMethod.FullMoneyRefund &&
                 refund.ProcessedAt >= request.From && refund.ProcessedAt < request.To &&
                 refund.PaymentTransaction.SettlementDisposition == PaymentSettlementDisposition.Primary &&
                 refund.PaymentTransaction.Order.OrganizationId != null && refund.PaymentTransaction.Order.DeletedAt == null)

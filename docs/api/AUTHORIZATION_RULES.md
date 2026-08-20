@@ -130,7 +130,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | Policy | Allowed roles | Notes |
 | --- | --- | --- |
 | `permission-matrix.view` | `SystemAdmin` | View the platform-wide static permission matrix. This policy does not authorize account role assignment. |
-| `dashboard.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View management dashboard metrics within assigned scope |
+| `dashboard.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View management dashboard metrics within assigned scope |
 | `accounts.read` | `SystemAdmin`, `OrgAdmin` | Read internal accounts through an organization-owned route. Results contain only role scopes belonging to that organization. |
 | `accounts.manage` | `SystemAdmin`, `OrgAdmin` | Create, update, disable, assign/update roles, set password, and send invitations for organization-owned internal accounts. `OrgAdmin` is limited to accounts with assignable roles and scopes inside the actor's assigned organization; it cannot grant `SystemAdmin` or access another organization. Global `SystemAdmin` provisioning is bootstrap-only. |
 | `workforce.staff.read` | `OrgAdmin`, `Manager` | Read Staff-only workforce accounts within the exact Organization or Store scope granted by the same role assignment. This does not expose OrgAdmin, Manager, Technician, SystemAdmin, or mixed-role accounts. |
@@ -141,11 +141,18 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `stores.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View stores. Scoped to assigned organization/store |
 | `stores.manage` | `SystemAdmin`, `OrgAdmin` | Create, disable, and activate stores. Scoped to assigned organization |
 | `stores.update` | `SystemAdmin`, `OrgAdmin`, `Manager` | Update store details. Scoped to assigned organization/store |
-| `kiosks.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View kiosks. Scoped to assigned organization/store/kiosk |
-| `kiosks.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create and change status of kiosks. Scoped to assigned organization/store/kiosk |
-| `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Update kiosk details. Scoped to assigned organization/store/kiosk |
+| `stores.sales.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Pause or resume store sales. Scoped to assigned organization/store |
+| `kiosks.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosks. Scoped to assigned organization/store/kiosk |
+| `kiosks.manage` | `SystemAdmin`, `OrgAdmin` | Create and change kiosk lifecycle status. Scoped to assigned organization/store/kiosk |
+| `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager` | Update kiosk business and location details. Scoped to assigned organization/store/kiosk |
+| `kiosks.operations.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Change operational and maintenance state without changing kiosk lifecycle or location metadata |
 | `devices.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View devices/hardware details within assigned scope |
-| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Create, update, status-change, replace, or retire devices/hardware; create, configure, provision, disable/reactivate, rotate credentials, or retire execution endpoints within assigned scope |
+| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Technician` | Create, update, replace, or retire physical devices/hardware within assigned scope |
+| `devices.operations.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Change the operational status of a non-retired device within assigned scope |
+| `execution-endpoints.manage` | `SystemAdmin`, `OrgAdmin`, `Technician` | Create or retire Edge execution endpoints within assigned scope |
+| `execution-endpoints.operations.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Disable or reactivate Edge execution endpoints within assigned scope |
+| `execution-endpoints.provision` | `SystemAdmin`, `OrgAdmin`, `Technician` | Provision endpoint identity and profile without exposing private key material |
+| `execution-endpoints.credentials.manage` | `SystemAdmin`, `OrgAdmin`, `Technician` | Rotate mTLS identity and provision, rotate, or revoke MQTT credentials |
 | `device-catalog.read` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Read the global DeviceType/DeviceModel lookup catalog; no tenant scope is required |
 | `device-catalog.manage` | `SystemAdmin` | Create/update/deactivate DeviceType and create/update/retire DeviceModel records |
 | `artifact.read` | `SystemAdmin`, `OrgAdmin` | List and inspect metadata for organization-owned robot Lua artifacts |
@@ -153,14 +160,14 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `artifact-template.read` | `SystemAdmin`, `OrgAdmin` | List and review global robot Lua templates; templates cannot execute directly |
 | `artifact-template.manage` | `SystemAdmin` | Upload, discard Draft, publish, and retire global robot Lua templates |
 | `program.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read robot programs within the actor's matching organization/store/kiosk scope |
-| `program.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Author, publish, and retire robot programs within the actor's matching organization/store/kiosk scope |
+| `program.manage` | `SystemAdmin`, `OrgAdmin` | Author, publish, and retire robot programs within the actor's matching organization/store/kiosk scope |
 | `release.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read production configuration releases and authoring options within the actor's matching organization scope |
 | `release.publish` | `SystemAdmin`, `OrgAdmin` | Author, publish, and retire organization-owned production configuration releases |
 | `deployment.read` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Monitor configuration deployment state and failure details within assigned kiosk scope |
 | `release.deploy` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request configuration deployment to assigned kiosks. The request requires an operator reason and backend records actor plus matching authorization scope in the kiosk operation log. |
 | `package.read` | `SystemAdmin`, `OrgAdmin`, `Manager` | Read published package catalog and installation state within tenant scope |
 | `package.manage` | `SystemAdmin` | Author and publish global production package versions |
-| `package.install` | `SystemAdmin`, `OrgAdmin`, `Manager` | Preview and install published packages within tenant scope |
+| `package.install` | `SystemAdmin`, `OrgAdmin` | Preview and install published packages within tenant scope |
 | `package.fork` | `SystemAdmin`, `OrgAdmin` | Convert package-managed technical configuration into an explicit organization fork |
 | `release.rollback` | `SystemAdmin`, `OrgAdmin`, `Manager` | Request a new deployment from a previously Active Full Edge release or low-cost artifact set within assigned scope. The request requires a reason and the client-observed active deployment id; backend rejects a stale observation and audits the request. |
 | `tenant-tree.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View tenant hierarchy for RBAC scope selection and management navigation |
@@ -173,24 +180,31 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `ingredients.manage` | `SystemAdmin` | Create, update, activate/deactivate, and safely delete unreferenced global ingredient definitions |
 | `menus.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Manage organization-owned menus, prices, promotions, and sellable offers within assigned scope |
 | `orders.view` | `OrgAdmin`, `Manager`, `Staff` | View back-office orders within assigned tenant scope; SystemAdmin uses aggregate platform reporting instead of tenant order detail. |
-| `orders.manage` | `OrgAdmin`, `Manager`, `Staff` | Manage order lifecycle and manual/packaged fulfillment within assigned tenant scope. |
-| `payments.manage` | `Manager` | Tenant payment-session intervention workflows within assigned scope. |
+| `orders.fulfillment.manage` | `OrgAdmin`, `Manager`, `Staff` | Record manual and packaged-item fulfillment outcomes within assigned tenant scope. |
+| `orders.intervention.manage` | `OrgAdmin`, `Manager` | Cancel orders, redispatch execution, and request production remakes within assigned tenant scope. |
+| `orders.refund-flag` | `OrgAdmin`, `Manager`, `Staff` | Mark an order as requiring refund review within assigned tenant scope. |
+| `payments.manage` | `OrgAdmin`, `Manager` | Tenant payment-session intervention workflows within assigned scope. |
 | `payment-methods.manage` | `SystemAdmin` | Global payment-method catalog status management |
-| `refunds.manage` | `Manager`, `Staff` | Manual support/refund workflow within assigned tenant scope. Auto provider refund is future work. |
+| `refunds.view` | `OrgAdmin`, `Manager`, `Staff` | View manual support/refund records within assigned tenant scope. |
+| `refunds.request` | `OrgAdmin`, `Manager`, `Staff` | Request manual compensation with a reason and idempotency key. |
+| `refunds.process` | `OrgAdmin`, `Manager` | Mark money refunded, reject, or cancel a manual compensation record. |
 | `platform.organization-sales.view` | `SystemAdmin` | Read organization-level aggregate sales collections for platform administration and reporting. It does not authorize tenant order, payment, refund, customer, or provider-transaction detail. |
 | `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
-| `inventory.manage` | `SystemAdmin`, `Manager`, `Staff`, `Technician` | Refill dispenser state and adjust inventory estimates within assigned scope |
-| `inventory.configure` | `SystemAdmin`, `Manager`, `Technician` | Provision and configure dispenser topology, activate/retire states, and delete only unused states within assigned scope |
+| `inventory.refill.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff` | Request, start, complete, or cancel an audited physical refill task within assigned scope |
+| `inventory.adjust.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Correct an inventory estimate outside the refill workflow within assigned scope |
+| `inventory.configure` | `SystemAdmin`, `OrgAdmin`, `Technician` | Provision balances or dispenser topology, configure tracking, activate/retire states, and delete only unused states within assigned scope |
 | `operations.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosk heartbeat history, device events, and curated operation logs within assigned scope |
 | `operations.diagnostics` | `SystemAdmin`, `Technician` | View raw operation-log payloads and order execution diagnostics within assigned kiosk scope |
-| `notifications.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | View normal notification delivery status and retry evidence within assigned scope; message content and provider diagnostics are excluded |
-| `notifications.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Requeue permanently failed notification deliveries within assigned scope; reason and actor are audited |
+| `payments.diagnostics.view` | `OrgAdmin`, `Manager` | View bounded payment-session diagnostics within assigned scope; raw provider request/response payloads are never returned |
+| `notifications.view` | `SystemAdmin`, `OrgAdmin`, `Manager` | View normal notification delivery status and retry evidence within assigned scope; message content and provider diagnostics are excluded |
+| `notifications.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Requeue permanently failed notification deliveries within assigned scope; reason and actor are audited |
 | `maintenance.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View maintenance tickets within assigned scope |
 | `maintenance.create` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Create maintenance tickets within assigned scope |
 | `maintenance.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Manage, assign, resolve, and close maintenance tickets within assigned scope. Staff can create/view tickets but cannot assign or resolve by default |
 | `sync-dead-letters.manage` | `SystemAdmin` | Inspect retry audit, replay supported sync event types, and resolve/ignore Cloud dead letters. Raw replay control is intentionally not tenant-admin self-service in V1 |
 | `alerts.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View actionable telemetry alerts within assigned scope |
-| `alerts.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Acknowledge and resolve actionable telemetry alerts within assigned scope |
+| `alerts.acknowledge` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Acknowledge actionable telemetry alerts within assigned scope |
+| `alerts.resolve` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Resolve actionable telemetry alerts with an outcome/reason within assigned scope |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |
 | `reports.view` | `SystemAdmin`, `Manager`, `OrgAdmin` | Scope filtering must be enforced when scoped authorization is implemented |
 

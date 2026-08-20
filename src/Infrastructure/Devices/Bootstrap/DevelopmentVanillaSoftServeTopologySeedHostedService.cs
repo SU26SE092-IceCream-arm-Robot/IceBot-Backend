@@ -78,6 +78,24 @@ public sealed class DevelopmentVanillaSoftServeTopologySeedHostedService : IHost
             return;
         }
 
+        var balance = await dbContext.KioskIngredientInventories
+            .SingleOrDefaultAsync(candidate => candidate.KioskId == kiosk.Id && candidate.IngredientId == ingredient.Id && candidate.Unit == "gram", cancellationToken);
+        if (balance is null)
+        {
+            balance = new KioskIngredientInventory
+            {
+                Id = Guid.NewGuid(), OrganizationId = kiosk.OrganizationId, StoreId = kiosk.StoreId,
+                KioskId = kiosk.Id, IngredientId = ingredient.Id, OriginNodeId = Guid.Empty,
+                Version = 1, CreatedAt = now
+            };
+            balance.Configure("gram", InitialQuantity, null, null, InventoryTrackingMode.ManualEstimate, now);
+            dbContext.KioskIngredientInventories.Add(balance);
+            dbContext.StockMovements.Add(StockMovement.CreateForKioskInventory(
+                balance.Id, balance.OrganizationId, balance.StoreId, balance.KioskId, balance.IngredientId,
+                "InitialBalance", InitialQuantity, 0m, InitialQuantity, balance.Unit, now,
+                "DEVELOPMENT_INITIAL_STOCK", "KioskIngredientInventory", balance.Id, isEstimated: true));
+        }
+
         var deviceType = await EnsureDeviceTypeAsync(dbContext, now, cancellationToken);
         var deviceModel = await EnsureDeviceModelAsync(dbContext, deviceType.Id, now, cancellationToken);
         var device = await dbContext.Devices
@@ -100,51 +118,24 @@ public sealed class DevelopmentVanillaSoftServeTopologySeedHostedService : IHost
             await dbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var stateExists = await dbContext.IngredientDispenserStates
-            .AnyAsync(candidate => candidate.DeviceId == device.Id && candidate.ContainerCode == ContainerCode, cancellationToken);
-        if (stateExists)
+        var state = await dbContext.IngredientDispenserStates
+            .SingleOrDefaultAsync(candidate => candidate.DeviceId == device.Id && candidate.ContainerCode == ContainerCode, cancellationToken);
+        if (state is null)
         {
-            return;
+            state = new IngredientDispenserState
+            {
+                Id = Guid.NewGuid(), DeviceId = device.Id, KioskId = kiosk.Id, IngredientId = ingredient.Id,
+                ContainerCode = ContainerCode, CurrentLevelStatus = IngredientLevelStatus.Full,
+                EstimatedQuantity = InitialQuantity, CapacityQuantity = InitialQuantity, Unit = "gram",
+                LastMeasuredAt = now, IsActive = true, OriginNodeId = Guid.Empty, Version = 1, CreatedAt = now
+            };
+            state.ChangeTrackingMode(InventoryTrackingMode.ManualEstimate);
+            dbContext.IngredientDispenserStates.Add(state);
         }
-
-        var state = new IngredientDispenserState
-        {
-            Id = Guid.NewGuid(),
-            DeviceId = device.Id,
-            KioskId = kiosk.Id,
-            IngredientId = ingredient.Id,
-            ContainerCode = ContainerCode,
-            CurrentLevelStatus = IngredientLevelStatus.Unknown,
-            EstimatedQuantity = 0m,
-            LastMeasuredAt = now,
-            IsActive = true,
-            OriginNodeId = Guid.Empty,
-            Version = 1,
-            CreatedAt = now
-        };
-        state.ChangeTrackingMode(InventoryTrackingMode.ManualEstimate);
-        state.ConfigureContainer(InitialQuantity, "gram");
-        var initialRefill = state.Refill(
-            InitialQuantity,
-            now,
-            reasonCode: "DEVELOPMENT_INITIAL_STOCK",
-            reportedLevelAfter: IngredientLevelStatus.Full);
-        initialRefill.OrganizationId = kiosk.OrganizationId;
-        initialRefill.StoreId = kiosk.StoreId;
-        initialRefill.KioskId = kiosk.Id;
-        initialRefill.DeviceId = device.Id;
-        initialRefill.IngredientId = ingredient.Id;
-        initialRefill.OriginNodeId = Guid.Empty;
-        initialRefill.Version = 1;
-        initialRefill.CreatedAt = now;
-
-        dbContext.IngredientDispenserStates.Add(state);
-        dbContext.StockMovements.Add(initialRefill);
+        state.KioskIngredientInventoryId = balance.Id;
         await dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogInformation(
-            "Created Development vanilla soft-serve topology for kiosk {KioskCode} with hopper {ContainerCode}.",
-            KioskCode,
-            ContainerCode);
+            "Ensured Development vanilla soft-serve balance and optional hopper for kiosk {KioskCode}.", KioskCode);
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;

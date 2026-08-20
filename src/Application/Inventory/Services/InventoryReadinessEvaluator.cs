@@ -58,7 +58,11 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             applicableRoutes.SelectMany(route => route.SupportedOptionCodes).Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
             cancellationToken);
         var states = await inventory.ListStatesForInventoryTopologyAsync(kiosk.Id, cancellationToken);
-        var statesByIngredient = states.ToLookup(state => state.IngredientId);
+        var balances = await inventory.ListKioskIngredientInventoriesAsync(kiosk.Id, cancellationToken);
+        var balancesByIngredient = balances.ToLookup(balance => balance.IngredientId);
+        var statesByBalanceId = states.Where(state => state.KioskIngredientInventoryId.HasValue)
+            .ToLookup(state => state.KioskIngredientInventoryId!.Value);
+        var warnings = BuildSensorAssistedWarnings(balances, statesByBalanceId, options);
 
         var itemsByRecipe = recipeItems.ToLookup(item => item.RecipeId);
         var results = new List<InventoryIngredientReadinessResult>();
@@ -67,13 +71,13 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
         {
             foreach (var item in itemsByRecipe[route.RecipeId])
             {
-                var matching = statesByIngredient[item.IngredientId].ToArray();
+                var matching = balancesByIngredient[item.IngredientId].ToArray();
                 results.Add(CreateIngredientResult(
                     route,
                     item.IngredientId,
                     item.Ingredient.Code,
                     item.Ingredient.Name,
-                    matching,
+                    matching, statesByBalanceId,
                     options,
                     item.Quantity * route.RequestedQuantity,
                     item.Unit,
@@ -82,13 +86,13 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
 
             foreach (var requirement in route.SelectedOptionIngredients ?? [])
             {
-                var matching = statesByIngredient[requirement.IngredientId].ToArray();
+                var matching = balancesByIngredient[requirement.IngredientId].ToArray();
                 results.Add(CreateIngredientResult(
                     route,
                     requirement.IngredientId,
                     requirement.IngredientCode,
                     requirement.IngredientName,
-                    matching,
+                    matching, statesByBalanceId,
                     options,
                     requirement.Quantity * route.RequestedQuantity,
                     requirement.Unit,
@@ -104,13 +108,13 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
                 {
                     var ingredients = option.IngredientRequirements.Select(requirement =>
                     {
-                        var matching = statesByIngredient[requirement.IngredientId].ToArray();
+                        var matching = balancesByIngredient[requirement.IngredientId].ToArray();
                         return CreateIngredientResult(
                             route,
                             requirement.IngredientId,
                             requirement.Ingredient.Code,
                             requirement.Ingredient.Name,
-                            matching,
+                            matching, statesByBalanceId,
                             options,
                             requirement.Quantity,
                             requirement.Unit,
@@ -154,10 +158,12 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             OrganizationId = kiosk.OrganizationId,
             StoreId = kiosk.StoreId,
             HasConfiguredInventoryTopology = states.Count != 0,
+            HasConfiguredInventoryBalance = balances.Count != 0,
             IsReady = baseReady && requiredOptionsReady,
             OverallStatus = overallStatus,
             Ingredients = results,
-            OptionGroups = optionGroupResults
+            OptionGroups = optionGroupResults,
+            Warnings = warnings
         };
     }
 
@@ -166,7 +172,8 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
         Guid ingredientId,
         string ingredientCode,
         string ingredientName,
-        IReadOnlyCollection<IngredientDispenserState> matching,
+        IReadOnlyCollection<KioskIngredientInventory> matching,
+        ILookup<Guid, IngredientDispenserState> statesByBalanceId,
         InventoryReadinessEvaluationOptions options,
         decimal requiredQuantity,
         string requiredUnit,
@@ -185,27 +192,28 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             RequiredUnit = includeRequirementInResult && options.Purpose == InventoryReadinessEvaluationPurpose.RuntimeSellability
                 ? requiredUnit
                 : null,
-            Status = ResolveStatus(matching, options, requiredQuantity, requiredUnit),
-            MatchingDispenserStateIds = matching.Select(state => state.Id).ToArray()
+            Status = ResolveStatus(matching, statesByBalanceId, options, requiredQuantity, requiredUnit),
+            MatchingDispenserStateIds = matching.SelectMany(balance => statesByBalanceId[balance.Id]).Select(state => state.Id).ToArray()
         };
 
     private static InventoryReadinessStatus ResolveStatus(
-        IReadOnlyCollection<IngredientDispenserState> states,
+        IReadOnlyCollection<KioskIngredientInventory> balances,
+        ILookup<Guid, IngredientDispenserState> statesByBalanceId,
         InventoryReadinessEvaluationOptions options,
         decimal requiredQuantity,
         string requiredUnit)
     {
-        if (states.Count == 0)
+        if (balances.Count == 0)
         {
             return InventoryReadinessStatus.MissingIngredient;
         }
 
-        if (states.All(state => !state.Ingredient.IsActive))
+        if (balances.All(balance => !balance.Ingredient.IsActive))
         {
             return InventoryReadinessStatus.MissingIngredient;
         }
 
-        var active = states.Where(state => state.IsActive && state.Ingredient.IsActive).ToArray();
+        var active = balances.Where(balance => balance.IsActive && balance.Ingredient.IsActive).ToArray();
         if (active.Length == 0)
         {
             return InventoryReadinessStatus.ContainerInactive;
@@ -217,27 +225,28 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
         }
 
         var observedAt = options.ObservedAt ?? DateTimeOffset.UtcNow;
-        var usable = active.Where(state =>
-            !state.ExpiresAt.HasValue || state.ExpiresAt.Value >= observedAt).ToArray();
+        var usable = active.Where(balance =>
+            !balance.ExpiresAt.HasValue || balance.ExpiresAt.Value >= observedAt).ToArray();
         if (usable.Length == 0)
         {
             return InventoryReadinessStatus.IngredientExpired;
         }
 
-        var sameUnit = usable.Where(state =>
-            string.Equals(state.Unit, requiredUnit, StringComparison.OrdinalIgnoreCase)).ToArray();
+        var sameUnit = usable.Where(balance =>
+            string.Equals(balance.Unit, requiredUnit, StringComparison.OrdinalIgnoreCase)).ToArray();
         if (sameUnit.Length == 0)
         {
             return InventoryReadinessStatus.UnitMismatch;
         }
 
-        var sensorEligible = sameUnit.Where(state =>
-            state.TrackingMode != InventoryTrackingMode.SensorRequired ||
-            IsSensorRequiredStateReady(state, observedAt, options.MaximumSensorEvidenceAge)).ToArray();
+        var sensorEligible = sameUnit.Where(balance =>
+            balance.TrackingMode != InventoryTrackingMode.SensorRequired ||
+            AreSensorRequiredStatesReady(statesByBalanceId[balance.Id].ToArray(), observedAt, options.MaximumSensorEvidenceAge)).ToArray();
         if (sensorEligible.Length == 0)
         {
-            var strictSensorStates = sameUnit.Where(state => state.TrackingMode == InventoryTrackingMode.SensorRequired).ToArray();
-            if (strictSensorStates.All(state => state.Device.Status != DeviceStatus.Online))
+            var strictSensorStates = sameUnit.Where(balance => balance.TrackingMode == InventoryTrackingMode.SensorRequired)
+                .SelectMany(balance => statesByBalanceId[balance.Id]).ToArray();
+            if (strictSensorStates.Length > 0 && strictSensorStates.All(state => state.Device.Status != DeviceStatus.Online))
             {
                 return InventoryReadinessStatus.DeviceUnavailable;
             }
@@ -251,25 +260,45 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
             return InventoryReadinessStatus.InventoryEvidenceStale;
         }
 
-        if (sensorEligible.Any(state => !state.EstimatedQuantity.HasValue))
+        if (sensorEligible.Any(balance => !balance.EstimatedQuantity.HasValue))
         {
             return InventoryReadinessStatus.QuantityUnavailable;
         }
 
-        return sensorEligible.Sum(state => state.EstimatedQuantity!.Value) >= requiredQuantity
+        return sensorEligible.Sum(balance => balance.EstimatedQuantity!.Value) >= requiredQuantity
             ? InventoryReadinessStatus.Ready
             : InventoryReadinessStatus.QuantityInsufficient;
     }
 
-    private static bool IsSensorRequiredStateReady(
-        IngredientDispenserState state,
+    private static IReadOnlyList<string> BuildSensorAssistedWarnings(
+        IReadOnlyCollection<KioskIngredientInventory> balances,
+        ILookup<Guid, IngredientDispenserState> statesByBalanceId,
+        InventoryReadinessEvaluationOptions options)
+    {
+        var observedAt = options.ObservedAt ?? DateTimeOffset.UtcNow;
+        return balances.Where(balance => balance.TrackingMode == InventoryTrackingMode.SensorAssisted)
+            .Select(balance =>
+            {
+                var states = statesByBalanceId[balance.Id].ToArray();
+                return AreSensorRequiredStatesReady(states, observedAt, options.MaximumSensorEvidenceAge)
+                    ? null
+                    : $"Sensor evidence for {balance.Ingredient.Code} is unavailable or stale; the manual balance remains in effect.";
+            })
+            .Where(warning => warning is not null)
+            .Select(warning => warning!)
+            .ToArray();
+    }
+
+    private static bool AreSensorRequiredStatesReady(
+        IReadOnlyCollection<IngredientDispenserState> states,
         DateTimeOffset observedAt,
         TimeSpan? maximumSensorEvidenceAge) =>
-        state.Device.Status == DeviceStatus.Online &&
-        !string.IsNullOrWhiteSpace(state.LevelToQuantityProfileJson) &&
-        maximumSensorEvidenceAge.HasValue &&
-        state.LastSensorObservedAt.HasValue &&
-        state.LastSensorObservedAt.Value >= observedAt - maximumSensorEvidenceAge.Value;
+        states.Count > 0 && states.All(state =>
+            state.Device.Status == DeviceStatus.Online &&
+            !string.IsNullOrWhiteSpace(state.LevelToQuantityProfileJson) &&
+            maximumSensorEvidenceAge.HasValue &&
+            state.LastSensorObservedAt.HasValue &&
+            state.LastSensorObservedAt.Value >= observedAt - maximumSensorEvidenceAge.Value);
 
     private static InventoryReadinessStatus ResolveOverallStatus(
         IReadOnlyCollection<InventoryIngredientReadinessResult> ingredients)

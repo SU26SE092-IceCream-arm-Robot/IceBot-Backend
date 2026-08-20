@@ -182,7 +182,6 @@ namespace Infrastructure
             services.AddScoped(provider => new Application.Operations.Alerts.Automation.InventoryAlertReconciler(
                 provider.GetRequiredService<Application.Operations.Alerts.Automation.IInventoryAlertAutomationStore>(),
                 provider.GetRequiredService<Application.Abstractions.Realtime.IRealtimeNotificationPublisher>(),
-                provider.GetRequiredService<Application.Operations.Alerts.Notifications.IInventoryOperationalAlertNotifier>(),
                 provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<Application.Operations.Alerts.Automation.InventoryAlertAutomationOptions>>().Value,
                 provider.GetRequiredService<Microsoft.Extensions.Logging.ILogger<Application.Operations.Alerts.Automation.InventoryAlertReconciler>>()));
             services.AddHostedService<Operations.Jobs.InventoryAlertReconciliationJob>();

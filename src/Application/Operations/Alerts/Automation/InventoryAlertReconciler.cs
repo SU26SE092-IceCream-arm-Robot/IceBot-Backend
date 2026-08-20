@@ -4,16 +4,17 @@ using Domain.Common.Enums;
 using Domain.Inventory.Entities;
 using Domain.Inventory.Enums;
 using Domain.Operations.Entities;
-using Domain.Operations.Enums;
-using Application.Operations.Alerts.Notifications;
 using Microsoft.Extensions.Logging;
 
 namespace Application.Operations.Alerts.Automation;
 
+/// <summary>
+/// Reconciles operational inventory balances. A physical dispenser is optional;
+/// sensor topology enriches the balance but does not own sellability or refill work.
+/// </summary>
 public sealed class InventoryAlertReconciler(
     IInventoryAlertAutomationStore store,
     IRealtimeNotificationPublisher publisher,
-    IInventoryOperationalAlertNotifier notifier,
     InventoryAlertAutomationOptions options,
     ILogger<InventoryAlertReconciler> logger)
 {
@@ -26,12 +27,10 @@ public sealed class InventoryAlertReconciler(
     {
         var changed = 0;
         var candidateFailures = 0;
-        var scanSlot = observedAt.ToUnixTimeSeconds() /
-            Math.Max(options.IntervalSeconds, 1);
-        var ids = await store.ListActiveDispenserStateIdsAsync(
-            checked(options.BatchSize * options.MaxBatchesPerRun),
-            scanSlot,
-            cancellationToken);
+        var scanSlot = observedAt.ToUnixTimeSeconds() / Math.Max(options.IntervalSeconds, 1);
+        var ids = await store.ListActiveKioskIngredientInventoryIdsAsync(
+            checked(options.BatchSize * options.MaxBatchesPerRun), scanSlot, cancellationToken);
+
         foreach (var id in ids)
         {
             try
@@ -64,8 +63,7 @@ public sealed class InventoryAlertReconciler(
             {
                 candidateFailures++;
                 logger.LogError(exception,
-                    "Inventory alert reconciliation failed for dispenser state {DispenserStateId}.",
-                    id);
+                    "Inventory alert reconciliation failed for kiosk inventory balance {KioskIngredientInventoryId}.", id);
             }
         }
 
@@ -73,126 +71,116 @@ public sealed class InventoryAlertReconciler(
     }
 
     private Task<List<AlertChangedEvent>> ReconcileOneAsync(
-        Guid dispenserStateId,
+        Guid balanceId,
         DateTimeOffset observedAt,
         CancellationToken cancellationToken) =>
         store.ExecuteInTransactionAsync(async ct =>
         {
-            await store.AcquireLockAsync(dispenserStateId, ct);
-            var state = await store.GetDispenserStateAsync(dispenserStateId, ct);
-            if (state?.KioskId is null || state.Kiosk is null || !state.IsActive) return [];
+            await store.AcquireBalanceLockAsync(balanceId, ct);
+            var balance = await store.GetKioskIngredientInventoryAsync(balanceId, ct);
+            if (balance?.Kiosk is null || !balance.IsActive) return [];
 
-            var desiredCode = Classify(state);
-            var activeAlerts = await store.ListActiveInventoryAlertsAsync(state.Id, ct);
+            var desiredCode = Classify(balance);
+            var activeAlerts = await store.ListActiveBalanceInventoryAlertsAsync(balance.Id, ct);
             var events = new List<AlertChangedEvent>();
             var mutated = false;
 
             foreach (var alert in activeAlerts.Where(alert => alert.AlertCode != desiredCode))
             {
                 var oldStatus = alert.Status.ToString();
-                alert.Resolve(observedAt, "Inventory level recovered or moved to a different threshold.");
-                events.Add(ToEvent(alert, state, oldStatus, observedAt));
+                alert.Resolve(observedAt, "Inventory balance recovered or moved to a different threshold.");
+                events.Add(ToEvent(alert, balance, oldStatus, observedAt));
                 mutated = true;
             }
 
             var current = desiredCode is null
                 ? null
-                : activeAlerts
-                    .Where(alert => alert.AlertCode == desiredCode)
-                    .OrderBy(alert => alert.RaisedAt)
-                    .ThenBy(alert => alert.Id)
-                    .FirstOrDefault();
-            foreach (var duplicate in activeAlerts.Where(alert =>
-                         alert.AlertCode == desiredCode && alert.Id != current?.Id))
+                : activeAlerts.Where(alert => alert.AlertCode == desiredCode)
+                    .OrderBy(alert => alert.RaisedAt).ThenBy(alert => alert.Id).FirstOrDefault();
+            foreach (var duplicate in activeAlerts.Where(alert => alert.AlertCode == desiredCode && alert.Id != current?.Id))
             {
                 var oldStatus = duplicate.Status.ToString();
                 duplicate.Resolve(observedAt, "Duplicate inventory alert reconciled.");
-                events.Add(ToEvent(duplicate, state, oldStatus, observedAt));
+                events.Add(ToEvent(duplicate, balance, oldStatus, observedAt));
                 mutated = true;
             }
+
             if (desiredCode is not null && current is null)
             {
-                var severity = desiredCode == EmptyCode ? SeverityLevel.Error : SeverityLevel.Warning;
-                current = Alert.RaiseFromInventoryState(
-                    state.KioskId.Value,
-                    state.DeviceId,
-                    state.Id,
+                current = Alert.RaiseFromKioskIngredientInventory(
+                    balance.KioskId,
+                    balance.Id,
                     desiredCode,
-                    severity,
-                    $"{state.Ingredient.Name} is {desiredCode[10..].ToLowerInvariant()}",
-                    $"Container {state.ContainerCode} requires inventory attention.",
-                    observedAt,
-                    state.OriginNodeId);
+                    desiredCode == EmptyCode ? SeverityLevel.Error : SeverityLevel.Warning,
+                    $"{balance.Ingredient.Name} is {desiredCode[10..].ToLowerInvariant()}",
+                    $"Kiosk inventory is {balance.EstimatedQuantity?.ToString() ?? "unknown"} {balance.Unit}.",
+                    observedAt);
                 await store.AddAlertAsync(current, ct);
-                events.Add(ToEvent(current, state, null, observedAt));
+                events.Add(ToEvent(current, balance, null, observedAt));
                 mutated = true;
-                if (desiredCode == EmptyCode)
+
+                if (!(await store.ListActiveInventoryRefillTasksAsync(balance.Id, ct)).Any())
                 {
-                    await notifier.NotifyEmptyAsync(
-                        current.Id,
-                        state.Kiosk.OrganizationId,
-                        state.Kiosk.StoreId,
-                        state.KioskId.Value,
-                        state.DeviceId,
-                        current.Title,
-                        ct);
+                    var task = CreateAutomaticRefillTask(balance, current, observedAt);
+                    await store.AddInventoryRefillTaskAsync(task, ct);
+                    await store.AddInventoryRefillTaskTransitionAsync(new InventoryRefillTaskTransition
+                    {
+                        Id = Guid.NewGuid(),
+                        InventoryRefillTaskId = task.Id,
+                        ToStatus = InventoryRefillTaskStatus.Requested,
+                        Reason = $"Automatically requested from {desiredCode} alert.",
+                        RequestIdempotencyKey = task.RequestIdempotencyKey,
+                        RequestFingerprint = task.RequestFingerprint,
+                        OccurredAt = observedAt,
+                        CreatedAt = observedAt
+                    }, ct);
                 }
             }
 
-            if (current is not null && desiredCode == EmptyCode && options.CreateMaintenanceTicketForEmpty &&
-                !await store.MaintenanceTicketExistsForAlertAsync(current.Id, ct))
-            {
-                await store.AddMaintenanceTicketAsync(CreateTicket(current, state, observedAt), ct);
-                mutated = true;
-            }
-
-            if (mutated)
-            {
-                await store.SaveChangesAsync(ct);
-            }
+            if (mutated) await store.SaveChangesAsync(ct);
             return events;
         }, cancellationToken);
 
-    private static string? Classify(IngredientDispenserState state)
+    private static string? Classify(KioskIngredientInventory balance)
     {
-        if (state.EstimatedQuantity is <= 0)
-            return EmptyCode;
-        return state.CurrentLevelStatus == IngredientLevelStatus.Low ? LowCode : null;
+        if (!balance.EstimatedQuantity.HasValue) return null;
+        if (balance.EstimatedQuantity <= 0) return EmptyCode;
+        return balance.LowStockThreshold.HasValue && balance.EstimatedQuantity <= balance.LowStockThreshold
+            ? LowCode
+            : null;
     }
 
-    private static MaintenanceTicket CreateTicket(
+    private static InventoryRefillTask CreateAutomaticRefillTask(
+        KioskIngredientInventory balance,
         Alert alert,
-        IngredientDispenserState state,
-        DateTimeOffset observedAt) => new()
+        DateTimeOffset observedAt)
     {
-        OrganizationId = state.Kiosk!.OrganizationId,
-        StoreId = state.Kiosk.StoreId,
-        KioskId = state.KioskId!.Value,
-        DeviceId = state.DeviceId,
-        AlertId = alert.Id,
-        TicketNumber = $"AUTO-{observedAt:yyyyMMddHHmmss}-{alert.Id.ToString("N")[..8].ToUpperInvariant()}",
-        IssueCode = EmptyCode,
-        Title = alert.Title,
-        Description = alert.Message,
-        Priority = MaintenancePriority.High,
-        Status = MaintenanceTicketStatus.Open,
-        ReportedAt = observedAt,
-        OriginNodeId = alert.OriginNodeId,
-        Version = 1,
-        SyncedAt = observedAt
-    };
+        var idempotencyKey = $"alert:{alert.Id:N}";
+        return new InventoryRefillTask
+        {
+            Id = Guid.NewGuid(),
+            OrganizationId = balance.OrganizationId,
+            StoreId = balance.StoreId,
+            KioskId = balance.KioskId,
+            KioskIngredientInventoryId = balance.Id,
+            SourceAlertId = alert.Id,
+            RequestSource = InventoryRefillRequestSource.AlertAutomation,
+            Unit = balance.Unit,
+            RequestedAt = observedAt,
+            RequestIdempotencyKey = idempotencyKey,
+            RequestFingerprint = $"alert:{alert.Id:N}:{balance.Id:N}",
+            CreatedAt = observedAt,
+            Version = 1
+        };
+    }
 
-    private static AlertChangedEvent ToEvent(
-        Alert alert,
-        IngredientDispenserState state,
-        string? oldStatus,
-        DateTimeOffset observedAt) => new()
+    private static AlertChangedEvent ToEvent(Alert alert, KioskIngredientInventory balance, string? oldStatus, DateTimeOffset observedAt) => new()
     {
         AlertId = alert.Id,
-        KioskId = state.KioskId!.Value,
-        OrganizationId = state.Kiosk!.OrganizationId,
-        StoreId = state.Kiosk.StoreId,
-        DeviceId = state.DeviceId,
+        KioskId = balance.KioskId,
+        OrganizationId = balance.OrganizationId,
+        StoreId = balance.StoreId,
+        DeviceId = null,
         AlertCode = alert.AlertCode,
         Severity = alert.Severity.ToString(),
         OldStatus = oldStatus,

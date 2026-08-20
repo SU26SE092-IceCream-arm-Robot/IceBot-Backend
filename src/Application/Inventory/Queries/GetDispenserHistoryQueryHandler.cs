@@ -68,7 +68,7 @@ public sealed class GetDispenserHistoryQueryHandler(IInventoryStore inventory)
                 movement.Id,
                 "StockMovement",
                 movement.MovementType,
-                movement.IngredientDispenserStateId,
+                movement.IngredientDispenserStateId ?? Guid.Empty,
                 null,
                 movement.ReasonCode ?? movement.Notes,
                 movement.Quantity,

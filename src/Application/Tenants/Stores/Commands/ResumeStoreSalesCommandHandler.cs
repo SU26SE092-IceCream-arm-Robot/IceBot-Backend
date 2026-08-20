@@ -20,7 +20,7 @@ public sealed class ResumeStoreSalesCommandHandler(IStoreStore storeStore)
         }
 
         if (!StoreAccessRules.CanManageOrganizationStores(
-                ScopeRoleSets.StoresManage,
+                ScopeRoleSets.StoresSalesManage,
                 command.UserContext,
                 command.OrganizationId))
         {

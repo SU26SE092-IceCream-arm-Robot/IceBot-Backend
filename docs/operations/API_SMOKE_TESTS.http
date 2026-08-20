@@ -163,14 +163,38 @@ GET {{baseUrl}}/management/inventory/dispenser-states
 Authorization: Bearer {{accessToken}}
 Accept: application/json
 
-### Refill Kiosk Dispenser
-POST {{baseUrl}}/management/kiosks/{{sampleGuid}}/inventory/dispenser-states/{{sampleGuid}}/refill
+### Get Kiosk Inventory Workspace
+GET {{baseUrl}}/management/kiosks/{{sampleGuid}}/inventory/workspace
 Authorization: Bearer {{accessToken}}
+Accept: application/json
+
+### Request audited refill task
+POST {{baseUrl}}/management/kiosks/{{sampleGuid}}/inventory/balances/{{sampleGuid}}/refill-tasks
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: refill-request-{{$timestamp}}
 Content-Type: application/json
 
 {
-  "quantity": 1000,
-  "reasonCode": "BATCH-001"
+  "requestedQuantity": 1000,
+  "reasonCode": "PHYSICAL_REFILL",
+  "notes": "Operator refill"
+}
+
+### Start refill task
+POST {{baseUrl}}/management/kiosks/{{sampleGuid}}/inventory/refill-tasks/{{sampleGuid}}/start
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: refill-start-{{$timestamp}}
+
+### Complete refill task
+POST {{baseUrl}}/management/kiosks/{{sampleGuid}}/inventory/refill-tasks/{{sampleGuid}}/complete
+Authorization: Bearer {{accessToken}}
+Idempotency-Key: refill-complete-{{$timestamp}}
+Content-Type: application/json
+
+{
+  "actualQuantity": 1000,
+  "reasonCode": "PHYSICAL_REFILL_CONFIRMED",
+  "notes": "Container refilled"
 }
 
 
@@ -178,13 +202,18 @@ Content-Type: application/json
 # 8. Operations Telemetry
 # ==========================================
 
+### Get Kiosk Operations Workspace
+GET {{baseUrl}}/management/kiosks/{{sampleGuid}}/operations/workspace
+Authorization: Bearer {{accessToken}}
+Accept: application/json
+
 ### Get Kiosk Heartbeats History
 GET {{baseUrl}}/management/kiosks/{{sampleGuid}}/heartbeats?from=2026-06-13T00:00:00Z&to=2026-06-14T00:00:00Z&pageNumber=1&pageSize=20
 Authorization: Bearer {{accessToken}}
 Accept: application/json
 
 ### Get Kiosk Device Events
-GET {{baseUrl}}/management/kiosks/{{sampleGuid}}/events?minSeverity=Warning&from=2026-06-13T00:00:00Z&to=2026-06-14T00:00:00Z&pageNumber=1&pageSize=20
+GET {{baseUrl}}/management/kiosks/{{sampleGuid}}/device-events?minSeverity=Warning&from=2026-06-13T00:00:00Z&to=2026-06-14T00:00:00Z&pageNumber=1&pageSize=20
 Authorization: Bearer {{accessToken}}
 Accept: application/json
 

@@ -57,7 +57,7 @@ public sealed class InventorySensorObservationIngestionTests
         Assert.Equal(observedAt, state.LastMeasuredAt);
         await observations.Received(1).AddObservationAsync(
             Arg.Is<InventorySensorObservation>(item =>
-                item.Disposition == InventorySensorObservationDisposition.Applied &&
+                item.Disposition == InventorySensorObservationDisposition.Unbound &&
                 item.ObservationSequence == 7 &&
                 item.IngredientDispenserStateId == state.Id),
             Arg.Any<CancellationToken>());

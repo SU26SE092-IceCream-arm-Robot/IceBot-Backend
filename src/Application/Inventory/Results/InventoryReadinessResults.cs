@@ -7,15 +7,15 @@ public sealed class KioskInventoryReadinessResult
     public Guid KioskId { get; set; }
     public Guid OrganizationId { get; set; }
     public Guid StoreId { get; set; }
-    /// <summary>
-    /// True once the kiosk has opted into inventory tracking by configuring at
-    /// least one dispenser state. An absent topology is not inventory evidence.
-    /// </summary>
+    /// <summary>Legacy topology visibility flag. Physical topology is optional.</summary>
     public bool HasConfiguredInventoryTopology { get; set; }
+    /// <summary>True once the kiosk has opted into Cloud inventory balance tracking.</summary>
+    public bool HasConfiguredInventoryBalance { get; set; }
     public bool IsReady { get; set; }
     public InventoryReadinessStatus OverallStatus { get; set; }
     public IReadOnlyList<InventoryIngredientReadinessResult> Ingredients { get; set; } = [];
     public IReadOnlyList<InventoryOptionGroupReadinessResult> OptionGroups { get; set; } = [];
+    public IReadOnlyList<string> Warnings { get; set; } = [];
 }
 
 public sealed class InventoryOptionGroupReadinessResult

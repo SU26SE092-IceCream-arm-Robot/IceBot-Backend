@@ -48,7 +48,7 @@ public sealed class AcknowledgeAlertCommandHandler
         AcknowledgeAlertCommand command,
         CancellationToken cancellationToken)
     {
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AlertsManage, command.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AlertsAcknowledge, command.UserContext);
         var alert = await _store.GetAccessibleByIdAsync(
             command.AlertId,
             command.UserContext.IsSystemAdmin,

@@ -7,6 +7,7 @@ using Application.Devices.Catalog.Queries;
 using Application.Devices.ExecutionEndpoints.Queries;
 using Application.Devices.Telemetry.Queries;
 using Application.Devices.Connectivity.Queries;
+using Application.Devices.Operations.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Devices;
@@ -18,6 +19,7 @@ public static class DevicesModule
         services.AddScoped<GetKioskHeartbeatsQueryHandler>();
         services.AddScoped<GetKioskDeviceEventsQueryHandler>();
         services.AddScoped<GetKioskStatusOverviewQueryHandler>();
+        services.AddScoped<GetKioskOperationsWorkspaceQueryHandler>();
         services.AddScoped<IngestKioskHeartbeatCommandHandler>();
         services.AddScoped<IngestDeviceEventCommandHandler>();
         services.AddScoped<IngestLocalOperationLogCommandHandler>();

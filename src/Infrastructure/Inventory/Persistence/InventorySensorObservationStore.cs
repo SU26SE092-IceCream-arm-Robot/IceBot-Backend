@@ -41,7 +41,13 @@ public sealed class InventorySensorObservationStore(IceBotDbContext dbContext) :
         dbContext.IngredientDispenserStates.IgnoreQueryFilters()
             .Include(state => state.Kiosk)
             .Include(state => state.Ingredient)
+            .Include(state => state.KioskIngredientInventory)
             .FirstOrDefaultAsync(state => state.Id == dispenserStateId && state.DeletedAt == null, cancellationToken);
+
+    public Task AcquireKioskIngredientInventoryMutationLockAsync(Guid inventoryId, CancellationToken cancellationToken = default) =>
+        dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"inventory-balance:{inventoryId:N}"}, 0));",
+            cancellationToken);
 
     public Task<InventorySensorObservation?> GetObservationBySourceEventAsync(
         Guid sourceExecutorId,
@@ -66,6 +72,9 @@ public sealed class InventorySensorObservationStore(IceBotDbContext dbContext) :
         InventorySensorObservation observation,
         CancellationToken cancellationToken = default) =>
         dbContext.InventorySensorObservations.AddAsync(observation, cancellationToken).AsTask();
+
+    public Task AddStockMovementAsync(StockMovement movement, CancellationToken cancellationToken = default) =>
+        dbContext.StockMovements.AddAsync(movement, cancellationToken).AsTask();
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default) =>
         dbContext.SaveChangesAsync(cancellationToken);

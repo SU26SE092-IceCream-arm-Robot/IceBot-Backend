@@ -58,6 +58,7 @@ public sealed class RefundConfirmationTests
         Assert.True(result.Succeeded, result.Message);
         Assert.NotNull(createdRefund);
         Assert.Equal(duplicate.Id, createdRefund!.PaymentTransactionId);
+        Assert.Equal(RefundCompensationMethod.FullMoneyRefund, createdRefund.CompensationMethod);
     }
 
     [Fact]

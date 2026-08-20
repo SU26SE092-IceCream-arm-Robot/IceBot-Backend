@@ -387,7 +387,7 @@ internal static class MqttEndpointCredentialWorkflow
         if (endpoint is null) return ("Execution endpoint not found.", 404);
         if (endpoint.KioskId != kioskId) return ("Execution endpoint not found.", 404);
         return ScopeAccessRules.CanAccessScopedRow(
-            ScopeRoleSets.DevicesManage, userContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId)
+            ScopeRoleSets.ExecutionEndpointsCredentialsManage, userContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId)
             ? null
             : ("Access denied.", 403);
     }

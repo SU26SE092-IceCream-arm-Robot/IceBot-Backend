@@ -17,7 +17,7 @@ internal static class RefundResultMapper
             Amount = refund.Amount,
             Currency = refund.Currency,
             Reason = parsed.Text,
-            RefundMethod = parsed.Method,
+            RefundMethod = refund.CompensationMethod.ToString(),
             VoucherCode = parsed.Code,
             VoucherValue = parsed.Value,
             Note = parsed.Note,

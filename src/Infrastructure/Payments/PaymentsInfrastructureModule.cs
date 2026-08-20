@@ -9,6 +9,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Application.Orders.PlaceOrder;
+using Application.Payments.Reconciliation;
 
 namespace Infrastructure.Payments;
 
@@ -46,6 +47,18 @@ public static class PaymentsInfrastructureModule
                 options => options.DurationMinutes is >= 1 and <= 120,
                 "Order payment window must be between 1 and 120 minutes.")
             .ValidateOnStart();
+        services.AddOptions<PaymentReconciliationOptions>()
+            .Bind(config.GetSection(PaymentReconciliationOptions.SectionName))
+            .Validate(options =>
+                    options.EvidenceFreshnessMinutes is >= 5 and <= 1440 &&
+                    options.ObservationIntervalSeconds is >= 60 and <= 3600 &&
+                    options.ObservationLookbackDays is >= 1 and <= 31 &&
+                    options.ObservationBatchSize is >= 1 and <= 500 &&
+                    HasValidTimeZone(options.TimeZoneId),
+                "Daily payment reconciliation settings are invalid.")
+            .ValidateOnStart();
+        services.AddSingleton(provider =>
+            provider.GetRequiredService<IOptions<PaymentReconciliationOptions>>().Value);
 
         services.AddHttpClient<PayOsPaymentGateway>((serviceProvider, client) =>
             {
@@ -57,12 +70,36 @@ public static class PaymentsInfrastructureModule
             .AddPayOsResilience(resilienceSettings);
 
         services.AddScoped<IPaymentStore, PaymentStore>();
+        services.AddScoped<IPaymentReconciliationStore, PaymentReconciliationStore>();
         services.AddScoped<IPaymentInterventionNotificationRecipientStore,
             PaymentInterventionNotificationRecipientStore>();
         services.AddScoped<IPaymentGateway>(provider => provider.GetRequiredService<PayOsPaymentGateway>());
         services.AddHostedService<PaymentMethodCatalogHostedService>();
         services.AddHostedService<PaymentSessionReconciliationJob>();
+        services.AddHostedService<PaymentProviderObservationJob>();
 
         return services;
+    }
+
+    private static bool HasValidTimeZone(string? timeZoneId)
+    {
+        if (string.IsNullOrWhiteSpace(timeZoneId))
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return false;
+        }
     }
 }

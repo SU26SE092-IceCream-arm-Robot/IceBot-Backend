@@ -40,12 +40,12 @@ public sealed class MenuCurrencyContractTests
 
         var result = await new UpdateMenuCommandHandler(
             store, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateMenuCommand
-        {
-            Scope = new MenuManagementCommandScope(
+            {
+                Scope = new MenuManagementCommandScope(
                 new CurrentUserContext { IsSystemAdmin = true }, organizationId),
-            MenuId = menu.Id,
-            Request = new UpdateMenuRequest { Currency = "USD" }
-        });
+                MenuId = menu.Id,
+                Request = new UpdateMenuRequest { Currency = "USD" }
+            });
 
         Assert.False(result.Succeeded);
         Assert.Equal(409, result.StatusCode);

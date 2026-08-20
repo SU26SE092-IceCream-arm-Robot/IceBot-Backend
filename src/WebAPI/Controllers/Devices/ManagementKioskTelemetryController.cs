@@ -3,6 +3,7 @@ using Application.Devices.Catalog.Queries;
 using Application.Devices.ExecutionEndpoints.Queries;
 using Application.Devices.Telemetry.Queries;
 using Application.Devices.Connectivity.Queries;
+using Application.Devices.Operations.Queries;
 using Asp.Versioning;
 using Domain.Common.Enums;
 using Domain.Devices.Catalog;
@@ -20,13 +21,25 @@ public sealed class ManagementKioskTelemetryController : ControllerBase
 {
     private readonly GetKioskHeartbeatsQueryHandler _heartbeatsHandler;
     private readonly GetKioskDeviceEventsQueryHandler _eventsHandler;
+    private readonly GetKioskOperationsWorkspaceQueryHandler _operationsWorkspaceHandler;
 
     public ManagementKioskTelemetryController(
         GetKioskHeartbeatsQueryHandler heartbeatsHandler,
-        GetKioskDeviceEventsQueryHandler eventsHandler)
+        GetKioskDeviceEventsQueryHandler eventsHandler,
+        GetKioskOperationsWorkspaceQueryHandler operationsWorkspaceHandler)
     {
         _heartbeatsHandler = heartbeatsHandler;
         _eventsHandler = eventsHandler;
+        _operationsWorkspaceHandler = operationsWorkspaceHandler;
+    }
+
+    [HttpGet("operations/workspace")]
+    public async Task<IActionResult> GetOperationsWorkspace(Guid kioskId, CancellationToken cancellationToken)
+    {
+        var result = await _operationsWorkspaceHandler.HandleAsync(
+            new GetKioskOperationsWorkspaceQuery(kioskId, User.GetUserContext()),
+            cancellationToken);
+        return StatusCode(result.StatusCode, result);
     }
 
     [HttpGet("heartbeats")]

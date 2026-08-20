@@ -3,8 +3,9 @@ namespace Application.Inventory.Results;
 public sealed class StockMovementResult
 {
     public Guid Id { get; set; }
-    public Guid IngredientDispenserStateId { get; set; }
-    public string ContainerCode { get; set; } = null!;
+    public Guid? IngredientDispenserStateId { get; set; }
+    public Guid? KioskIngredientInventoryId { get; set; }
+    public string? ContainerCode { get; set; }
     public Guid? KioskId { get; set; }
     public string? KioskName { get; set; }
     public Guid? IngredientId { get; set; }

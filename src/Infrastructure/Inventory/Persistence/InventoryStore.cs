@@ -10,6 +10,7 @@ using Domain.Tenants.Entities;
 using Npgsql;
 using Domain.ProductionExecution.Enums;
 using Domain.Identity.Entities;
+using Domain.Operations.Entities;
 
 namespace Infrastructure.Inventory.Persistence;
 
@@ -89,6 +90,83 @@ public sealed class InventoryStore : IInventoryStore
             .Include(x => x.Ingredient)
             .FirstOrDefaultAsync(x => x.Id == id && x.DeletedAt == null, cancellationToken);
     }
+
+    public Task<KioskIngredientInventory?> GetKioskIngredientInventoryAsync(Guid id, CancellationToken cancellationToken = default) =>
+        _dbContext.KioskIngredientInventories.WhereNotDeleted()
+            .Include(x => x.Kiosk).Include(x => x.Ingredient)
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
+
+    public Task<KioskIngredientInventory?> GetKioskIngredientInventoryAsync(Guid kioskId, Guid ingredientId, string unit, CancellationToken cancellationToken = default) =>
+        _dbContext.KioskIngredientInventories.WhereNotDeleted()
+            .Include(x => x.Kiosk).Include(x => x.Ingredient)
+            .FirstOrDefaultAsync(x => x.KioskId == kioskId && x.IngredientId == ingredientId &&
+                x.Unit == unit.Trim().ToLower(), cancellationToken);
+
+    public Task<List<KioskIngredientInventory>> ListKioskIngredientInventoriesAsync(Guid kioskId, CancellationToken cancellationToken = default) =>
+        _dbContext.KioskIngredientInventories.WhereNotDeleted().AsNoTracking()
+            .Include(x => x.Ingredient)
+            .Where(x => x.KioskId == kioskId)
+            .OrderBy(x => x.Ingredient.Code).ThenBy(x => x.Unit)
+            .ToListAsync(cancellationToken);
+
+    public Task<InventoryRefillTask?> GetInventoryRefillTaskAsync(Guid taskId, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryRefillTasks.WhereNotDeleted().FirstOrDefaultAsync(x => x.Id == taskId, cancellationToken);
+
+    public Task<InventoryRefillTask?> GetInventoryRefillTaskByRequestKeyAsync(Guid kioskId, string requestIdempotencyKey, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryRefillTasks.WhereNotDeleted()
+            .FirstOrDefaultAsync(x => x.KioskId == kioskId && x.RequestIdempotencyKey == requestIdempotencyKey, cancellationToken);
+
+    public Task<int> CountInventoryRefillTasksAsync(
+        Guid kioskId,
+        Domain.Inventory.Enums.InventoryRefillTaskStatus? status,
+        DateTimeOffset? requestedFrom,
+        DateTimeOffset? requestedTo,
+        CancellationToken cancellationToken = default) =>
+        ApplyInventoryRefillTaskFilters(kioskId, status, requestedFrom, requestedTo).CountAsync(cancellationToken);
+
+    public Task<List<InventoryRefillTask>> ListInventoryRefillTasksAsync(
+        Guid kioskId,
+        Domain.Inventory.Enums.InventoryRefillTaskStatus? status,
+        DateTimeOffset? requestedFrom,
+        DateTimeOffset? requestedTo,
+        int pageNumber,
+        int pageSize,
+        CancellationToken cancellationToken = default) =>
+        ApplyInventoryRefillTaskFilters(kioskId, status, requestedFrom, requestedTo)
+            .AsNoTracking()
+            .OrderByDescending(x => x.RequestedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(cancellationToken);
+
+    public Task<List<InventoryRefillTask>> ListActiveInventoryRefillTasksAsync(
+        Guid kioskId,
+        int take,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryRefillTasks.WhereNotDeleted()
+            .AsNoTracking()
+            .Where(task => task.KioskId == kioskId &&
+                (task.Status == Domain.Inventory.Enums.InventoryRefillTaskStatus.Requested ||
+                 task.Status == Domain.Inventory.Enums.InventoryRefillTaskStatus.InProgress))
+            .OrderBy(task => task.Status)
+            .ThenByDescending(task => task.RequestedAt)
+            .Take(Math.Clamp(take, 1, 100))
+            .ToListAsync(cancellationToken);
+
+    public Task<InventoryRefillTask?> GetActiveInventoryRefillTaskAsync(Guid kioskIngredientInventoryId, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryRefillTasks.WhereNotDeleted().FirstOrDefaultAsync(
+            x => x.KioskIngredientInventoryId == kioskIngredientInventoryId &&
+                (x.Status == Domain.Inventory.Enums.InventoryRefillTaskStatus.Requested || x.Status == Domain.Inventory.Enums.InventoryRefillTaskStatus.InProgress), cancellationToken);
+
+    public Task<List<IngredientDispenserState>> ListBoundDispenserStatesForMutationAsync(Guid kioskIngredientInventoryId, CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.WhereNotDeleted()
+            .Where(x => x.KioskIngredientInventoryId == kioskIngredientInventoryId && x.IsActive).ToListAsync(cancellationToken);
+
+    public Task<List<IngredientDispenserState>> ListBoundDispenserStatesAsync(Guid kioskIngredientInventoryId, CancellationToken cancellationToken = default) =>
+        _dbContext.IngredientDispenserStates.WhereNotDeleted().AsNoTracking()
+            .Include(x => x.Device).Include(x => x.Ingredient)
+            .Where(x => x.KioskIngredientInventoryId == kioskIngredientInventoryId && x.IsActive)
+            .OrderBy(x => x.ContainerCode).ToListAsync(cancellationToken);
 
     public Task<Device?> GetDeviceForTopologyAsync(Guid kioskId, Guid deviceId, CancellationToken cancellationToken = default) =>
         _dbContext.Devices.WhereNotDeleted().AsNoTracking()
@@ -189,6 +267,20 @@ public sealed class InventoryStore : IInventoryStore
             cancellationToken);
     }
 
+    public async Task AcquireKioskIngredientInventoryMutationLockAsync(Guid kioskIngredientInventoryId, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"inventory-balance:{kioskIngredientInventoryId:N}"}, 0))",
+            cancellationToken);
+    }
+
+    public async Task AcquireInventoryRefillTaskMutationLockAsync(Guid inventoryRefillTaskId, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"inventory-refill-task:{inventoryRefillTaskId:N}"}, 0))",
+            cancellationToken);
+    }
+
     public async Task AcquireDeviceTopologyMutationLocksAsync(
         IEnumerable<Guid> deviceIds,
         CancellationToken cancellationToken = default)
@@ -203,6 +295,32 @@ public sealed class InventoryStore : IInventoryStore
 
     public Task AddDispenserStateAsync(IngredientDispenserState state, CancellationToken cancellationToken = default) =>
         _dbContext.IngredientDispenserStates.AddAsync(state, cancellationToken).AsTask();
+
+    public Task AddKioskIngredientInventoryAsync(KioskIngredientInventory inventory, CancellationToken cancellationToken = default) =>
+        _dbContext.KioskIngredientInventories.AddAsync(inventory, cancellationToken).AsTask();
+
+    public Task AddInventoryRefillTaskAsync(InventoryRefillTask task, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryRefillTasks.AddAsync(task, cancellationToken).AsTask();
+
+    public Task AddInventoryRefillTaskTransitionAsync(InventoryRefillTaskTransition transition, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryRefillTaskTransitions.AddAsync(transition, cancellationToken).AsTask();
+
+    public Task<InventoryRefillTaskTransition?> GetInventoryRefillTaskTransitionByRequestKeyAsync(Guid taskId, string requestIdempotencyKey, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryRefillTaskTransitions.FirstOrDefaultAsync(
+            x => x.InventoryRefillTaskId == taskId && x.RequestIdempotencyKey == requestIdempotencyKey, cancellationToken);
+
+    public Task<Alert?> GetAlertByIdAsync(Guid alertId, CancellationToken cancellationToken = default) =>
+        _dbContext.Alerts.FirstOrDefaultAsync(alert => alert.Id == alertId && alert.DeletedAt == null, cancellationToken);
+
+    public async Task AcquireAlertMutationLockAsync(Guid alertId, CancellationToken cancellationToken = default)
+    {
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock(hashtextextended({$"inventory-alert:{alertId:N}"}, 0))",
+            cancellationToken);
+    }
+
+    public Task AddInventoryReconciliationCaseAsync(InventoryReconciliationCase reconciliationCase, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryReconciliationCases.AddAsync(reconciliationCase, cancellationToken).AsTask();
 
     public void RemoveDispenserState(IngredientDispenserState state) =>
         _dbContext.IngredientDispenserStates.Remove(state);
@@ -530,6 +648,19 @@ public sealed class InventoryStore : IInventoryStore
                 (x.KioskId.HasValue && allowedKiosks.Contains(x.KioskId.Value)));
         }
 
+        return query;
+    }
+
+    private IQueryable<InventoryRefillTask> ApplyInventoryRefillTaskFilters(
+        Guid kioskId,
+        Domain.Inventory.Enums.InventoryRefillTaskStatus? status,
+        DateTimeOffset? requestedFrom,
+        DateTimeOffset? requestedTo)
+    {
+        var query = _dbContext.InventoryRefillTasks.WhereNotDeleted().Where(x => x.KioskId == kioskId);
+        if (status.HasValue) query = query.Where(x => x.Status == status.Value);
+        if (requestedFrom.HasValue) query = query.Where(x => x.RequestedAt >= requestedFrom.Value);
+        if (requestedTo.HasValue) query = query.Where(x => x.RequestedAt < requestedTo.Value);
         return query;
     }
 

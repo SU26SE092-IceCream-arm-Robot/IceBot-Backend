@@ -45,7 +45,7 @@ public sealed class SetDeviceStatusCommandHandler
         {
             return ApiResult<DeviceResult>.Fail("Device kiosk is missing.", 400);
         }
-        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesManage, userContext, device.Kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesOperationsManage, userContext, device.Kiosk))
         {
             return ApiResult<DeviceResult>.Fail("Access denied.", 403);
         }

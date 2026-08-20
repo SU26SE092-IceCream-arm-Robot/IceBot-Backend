@@ -19,7 +19,7 @@ public sealed class CreateExecutionEndpointCommandHandler
     {
         var kiosk = await _store.GetKioskByIdAsync(command.KioskId, cancellationToken);
         if (kiosk is null) return ApiResult<ExecutionEndpointResult>.Fail("Kiosk not found.", 404);
-        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesManage, command.UserContext, kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.ExecutionEndpointsManage, command.UserContext, kiosk))
             return ApiResult<ExecutionEndpointResult>.Fail("Access denied.", 403);
 
         var code = command.Request.EndpointCode.Trim();

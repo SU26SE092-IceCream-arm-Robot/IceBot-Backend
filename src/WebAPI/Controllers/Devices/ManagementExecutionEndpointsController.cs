@@ -97,7 +97,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPost("kiosks/{kioskId:guid}/execution-endpoints")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.manage")]
     public async Task<IActionResult> Create(
         Guid kioskId, [FromBody] CreateExecutionEndpointRequest request, CancellationToken cancellationToken)
     {
@@ -109,7 +109,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPost("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/provision")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.provision")]
     public async Task<IActionResult> Provision(
         Guid kioskId, Guid endpointId, [FromBody] ProvisionExecutionEndpointRequest request, CancellationToken cancellationToken)
     {
@@ -121,7 +121,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/disable")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.operations.manage")]
     public async Task<IActionResult> Disable(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _disableHandler.HandleAsync(new DisableExecutionEndpointCommand
@@ -132,7 +132,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/reactivate")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.operations.manage")]
     public async Task<IActionResult> Reactivate(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _reactivateHandler.HandleAsync(new ReactivateExecutionEndpointCommand
@@ -143,7 +143,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/retire")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.manage")]
     public async Task<IActionResult> Retire(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _retireHandler.HandleAsync(new RetireExecutionEndpointCommand
@@ -154,7 +154,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/credential")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.credentials.manage")]
     public async Task<IActionResult> RotateCredential(
         Guid kioskId,
         Guid endpointId,
@@ -175,7 +175,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPost("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/mqtt-credential")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.credentials.manage")]
     public async Task<IActionResult> ProvisionMqttCredential(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _provisionMqttHandler.HandleAsync(new ProvisionMqttEndpointCredentialCommand
@@ -186,7 +186,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpPatch("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/mqtt-credential")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.credentials.manage")]
     public async Task<IActionResult> RotateMqttCredential(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _rotateMqttHandler.HandleAsync(new RotateMqttEndpointCredentialCommand
@@ -197,7 +197,7 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     }
 
     [HttpDelete("kiosks/{kioskId:guid}/execution-endpoints/{endpointId:guid}/mqtt-credential")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "execution-endpoints.credentials.manage")]
     public async Task<IActionResult> RevokeMqttCredential(Guid kioskId, Guid endpointId, CancellationToken cancellationToken)
     {
         var result = await _revokeMqttHandler.HandleAsync(new RevokeMqttEndpointCredentialCommand

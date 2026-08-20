@@ -147,7 +147,7 @@ public class ManagementStoresController : ControllerBase
     }
 
     [HttpPatch("organizations/{organizationId:guid}/stores/{storeId:guid}/sales-pause")]
-    [Authorize(Policy = "stores.manage")]
+    [Authorize(Policy = "stores.sales.manage")]
     public async Task<IActionResult> PauseStoreSales(
         Guid organizationId,
         Guid storeId,
@@ -166,7 +166,7 @@ public class ManagementStoresController : ControllerBase
     }
 
     [HttpPatch("organizations/{organizationId:guid}/stores/{storeId:guid}/sales-resume")]
-    [Authorize(Policy = "stores.manage")]
+    [Authorize(Policy = "stores.sales.manage")]
     public async Task<IActionResult> ResumeStoreSales(
         Guid organizationId,
         Guid storeId,

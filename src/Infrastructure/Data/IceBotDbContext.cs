@@ -60,6 +60,7 @@ public class IceBotDbContext : DbContext
         typeof(Product),
         typeof(Ingredient),
         typeof(IngredientDispenserState),
+        typeof(KioskIngredientInventory),
         typeof(Order),
         typeof(PaymentTransaction),
         typeof(ConfigurationRelease),
@@ -154,6 +155,10 @@ public class IceBotDbContext : DbContext
     public DbSet<RecipeItem> RecipeItems => Set<RecipeItem>();
     public DbSet<Ingredient> Ingredients => Set<Ingredient>();
     public DbSet<IngredientDispenserState> IngredientDispenserStates => Set<IngredientDispenserState>();
+    public DbSet<KioskIngredientInventory> KioskIngredientInventories => Set<KioskIngredientInventory>();
+    public DbSet<InventoryRefillTask> InventoryRefillTasks => Set<InventoryRefillTask>();
+    public DbSet<InventoryRefillTaskTransition> InventoryRefillTaskTransitions => Set<InventoryRefillTaskTransition>();
+    public DbSet<InventoryReconciliationCase> InventoryReconciliationCases => Set<InventoryReconciliationCase>();
     public DbSet<InventorySensorObservation> InventorySensorObservations => Set<InventorySensorObservation>();
     public DbSet<InventoryTopologyRebindRecord> InventoryTopologyRebindRecords => Set<InventoryTopologyRebindRecord>();
     public DbSet<InventoryTopologyChangeRecord> InventoryTopologyChangeRecords => Set<InventoryTopologyChangeRecord>();
@@ -175,6 +180,7 @@ public class IceBotDbContext : DbContext
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
     public DbSet<PaymentCallback> PaymentCallbacks => Set<PaymentCallback>();
+    public DbSet<PaymentProviderObservation> PaymentProviderObservations => Set<PaymentProviderObservation>();
     public DbSet<Refund> Refunds => Set<Refund>();
 
     public DbSet<RobotProgram> RobotPrograms => Set<RobotProgram>();

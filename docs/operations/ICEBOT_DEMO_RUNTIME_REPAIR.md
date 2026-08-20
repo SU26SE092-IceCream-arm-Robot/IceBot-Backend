@@ -48,3 +48,13 @@ completed; it does not execute before Kestrel startup. If the repair fails, the
 failure is logged and the API host remains available. After the production demo
 data has been verified, set this flag back to `false` in the deployment
 configuration and deploy again.
+
+## Search Keywords
+
+`ICEBOT-DEMO`, runtime menu empty, vanilla soft serve, inventory topology,
+`VANILLA-SOFT-SERVE-MIX`, demo runtime repair.
+
+## Related Docs
+
+- [Robot Lua Deployment and Activation Flow](../flows/ROBOT_LUA_DEPLOYMENT_AND_ACTIVATION_FLOW.md)
+- [MQTT Operations](MQTT_OPERATIONS.md)

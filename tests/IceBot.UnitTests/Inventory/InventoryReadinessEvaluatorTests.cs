@@ -47,6 +47,7 @@ public sealed class InventoryReadinessEvaluatorTests
         store.ListRequiredRecipeItemsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([recipeItem]);
         store.ListSupportedProductOptionsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns([]);
         store.ListStatesForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([state]);
+        store.ListKioskIngredientInventoriesAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([CreateBalance(kiosk, ingredient, 5m, InventoryTrackingMode.ManualEstimate)]);
 
         var result = await new InventoryReadinessEvaluator(store).EvaluateKioskAsync(
             kiosk.Id,
@@ -117,6 +118,8 @@ public sealed class InventoryReadinessEvaluatorTests
             .Returns([]);
         store.ListStatesForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>())
             .Returns([state]);
+        store.ListKioskIngredientInventoriesAsync(kiosk.Id, Arg.Any<CancellationToken>())
+            .Returns([CreateBalance(kiosk, ingredient, 0m, InventoryTrackingMode.ManualEstimate)]);
 
         var result = await new InventoryReadinessEvaluator(store).EvaluateKioskAsync(
             kiosk.Id,
@@ -158,6 +161,7 @@ public sealed class InventoryReadinessEvaluatorTests
             new RecipeItem { RecipeId = recipeId, IngredientId = ingredient.Id, Ingredient = ingredient, Quantity = 10, Unit = "gram" }]);
         store.ListSupportedProductOptionsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns([]);
         store.ListStatesForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([state]);
+        store.ListKioskIngredientInventoriesAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([CreateBalance(kiosk, ingredient, 100m, InventoryTrackingMode.ManualEstimate)]);
 
         var result = await new InventoryReadinessEvaluator(store).EvaluateKioskAsync(kiosk.Id,
             [new InventoryReadinessRouteInput(Guid.NewGuid(), "ROUTE-1", Guid.NewGuid(), recipeId,
@@ -189,6 +193,9 @@ public sealed class InventoryReadinessEvaluatorTests
             new RecipeItem { RecipeId = recipeId, IngredientId = ingredient.Id, Ingredient = ingredient, Quantity = 10, Unit = "gram" }]);
         store.ListSupportedProductOptionsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<IReadOnlyCollection<string>>(), Arg.Any<CancellationToken>()).Returns([]);
         store.ListStatesForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([state]);
+        var balance = CreateBalance(kiosk, ingredient, 100m, InventoryTrackingMode.SensorRequired);
+        state.KioskIngredientInventoryId = balance.Id;
+        store.ListKioskIngredientInventoriesAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns([balance]);
 
         var result = await new InventoryReadinessEvaluator(store).EvaluateKioskAsync(kiosk.Id,
             [new InventoryReadinessRouteInput(Guid.NewGuid(), "ROUTE-1", Guid.NewGuid(), recipeId,
@@ -201,5 +208,16 @@ public sealed class InventoryReadinessEvaluatorTests
 
         Assert.False(result!.IsReady);
         Assert.Equal(InventoryReadinessStatus.InventoryEvidenceStale, result.OverallStatus);
+    }
+
+    private static KioskIngredientInventory CreateBalance(Kiosk kiosk, Ingredient ingredient, decimal quantity, InventoryTrackingMode trackingMode)
+    {
+        var balance = new KioskIngredientInventory
+        {
+            Id = Guid.NewGuid(), OrganizationId = kiosk.OrganizationId, StoreId = kiosk.StoreId,
+            KioskId = kiosk.Id, IngredientId = ingredient.Id, Kiosk = kiosk, Ingredient = ingredient
+        };
+        balance.Configure("gram", quantity, null, null, trackingMode, DateTimeOffset.UtcNow);
+        return balance;
     }
 }

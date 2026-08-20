@@ -2318,8 +2318,15 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("KioskId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("KioskIngredientInventoryId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTimeOffset>("LastMeasuredAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("LastObservedEstimatedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
 
                     b.Property<DateTimeOffset?>("LastRefilledAt")
                         .HasColumnType("timestamp with time zone");
@@ -2340,6 +2347,15 @@ namespace Infrastructure.Migrations
                     b.Property<string>("SensorPayloadJson")
                         .HasMaxLength(500)
                         .HasColumnType("jsonb");
+
+                    b.Property<Guid?>("SensorRebaselineRefillTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SensorRebaselineRequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("SensorRebaselineRequired")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTimeOffset?>("SyncedAt")
                         .HasColumnType("timestamp with time zone");
@@ -2369,6 +2385,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("KioskId");
 
+                    b.HasIndex("KioskIngredientInventoryId");
+
                     b.HasIndex("DeviceId", "ContainerCode")
                         .IsUnique()
                         .HasFilter("\"IsActive\" = TRUE AND \"DeletedAt\" IS NULL");
@@ -2376,6 +2394,331 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.ToTable("IngredientDispenserStates", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryReconciliationCase", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("AppliedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("ExpectedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("KioskIngredientInventoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReasonCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ResolutionNote")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("ResolvedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SourceEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("KioskIngredientInventoryId");
+
+                    b.HasIndex("OriginNodeId", "Version");
+
+                    b.HasIndex("SourceEventId", "IngredientId", "Unit", "ReasonCode")
+                        .IsUnique();
+
+                    b.ToTable("InventoryReconciliationCases", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryRefillTask", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ActualQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("CancellationReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CancelledByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CompletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ExternalLotReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid?>("IngredientDispenserStateId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskIngredientInventoryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RequestIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("RequestSource")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RequestedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("RequestedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid?>("SourceAlertId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("StartedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CancelledByAccountId");
+
+                    b.HasIndex("CompletedByAccountId");
+
+                    b.HasIndex("IngredientDispenserStateId");
+
+                    b.HasIndex("KioskIngredientInventoryId")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL AND \"Status\" IN (1, 2)");
+
+                    b.HasIndex("RequestedByAccountId");
+
+                    b.HasIndex("SourceAlertId");
+
+                    b.HasIndex("StartedByAccountId");
+
+                    b.HasIndex("KioskId", "RequestIdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL");
+
+                    b.HasIndex("OriginNodeId", "Version");
+
+                    b.HasIndex("KioskId", "Status", "RequestedAt");
+
+                    b.ToTable("InventoryRefillTasks", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryRefillTaskTransition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorKioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ActorOrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActorRoleCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<Guid?>("ActorStoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("ActualQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("FromStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("InventoryRefillTaskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RequestIdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorAccountId");
+
+                    b.HasIndex("InventoryRefillTaskId", "RequestIdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("OriginNodeId", "Version");
+
+                    b.ToTable("InventoryRefillTaskTransitions", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Inventory.Entities.InventorySensorObservation", b =>
@@ -2621,6 +2964,94 @@ namespace Infrastructure.Migrations
                     b.ToTable("InventoryTopologyRebindRecords", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Inventory.Entities.KioskIngredientInventory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("EstimatedQuantity")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("IngredientId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("LastMeasuredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("LastSensorReconciledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("LowStockThreshold")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("OriginNodeId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("SyncedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("TrackingMode")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Version")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngredientId");
+
+                    b.HasIndex("OriginNodeId", "Version");
+
+                    b.HasIndex("KioskId", "IngredientId", "Unit")
+                        .IsUnique();
+
+                    b.ToTable("KioskIngredientInventories", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Inventory.Entities.StockMovement", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2649,7 +3080,7 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("DeviceId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("IngredientDispenserStateId")
+                    b.Property<Guid?>("IngredientDispenserStateId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid?>("IngredientId")
@@ -2659,6 +3090,9 @@ namespace Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<Guid?>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("KioskIngredientInventoryId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("MovementType")
@@ -2728,6 +3162,8 @@ namespace Infrastructure.Migrations
                     b.HasIndex("IngredientId");
 
                     b.HasIndex("KioskId");
+
+                    b.HasIndex("KioskIngredientInventoryId");
 
                     b.HasIndex("OrganizationId");
 
@@ -2845,6 +3281,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("OriginNodeId", "Version");
 
                     b.HasIndex("KioskId", "Status", "RaisedAt");
+
+                    b.HasIndex("KioskId", "SourceType", "SourceId", "CorrelationKey")
+                        .IsUnique()
+                        .HasFilter("\"DeletedAt\" IS NULL AND \"Status\" IN (1, 2)");
 
                     b.HasIndex("KioskId", "DeviceId", "CorrelationKey", "Status", "LastOccurredAt");
 
@@ -4009,6 +4449,84 @@ namespace Infrastructure.Migrations
                     b.ToTable("PaymentMethods", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Payments.Entities.PaymentProviderObservation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CloudReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("FailureMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<decimal?>("ObservedAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<DateTimeOffset>("ObservedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal?>("ObservedPaidAmount")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<string>("ObservedStatus")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("PaymentTransactionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ProviderOrderCode")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ProviderTransactionId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PaymentTransactionId", "CloudReceivedAt");
+
+                    b.HasIndex("Provider", "ProviderOrderCode", "CloudReceivedAt");
+
+                    b.ToTable("PaymentProviderObservations", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Payments.Entities.PaymentTransaction", b =>
                 {
                     b.Property<Guid>("Id")
@@ -4194,6 +4712,11 @@ namespace Infrastructure.Migrations
                     b.Property<decimal>("Amount")
                         .HasPrecision(18, 4)
                         .HasColumnType("numeric(18,4)");
+
+                    b.Property<int>("CompensationMethod")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1);
 
                     b.Property<Guid?>("CorrelationId")
                         .HasColumnType("uuid");
@@ -9163,11 +9686,79 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("KioskId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Domain.Inventory.Entities.KioskIngredientInventory", "KioskIngredientInventory")
+                        .WithMany()
+                        .HasForeignKey("KioskIngredientInventoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.Navigation("Device");
 
                     b.Navigation("Ingredient");
 
                     b.Navigation("Kiosk");
+
+                    b.Navigation("KioskIngredientInventory");
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryReconciliationCase", b =>
+                {
+                    b.HasOne("Domain.Inventory.Entities.KioskIngredientInventory", null)
+                        .WithMany()
+                        .HasForeignKey("KioskIngredientInventoryId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryRefillTask", b =>
+                {
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("CancelledByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("CompletedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", null)
+                        .WithMany()
+                        .HasForeignKey("IngredientDispenserStateId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Inventory.Entities.KioskIngredientInventory", null)
+                        .WithMany()
+                        .HasForeignKey("KioskIngredientInventoryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("RequestedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Operations.Entities.Alert", null)
+                        .WithMany()
+                        .HasForeignKey("SourceAlertId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("StartedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Domain.Inventory.Entities.InventoryRefillTaskTransition", b =>
+                {
+                    b.HasOne("Domain.Identity.Entities.Account", null)
+                        .WithMany()
+                        .HasForeignKey("ActorAccountId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Inventory.Entities.InventoryRefillTask", null)
+                        .WithMany()
+                        .HasForeignKey("InventoryRefillTaskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Inventory.Entities.InventorySensorObservation", b =>
@@ -9200,6 +9791,25 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Domain.Inventory.Entities.KioskIngredientInventory", b =>
+                {
+                    b.HasOne("Domain.Catalog.Entities.Ingredient", "Ingredient")
+                        .WithMany()
+                        .HasForeignKey("IngredientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Ingredient");
+
+                    b.Navigation("Kiosk");
+                });
+
             modelBuilder.Entity("Domain.Inventory.Entities.StockMovement", b =>
                 {
                     b.HasOne("Domain.Identity.Entities.Account", "CreatedByAccount")
@@ -9215,8 +9825,7 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Inventory.Entities.IngredientDispenserState", "IngredientDispenserState")
                         .WithMany()
                         .HasForeignKey("IngredientDispenserStateId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Domain.Catalog.Entities.Ingredient", "Ingredient")
                         .WithMany()
@@ -9226,6 +9835,11 @@ namespace Infrastructure.Migrations
                     b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
                         .WithMany()
                         .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Inventory.Entities.KioskIngredientInventory", "KioskIngredientInventory")
+                        .WithMany()
+                        .HasForeignKey("KioskIngredientInventoryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
@@ -9247,6 +9861,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("IngredientDispenserState");
 
                     b.Navigation("Kiosk");
+
+                    b.Navigation("KioskIngredientInventory");
 
                     b.Navigation("Organization");
 
@@ -9554,6 +10170,17 @@ namespace Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Domain.Payments.Entities.PaymentCallback", b =>
+                {
+                    b.HasOne("Domain.Payments.Entities.PaymentTransaction", "PaymentTransaction")
+                        .WithMany()
+                        .HasForeignKey("PaymentTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("PaymentTransaction");
+                });
+
+            modelBuilder.Entity("Domain.Payments.Entities.PaymentProviderObservation", b =>
                 {
                     b.HasOne("Domain.Payments.Entities.PaymentTransaction", "PaymentTransaction")
                         .WithMany()

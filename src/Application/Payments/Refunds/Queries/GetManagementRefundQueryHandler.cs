@@ -26,7 +26,7 @@ public sealed class GetManagementRefundQueryHandler
         }
 
         var order = refund.PaymentTransaction.Order;
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsView,
             query.UserContext,
             order.OrganizationId,
             order.StoreId,

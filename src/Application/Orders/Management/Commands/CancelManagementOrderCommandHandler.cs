@@ -27,7 +27,7 @@ public sealed class CancelManagementOrderCommandHandler
     {
         OrderStatus fromStatus = OrderStatus.Draft;
         OrderStatusChangedEvent? statusChangedEvent = null;
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, command.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersInterventionManage, command.UserContext);
 
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {

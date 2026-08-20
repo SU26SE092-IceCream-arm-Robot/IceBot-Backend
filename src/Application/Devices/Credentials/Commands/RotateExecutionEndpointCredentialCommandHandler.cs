@@ -41,7 +41,7 @@ public sealed class RotateExecutionEndpointCredentialCommandHandler
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Execution endpoint not found.", 404);
         }
 
-        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.DevicesManage, command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
+        if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.ExecutionEndpointsCredentialsManage, command.UserContext, endpoint.Kiosk.OrganizationId, endpoint.Kiosk.StoreId, endpoint.KioskId))
         {
             return ApiResult<ExecutionEndpointCredentialRotationResult>.Fail("Access denied.", 403);
         }

@@ -25,7 +25,7 @@ public sealed class RequestOrderItemProductionRemakeCommandHandler
     {
         if (command.UserContext.AccountId == Guid.Empty)
             return ApiResult<OrderExecutionDispatchResult>.Fail("Authenticated operator is required.", 401);
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, command.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersInterventionManage, command.UserContext);
         var order = await _orderStore.GetManagementOrderByIdAsync(
             command.OrderId,
             command.UserContext.IsSystemAdmin,

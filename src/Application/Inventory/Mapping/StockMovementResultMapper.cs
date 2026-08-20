@@ -11,7 +11,8 @@ internal static class StockMovementResultMapper
         {
             Id = m.Id,
             IngredientDispenserStateId = m.IngredientDispenserStateId,
-            ContainerCode = m.IngredientDispenserState.ContainerCode,
+            KioskIngredientInventoryId = m.KioskIngredientInventoryId,
+            ContainerCode = m.IngredientDispenserState?.ContainerCode,
             KioskId = m.KioskId,
             KioskName = m.Kiosk?.Name,
             IngredientId = m.IngredientId,

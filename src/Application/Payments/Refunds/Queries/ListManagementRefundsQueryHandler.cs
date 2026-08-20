@@ -21,7 +21,7 @@ public sealed class ListManagementRefundsQueryHandler
     {
         var pageNumber = Math.Max(query.PageNumber, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.RefundsManage, query.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.RefundsView, query.UserContext);
 
         var totalCount = await _paymentStore.CountRefundsAsync(
             query.Search,

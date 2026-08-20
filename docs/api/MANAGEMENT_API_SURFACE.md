@@ -124,7 +124,6 @@ POST /api/v1/management/organizations/{organizationId}/workforce/staff/{accountI
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 ```
-
 Staff workforce mutation rules:
 
 - Create requires the `Idempotency-Key` request header. The key is unique inside
@@ -244,17 +243,26 @@ PATCH /api/v1/management/refunds/{refundId}/reject
 PATCH /api/v1/management/refunds/{refundId}/cancel
 GET /api/v1/management/inventory/dispenser-states
 GET /api/v1/management/inventory/stock-movements
+GET /api/v1/management/kiosks/{kioskId}/inventory/workspace
+POST /api/v1/management/kiosks/{kioskId}/inventory/balances
+PUT /api/v1/management/kiosks/{kioskId}/inventory/balances/{id}
+GET /api/v1/management/kiosks/{kioskId}/inventory/refill-tasks?status=&requestedFrom=&requestedTo=&pageNumber=&pageSize=
+GET /api/v1/management/kiosks/{kioskId}/inventory/refill-tasks/{taskId}
+POST /api/v1/management/kiosks/{kioskId}/inventory/balances/{id}/refill-tasks
+POST /api/v1/management/kiosks/{kioskId}/inventory/refill-tasks/{taskId}/start
+POST /api/v1/management/kiosks/{kioskId}/inventory/refill-tasks/{taskId}/complete
+POST /api/v1/management/kiosks/{kioskId}/inventory/refill-tasks/{taskId}/cancel
+POST /api/v1/management/kiosks/{kioskId}/inventory/balances/{id}/adjust-estimate
 POST /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states
 PUT /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states/{dispenserStateId}
 PATCH /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states/{dispenserStateId}/status
 DELETE /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states/{dispenserStateId}
-POST /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states/{id}/refill
-POST /api/v1/management/kiosks/{kioskId}/inventory/dispenser-states/{id}/adjust-estimate
 GET /api/v1/management/kiosks/{kioskId}/heartbeats
 GET /api/v1/management/kiosks/{kioskId}/operation-logs
 GET /api/v1/management/kiosks/{kioskId}/operation-logs/{operationLogId}
 GET /api/v1/management/kiosks/{kioskId}/operation-logs/{operationLogId}/diagnostics
 GET /api/v1/management/kiosks/{kioskId}/device-events
+GET /api/v1/management/kiosks/{kioskId}/operations/workspace
 GET /api/v1/management/alerts
 GET /api/v1/management/alerts/{alertId}
 PATCH /api/v1/management/alerts/{alertId}/acknowledge
@@ -270,20 +278,16 @@ PATCH /api/v1/management/maintenance-tickets/{ticketId}/resolve
 PATCH /api/v1/management/maintenance-tickets/{ticketId}/close
 PATCH /api/v1/management/maintenance-tickets/{ticketId}/cancel
 ```
-
 ## Route Boundary Summaries
-
 These summaries describe client-visible scope, authorization, and request/response behavior. Detailed lifecycle and domain invariants remain owned by the linked flow and architecture documents.
 
 ### Maintenance Assignment
-
 Maintenance assignment accepts only an active `Technician`, `Manager`, or
 `OrgAdmin` whose single role-scope assignment matches the ticket kiosk, store,
 or organization. Cross-tenant role and scope composition is rejected. Push-token
 registration is not an assignment prerequisite.
 
 ### Device Catalog And Lifecycle
-
 - Device and execution-endpoint item operations are kiosk-owned routes: `/api/v1/management/kiosks/{kioskId}/devices/{deviceId}/...` and `/api/v1/management/kiosks/{kioskId}/execution-endpoints/{endpointId}/...`. Handlers must reject mismatched route kiosk and item ownership with `404`.
 - `DELETE /api/v1/management/kiosks/{kioskId}/devices/{deviceId}` is a soft retire operation. It sets `DeviceStatus.Retired` and soft-deletes the row; it does not physically delete the device record.
 - Device retirement is atomic with Inventory topology retirement and is blocked while the kiosk has an Accepted or Running execution. Active dispenser states are retired with the supplied `reason` query value or the system reason `DEVICE_RETIRED`; estimates remain historical and are not silently discarded.
@@ -301,7 +305,6 @@ registration is not an assignment prerequisite.
 - A capability required by active dispenser topology cannot be removed from its DeviceModel. A DeviceModel cannot be retired while assigned to a non-retired Device.
 
 ### Cross-Cutting Management Rules
-
 - Use `/management/...`, not `/admin/...`.
 - Access is controlled by authorization policies, not the route prefix.
 - Tenant authorization must match role and resource scope on the same `UserRoleScope`; combining a privileged role from one scope with an unrelated scope from another assignment is forbidden.
@@ -328,14 +331,14 @@ registration is not an assignment prerequisite.
 - Execution-attempt reads use durable `ExecuteOrder` commands as the list authority, so pending or rejected attempts remain visible before an execution projection exists. Detail combines the optional order-summary projection with job/unit `ProductionExecutionRecord` rows, completed/failed/in-progress/unreported unit counts, ordered delivery-attempt history, timeout provenance, redispatch actor/reason, and previous/next dispatch references. It excludes command payload JSON, raw sync events, and stock payloads. Both routes use `orders.view` and enforce scope through the owning Order.
 - The per-order execution-attempt list is paging-only and has no status, endpoint, or time filters. Dispatch attempts are bounded by `OrderExecutionDispatch__MaxDispatchAttempts` (default `3`).
 - Accepted commands create a provisional order-execution projection with sequence `0`. Management reads may show it before the first Edge order-summary report. Timeout reconciliation changes only observation/customer projection to `Stale/Delayed`, `Unreachable/PendingRecovery`, or prolonged `Unreachable/SupportRequired`; it must not infer `OrderStatus.Failed` from silence. Customer order/payment polling reads the latest dispatch attempt projection.
-- `POST /management/orders/{orderId}/execution-attempts` is the explicit operator redispatch command. Backend allocates `latest DispatchAttemptNo + 1` under the order advisory lock; clients do not choose attempt numbers. It requires `orders.manage`, an authenticated account, and a reason of at most 500 characters.
+- `POST /management/orders/{orderId}/execution-attempts` is the explicit operator redispatch command. Backend allocates `latest DispatchAttemptNo + 1` under the order advisory lock; clients do not choose attempt numbers. It requires `orders.intervention.manage`, an authenticated account, and a reason of at most 500 characters.
 - GraphQL `orderExecutionAttempts` exposes the normal operational summary. Full command provenance, delivery attempts, executor sequence data, and production evidence are restricted to `GET /management/orders/{orderId}/execution-attempts/{sourceCommandId}/diagnostics` with `operations.diagnostics`; the attempt must belong to the route order.
 - `POST /management/orders/{orderId}/items/{orderItemId}/production-remakes` creates an idempotent remake command for an exact failed unit range. `remakeRequestId` is client-generated. The normal endpoint permits it only for a paid `FulfillmentIssue`, complete terminal source evidence, and units whose latest outcome is `Failed` with `physicalOutputMayHaveOccurred=false`. It never replays the whole order.
 - Failed or manual-intervention production job evidence creates one Orders-owned production incident in the same ingestion transaction. Unknown or possible physical output remains `AwaitingInspection`; confirmed no-output evidence records `NotProduced` without claiming that output exists.
 - `GET /management/production-incidents` is the tenant-scoped operations work queue. Incident detail and mutations are order-owned routes. Manual defect reporting must reference an existing execution job and exact production-unit range; it cannot invent production provenance.
 - Inspection is required before selecting a resolution. Supported V1 resolutions are deliver existing output, discard, exact-unit remake, full-order refund, full-order voucher, technical review, or no action. A defective-output remake is allowed only through the matching incident whose inspection is `Defective` and whose selected resolution is `RequestRemake`; this exception does not weaken the normal remake endpoint.
 - Resolution selection is idempotent by `resolutionRequestId` plus a stored fingerprint of the normalized resolution payload. Reusing an id with changed resolution, payment target, voucher data, reason, or acknowledgement returns `409`. Remake stores the resulting Edge command id; refund/voucher stores the Payments-owned refund id. Completing an incident is an explicit staff audit action and does not rewrite immutable execution or stock-consumption evidence.
-- Refund/voucher incident resolution requires explicit `acknowledgeFullOrderCompensation=true` because V1 has no partial-refund contract. It additionally requires the existing `refunds.manage` scope enforced by the Payments handler. Production incidents never trigger automatic refunds.
+- Refund/voucher incident resolution requires explicit `acknowledgeFullOrderCompensation=true` because V1 has no partial-refund contract. It additionally requires `refunds.request` for the request; later processing remains restricted to `refunds.process`. Production incidents never trigger automatic refunds.
 - Redispatch is allowed only when the latest execute-order command is `DeliveryFailed`, or `Rejected` while the Order is `ExecutionRejected` (rejection before physical output). `RefundRequired`, `Failed`, active attempts, and possible physical-output cases are not redispatched automatically.
 - `OrderExecutionDispatch__MaxDispatchAttempts` limits attempts. The new command stores `CreatedByAccountId`; `OrderStatusHistory` stores actor, attempt number, and reason. Repeating the request by the same operator while that new attempt is active returns the existing attempt rather than allocating another.
 - Refund APIs in v1 track manual staff-handled compensation only. Supported methods are `FullMoneyRefund` and `Voucher`. Normal refund-required orders use full-order compensation; duplicate-payment intervention refunds the selected duplicate occurrence while preserving the primary settlement.
@@ -345,7 +348,7 @@ registration is not an assignment prerequisite.
 - Payment-session creation selects `paymentMethodCode` and submits the amount/currency currently displayed by the client. Backend remains authoritative from the stored Order and returns `409` without creating a provider session when the values differ.
 - `POST /api/v1/management/orders/{orderId}/cash-payments/{paymentTransactionId}/confirm` is the Staff/Manager/OrgAdmin action after physical cash receipt. It requires `cash-payments.confirm`, rechecks organization/store/kiosk scope through the Order, records the confirming account and optional note in the payment/order audit evidence, and applies the same post-commit dispatch rule as a provider-confirmed payment. Retrying a confirmed payment is idempotent; a second settlement is rejected for review.
 - Full-money refund completion requires staff to explicitly submit `moneyWasRefunded`; omission must not be interpreted as a successful money reversal.
-- `GET /api/v1/management/orders/{orderId}/payment-diagnostics` is an order-owned diagnostics read protected by `operations.diagnostics`. It exposes provider identity, reconciliation attempts, bounded failure details, and stored provider request/response evidence; normal tablet and order-management responses do not expose those fields.
+- `GET /api/v1/management/orders/{orderId}/payment-diagnostics` is an order-owned diagnostics read protected by `payments.diagnostics.view`. It is available only to the matching tenant OrgAdmin or Manager and exposes provider identity, reconciliation attempts, and bounded failure details. Stored provider request/response payloads remain internal evidence and are never returned by the management API.
 - Payment-session creation persists a deterministic provider order code before the provider `POST`. Recovery queries that identity instead of repeating the create request. A provider lookup may restore checkout instructions, but only a verified provider webhook may commit `Paid` and trigger fulfillment.
 - Provider webhook idempotency is exact: reusing `ProviderEventId` requires the same provider payment identity and raw verified payload. A different identity or payload returns `409`. Verified callbacks rejected by business validation are retained as ignored evidence and do not mutate payment or Order state.
 - A callback must pass provider signature verification before Cloud accesses payment/order data. A verified callback with no matching `(Provider, ProviderOrderCode)` transaction is acknowledged with `2xx`, creates no `PaymentCallback` or financial/fulfillment state, and is visible only through safe operational logging and a bounded metric.
@@ -393,7 +396,7 @@ registration is not an assignment prerequisite.
 ### Inventory
 
 - Inventory owns Cloud dispenser topology in V1. Create binds an immutable `Kiosk + Device + Ingredient + ContainerCode` identity; update changes only capacity, unit, and the typed level-to-quantity profile. Unit cannot change after an estimate or stock history exists. Ingredient/device rebinding requires retiring the old state and creating a new one.
-- Dispenser topology is authored directly through Inventory management APIs, not materialized by Configuration Release. `inventory.configure` excludes Staff and owns create/update/status/delete; `inventory.manage` continues to own refill and estimate adjustment.
+- Dispenser topology and balance metadata are authored directly through Inventory management APIs, not materialized by Configuration Release. `inventory.configure` owns balance/topology create, update, status, and delete; `inventory.refill.manage` owns the audited refill workflow; `inventory.adjust.manage` owns exceptional estimate corrections.
 - `GET /api/v1/management/kiosks/{kioskId}/inventory/topology` returns the kiosk Device -> containers -> Ingredient configuration, including devices with no configured containers. `CanHostDispenser` distinguishes valid unconfigured dispenser hardware from unrelated devices.
 - The topology read model retains referenced retired devices and reports `DeviceInactive`, `DeviceUnavailable`, `ContainerInactive`, and `IngredientInactive` warnings instead of silently hiding stale topology references.
 - Creating, updating, reactivating, or rebinding a dispenser requires a DeviceModel with `IngredientDispenser`. Devices without a model or with unrelated capabilities cannot own dispenser topology. Categorical level mapping does not require a sensor capability.

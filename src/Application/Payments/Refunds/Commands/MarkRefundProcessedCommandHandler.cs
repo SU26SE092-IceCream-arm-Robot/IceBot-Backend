@@ -69,7 +69,7 @@ public sealed class MarkRefundProcessedCommandHandler
             orderNumber = order.OrderNumber;
             provider = transaction.Provider;
 
-            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsManage,
+            if (!ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.RefundsProcess,
                 command.UserContext,
                 order.OrganizationId,
                 order.StoreId,
@@ -80,9 +80,7 @@ public sealed class MarkRefundProcessedCommandHandler
 
             var now = DateTimeOffset.UtcNow;
 
-            // Parse refund method from serialized metadata in Reason
-            var parsed = Mapping.RefundResultMapper.ParseReason(refund.Reason);
-            var method = parsed.Method;
+            var method = refund.CompensationMethod;
 
             if (refund.Status == RefundStatus.Processed)
             {
@@ -91,7 +89,7 @@ public sealed class MarkRefundProcessedCommandHandler
                     "Refund was already marked as processed.");
             }
 
-            if (!string.Equals(method, "Voucher", StringComparison.OrdinalIgnoreCase) &&
+            if (method != RefundCompensationMethod.Voucher &&
                 command.MoneyWasRefunded is not true)
             {
                 return ApiResult<RefundResult>.Fail(
@@ -104,7 +102,7 @@ public sealed class MarkRefundProcessedCommandHandler
             var previousStatus = order.Status;
             var isDuplicatePayment = transaction.SettlementDisposition ==
                 PaymentSettlementDisposition.DuplicateRefundRequired;
-            var moneyWasRefunded = !string.Equals(method, "Voucher", StringComparison.OrdinalIgnoreCase);
+            var moneyWasRefunded = method == RefundCompensationMethod.FullMoneyRefund;
 
             if (isDuplicatePayment)
             {

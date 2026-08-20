@@ -11,7 +11,6 @@ namespace WebAPI.Controllers.Payments;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/management")]
-[Authorize(Policy = "refunds.manage")]
 public sealed class ManagementRefundsController : ControllerBase
 {
     private readonly ListManagementRefundsQueryHandler _listHandler;
@@ -38,6 +37,7 @@ public sealed class ManagementRefundsController : ControllerBase
     }
 
     [HttpGet("refunds")]
+    [Authorize(Policy = "refunds.view")]
     public async Task<IActionResult> ListRefunds(
         [FromQuery] string? search,
         [FromQuery] Domain.Payments.Enums.RefundStatus? status,
@@ -65,6 +65,7 @@ public sealed class ManagementRefundsController : ControllerBase
     }
 
     [HttpGet("refunds/{refundId:guid}")]
+    [Authorize(Policy = "refunds.view")]
     public async Task<IActionResult> GetRefund(Guid refundId, CancellationToken cancellationToken)
     {
         var query = new GetManagementRefundQuery
@@ -86,6 +87,7 @@ public sealed class ManagementRefundsController : ControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The created refund details.</returns>
     [HttpPost("orders/{orderId:guid}/refunds")]
+    [Authorize(Policy = "refunds.request")]
     public async Task<IActionResult> RequestRefund(
         Guid orderId,
         [FromBody] RequestRefundRequest request,
@@ -120,6 +122,7 @@ public sealed class ManagementRefundsController : ControllerBase
     }
 
     [HttpPatch("refunds/{refundId:guid}/mark-processed")]
+    [Authorize(Policy = "refunds.process")]
     public async Task<IActionResult> MarkProcessed(
         Guid refundId,
         [FromBody] MarkRefundProcessedRequest? request,
@@ -138,6 +141,7 @@ public sealed class ManagementRefundsController : ControllerBase
     }
 
     [HttpPatch("refunds/{refundId:guid}/reject")]
+    [Authorize(Policy = "refunds.process")]
     public async Task<IActionResult> RejectRefund(
         Guid refundId,
         [FromBody] RefundReasonRequest request,
@@ -160,6 +164,7 @@ public sealed class ManagementRefundsController : ControllerBase
     }
 
     [HttpPatch("refunds/{refundId:guid}/cancel")]
+    [Authorize(Policy = "refunds.process")]
     public async Task<IActionResult> CancelRefund(
         Guid refundId,
         [FromBody] RefundReasonRequest? request,

@@ -323,10 +323,14 @@ public sealed class RobotAuthoringBundleCodecTests
         {
             Write(archive, "export-manifest.json", JsonSerializer.Serialize(new
             {
-                schemaVersion = 1, exportId = Guid.NewGuid(), exportedAt = DateTimeOffset.UtcNow,
+                schemaVersion = 1,
+                exportId = Guid.NewGuid(),
+                exportedAt = DateTimeOffset.UtcNow,
                 program = new
                 {
-                    code = "MAKE_ICE_CREAM", name = "Make ice cream", runtimeTargetCode = "FAIRINO_LUA_V1",
+                    code = "MAKE_ICE_CREAM",
+                    name = "Make ice cream",
+                    runtimeTargetCode = "FAIRINO_LUA_V1",
                     machineModelCode = "FR5",
                     artifacts = new[] { new { artifactCode = "DISPENSE", fileName = "dispense.lua", sidecarFileName = "dispense.icebot.json", runOrder = 1 } }
                 }
@@ -343,8 +347,11 @@ public sealed class RobotAuthoringBundleCodecTests
             };
             Write(archive, "contracts/dispense.icebot.json", JsonSerializer.Serialize(new
             {
-                schemaVersion, artifactCode = "DISPENSE", artifactFileName = "dispense.lua",
-                runtimeTargetCode = "FAIRINO_LUA_V1", machineModelCode = "FR5",
+                schemaVersion,
+                artifactCode = "DISPENSE",
+                artifactFileName = "dispense.lua",
+                runtimeTargetCode = "FAIRINO_LUA_V1",
+                machineModelCode = "FR5",
                 effects,
                 orderingConstraints
             }));
@@ -359,11 +366,16 @@ public sealed class RobotAuthoringBundleCodecTests
         {
             Write(archive, "export-manifest.json", JsonSerializer.Serialize(new
             {
-                schemaVersion = 1, exportId = Guid.NewGuid(), exportedAt = DateTimeOffset.UtcNow,
+                schemaVersion = 1,
+                exportId = Guid.NewGuid(),
+                exportedAt = DateTimeOffset.UtcNow,
                 program = new
                 {
-                    code = "MAKE_ICE_CREAM", name = "Make ice cream", runtimeTargetCode = "FAIRINO_LUA_V1",
-                    machineModelCode = "FR5", artifacts = (object?)null
+                    code = "MAKE_ICE_CREAM",
+                    name = "Make ice cream",
+                    runtimeTargetCode = "FAIRINO_LUA_V1",
+                    machineModelCode = "FR5",
+                    artifacts = (object?)null
                 }
             }));
         }

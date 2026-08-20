@@ -47,7 +47,7 @@ public sealed class SetKioskOperationalStateCommandHandler
                 }
 
                 if (!KioskAccessRules.CanAccessKiosk(
-                        ScopeRoleSets.KiosksManage,
+                        ScopeRoleSets.KiosksOperationsManage,
                         command.UserContext,
                         kiosk))
                 {

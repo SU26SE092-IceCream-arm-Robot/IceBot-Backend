@@ -33,7 +33,7 @@ public sealed class MarkOrderRefundRequiredCommandHandler
 
         OrderStatus fromStatus = OrderStatus.Draft;
         OrderStatusChangedEvent? statusChangedEvent = null;
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, command.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersRefundFlag, command.UserContext);
 
         var result = await _orderStore.ExecuteInTransactionAsync(async ct =>
         {

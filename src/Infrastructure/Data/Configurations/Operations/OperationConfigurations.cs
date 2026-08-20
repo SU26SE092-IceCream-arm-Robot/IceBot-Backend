@@ -29,6 +29,8 @@ internal sealed class AlertConfiguration : IEntityTypeConfiguration<Alert>
         entity.ToTable("Alerts");
         entity.HasIndex(x => new { x.KioskId, x.Status, x.RaisedAt });
         entity.HasIndex(x => new { x.KioskId, x.DeviceId, x.CorrelationKey, x.Status, x.LastOccurredAt });
+        entity.HasIndex(x => new { x.KioskId, x.SourceType, x.SourceId, x.CorrelationKey }).IsUnique()
+            .HasFilter("\"DeletedAt\" IS NULL AND \"Status\" IN (1, 2)");
         entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Device).WithMany()
             .HasForeignKey(x => new { x.DeviceId, x.KioskId })

@@ -111,6 +111,30 @@ public sealed class IceBotDemoRuntimeRepair(IceBotDbContext dbContext)
             }
         }
 
+        // The balance remains valid even when the physical hopper is absent or
+        // disconnected. The hopper below is optional topology/evidence only.
+        var balance = await dbContext.KioskIngredientInventories
+            .SingleOrDefaultAsync(item => item.KioskId == kiosk.Id && item.IngredientId == ingredient.Id && item.Unit == "gram", cancellationToken);
+        if (balance is null)
+        {
+            balance = new KioskIngredientInventory
+            {
+                Id = Guid.NewGuid(), OrganizationId = kiosk.OrganizationId, StoreId = kiosk.StoreId,
+                KioskId = kiosk.Id, IngredientId = ingredient.Id, OriginNodeId = Guid.Empty,
+                Version = 1, CreatedAt = now
+            };
+            balance.Configure("gram", InitialQuantity, null, null, InventoryTrackingMode.ManualEstimate, now);
+            dbContext.KioskIngredientInventories.Add(balance);
+            dbContext.StockMovements.Add(StockMovement.CreateForKioskInventory(
+                balance.Id, balance.OrganizationId, balance.StoreId, balance.KioskId, balance.IngredientId,
+                "InitialBalance", InitialQuantity, 0m, InitialQuantity, balance.Unit, now,
+                "DEMO_RUNTIME_REPAIR", "KioskIngredientInventory", balance.Id, isEstimated: true));
+        }
+        else
+        {
+            balance.Configure("gram", InitialQuantity, null, null, InventoryTrackingMode.ManualEstimate, now);
+        }
+
         var device = await dbContext.Devices
             .Include(item => item.IngredientDispenserStates)
             .SingleOrDefaultAsync(item => item.KioskId == kiosk.Id && item.Code == DeviceCode, cancellationToken);
@@ -155,6 +179,8 @@ public sealed class IceBotDemoRuntimeRepair(IceBotDbContext dbContext)
                     state.LastMeasuredAt = now;
                 }
             }
+
+            state.KioskIngredientInventoryId = balance.Id;
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);

@@ -38,7 +38,7 @@ public sealed class RecordManualOrderItemFulfillmentEventCommandHandler(
         OrderStatus? previousOrderStatus = null;
         Order? changedOrder = null;
         OrderItemFulfillmentChangedEvent? itemChangedEvent = null;
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, command.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersFulfillmentManage, command.UserContext);
         var result = await orders.ExecuteInTransactionAsync(async ct =>
         {
             await orders.AcquireOrderWorkflowLockAsync(command.OrderId, ct);

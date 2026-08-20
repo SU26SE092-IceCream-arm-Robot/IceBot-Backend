@@ -5,6 +5,7 @@ using Domain.Orders.Entities;
 using Domain.ProductionExecution.Projections;
 using Domain.Sync.Entities;
 using Domain.Sync.Enums;
+using Domain.Common.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Application.Orders.Support;
@@ -79,6 +80,13 @@ public sealed class EdgeCommandStore : IEdgeCommandStore
             .Where(command =>
                 command.KioskId == kioskId &&
                 command.TargetExecutionEndpointId == endpointId &&
+                // A command that was already delivered remains available for
+                // acknowledgement/outcome reporting. Only new delivery is
+                // suppressed when its tenant is no longer operational.
+                (command.Status != EdgeCommandStatus.PendingDelivery ||
+                    _dbContext.Kiosks.Any(kiosk =>
+                        kiosk.Id == kioskId &&
+                        kiosk.Organization.Status == EntityStatus.Active)) &&
                 (command.CommandType != EdgeCommandType.ExecuteOrder ||
                     _dbContext.Kiosks.Any(kiosk =>
                         kiosk.Id == kioskId &&

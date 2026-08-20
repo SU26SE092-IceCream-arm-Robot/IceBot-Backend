@@ -17,7 +17,7 @@ public sealed class OpenProductionIncidentCommandHandler(IProductionIncidentStor
         {
             await store.AcquireSourceLockAsync(command.SourceCommandId, command.SourceProductionJobId, innerCt);
             var order = await store.GetOrderAsync(command.OrderId, innerCt);
-            if (order is null || !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersManage,
+            if (order is null || !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersInterventionManage,
                     command.UserContext, order.OrganizationId, order.StoreId, order.KioskId))
                 return ApiResult<ProductionIncidentResult>.Fail("Order not found.", 404);
             var item = order.OrderItems.SingleOrDefault(x => x.Id == command.OrderItemId);

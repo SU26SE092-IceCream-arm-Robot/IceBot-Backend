@@ -186,6 +186,12 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
             .FirstOrDefaultAsync(kiosk => kiosk.Id == kioskId, cancellationToken);
     }
 
+    public Task<KioskConnectivityProjection?> GetConnectivityAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.KioskConnectivityProjections.AsNoTracking()
+            .FirstOrDefaultAsync(connectivity => connectivity.KioskId == kioskId, cancellationToken);
+
     public Task<int> CountHeartbeatsAsync(
         Guid kioskId,
         KioskHeartbeatStatus? status,

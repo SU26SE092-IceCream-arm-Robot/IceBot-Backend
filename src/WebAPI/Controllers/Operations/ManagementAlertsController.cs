@@ -75,7 +75,7 @@ public sealed class ManagementAlertsController : ControllerBase
     }
 
     [HttpPatch("{alertId:guid}/acknowledge")]
-    [Authorize(Policy = "alerts.manage")]
+    [Authorize(Policy = "alerts.acknowledge")]
     public async Task<IActionResult> Acknowledge(Guid alertId, CancellationToken cancellationToken = default)
     {
         var result = await _acknowledgeHandler.HandleAsync(new AcknowledgeAlertCommand
@@ -87,7 +87,7 @@ public sealed class ManagementAlertsController : ControllerBase
     }
 
     [HttpPatch("{alertId:guid}/resolve")]
-    [Authorize(Policy = "alerts.manage")]
+    [Authorize(Policy = "alerts.resolve")]
     public async Task<IActionResult> Resolve(
         Guid alertId,
         [FromBody] ResolveAlertRequest request,

@@ -12,7 +12,7 @@ namespace IceBot.UnitTests.ProductionConfiguration;
 public sealed class ProductionInventoryReadinessGuardTests
 {
     [Fact]
-    public async Task Deploy_DoesNotBlockWhenInventoryTopologyIsNotConfigured()
+    public async Task Deploy_DoesNotBlockWhenInventoryBalanceIsNotConfigured()
     {
         var evaluator = Substitute.For<IInventoryReadinessEvaluator>();
         evaluator.EvaluateKioskAsync(
@@ -23,7 +23,7 @@ public sealed class ProductionInventoryReadinessGuardTests
             .Returns(new KioskInventoryReadinessResult
             {
                 KioskId = Guid.NewGuid(),
-                HasConfiguredInventoryTopology = false,
+                HasConfiguredInventoryBalance = false,
                 IsReady = false,
                 OverallStatus = InventoryReadinessStatus.MissingIngredient
             });
@@ -43,7 +43,7 @@ public sealed class ProductionInventoryReadinessGuardTests
     }
 
     [Fact]
-    public async Task Deploy_BlocksWhenConfiguredTopologyReportsNotReady()
+    public async Task Deploy_BlocksWhenConfiguredInventoryBalanceReportsNotReady()
     {
         var evaluator = Substitute.For<IInventoryReadinessEvaluator>();
         evaluator.EvaluateKioskAsync(
@@ -54,7 +54,7 @@ public sealed class ProductionInventoryReadinessGuardTests
             .Returns(new KioskInventoryReadinessResult
             {
                 KioskId = Guid.NewGuid(),
-                HasConfiguredInventoryTopology = true,
+                HasConfiguredInventoryBalance = true,
                 IsReady = false,
                 OverallStatus = InventoryReadinessStatus.MissingIngredient
             });

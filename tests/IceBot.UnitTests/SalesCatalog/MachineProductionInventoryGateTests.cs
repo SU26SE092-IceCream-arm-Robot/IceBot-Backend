@@ -16,7 +16,7 @@ namespace IceBot.UnitTests.SalesCatalog;
 public sealed class MachineProductionInventoryGateTests
 {
     [Fact]
-    public async Task UnconfiguredInventoryTopology_DoesNotBlockMachineSale()
+    public async Task UnconfiguredInventoryBalance_DoesNotBlockMachineSale()
     {
         var inventory = Substitute.For<IInventoryReadinessEvaluator>();
         inventory.EvaluateKioskAsync(
@@ -26,7 +26,7 @@ public sealed class MachineProductionInventoryGateTests
                 Arg.Any<InventoryReadinessEvaluationOptions>())
             .Returns(new KioskInventoryReadinessResult
             {
-                HasConfiguredInventoryTopology = false,
+                HasConfiguredInventoryBalance = false,
                 IsReady = false,
                 OverallStatus = InventoryReadinessStatus.MissingIngredient
             });
@@ -43,7 +43,7 @@ public sealed class MachineProductionInventoryGateTests
     }
 
     [Fact]
-    public async Task ConfiguredInventoryTopology_StillBlocksMissingIngredient()
+    public async Task ConfiguredInventoryBalance_StillBlocksMissingIngredient()
     {
         var inventory = Substitute.For<IInventoryReadinessEvaluator>();
         inventory.EvaluateKioskAsync(
@@ -53,7 +53,7 @@ public sealed class MachineProductionInventoryGateTests
                 Arg.Any<InventoryReadinessEvaluationOptions>())
             .Returns(new KioskInventoryReadinessResult
             {
-                HasConfiguredInventoryTopology = true,
+                HasConfiguredInventoryBalance = true,
                 IsReady = false,
                 OverallStatus = InventoryReadinessStatus.MissingIngredient
             });

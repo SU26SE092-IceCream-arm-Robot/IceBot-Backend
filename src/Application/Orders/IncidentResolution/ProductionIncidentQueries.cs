@@ -10,7 +10,7 @@ public sealed class ListProductionIncidentsQueryHandler(IProductionIncidentStore
     {
         var page = Math.Max(query.PageNumber, 1);
         var size = Math.Clamp(query.PageSize, 1, 100);
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersManage, query.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.OrdersInterventionManage, query.UserContext);
         var (items, total) = await store.ListAsync(query.Status, query.OrganizationId, query.StoreId, query.KioskId,
             query.UserContext.IsSystemAdmin, scope.OrganizationIds, scope.StoreIds, scope.KioskIds, page, size, ct);
         return PagedResult<ProductionIncidentResult>.Success(
@@ -30,7 +30,7 @@ public sealed class GetProductionIncidentQueryHandler(IProductionIncidentStore s
 
     internal static bool CanManage(Domain.Orders.Incidents.ProductionIncident incident,
         Application.Identity.Tokens.Claims.CurrentUserContext user) =>
-        ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersManage, user,
+        ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OrdersInterventionManage, user,
             incident.OrganizationId, incident.StoreId, incident.KioskId);
 }
 

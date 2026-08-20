@@ -1,4 +1,6 @@
+using Application.ProductionConfiguration.Bindings;
 using Domain.ProductionConfiguration.Entities;
+using Domain.RobotConfiguration.Programs.Manifests;
 
 namespace IceBot.UnitTests.ProductionConfiguration;
 
@@ -30,4 +32,28 @@ public sealed class ProductionProgramBindingCapabilityEvidenceTests
         Assert.Empty(binding.GetRequiredCapabilityCodes());
         Assert.Equal(ProductionProgramBindingCapabilityEvidenceStatus.Missing, binding.CapabilityEvidenceStatus);
     }
+
+    [Fact]
+    public void Resolve_UsesRobotArmDefault_ForAnAllFairinoFr5ProgramWithoutDeclarations()
+    {
+        var proposal = RobotProgramCapabilityProfileDefaults.Resolve(CreateManifest("FAIRINO_LUA_V1", "FR5"), []);
+
+        Assert.Equal(["ROBOT_ARM"], proposal.RequiredCapabilityCodes);
+        Assert.Equal(ProductionProgramBindingCapabilityEvidenceStatus.TargetProfileDefault, proposal.Status);
+    }
+
+    [Fact]
+    public void Resolve_DoesNotApplyProfileDefault_ToMixedOrUnknownTargets()
+    {
+        var proposal = RobotProgramCapabilityProfileDefaults.Resolve(CreateManifest("FAIRINO_LUA_V1", "FR3"), []);
+
+        Assert.Empty(proposal.RequiredCapabilityCodes);
+        Assert.Equal(ProductionProgramBindingCapabilityEvidenceStatus.Missing, proposal.Status);
+    }
+
+    private static RobotProgramManifestDocument CreateManifest(string runtimeTargetCode, string machineModelCode) => new(
+        Guid.NewGuid(), "PROGRAM", 1,
+        [new RobotProgramManifestItem(Guid.NewGuid(), 1, 1, null,
+            new RobotProgramManifestArtifact(Guid.NewGuid(), new string('c', 64), "program.lua", runtimeTargetCode,
+                machineModelCode, 1, null, null))]);
 }

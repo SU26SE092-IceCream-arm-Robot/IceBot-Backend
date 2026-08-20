@@ -17,15 +17,24 @@ public static class InventoryModule
         services.AddScoped<GetKioskInventoryTopologyQueryHandler>();
         services.AddScoped<GetDispenserRebindHistoryQueryHandler>();
         services.AddScoped<GetDispenserHistoryQueryHandler>();
+        services.AddScoped<GetKioskIngredientInventoriesQueryHandler>();
+        services.AddScoped<GetKioskInventoryWorkspaceQueryHandler>();
+        services.AddScoped<ListInventoryRefillTasksQueryHandler>();
+        services.AddScoped<GetInventoryRefillTaskQueryHandler>();
         services.AddScoped<IInventoryReadinessEvaluator, InventoryReadinessEvaluator>();
-        services.AddScoped<RefillDispenserCommandHandler>();
-        services.AddScoped<AdjustDispenserEstimateCommandHandler>();
         services.AddScoped<CreateDispenserStateCommandHandler>();
         services.AddScoped<UpdateDispenserStateCommandHandler>();
         services.AddScoped<SetDispenserStateStatusCommandHandler>();
         services.AddScoped<DeleteDispenserStateCommandHandler>();
         services.AddScoped<RebindDispenserStateCommandHandler>();
         services.AddScoped<IngestInventorySensorObservationsCommandHandler>();
+        services.AddScoped<CreateKioskIngredientInventoryCommandHandler>();
+        services.AddScoped<UpdateKioskIngredientInventoryCommandHandler>();
+        services.AddScoped<AdjustKioskIngredientInventoryCommandHandler>();
+        services.AddScoped<RequestInventoryRefillTaskCommandHandler>();
+        services.AddScoped<StartInventoryRefillTaskCommandHandler>();
+        services.AddScoped<CompleteInventoryRefillTaskCommandHandler>();
+        services.AddScoped<CancelInventoryRefillTaskCommandHandler>();
 
         return services;
     }

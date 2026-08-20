@@ -3,6 +3,7 @@ using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.ExecutionEndpoints.Mapping;
 using Application.Devices.ExecutionEndpoints.Results;
 using Application.Shared.Wrappers;
+using Application.Tenants;
 using Domain.Common;
 using Domain.Devices.Catalog;
 using Application.Devices.Credentials.Security;
@@ -17,7 +18,8 @@ public sealed class ProvisionExecutionEndpointCommandHandler
     public async Task<ApiResult<ExecutionEndpointResult>> HandleAsync(ProvisionExecutionEndpointCommand command, CancellationToken cancellationToken = default)
     {
         var loaded = await ExecutionEndpointCommandRules.LoadAccessibleAsync(
-            _store, command.UserContext, command.KioskId, command.EndpointId, cancellationToken);
+            _store, command.UserContext, command.KioskId, command.EndpointId,
+            ScopeRoleSets.ExecutionEndpointsProvision, cancellationToken);
         if (loaded.Error is not null) return loaded.Error;
         var endpoint = loaded.Endpoint!;
         if (endpoint.Status != KioskExecutionEndpointStatus.Provisioning)

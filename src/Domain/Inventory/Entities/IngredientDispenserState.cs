@@ -14,6 +14,8 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     public Guid IngredientId { get; set; }
 
+    public Guid? KioskIngredientInventoryId { get; set; }
+
     public string ContainerCode { get; set; } = null!;
 
     public IngredientLevelStatus CurrentLevelStatus { get; set; } = IngredientLevelStatus.Unknown;
@@ -34,6 +36,14 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     public DateTimeOffset? LastSensorObservedAt { get; private set; }
 
+    public decimal? LastObservedEstimatedQuantity { get; private set; }
+
+    public bool SensorRebaselineRequired { get; private set; }
+
+    public DateTimeOffset? SensorRebaselineRequestedAt { get; private set; }
+
+    public Guid? SensorRebaselineRefillTaskId { get; private set; }
+
     public DateTimeOffset? LastRefilledAt { get; set; }
 
     public DateTimeOffset? ExpiresAt { get; set; }
@@ -47,6 +57,8 @@ public partial class IngredientDispenserState : SyncAggregateEntity
     public virtual Kiosk? Kiosk { get; set; }
 
     public virtual Ingredient Ingredient { get; set; } = null!;
+
+    public virtual KioskIngredientInventory? KioskIngredientInventory { get; set; }
 
     public void ConfigureContainer(decimal? capacityQuantity, string unit, string? levelToQuantityProfileJson = null)
     {
@@ -93,6 +105,25 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         LastMeasuredAt = measuredAt;
         LastSensorObservedAt = measuredAt;
         SensorPayloadJson = sensorPayloadJson;
+        LastObservedEstimatedQuantity = estimatedQuantity;
+    }
+
+    public void RequireSensorRebaseline(Guid refillTaskId, DateTimeOffset requestedAt)
+    {
+        EnsureActive();
+        if (refillTaskId == Guid.Empty) throw new DomainRuleException("Refill task is required for sensor rebaseline.");
+        SensorRebaselineRequired = true;
+        SensorRebaselineRequestedAt = requestedAt;
+        SensorRebaselineRefillTaskId = refillTaskId;
+    }
+
+    public bool ConsumeSensorRebaseline()
+    {
+        if (!SensorRebaselineRequired) return false;
+        SensorRebaselineRequired = false;
+        SensorRebaselineRequestedAt = null;
+        SensorRebaselineRefillTaskId = null;
+        return true;
     }
 
     public void ChangeTrackingMode(InventoryTrackingMode trackingMode)

@@ -22,6 +22,8 @@ public partial class Refund : BusinessEntity
 
     public string Currency { get; set; } = "VND";
 
+    public RefundCompensationMethod CompensationMethod { get; set; } = RefundCompensationMethod.FullMoneyRefund;
+
     public string Reason { get; set; } = null!;
 
     public RefundStatus Status { get; set; } = RefundStatus.Requested;

@@ -69,6 +69,24 @@ internal sealed class PaymentCallbackConfiguration : IEntityTypeConfiguration<Pa
     }
 }
 
+internal sealed class PaymentProviderObservationConfiguration : IEntityTypeConfiguration<PaymentProviderObservation>
+{
+    public void Configure(EntityTypeBuilder<PaymentProviderObservation> entity)
+    {
+        entity.ToTable("PaymentProviderObservations");
+        entity.HasIndex(x => new { x.PaymentTransactionId, x.CloudReceivedAt });
+        entity.HasIndex(x => new { x.Provider, x.ProviderOrderCode, x.CloudReceivedAt });
+        entity.Property(x => x.Provider).HasMaxLength(50);
+        entity.Property(x => x.ProviderOrderCode).HasMaxLength(100);
+        entity.Property(x => x.ObservedStatus).HasMaxLength(100);
+        entity.Property(x => x.ProviderTransactionId).HasMaxLength(200);
+        entity.Property(x => x.FailureCode).HasMaxLength(100);
+        entity.Property(x => x.FailureMessage).HasMaxLength(500);
+        entity.HasOne(x => x.PaymentTransaction).WithMany().HasForeignKey(x => x.PaymentTransactionId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
 {
     public void Configure(EntityTypeBuilder<Refund> entity)
@@ -77,6 +95,7 @@ internal sealed class RefundConfiguration : IEntityTypeConfiguration<Refund>
         entity.HasIndex(x => x.RefundNumber).IsUnique();
         entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
         entity.HasIndex(x => x.ProviderRefundId).HasFilter("\"ProviderRefundId\" IS NOT NULL");
+        entity.Property(x => x.CompensationMethod).HasDefaultValue(Domain.Payments.Enums.RefundCompensationMethod.FullMoneyRefund);
         entity.HasOne(x => x.PaymentTransaction).WithMany().HasForeignKey(x => x.PaymentTransactionId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.RequestedByAccount).WithMany().HasForeignKey(x => x.RequestedByAccountId).OnDelete(DeleteBehavior.Restrict);
 

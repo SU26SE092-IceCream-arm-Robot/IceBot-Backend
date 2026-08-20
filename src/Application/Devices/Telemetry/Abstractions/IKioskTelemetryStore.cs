@@ -19,6 +19,9 @@ public interface IKioskTelemetryStore
         CancellationToken cancellationToken = default);
 
     Task<Kiosk?> GetKioskByIdAsync(Guid kioskId, CancellationToken cancellationToken = default);
+    Task<Domain.Devices.Connectivity.KioskConnectivityProjection?> GetConnectivityAsync(
+        Guid kioskId,
+        CancellationToken cancellationToken = default);
 
     Task<int> CountHeartbeatsAsync(
         Guid kioskId,

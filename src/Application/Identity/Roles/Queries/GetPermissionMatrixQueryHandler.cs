@@ -72,6 +72,13 @@ public static class PermissionCatalog
         },
         new()
         {
+            Policy = "stores.sales.manage",
+            Description = "Pause or resume store sales within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "kiosks.view",
             Description = "View kiosk details within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
@@ -81,13 +88,20 @@ public static class PermissionCatalog
         {
             Policy = "kiosks.manage",
             Description = "Create, activate, or disable kiosks.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },
         new()
         {
             Policy = "kiosks.update",
             Description = "Update kiosk details within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "kiosks.operations.manage",
+            Description = "Change kiosk operational and maintenance state within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
@@ -158,7 +172,14 @@ public static class PermissionCatalog
         {
             Policy = "payments.manage",
             Description = "Manage payment methods and status.",
-            Roles = new[] { "Manager" },
+            Roles = new[] { "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "payments.reconciliation.view",
+            Description = "View organization-level daily payment reconciliation aggregates and scoped discrepancies.",
+            Roles = new[] { "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
@@ -186,7 +207,7 @@ public static class PermissionCatalog
         {
             Policy = "dashboard.view",
             Description = "View management dashboard metrics within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
@@ -198,16 +219,44 @@ public static class PermissionCatalog
         },
         new()
         {
-            Policy = "orders.manage",
-            Description = "Manage order lifecycle and manual/packaged item fulfillment within allowed scope.",
+            Policy = "orders.fulfillment.manage",
+            Description = "Record manual and packaged-item fulfillment outcomes within allowed scope.",
             Roles = new[] { "OrgAdmin", "Manager", "Staff" },
             ScopeRequired = true
         },
         new()
         {
-            Policy = "refunds.manage",
-            Description = "Manage refunds (request, processed, reject, cancel) within allowed scope.",
-            Roles = new[] { "Manager", "Staff" },
+            Policy = "orders.intervention.manage",
+            Description = "Cancel orders, redispatch execution, or request production remake within allowed scope.",
+            Roles = new[] { "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "orders.refund-flag",
+            Description = "Mark an order as requiring refund review within allowed scope.",
+            Roles = new[] { "OrgAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "refunds.view",
+            Description = "View refunds within allowed scope.",
+            Roles = new[] { "OrgAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "refunds.request",
+            Description = "Request refunds within allowed scope.",
+            Roles = new[] { "OrgAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "refunds.process",
+            Description = "Mark refunds processed, reject, or cancel them within allowed scope.",
+            Roles = new[] { "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
@@ -240,16 +289,23 @@ public static class PermissionCatalog
         },
         new()
         {
-            Policy = "inventory.manage",
-            Description = "Manage inventory (refill, adjust estimate) within allowed scope.",
-            Roles = new[] { "SystemAdmin", "Manager", "Staff", "Technician" },
+            Policy = "inventory.refill.manage",
+            Description = "Request, start, complete, or cancel physical inventory refill tasks within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "inventory.adjust.manage",
+            Description = "Correct an inventory estimate outside the audited refill workflow within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
         {
             Policy = "inventory.configure",
             Description = "Provision, configure, activate/retire, and safely delete kiosk dispenser topology.",
-            Roles = new[] { "SystemAdmin", "Manager", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
             ScopeRequired = true
         },
         new()
@@ -289,16 +345,23 @@ public static class PermissionCatalog
         },
         new()
         {
+            Policy = "payments.diagnostics.view",
+            Description = "View bounded payment-session diagnostics without raw provider payloads within allowed scope.",
+            Roles = new[] { "OrgAdmin", "Manager" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "notifications.manage",
             Description = "Requeue permanently failed notification deliveries within allowed scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
         {
             Policy = "notifications.view",
             Description = "View notification delivery status and retry evidence without provider diagnostic details.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
@@ -311,8 +374,43 @@ public static class PermissionCatalog
         new()
         {
             Policy = "devices.manage",
-            Description = "Create, update, status-change, or retire devices/hardware within assigned scope.",
+            Description = "Create, update, replace, or retire devices/hardware within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "devices.operations.manage",
+            Description = "Change the operational status of non-retired devices within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "execution-endpoints.manage",
+            Description = "Create or retire Edge execution endpoints within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "execution-endpoints.operations.manage",
+            Description = "Disable or reactivate Edge execution endpoints within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "execution-endpoints.provision",
+            Description = "Provision Edge execution endpoint identity within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "execution-endpoints.credentials.manage",
+            Description = "Rotate mTLS identity or manage MQTT credentials for Edge execution endpoints within assigned scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
             ScopeRequired = true
         },
         new()
@@ -338,8 +436,15 @@ public static class PermissionCatalog
         },
         new()
         {
-            Policy = "alerts.manage",
-            Description = "Acknowledge and resolve actionable telemetry alerts within allowed scope.",
+            Policy = "alerts.acknowledge",
+            Description = "Acknowledge actionable telemetry alerts within allowed scope.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Staff", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "alerts.resolve",
+            Description = "Resolve actionable telemetry alerts within allowed scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
@@ -388,7 +493,7 @@ public static class PermissionCatalog
         {
             Policy = "program.manage",
             Description = "Manage robot programs within assigned organization, store, or kiosk scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },
         new()
@@ -444,7 +549,7 @@ public static class PermissionCatalog
         {
             Policy = "package.install",
             Description = "Install production packages within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },
         new()
@@ -490,6 +595,19 @@ public static class PermissionCatalog
             ScopeRequired = false
         }
     };
+
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> RolesByPolicy = Matrix
+        .ToDictionary(item => item.Policy, item => item.Roles, StringComparer.OrdinalIgnoreCase);
+
+    public static IReadOnlyList<string> GetRoles(string policy)
+    {
+        if (RolesByPolicy.TryGetValue(policy, out var roles))
+        {
+            return roles.ToArray();
+        }
+
+        throw new InvalidOperationException($"Permission policy '{policy}' is not registered.");
+    }
 
     public static List<string> ResolvePermissionCodes(IEnumerable<string> roleCodes)
     {

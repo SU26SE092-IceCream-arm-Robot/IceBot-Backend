@@ -17,7 +17,6 @@ public interface ICriticalOperationalAlertNotifier
         CriticalOperationalAlertNotification notification,
         CancellationToken cancellationToken = default);
 }
-
 public interface IOperationalAlertNotificationRecipientStore
 {
     Task<IReadOnlyCollection<Guid>> ListRecipientAccountIdsAsync(
@@ -64,62 +63,6 @@ public sealed class CriticalOperationalAlertNotifier(
                 accountId,
                 "Critical kiosk alert",
                 notification.Title,
-                JsonSerializer.Serialize(data),
-                DateTimeOffset.UtcNow);
-            await deliveries.AddAsync(delivery, cancellationToken);
-        }
-    }
-}
-
-public interface IInventoryOperationalAlertNotifier
-{
-    Task NotifyEmptyAsync(
-        Guid alertId,
-        Guid organizationId,
-        Guid storeId,
-        Guid kioskId,
-        Guid deviceId,
-        string title,
-        CancellationToken cancellationToken = default);
-}
-
-public sealed class InventoryOperationalAlertNotifier(
-    IOperationalAlertNotificationRecipientStore recipients,
-    INotificationDeliveryStore deliveries) : IInventoryOperationalAlertNotifier
-{
-    public async Task NotifyEmptyAsync(
-        Guid alertId,
-        Guid organizationId,
-        Guid storeId,
-        Guid kioskId,
-        Guid deviceId,
-        string title,
-        CancellationToken cancellationToken = default)
-    {
-        var accountIds = await recipients.ListRecipientAccountIdsAsync(
-            organizationId, storeId, kioskId, cancellationToken);
-        foreach (var accountId in accountIds.Distinct())
-        {
-            var data = new Dictionary<string, string>
-            {
-                ["type"] = "inventory_empty",
-                ["deliveryId"] = string.Empty,
-                ["alertId"] = alertId.ToString("D"),
-                ["kioskId"] = kioskId.ToString("D"),
-                ["deviceId"] = deviceId.ToString("D"),
-                ["alertCode"] = "INVENTORY_EMPTY",
-                ["severity"] = "Error"
-            };
-            var delivery = Domain.Operations.Entities.NotificationDelivery.CreatePush(
-                organizationId,
-                storeId,
-                kioskId,
-                alertId,
-                $"inventory-empty:{alertId:D}:account:{accountId:D}",
-                "inventory_empty",
-                accountId,
-                "Kiosk inventory empty",
-                title,
                 JsonSerializer.Serialize(data),
                 DateTimeOffset.UtcNow);
             await deliveries.AddAsync(delivery, cancellationToken);

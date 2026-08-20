@@ -31,35 +31,34 @@ public sealed class ProductionProgramBindingStore(IceBotDbContext db) : IProduct
             .Select(item => new { Id = item.TechnicalContractId!.Value, Checksum = item.TechnicalContractChecksum!.Trim().ToLowerInvariant() })
             .Distinct()
             .ToArray();
-        if (references.Length == 0)
-            return new ProductionProgramCapabilityProposal([], ProductionProgramBindingCapabilityEvidenceStatus.Missing);
-
-        var contractIds = references.Select(reference => reference.Id).ToArray();
-        var contracts = await db.RobotArtifactTechnicalContracts
-            .Include(contract => contract.Effects)
-            .Where(contract => contractIds.Contains(contract.Id) && contract.DeletedAt == null)
-            .ToListAsync(cancellationToken);
-        if (contracts.Count != contractIds.Length || contracts.Any(contract =>
-                contract.Status != RobotArtifactContractStatus.Published ||
-                (contract.OrganizationId.HasValue && contract.OrganizationId != program.OrganizationId) ||
-                !references.Any(reference => reference.Id == contract.Id &&
-                    string.Equals(reference.Checksum, contract.ContractChecksum, StringComparison.OrdinalIgnoreCase))))
+        var codes = Array.Empty<string>();
+        if (references.Length > 0)
         {
-            throw new DomainRuleException(
-                "A technical declaration referenced by the published program is missing, out of scope, unpublished, or checksum-inconsistent.");
+            var contractIds = references.Select(reference => reference.Id).ToArray();
+            var contracts = await db.RobotArtifactTechnicalContracts
+                .Include(contract => contract.Effects)
+                .Where(contract => contractIds.Contains(contract.Id) && contract.DeletedAt == null)
+                .ToListAsync(cancellationToken);
+            if (contracts.Count != contractIds.Length || contracts.Any(contract =>
+                    contract.Status != RobotArtifactContractStatus.Published ||
+                    (contract.OrganizationId.HasValue && contract.OrganizationId != program.OrganizationId) ||
+                    !references.Any(reference => reference.Id == contract.Id &&
+                        string.Equals(reference.Checksum, contract.ContractChecksum, StringComparison.OrdinalIgnoreCase))))
+            {
+                throw new DomainRuleException(
+                    "A technical declaration referenced by the published program is missing, out of scope, unpublished, or checksum-inconsistent.");
+            }
+
+            codes = contracts.SelectMany(contract => contract.Effects)
+                .Select(effect => effect.RequiredWorkcellCapabilityCode)
+                .Where(code => !string.IsNullOrWhiteSpace(code))
+                .Select(code => code!.Trim().ToUpperInvariant())
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)
+                .ToArray();
         }
 
-        var codes = contracts.SelectMany(contract => contract.Effects)
-            .Select(effect => effect.RequiredWorkcellCapabilityCode)
-            .Where(code => !string.IsNullOrWhiteSpace(code))
-            .Select(code => code!.Trim().ToUpperInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .Order(StringComparer.Ordinal)
-            .ToArray();
-        return new ProductionProgramCapabilityProposal(codes,
-            codes.Length == 0
-                ? ProductionProgramBindingCapabilityEvidenceStatus.Missing
-                : ProductionProgramBindingCapabilityEvidenceStatus.Declared);
+        return RobotProgramCapabilityProfileDefaults.Resolve(document, codes);
     }
 
     public async Task<ProductionProgramBinding?> FindActiveEquivalentAsync(Guid organizationId, Guid recipeId, Guid robotProgramId,

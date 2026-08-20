@@ -28,110 +28,74 @@ internal static class ExpectedProductionConsumptionApplier
             context.EdgeCommand.OrderId!.Value, command.OrderItemId.Value, cancellationToken);
         if (requirements.Count == 0) return false;
 
-        var candidates = new Dictionary<ExpectedInventoryRequirement, List<IngredientDispenserState>>();
+        var balances = new Dictionary<ExpectedInventoryRequirement, KioskIngredientInventory?>();
         foreach (var requirement in requirements)
         {
-            candidates[requirement] = await store.ListActiveDispenserStatesForExpectedConsumptionAsync(
+            balances[requirement] = await store.GetKioskIngredientInventoryForExpectedConsumptionAsync(
                 context.Endpoint.KioskId, requirement.IngredientId, requirement.Unit, cancellationToken);
         }
 
-        var stateIds = candidates.Values.SelectMany(states => states).Select(state => state.Id).Distinct().ToArray();
-        if (stateIds.Length == 0) return false;
-        await store.AcquireDispenserMutationLocksAsync(stateIds, cancellationToken);
+        await store.AcquireKioskIngredientInventoryMutationLocksAsync(
+            balances.Values.Where(balance => balance is not null).Select(balance => balance!.Id), cancellationToken);
 
-        // Reload after locks so a concurrent refill, adjustment, or completion cannot be lost.
-        candidates.Clear();
-        foreach (var requirement in requirements)
-        {
-            candidates[requirement] = await store.ListActiveDispenserStatesForExpectedConsumptionAsync(
-                context.Endpoint.KioskId, requirement.IngredientId, requirement.Unit, cancellationToken);
-        }
-
-        var planned = new List<(ExpectedInventoryRequirement Requirement, IngredientDispenserState State, decimal Quantity, Guid SourceEventId)>();
+        var applied = false;
         foreach (var requirement in requirements)
         {
             var required = requirement.Quantity * command.ProductionUnitQuantity.Value;
-            var states = candidates[requirement];
-            var existing = new Dictionary<Guid, decimal>();
-            foreach (var state in states)
+            var sourceEventId = CreateSourceEventId(command.SourceProductionJobId.Value, requirement.IngredientId);
+            var existing = await store.GetStockMovementBySourceEventIdAsync(sourceEventId, cancellationToken);
+            if (existing is not null)
             {
-                var sourceEventId = CreateSourceEventId(command.SourceProductionJobId.Value, requirement.IngredientId, state.Id);
-                var movement = await store.GetStockMovementBySourceEventIdAsync(sourceEventId, cancellationToken);
-                if (movement is not null)
+                if (existing.ReferenceType != "OrderItemProductionUnit" || existing.ReferenceId != command.OrderItemId || existing.Quantity >= 0 || !existing.IsEstimated)
+                    throw new DomainRuleException("Expected inventory source id was reused with different evidence.");
+                continue;
+            }
+
+            var balance = balances[requirement];
+            var appliedQuantity = balance?.ConsumeAvailable(required, context.CloudReceivedAt) ?? 0m;
+            if (balance is not null && appliedQuantity > 0)
+            {
+                var movement = StockMovement.CreateForKioskInventory(balance.Id, balance.OrganizationId, balance.StoreId, balance.KioskId,
+                    balance.IngredientId, "CONSUME", -appliedQuantity, balance.EstimatedQuantity + appliedQuantity,
+                    balance.EstimatedQuantity, balance.Unit, context.CloudReceivedAt, "EXPECTED_PRODUCTION_CONSUMPTION",
+                    "OrderItemProductionUnit", command.OrderItemId, sourceEventId, true);
+                movement.Id = Guid.NewGuid();
+                movement.CorrelationId = context.EdgeCommand.OrderId;
+                movement.CausationId = command.SourceEventId;
+                await store.AddStockMovementAsync(movement, cancellationToken);
+                applied = true;
+                context.Notifications.InventoryChanged.Add(new InventoryChangedEvent
                 {
-                    if (movement.ReferenceType != "OrderItemProductionUnit" || movement.ReferenceId != command.OrderItemId ||
-                        movement.Quantity >= 0 || !movement.IsEstimated)
+                    DispenserStateId = Guid.Empty, KioskId = balance.KioskId, OrganizationId = balance.OrganizationId, StoreId = balance.StoreId,
+                    IngredientName = balance.Ingredient.Name, EstimatedQuantity = balance.EstimatedQuantity,
+                    Unit = balance.Unit, Status = "Balance", UpdatedAt = context.CloudReceivedAt, Version = checked((int)balance.Version)
+                });
+            }
+
+            if (appliedQuantity < required)
+            {
+                const string reasonCode = "EXPECTED_CONSUMPTION_UNRECONCILED";
+                var caseExists = await store.GetInventoryReconciliationCaseAsync(sourceEventId, requirement.IngredientId, requirement.Unit, reasonCode, cancellationToken);
+                if (caseExists is null)
+                {
+                    await store.AddInventoryReconciliationCaseAsync(new InventoryReconciliationCase
                     {
-                        throw new DomainRuleException("Expected inventory source id was reused with different evidence.");
-                    }
-                    existing[state.Id] = -movement.Quantity;
+                        Id = Guid.NewGuid(), OrganizationId = context.Endpoint.Kiosk.OrganizationId, StoreId = context.Endpoint.Kiosk.StoreId,
+                        KioskId = context.Endpoint.KioskId, IngredientId = requirement.IngredientId, KioskIngredientInventoryId = balance?.Id,
+                        SourceEventId = sourceEventId, ExpectedQuantity = required, AppliedQuantity = appliedQuantity,
+                        Unit = requirement.Unit.Trim().ToLowerInvariant(), ReasonCode = reasonCode, CreatedAt = context.CloudReceivedAt
+                    }, cancellationToken);
                 }
             }
-
-            var remaining = required - existing.Values.Sum();
-            if (remaining < 0) throw new DomainRuleException("Expected inventory evidence exceeds the completed production quantity.");
-            if (remaining == 0) continue;
-
-            // A successful physical outcome stays true even if a concurrent adjustment made the estimate insufficient.
-            // Do not reject the report or fabricate a negative balance; an operator must reconcile the inventory estimate.
-            var available = states.Sum(state => state.EstimatedQuantity ?? 0m);
-            if (available < remaining || states.Any(state => !state.EstimatedQuantity.HasValue)) return false;
-
-            foreach (var state in states)
-            {
-                if (remaining == 0) break;
-                var alreadyApplied = existing.GetValueOrDefault(state.Id);
-                var availableFromState = state.EstimatedQuantity!.Value;
-                var amount = Math.Min(availableFromState, remaining);
-                if (amount <= 0 || alreadyApplied > 0) continue;
-                planned.Add((requirement, state, amount,
-                    CreateSourceEventId(command.SourceProductionJobId.Value, requirement.IngredientId, state.Id)));
-                remaining -= amount;
-            }
-
-            if (remaining != 0) return false;
-        }
-
-        var applied = false;
-        foreach (var entry in planned)
-        {
-            var movement = entry.State.Consume(
-                entry.Quantity,
-                context.CloudReceivedAt,
-                "OrderItemProductionUnit",
-                command.OrderItemId,
-                entry.SourceEventId);
-            movement.OrganizationId = entry.State.Kiosk!.OrganizationId;
-            movement.StoreId = entry.State.Kiosk.StoreId;
-            movement.ReasonCode = "EXPECTED_PRODUCTION_CONSUMPTION";
-            movement.IsEstimated = true;
-            movement.CorrelationId = context.EdgeCommand.OrderId;
-            movement.CausationId = command.SourceEventId;
-            await store.AddStockMovementAsync(movement, cancellationToken);
-            applied = true;
-
-            context.Notifications.InventoryChanged.Add(new InventoryChangedEvent
-            {
-                DispenserStateId = entry.State.Id,
-                KioskId = entry.State.KioskId!.Value,
-                OrganizationId = entry.State.Kiosk.OrganizationId,
-                StoreId = entry.State.Kiosk.StoreId,
-                IngredientName = entry.State.Ingredient.Name,
-                EstimatedQuantity = entry.State.EstimatedQuantity,
-                Unit = entry.State.Unit,
-                Status = entry.State.CurrentLevelStatus.ToString(),
-                UpdatedAt = context.CloudReceivedAt,
-                Version = 1
-            });
         }
 
         return applied;
     }
 
-    private static Guid CreateSourceEventId(Guid productionJobId, Guid ingredientId, Guid dispenserStateId)
+    private static Guid CreateSourceEventId(Guid productionJobId, Guid ingredientId)
     {
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(
-            $"expected-production-consumption:{productionJobId:D}:{ingredientId:D}:{dispenserStateId:D}"));
+            $"expected-production-consumption:{productionJobId:D}:{ingredientId:D}"));
         return new Guid(bytes.AsSpan(0, 16));
     }
 }

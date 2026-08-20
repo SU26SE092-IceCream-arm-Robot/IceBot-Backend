@@ -9,83 +9,43 @@ namespace Infrastructure.Operations.Persistence;
 
 public sealed class InventoryAlertAutomationStore(IceBotDbContext db) : IInventoryAlertAutomationStore
 {
-    public async Task<IReadOnlyList<Guid>> ListActiveDispenserStateIdsAsync(
-        int maxCount,
-        long scanSlot,
-        CancellationToken cancellationToken = default) =>
-        await ListActiveDispenserStateIdsCoreAsync(maxCount, scanSlot, cancellationToken);
-
-    private async Task<IReadOnlyList<Guid>> ListActiveDispenserStateIdsCoreAsync(
-        int maxCount,
-        long scanSlot,
-        CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<Guid>> ListActiveKioskIngredientInventoryIdsAsync(int maxCount, long scanSlot, CancellationToken cancellationToken = default)
     {
         var take = Math.Clamp(maxCount, 1, 10_000);
-        var query = db.IngredientDispenserStates.WhereNotDeleted().AsNoTracking()
-            .Where(state => state.IsActive)
-            .OrderBy(state => state.Id);
+        var query = db.KioskIngredientInventories.WhereNotDeleted().AsNoTracking().Where(balance => balance.IsActive).OrderBy(balance => balance.Id);
         var count = await query.CountAsync(cancellationToken);
-        if (count == 0)
-        {
-            return [];
-        }
-
+        if (count == 0) return [];
         var offset = InventoryAlertScanWindow.CalculateOffset(count, take, scanSlot);
-        var result = await query
-            .Skip(offset)
-            .Select(state => state.Id)
-            .Take(take)
-            .ToListAsync(cancellationToken);
-        if (result.Count == take || result.Count == count)
-        {
-            return result;
-        }
-
-        var remaining = take - result.Count;
-        var wrapAround = await query
-            .Select(state => state.Id)
-            .Take(remaining)
-            .ToListAsync(cancellationToken);
-        result.AddRange(wrapAround);
+        var result = await query.Skip(offset).Select(balance => balance.Id).Take(take).ToListAsync(cancellationToken);
+        if (result.Count == take || result.Count == count) return result;
+        result.AddRange(await query.Select(balance => balance.Id).Take(take - result.Count).ToListAsync(cancellationToken));
         return result;
     }
 
-    public Task<IngredientDispenserState?> GetDispenserStateAsync(
-        Guid id,
-        CancellationToken cancellationToken = default) =>
-        db.IngredientDispenserStates.WhereNotDeleted()
-            .Include(state => state.Kiosk)
-            .Include(state => state.Ingredient)
-            .FirstOrDefaultAsync(state => state.Id == id && state.IsActive, cancellationToken);
+    public Task<KioskIngredientInventory?> GetKioskIngredientInventoryAsync(Guid id, CancellationToken cancellationToken = default) =>
+        db.KioskIngredientInventories.WhereNotDeleted().Include(balance => balance.Kiosk).Include(balance => balance.Ingredient)
+            .FirstOrDefaultAsync(balance => balance.Id == id && balance.IsActive, cancellationToken);
 
-    public Task<List<Alert>> ListActiveInventoryAlertsAsync(
-        Guid dispenserStateId,
-        CancellationToken cancellationToken = default) =>
-        db.Alerts.Where(alert =>
-                alert.DeletedAt == null &&
-                alert.SourceType == "InventoryDispenserState" &&
-                alert.SourceId == dispenserStateId &&
-                alert.Status != AlertStatus.Resolved &&
-                alert.Status != AlertStatus.Suppressed)
-            .ToListAsync(cancellationToken);
-
-    public Task<bool> MaintenanceTicketExistsForAlertAsync(
-        Guid alertId,
-        CancellationToken cancellationToken = default) =>
-        db.MaintenanceTickets.AnyAsync(ticket => ticket.AlertId == alertId, cancellationToken);
+    public Task<List<InventoryRefillTask>> ListActiveInventoryRefillTasksAsync(Guid kioskIngredientInventoryId, CancellationToken cancellationToken = default) =>
+        db.InventoryRefillTasks.WhereNotDeleted().Where(task => task.KioskIngredientInventoryId == kioskIngredientInventoryId &&
+            (task.Status == Domain.Inventory.Enums.InventoryRefillTaskStatus.Requested || task.Status == Domain.Inventory.Enums.InventoryRefillTaskStatus.InProgress)).ToListAsync(cancellationToken);
+    public Task<List<Alert>> ListActiveBalanceInventoryAlertsAsync(Guid kioskIngredientInventoryId, CancellationToken cancellationToken = default) =>
+        db.Alerts.Where(alert => alert.DeletedAt == null && alert.SourceType == "KioskIngredientInventory" &&
+            alert.SourceId == kioskIngredientInventoryId && alert.Status != AlertStatus.Resolved && alert.Status != AlertStatus.Suppressed).ToListAsync(cancellationToken);
 
     public Task AddAlertAsync(Alert alert, CancellationToken cancellationToken = default) =>
         db.Alerts.AddAsync(alert, cancellationToken).AsTask();
 
-    public Task AddMaintenanceTicketAsync(MaintenanceTicket ticket, CancellationToken cancellationToken = default) =>
-        db.MaintenanceTickets.AddAsync(ticket, cancellationToken).AsTask();
+    public Task AddInventoryRefillTaskAsync(InventoryRefillTask task, CancellationToken cancellationToken = default) =>
+        db.InventoryRefillTasks.AddAsync(task, cancellationToken).AsTask();
 
-    public Task AcquireLockAsync(Guid dispenserStateId, CancellationToken cancellationToken = default)
+    public Task AddInventoryRefillTaskTransitionAsync(InventoryRefillTaskTransition transition, CancellationToken cancellationToken = default) =>
+        db.InventoryRefillTaskTransitions.AddAsync(transition, cancellationToken).AsTask();
+
+    public Task AcquireBalanceLockAsync(Guid kioskIngredientInventoryId, CancellationToken cancellationToken = default)
     {
-        var lockKey = $"inventory-alert:{dispenserStateId:N}";
-        return db.Database.ExecuteSqlInterpolatedAsync(
-            $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0));",
-            cancellationToken);
+        var lockKey = $"inventory-balance:{kioskIngredientInventoryId:N}";
+        return db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0));", cancellationToken);
     }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>

@@ -14,7 +14,8 @@ public enum ProductionProgramBindingStatus
 public enum ProductionProgramBindingCapabilityEvidenceStatus
 {
     Declared = 0,
-    Missing = 1
+    Missing = 1,
+    TargetProfileDefault = 2
 }
 
 public enum ProductionProgramBindingAssurance

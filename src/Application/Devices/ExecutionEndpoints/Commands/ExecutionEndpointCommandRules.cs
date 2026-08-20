@@ -16,12 +16,13 @@ internal static class ExecutionEndpointCommandRules
         CurrentUserContext userContext,
         Guid kioskId,
         Guid endpointId,
+        IReadOnlyCollection<string> allowedRoles,
         CancellationToken cancellationToken)
     {
         var endpoint = await store.GetByKioskIdAsync(kioskId, endpointId, cancellationToken);
         if (endpoint is null)
             return (null, ApiResult<ExecutionEndpointResult>.Fail("Execution endpoint not found.", 404));
-        if (!KioskAccessRules.CanAccessKiosk(ScopeRoleSets.DevicesManage, userContext, endpoint.Kiosk))
+        if (!KioskAccessRules.CanAccessKiosk(allowedRoles, userContext, endpoint.Kiosk))
             return (null, ApiResult<ExecutionEndpointResult>.Fail("Access denied.", 403));
         return (endpoint, null);
     }

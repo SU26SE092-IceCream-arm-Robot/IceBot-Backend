@@ -129,7 +129,7 @@ public class ManagementKiosksController : ControllerBase
     }
 
     [HttpPatch("stores/{storeId:guid}/kiosks/{kioskId:guid}/operational-state")]
-    [Authorize(Policy = "kiosks.manage")]
+    [Authorize(Policy = "kiosks.operations.manage")]
     public async Task<IActionResult> SetKioskOperationalState(
         Guid storeId,
         Guid kioskId,

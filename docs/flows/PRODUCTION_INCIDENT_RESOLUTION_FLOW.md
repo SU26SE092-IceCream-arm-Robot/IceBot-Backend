@@ -51,7 +51,7 @@ Resolution rules:
 - `RequestRemake` requires `NotProduced` or `Defective`.
 - A normal remake still requires failed evidence with confirmed no physical output.
 - A defective-output remake additionally requires the matching incident, exact item/unit range, `Defective` inspection, and selected `RequestRemake` resolution.
-- `RequestRefund` and `IssueVoucher` are V1 full-order compensation only and require explicit acknowledgement plus `refunds.manage` authorization.
+- `RequestRefund` and `IssueVoucher` are V1 full-order compensation only and require explicit acknowledgement plus `refunds.request` authorization. Completing, rejecting, or cancelling the resulting compensation requires `refunds.process`.
 - No resolution automatically deletes execution records, successful-unit evidence, or stock movements.
 
 ## API

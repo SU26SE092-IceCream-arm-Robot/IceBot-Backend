@@ -52,6 +52,9 @@ public sealed class ExecutionReportStore :
     {
         return _dbContext.KioskExecutionEndpoints.WhereNotDeleted()
             .Include(endpoint => endpoint.CredentialBinding)
+            // Expected-consumption reconciliation needs the endpoint's tenant scope
+            // when no kiosk inventory balance exists yet.
+            .Include(endpoint => endpoint.Kiosk)
             .FirstOrDefaultAsync(
                 endpoint => endpoint.Id == endpointId && endpoint.Kiosk.DeletedAt == null,
                 cancellationToken);
@@ -256,6 +259,16 @@ public sealed class ExecutionReportStore :
             select optionRequirement.Id).AnyAsync(cancellationToken);
     }
 
+    public async Task AcquireKioskIngredientInventoryMutationLocksAsync(IEnumerable<Guid> inventoryIds, CancellationToken cancellationToken = default)
+    {
+        foreach (var inventoryId in inventoryIds.Distinct().OrderBy(id => id))
+        {
+            await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"SELECT pg_advisory_xact_lock(hashtextextended({$"inventory-balance:{inventoryId:N}"}, 0));",
+                cancellationToken);
+        }
+    }
+
     public async Task<IReadOnlyList<ExpectedInventoryRequirement>> ListExpectedInventoryRequirementsAsync(
         Guid orderId,
         Guid orderItemId,
@@ -340,6 +353,19 @@ public sealed class ExecutionReportStore :
             .ThenBy(state => state.Id)
             .ToListAsync(cancellationToken);
 
+    public Task<KioskIngredientInventory?> GetKioskIngredientInventoryForExpectedConsumptionAsync(
+        Guid kioskId, Guid ingredientId, string unit, CancellationToken cancellationToken = default) =>
+        _dbContext.KioskIngredientInventories.WhereNotDeleted()
+            .Include(inventory => inventory.Kiosk)
+            .Include(inventory => inventory.Ingredient)
+            .FirstOrDefaultAsync(inventory => inventory.KioskId == kioskId && inventory.IngredientId == ingredientId &&
+                inventory.IsActive && inventory.Ingredient.IsActive && inventory.Unit == unit.Trim().ToLower(), cancellationToken);
+
+    public Task<InventoryReconciliationCase?> GetInventoryReconciliationCaseAsync(
+        Guid sourceEventId, Guid ingredientId, string unit, string reasonCode, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryReconciliationCases.FirstOrDefaultAsync(item => item.SourceEventId == sourceEventId &&
+            item.IngredientId == ingredientId && item.Unit == unit.Trim().ToLower() && item.ReasonCode == reasonCode, cancellationToken);
+
     public Task<StockMovement?> GetStockMovementBySourceEventIdAsync(
         Guid sourceEventId,
         CancellationToken cancellationToken = default)
@@ -415,6 +441,9 @@ public sealed class ExecutionReportStore :
     {
         return _dbContext.StockMovements.AddAsync(movement, cancellationToken).AsTask();
     }
+
+    public Task AddInventoryReconciliationCaseAsync(InventoryReconciliationCase reconciliationCase, CancellationToken cancellationToken = default) =>
+        _dbContext.InventoryReconciliationCases.AddAsync(reconciliationCase, cancellationToken).AsTask();
 
     public Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {

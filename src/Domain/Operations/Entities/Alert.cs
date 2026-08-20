@@ -166,6 +166,41 @@ public partial class Alert : SyncAggregateEntity
         };
     }
 
+    public static Alert RaiseFromKioskIngredientInventory(
+        Guid kioskId,
+        Guid kioskIngredientInventoryId,
+        string alertCode,
+        SeverityLevel severity,
+        string title,
+        string? message,
+        DateTimeOffset raisedAt)
+    {
+        if (kioskId == Guid.Empty || kioskIngredientInventoryId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(alertCode) || string.IsNullOrWhiteSpace(title))
+        {
+            throw new DomainRuleException("Inventory balance alert identity, code, and title are required.");
+        }
+
+        return new Alert
+        {
+            KioskId = kioskId,
+            DeviceId = null,
+            AlertCode = alertCode.Trim(),
+            CorrelationKey = $"{NormalizeCorrelationKey(alertCode)}:{kioskIngredientInventoryId:N}",
+            Severity = severity,
+            Title = title.Trim(),
+            Message = string.IsNullOrWhiteSpace(message) ? null : message.Trim(),
+            Status = AlertStatus.Open,
+            SourceType = "KioskIngredientInventory",
+            SourceId = kioskIngredientInventoryId,
+            RaisedAt = raisedAt,
+            LastOccurredAt = raisedAt,
+            OccurrenceCount = 1,
+            Version = 1,
+            SyncedAt = raisedAt
+        };
+    }
+
     public static Alert RaiseFromExecutionEndpoint(
         Guid kioskId,
         Guid executionEndpointId,

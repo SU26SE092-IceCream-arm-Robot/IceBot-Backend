@@ -56,10 +56,11 @@ public sealed class ProductionInventoryReadinessGuard(
         InventoryReadinessPolicy policy,
         IReadOnlyCollection<KioskInventoryReadinessResult> results)
     {
-        // Inventory tracking is optional. Once a kiosk configures topology, its
-        // reported state becomes authoritative for publication and deployment.
+        // Inventory tracking is optional. Once a kiosk configures a Cloud
+        // balance, its recorded state becomes authoritative for publication
+        // and deployment policy evaluation.
         var trackedResults = results
-            .Where(result => result.HasConfiguredInventoryTopology)
+            .Where(result => result.HasConfiguredInventoryBalance)
             .ToArray();
         var notReady = trackedResults.Where(result => !result.IsReady).ToArray();
         return new ProductionInventoryReadinessAssessment(

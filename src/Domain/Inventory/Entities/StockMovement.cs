@@ -8,7 +8,9 @@ namespace Domain.Inventory.Entities;
 
 public partial class StockMovement : AppendOnlySyncEntity, IStoreScoped
 {
-    public Guid IngredientDispenserStateId { get; set; }
+    public Guid? IngredientDispenserStateId { get; set; }
+
+    public Guid? KioskIngredientInventoryId { get; set; }
 
     public Guid? OrganizationId { get; set; }
 
@@ -60,7 +62,9 @@ public partial class StockMovement : AppendOnlySyncEntity, IStoreScoped
 
     public virtual Ingredient? Ingredient { get; set; }
 
-    public virtual IngredientDispenserState IngredientDispenserState { get; set; } = null!;
+    public virtual IngredientDispenserState? IngredientDispenserState { get; set; }
+
+    public virtual KioskIngredientInventory? KioskIngredientInventory { get; set; }
 
     public static StockMovement Create(
         Guid ingredientDispenserStateId,
@@ -110,6 +114,48 @@ public partial class StockMovement : AppendOnlySyncEntity, IStoreScoped
             BalanceAfter = balanceAfter,
             IsEstimated = isEstimated,
             Unit = string.IsNullOrWhiteSpace(unit) ? "unit" : unit.Trim(),
+            OccurredAt = occurredAt,
+            ReasonCode = reasonCode,
+            ReferenceType = referenceType,
+            ReferenceId = referenceId,
+            SourceEventId = sourceEventId
+        };
+    }
+
+    public static StockMovement CreateForKioskInventory(
+        Guid kioskIngredientInventoryId,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        Guid ingredientId,
+        string movementType,
+        decimal quantity,
+        decimal? balanceBefore,
+        decimal? balanceAfter,
+        string unit,
+        DateTimeOffset occurredAt,
+        string? reasonCode = null,
+        string? referenceType = null,
+        Guid? referenceId = null,
+        Guid? sourceEventId = null,
+        bool isEstimated = false)
+    {
+        if (kioskIngredientInventoryId == Guid.Empty) throw new DomainRuleException("Kiosk ingredient inventory is required for stock movement.");
+        if (string.IsNullOrWhiteSpace(movementType)) throw new DomainRuleException("Stock movement type is required.");
+        if (quantity == 0) throw new DomainRuleException("Stock movement quantity cannot be zero.");
+        return new StockMovement
+        {
+            KioskIngredientInventoryId = kioskIngredientInventoryId,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            IngredientId = ingredientId,
+            MovementType = movementType.Trim(),
+            Quantity = quantity,
+            BalanceBefore = balanceBefore,
+            BalanceAfter = balanceAfter,
+            IsEstimated = isEstimated,
+            Unit = string.IsNullOrWhiteSpace(unit) ? "unit" : unit.Trim().ToLowerInvariant(),
             OccurredAt = occurredAt,
             ReasonCode = reasonCode,
             ReferenceType = referenceType,

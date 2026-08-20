@@ -31,7 +31,6 @@ public static class OperationsModule
         services.AddScoped<AcknowledgeAlertCommandHandler>();
         services.AddScoped<ResolveAlertCommandHandler>();
         services.AddScoped<ICriticalOperationalAlertNotifier, CriticalOperationalAlertNotifier>();
-        services.AddScoped<IInventoryOperationalAlertNotifier, InventoryOperationalAlertNotifier>();
         services.AddScoped<ListOperationLogsQueryHandler>();
         services.AddScoped<GetOperationLogQueryHandler>();
         services.AddScoped<GetOperationLogDiagnosticsQueryHandler>();

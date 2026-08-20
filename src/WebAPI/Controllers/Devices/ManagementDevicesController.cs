@@ -131,7 +131,7 @@ public sealed class ManagementDevicesController : ControllerBase
     }
 
     [HttpPatch("kiosks/{kioskId:guid}/devices/{deviceId:guid}/status")]
-    [Authorize(Policy = "devices.manage")]
+    [Authorize(Policy = "devices.operations.manage")]
     public async Task<IActionResult> SetDeviceStatus(
         Guid kioskId,
         Guid deviceId,

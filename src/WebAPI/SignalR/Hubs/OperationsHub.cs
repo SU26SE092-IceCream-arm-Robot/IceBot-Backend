@@ -23,10 +23,15 @@ public sealed class OperationsHub : Hub
         var user = Context.User!.GetUserContext();
         var kiosk = await _kioskStore.GetByIdAsync(kioskId, Context.ConnectionAborted);
         if (kiosk is null ||
-            !await _organizationAccess.IsActiveAsync(kiosk.OrganizationId, Context.ConnectionAborted) ||
             !ScopeAccessRules.CanAccessScopedRow(ScopeRoleSets.OperationsView, user, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id))
         {
             throw new HubException("Access denied: you do not have access to this kiosk.");
+        }
+
+        if (!await _organizationAccess.IsActiveAsync(kiosk.OrganizationId, Context.ConnectionAborted))
+        {
+            Context.Abort();
+            throw new HubException("Organization access is unavailable.");
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, $"kiosk:{kioskId}");

@@ -56,7 +56,7 @@ public sealed class ResolveAlertCommandHandler
         CancellationToken cancellationToken)
     {
 
-        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AlertsManage, command.UserContext);
+        var scope = ScopeAccessRules.GetEffectiveScope(ScopeRoleSets.AlertsResolve, command.UserContext);
         var alert = await _store.GetAccessibleByIdAsync(
             command.AlertId,
             command.UserContext.IsSystemAdmin,

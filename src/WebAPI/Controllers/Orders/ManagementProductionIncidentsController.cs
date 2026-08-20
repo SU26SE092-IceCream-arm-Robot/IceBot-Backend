@@ -11,7 +11,7 @@ namespace WebAPI.Controllers.Orders;
 [ApiController]
 [ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/management")]
-[Authorize(Policy = "orders.manage")]
+[Authorize(Policy = "orders.intervention.manage")]
 public sealed class ManagementProductionIncidentsController(
     ListProductionIncidentsQueryHandler listHandler,
     GetProductionIncidentQueryHandler getHandler,
