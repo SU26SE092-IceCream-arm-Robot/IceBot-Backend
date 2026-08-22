@@ -10,6 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Infrastructure.Devices.Connectivity.Persistence;
+
 public sealed class ExecutionReadinessStore : IExecutionReadinessStore, IExecutionEndpointReportedDeviceStore
 {
     private readonly IceBotDbContext _db;

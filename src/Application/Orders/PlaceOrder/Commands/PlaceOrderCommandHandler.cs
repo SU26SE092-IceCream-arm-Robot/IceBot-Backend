@@ -7,11 +7,10 @@ using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Rules;
 using Application.Orders.PlaceOrder.Support;
 using Application.Orders.PlaceOrder.Services;
-using Application.Orders.Admission;
 using Application.Shared.Wrappers;
 using Application.Shared.Idempotency;
-using Application.Tenants.Kiosks.Rules;
-using Application.Tenants.Stores;
+using Application.SalesCatalog.Admission;
+using Application.SalesCatalog.Admission.Services;
 using Domain.Orders.Entities;
 using Microsoft.Extensions.Options;
 
@@ -24,20 +23,20 @@ public sealed class PlaceOrderCommandHandler
     private readonly IRealtimeNotificationPublisher _publisher;
     private readonly PlaceOrderItemAppender _itemAppender;
     private readonly OrderPaymentWindowOptions _paymentWindow;
-    private readonly KioskSalesAdmissionOptions _salesAdmission;
+    private readonly KioskSalesAdmissionEvaluator _admissionEvaluator;
 
     public PlaceOrderCommandHandler(
         IOrderStore orderStore,
         IRealtimeNotificationPublisher publisher,
         PlaceOrderItemAppender itemAppender,
         IOptions<OrderPaymentWindowOptions> paymentWindow,
-        IOptions<KioskSalesAdmissionOptions> salesAdmission)
+        KioskSalesAdmissionEvaluator admissionEvaluator)
     {
         _orderStore = orderStore;
         _publisher = publisher;
         _itemAppender = itemAppender;
         _paymentWindow = paymentWindow.Value;
-        _salesAdmission = salesAdmission.Value;
+        _admissionEvaluator = admissionEvaluator;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
@@ -103,23 +102,11 @@ public sealed class PlaceOrderCommandHandler
 
             await _orderStore.AcquireKioskOperationalLockAsync(kiosk.Id, ct);
 
-            var connectivity = await _orderStore.GetKioskConnectivityAsync(kiosk.Id, ct);
-            var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(
-                kiosk, connectivity, _salesAdmission.RequireConnectivity);
-            if (salesAvailabilityError is not null)
-            {
-                return ApiResult<OrderResult>.Fail(salesAvailabilityError, 409);
-            }
-
             var now = DateTimeOffset.UtcNow;
-            if (await _orderStore.HasActiveCustomerSessionAsync(kiosk.Id, now, cancellationToken: ct))
+            var admission = await _admissionEvaluator.EvaluateAsync(kiosk, new KioskSalesAdmissionRequest(now), ct);
+            if (!admission.CanPlaceOrder)
             {
-                return ApiResult<OrderResult>.Fail(KioskCustomerSessionAdmission.OccupiedMessage, 409);
-            }
-            var admissionError = StoreSalesAvailabilityRules.ValidateSalesAdmission(kiosk.Store, now);
-            if (admissionError is not null)
-            {
-                return ApiResult<OrderResult>.Fail(admissionError, 409);
+                return ApiResult<OrderResult>.Fail(admission.ToDisplayMessage()!, 409);
             }
 
             var order = new Order

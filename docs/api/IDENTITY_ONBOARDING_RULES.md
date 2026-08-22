@@ -8,12 +8,12 @@ This document is the backend source of truth for internal account onboarding, in
 
 ## Purpose
 
-Internal accounts are created by authorized management users. Public signup is disabled for internal system accounts. Account management is organization-owned: `SystemAdmin` may create and administer accounts for any selected organization, while `OrgAdmin` may do so only in its own organization scope. Either actor may assign `OrgAdmin`, `Manager`, `Staff`, and `Technician` within that route organization; neither organization route can assign the global `SystemAdmin` role. Initial/recovery `SystemAdmin` provisioning remains bootstrap-only.
+Internal tenant accounts are created by authorized organization-management users. `Technician` is not a tenant workforce role: only `SystemAdmin` manages platform Technicians through `/management/platform/technicians`, and each tenant access grant must be Store- or Kiosk-scoped. Neither organization route can assign `Technician` or the global `SystemAdmin` role. Initial/recovery `SystemAdmin` provisioning remains bootstrap-only.
 
 ## Temporary Demo Override
 
-Current implementation temporarily creates every tenant account role
-(`OrgAdmin`, `Manager`, `Staff`, and `Technician`) as `Active`, enables local
+Current implementation temporarily creates every tenant workforce role
+(`OrgAdmin`, `Manager`, and `Staff`) as `Active`, enables local
 login, generates a random temporary password, stores only its hash, and emails
 the username, email, and plaintext temporary password to the account mailbox.
 `SystemAdmin` remains excluded and bootstrap-only.

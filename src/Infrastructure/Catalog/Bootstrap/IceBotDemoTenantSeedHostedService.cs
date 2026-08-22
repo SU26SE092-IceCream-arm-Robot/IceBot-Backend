@@ -23,8 +23,7 @@ public sealed class IceBotDemoTenantSeedHostedService(
     public const string KioskCode = "ICEBOT-DEMO-KIOSK";
 
     public static bool IsEnabled(IConfiguration configuration) =>
-        configuration.GetValue<bool>("DemoCatalogSeed:IceBotDemoEnabled") ||
-        configuration.GetValue<bool>("DevelopmentCatalogSeed:VanillaSoftServeEnabled");
+        configuration.GetValue<bool>("DemoCatalogSeed:IceBotDemoEnabled");
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {

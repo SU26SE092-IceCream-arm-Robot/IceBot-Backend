@@ -14,6 +14,7 @@ using WebAPI.Configuration.Security;
 using Application.Devices.Connectivity.Contracts;
 
 namespace WebAPI.Controllers.IoT;
+
 [ApiController, ApiVersion("1.0")]
 [Route("api/v{version:apiVersion}/iot/execution-endpoints/{endpointId:guid}/readiness")]
 public sealed class ExecutionReadinessController : ControllerBase
@@ -31,10 +32,16 @@ public sealed class ExecutionReadinessController : ControllerBase
         if (!auth.Succeeded) return Unauthorized(ApiResult<object>.Fail(auth.Message, 401));
         var result = await _handler.HandleAsync(new IngestExecutionReadinessCommand
         {
-            KioskId = auth.Endpoint!.KioskId, EndpointId = endpointId, SourceExecutorId = request.SourceExecutorId,
-            StateRevision = request.StateRevision, ExecutorReportedAt = request.ExecutorReportedAt,
-            Readiness = request.Readiness, Activity = request.Activity, Safety = request.Safety,
-            CurrentCommandId = request.CurrentCommandId, PhysicalOutputState = request.PhysicalOutputState,
+            KioskId = auth.Endpoint!.KioskId,
+            EndpointId = endpointId,
+            SourceExecutorId = request.SourceExecutorId,
+            StateRevision = request.StateRevision,
+            ExecutorReportedAt = request.ExecutorReportedAt,
+            Readiness = request.Readiness,
+            Activity = request.Activity,
+            Safety = request.Safety,
+            CurrentCommandId = request.CurrentCommandId,
+            PhysicalOutputState = request.PhysicalOutputState,
             FaultCode = request.FaultCode,
             LocalPersistenceHealth = new LocalPersistenceHealthInput(
                 request.LocalPersistenceHealth.StorageWritable,

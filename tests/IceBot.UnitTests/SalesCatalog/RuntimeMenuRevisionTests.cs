@@ -1,7 +1,8 @@
 using Application.SalesCatalog.Abstractions;
-using Application.SalesCatalog.Availability;
 using Application.Devices.Telemetry;
-using Application.Inventory.Abstractions;
+using Application.SalesCatalog.Admission;
+using Application.SalesCatalog.Admission.Abstractions;
+using Application.SalesCatalog.Admission.Services;
 using Application.SalesCatalog.ReadModels;
 using Application.SalesCatalog.RuntimeMenus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Abstractions;
@@ -42,16 +43,13 @@ public sealed class RuntimeMenuRevisionTests
         store.ListMenuItemOptionGroupsAsync(
                 Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
             .Returns(new List<MenuItemOptionGroupReadModel>());
-        var availability = Substitute.For<IMenuItemOperationalAvailabilityReader>();
-        availability.GetPausedMenuItemIdsAsync(
-                kiosk.Id, Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
-            .Returns(new HashSet<Guid>());
+        var admissionStore = AdmissionStore(connectivity);
         var handler = new GetKioskRuntimeMenuQueryHandler(
             store,
-            new RuntimeMenuProjectionBuilder(store, CreateInventoryGate(), CreateTelemetryOptions()),
+            new RuntimeMenuProjectionBuilder(store),
             new PassthroughRuntimeMenuCache(),
-            availability,
-            Options.Create(new KioskSalesAdmissionOptions()));
+            KioskAdmission(admissionStore),
+            ItemAdmission(admissionStore));
 
         var first = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
         var second = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
@@ -63,7 +61,7 @@ public sealed class RuntimeMenuRevisionTests
     }
 
     [Fact]
-    public async Task OfflineKiosk_DoesNotReadCachedProjection()
+    public async Task OfflineKiosk_ExposesCatalogStateButBlocksOrderAdmission()
     {
         var kiosk = ActiveKiosk();
         var connectivity = KioskConnectivityProjection.Create(kiosk.Id, DateTimeOffset.UtcNow);
@@ -75,20 +73,31 @@ public sealed class RuntimeMenuRevisionTests
         var store = Substitute.For<IMenuStore>();
         store.GetKioskByIdAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(kiosk);
         store.GetKioskConnectivityAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(connectivity);
-        var availability = Substitute.For<IMenuItemOperationalAvailabilityReader>();
+        store.ListActiveMenusForKioskAsync(
+                kiosk.OrganizationId, kiosk.StoreId, kiosk.Id, Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>())
+            .Returns(new List<Menu>());
+        store.ListMenuItemProductOptionsAsync(
+                Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<MenuItemProductOptionReadModel>());
+        store.ListMenuItemOptionGroupsAsync(
+                Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<MenuItemOptionGroupReadModel>());
+        var admissionStore = AdmissionStore(connectivity);
         var cache = new RecordingRuntimeMenuCache();
         var handler = new GetKioskRuntimeMenuQueryHandler(
             store,
-            new RuntimeMenuProjectionBuilder(store, CreateInventoryGate(), CreateTelemetryOptions()),
+            new RuntimeMenuProjectionBuilder(store),
             cache,
-            availability,
-            Options.Create(new KioskSalesAdmissionOptions()));
+            KioskAdmission(admissionStore),
+            ItemAdmission(admissionStore));
 
         var result = await handler.HandleAsync(new GetKioskRuntimeMenuQuery(kiosk.Id));
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(409, result.StatusCode);
-        Assert.Equal(0, cache.ReadCount);
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Empty(result.Data!.Items);
+        Assert.False(result.Data.Admission!.CanPlaceOrder);
+        Assert.False(result.Data.Admission.CanOpenPayment);
+        Assert.Equal(1, cache.ReadCount);
     }
 
     private static Kiosk ActiveKiosk()
@@ -122,11 +131,30 @@ public sealed class RuntimeMenuRevisionTests
         };
     }
 
-    private static MachineProductionInventoryGate CreateInventoryGate() =>
-        new(Substitute.For<IInventoryReadinessEvaluator>(), CreateTelemetryOptions());
+    private static IOperationalAdmissionReadStore AdmissionStore(KioskConnectivityProjection connectivity)
+    {
+        var store = Substitute.For<IOperationalAdmissionReadStore>();
+        store.GetKioskConnectivityAsync(connectivity.KioskId, Arg.Any<CancellationToken>()).Returns(connectivity);
+        store.HasActiveCustomerSessionAsync(
+                connectivity.KioskId,
+                Arg.Any<DateTimeOffset>(),
+                null,
+                Arg.Any<CancellationToken>())
+            .Returns(false);
+        return store;
+    }
 
-    private static IOptions<EdgeTelemetryIngestionOptions> CreateTelemetryOptions() =>
-        Options.Create(new EdgeTelemetryIngestionOptions());
+    private static KioskSalesAdmissionEvaluator KioskAdmission(IOperationalAdmissionReadStore store) =>
+        new(
+            store,
+            Options.Create(new KioskSalesAdmissionOptions()),
+            Options.Create(new EdgeTelemetryIngestionOptions()));
+
+    private static MenuItemOperationalAdmissionEvaluator ItemAdmission(IOperationalAdmissionReadStore store) =>
+        new(
+            store,
+            null!,
+            Options.Create(new EdgeTelemetryIngestionOptions()));
 
     private sealed class PassthroughRuntimeMenuCache : IRuntimeMenuProjectionCache
     {

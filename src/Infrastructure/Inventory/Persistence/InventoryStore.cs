@@ -14,7 +14,11 @@ using Domain.Operations.Entities;
 
 namespace Infrastructure.Inventory.Persistence;
 
-public sealed class InventoryStore : IInventoryStore
+public sealed class InventoryStore :
+    IInventoryStore,
+    IKioskIngredientInventoryStore,
+    IInventoryRefillTaskStore,
+    IInventoryWorkspaceStore
 {
     private readonly IceBotDbContext _dbContext;
 

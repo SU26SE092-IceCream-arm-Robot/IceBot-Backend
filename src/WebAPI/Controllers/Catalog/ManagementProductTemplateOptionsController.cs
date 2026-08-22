@@ -54,8 +54,12 @@ public sealed class ManagementProductTemplateOptionsController(
         ReplaceProductOptionIngredientRequirementsRequest request, CancellationToken ct) =>
         Execute(replaceIngredientRequirements.HandleAsync(new ReplaceProductOptionIngredientRequirementsCommand
         {
-            Scope = Scope(), ProductId = productId, OptionGroupId = optionGroupId,
-            ProductOptionId = productOptionId, Request = request, UpdatedByAccountId = CurrentAccountId()
+            Scope = Scope(),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            ProductOptionId = productOptionId,
+            Request = request,
+            UpdatedByAccountId = CurrentAccountId()
         }, ct));
 
     [HttpPatch("{optionGroupId:long}/options/{productOptionId:guid}/availability")]

@@ -35,6 +35,10 @@ public sealed class OrganizationLifecycleTransitionCommandHandler
 
         return _organizations.ExecuteInTransactionAsync(async () =>
         {
+            await _organizations.AcquireLifecycleMutationLockAsync(
+                command.OrganizationId,
+                cancellationToken);
+
             var request = command.Request;
             var idempotencyKey = request.IdempotencyKey?.Trim();
             if (!string.IsNullOrWhiteSpace(idempotencyKey))

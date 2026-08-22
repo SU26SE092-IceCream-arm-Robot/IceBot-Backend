@@ -234,10 +234,17 @@ public sealed class PaymentReconciliationStore : IPaymentReconciliationStore
 
     private static PaymentReconciliationDiscrepancyResult Create(string code, string severity, string action, PaymentRow payment, PaymentProviderObservation? evidence) => new()
     {
-        Code = code, Severity = severity, RecommendedAction = action, PaymentTransactionId = payment.Id,
-        OrderId = payment.OrderId, OrderNumber = payment.OrderNumber, Provider = payment.Provider,
-        ExpectedAmount = payment.Amount, ObservedAmount = evidence?.ObservedPaidAmount ?? evidence?.ObservedAmount,
-        ObservedStatus = evidence?.ObservedStatus, ObservedAt = evidence?.ObservedAt
+        Code = code,
+        Severity = severity,
+        RecommendedAction = action,
+        PaymentTransactionId = payment.Id,
+        OrderId = payment.OrderId,
+        OrderNumber = payment.OrderNumber,
+        Provider = payment.Provider,
+        ExpectedAmount = payment.Amount,
+        ObservedAmount = evidence?.ObservedPaidAmount ?? evidence?.ObservedAmount,
+        ObservedStatus = evidence?.ObservedStatus,
+        ObservedAt = evidence?.ObservedAt
     };
 
     private static bool IsProviderPaid(PaymentProviderObservation observation) =>

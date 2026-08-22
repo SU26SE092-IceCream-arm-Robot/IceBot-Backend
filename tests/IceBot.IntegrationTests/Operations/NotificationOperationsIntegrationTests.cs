@@ -25,21 +25,29 @@ public sealed class NotificationOperationsIntegrationTests(IntegrationTestFixtur
         await using var db = fixture.CreateDbContext();
         var organization = new Organization
         {
-            Code = $"REQUEUE-{Guid.NewGuid():N}", Name = "Requeue organization", Status = EntityStatus.Active
+            Code = $"REQUEUE-{Guid.NewGuid():N}",
+            Name = "Requeue organization",
+            Status = EntityStatus.Active
         };
         var store = new Store
         {
-            OrganizationId = organization.Id, Code = $"STORE-{Guid.NewGuid():N}",
-            Name = "Requeue store", Status = EntityStatus.Active
+            OrganizationId = organization.Id,
+            Code = $"STORE-{Guid.NewGuid():N}",
+            Name = "Requeue store",
+            Status = EntityStatus.Active
         };
         var kiosk = new Kiosk
         {
-            OrganizationId = organization.Id, StoreId = store.Id,
-            Code = $"KIOSK-{Guid.NewGuid():N}", Name = "Requeue kiosk", Status = KioskStatus.Active
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            Code = $"KIOSK-{Guid.NewGuid():N}",
+            Name = "Requeue kiosk",
+            Status = KioskStatus.Active
         };
         var actor = new Account
         {
-            UserName = $"requeue-{Guid.NewGuid():N}", Email = $"requeue-{Guid.NewGuid():N}@example.test",
+            UserName = $"requeue-{Guid.NewGuid():N}",
+            Email = $"requeue-{Guid.NewGuid():N}@example.test",
             Status = AccountStatus.Active
         };
         db.AddRange(organization, store, kiosk, actor);
@@ -56,7 +64,8 @@ public sealed class NotificationOperationsIntegrationTests(IntegrationTestFixtur
             new NotificationDeliveryReadStore(db), new NotificationDeliveryStore(db), new OperationLogStore(db));
         var result = await service.RequeueAsync(new CurrentUserContext
         {
-            AccountId = actor.Id, IsSystemAdmin = true
+            AccountId = actor.Id,
+            IsSystemAdmin = true
         }, organization.Id, delivery.Id, "Operator confirmed transport recovery.");
 
         Assert.True(result.Succeeded);
@@ -82,11 +91,15 @@ public sealed class NotificationOperationsIntegrationTests(IntegrationTestFixtur
         var actorId = Guid.NewGuid();
         var ownOrganization = new Organization
         {
-            Code = $"REQUEUE-OWN-{Guid.NewGuid():N}", Name = "Own organization", Status = EntityStatus.Active
+            Code = $"REQUEUE-OWN-{Guid.NewGuid():N}",
+            Name = "Own organization",
+            Status = EntityStatus.Active
         };
         var otherOrganization = new Organization
         {
-            Code = $"REQUEUE-OTHER-{Guid.NewGuid():N}", Name = "Other organization", Status = EntityStatus.Active
+            Code = $"REQUEUE-OTHER-{Guid.NewGuid():N}",
+            Name = "Other organization",
+            Status = EntityStatus.Active
         };
         var ownStore = CreateStore(ownOrganization.Id, "OWN");
         var otherStore = CreateStore(otherOrganization.Id, "OTHER");

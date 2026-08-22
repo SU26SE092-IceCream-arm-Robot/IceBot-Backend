@@ -2,12 +2,10 @@ using Application.SalesCatalog.Abstractions;
 using Application.SalesCatalog.RuntimeMenus.Abstractions;
 using Application.SalesCatalog.RuntimeMenus.Results;
 using Application.Shared.Wrappers;
-using Application.Tenants.Kiosks.Rules;
-using Application.Tenants.Stores;
 using Application.SalesCatalog.RuntimeMenus.Services;
 using Application.SalesCatalog.RuntimeMenus.Support;
-using Application.SalesCatalog.Availability;
-using Microsoft.Extensions.Options;
+using Application.SalesCatalog.Admission.Services;
+using Domain.Catalog.Enums;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
 
@@ -16,21 +14,21 @@ public sealed class GetKioskRuntimeMenuQueryHandler
     private readonly IMenuStore _menus;
     private readonly RuntimeMenuProjectionBuilder _projectionBuilder;
     private readonly IRuntimeMenuProjectionCache _cache;
-    private readonly IMenuItemOperationalAvailabilityReader _operationalAvailability;
-    private readonly KioskSalesAdmissionOptions _salesAdmission;
+    private readonly KioskSalesAdmissionEvaluator _kioskAdmission;
+    private readonly MenuItemOperationalAdmissionEvaluator _itemAdmission;
 
     public GetKioskRuntimeMenuQueryHandler(
         IMenuStore menus,
         RuntimeMenuProjectionBuilder projectionBuilder,
         IRuntimeMenuProjectionCache cache,
-        IMenuItemOperationalAvailabilityReader operationalAvailability,
-        IOptions<KioskSalesAdmissionOptions> salesAdmission)
+        KioskSalesAdmissionEvaluator kioskAdmission,
+        MenuItemOperationalAdmissionEvaluator itemAdmission)
     {
         _menus = menus;
         _projectionBuilder = projectionBuilder;
         _cache = cache;
-        _operationalAvailability = operationalAvailability;
-        _salesAdmission = salesAdmission.Value;
+        _kioskAdmission = kioskAdmission;
+        _itemAdmission = itemAdmission;
     }
 
     public async Task<ApiResult<RuntimeMenuResult>> HandleAsync(
@@ -44,19 +42,11 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             return ApiResult<RuntimeMenuResult>.Fail("Kiosk not found.", 404);
         }
 
-        var connectivity = await _menus.GetKioskConnectivityAsync(kioskId, cancellationToken);
-        var salesAvailabilityError = KioskSalesAvailabilityRules.ValidateOnlineSalesAvailability(
-            kiosk, connectivity, _salesAdmission.RequireConnectivity);
-        if (salesAvailabilityError is not null)
-        {
-            return ApiResult<RuntimeMenuResult>.Fail(salesAvailabilityError, 409);
-        }
-
         var now = DateTimeOffset.UtcNow;
-        var admissionError = StoreSalesAvailabilityRules.ValidateSalesAdmission(kiosk.Store, now);
-        if (admissionError is not null)
+        var admission = await _kioskAdmission.EvaluateAsync(kiosk, new(now), cancellationToken);
+        if (!admission.CanExposeCatalog)
         {
-            return ApiResult<RuntimeMenuResult>.Fail(admissionError, 409);
+            return ApiResult<RuntimeMenuResult>.Fail(admission.ToDisplayMessage()!, 409);
         }
 
         var projection = await _cache.GetOrCreateAsync(
@@ -64,24 +54,111 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             ct => _projectionBuilder.BuildAsync(kiosk, ct),
             cancellationToken);
 
-        var pausedMenuItemIds = await _operationalAvailability.GetPausedMenuItemIdsAsync(
-            kiosk.Id,
-            projection.Items.Select(item => item.MenuItemId).ToArray(),
-            cancellationToken);
-        var availableItems = pausedMenuItemIds.Count == 0
-            ? projection.Items
-            : projection.Items.Where(item => !pausedMenuItemIds.Contains(item.MenuItemId)).ToList();
+        var availableItems = new List<RuntimeMenuItemResult>();
+        foreach (var item in projection.Items)
+        {
+            var itemDecision = await _itemAdmission.EvaluateAsync(
+                kiosk,
+                item.MenuItemId,
+                quantity: 1,
+                selectedOptionIngredients: null,
+                now,
+                cancellationToken);
+            if (itemDecision.CanSell)
+            {
+                var itemWithLiveOptionPolicy = ApplyProductionOptionPolicy(item, itemDecision.SupportedProductionOptionCodes);
+                if (HasSatisfiableOptionGroups(itemWithLiveOptionPolicy))
+                {
+                    availableItems.Add(itemWithLiveOptionPolicy);
+                }
+            }
+        }
+
+        var visibleItems = admission.CanPlaceOrder ? availableItems : [];
 
         var result = new RuntimeMenuResult
         {
             SnapshotId = Guid.CreateVersion7(),
-            Revision = RuntimeMenuRevision.Compute(kiosk.Id, availableItems),
+            Revision = RuntimeMenuRevision.Compute(kiosk.Id, visibleItems),
             KioskId = kiosk.Id,
             GeneratedAt = now,
             ExpiresAt = projection.ValidUntil,
-            Items = availableItems
+            Items = visibleItems,
+            Admission = new RuntimeMenuAdmissionResult
+            {
+                CanPlaceOrder = admission.CanPlaceOrder,
+                CanOpenPayment = admission.CanOpenPayment,
+                EvidenceValidUntil = admission.EvidenceValidUntil,
+                Blockers = admission.Blockers.Select(blocker => new RuntimeMenuAdmissionBlockerResult
+                {
+                    Code = blocker.Code.ToString(),
+                    Scope = blocker.Scope.ToString()
+                }).ToList()
+            }
         };
 
         return ApiResult<RuntimeMenuResult>.Success(result);
     }
+
+    private static RuntimeMenuItemResult ApplyProductionOptionPolicy(
+        RuntimeMenuItemResult item,
+        IReadOnlySet<string> supportedProductionOptionCodes)
+    {
+        return new RuntimeMenuItemResult
+        {
+            MenuId = item.MenuId,
+            MenuItemId = item.MenuItemId,
+            ProductId = item.ProductId,
+            ProductVariantId = item.ProductVariantId,
+            RecipeId = item.RecipeId,
+            MenuItemCode = item.MenuItemCode,
+            ProductCode = item.ProductCode,
+            ProductVariantCode = item.ProductVariantCode,
+            DisplayName = item.DisplayName,
+            Description = item.Description,
+            SizeCode = item.SizeCode,
+            Price = item.Price,
+            DiscountAmount = item.DiscountAmount,
+            FinalPrice = item.FinalPrice,
+            Currency = item.Currency,
+            PreparationTimeSeconds = item.PreparationTimeSeconds,
+            ImageUrl = item.ImageUrl,
+            RecipeVersion = item.RecipeVersion,
+            OptionGroups = item.OptionGroups.Select(group => new RuntimeMenuOptionGroupResult
+            {
+                OptionGroupId = group.OptionGroupId,
+                Code = group.Code,
+                Name = group.Name,
+                SelectionType = group.SelectionType,
+                MinSelections = group.MinSelections,
+                MaxSelections = group.MaxSelections,
+                IsRequired = group.IsRequired,
+                Options = group.Options
+                    .Where(option =>
+                        option.ExecutionImpact != ProductOptionExecutionImpact.ProductionAffecting.ToString() ||
+                        supportedProductionOptionCodes.Contains(option.Code))
+                    .Select(option => new RuntimeMenuProductOptionResult
+                    {
+                        ProductOptionId = option.ProductOptionId,
+                        Code = option.Code,
+                        Name = option.Name,
+                        Description = option.Description,
+                        PriceDelta = option.PriceDelta,
+                        Currency = option.Currency,
+                        IsDefault = option.IsDefault,
+                        ExecutionImpact = option.ExecutionImpact
+                    }).ToList()
+            }).ToList()
+        };
+    }
+
+    private static bool HasSatisfiableOptionGroups(RuntimeMenuItemResult item) =>
+        item.OptionGroups.All(group =>
+        {
+            var minimum = group.IsRequired ? Math.Max(1, group.MinSelections) : group.MinSelections;
+            var maximum = string.Equals(group.SelectionType, "Single", StringComparison.Ordinal)
+                ? 1
+                : group.MaxSelections;
+            return group.Options.Count >= minimum && (maximum <= 0 || minimum <= maximum);
+        });
 }

@@ -230,10 +230,11 @@ public sealed class ProductionPackageInstallationService(
 
                 await installations.PersistMaterializedGraphAsync(
                     installation, products.Select(x => x.Product).ToArray(), artifacts.Created,
-                    programsAndCompositions.Programs.Values.ToArray(), programsAndCompositions.Compositions,
+                    programsAndCompositions.Programs.Values.ToArray(),
+                    programsAndCompositions.Bindings.Values.ToArray(), programsAndCompositions.Compositions,
                     releaseNumber => ProductionPackageInstallationMaterializer.CreateRelease(
                         command, installation, version, releaseNumber, products,
-                        programsAndCompositions.Programs, optionImpacts), ct);
+                        programsAndCompositions.Programs, programsAndCompositions.Bindings, optionImpacts), ct);
                 preparedObjects.Commit();
                 return ApiResult<ProductionPackageInstallationResult>.Success(
                     ProductionPackageInstallationResult.From(installation),
@@ -340,11 +341,7 @@ public sealed class ProductionPackageInstallationService(
         await using var preparedObjects = new UncommittedArtifactObjectSet(contentService);
         try
         {
-            var copyableSharedArtifactIds = observed.SharedPackageManagedArtifactIds
-                .Where(artifactId => observed.Programs
-                    .Where(program => program.RobotProgramArtifacts.Any(item => item.RobotArtifactId == artifactId))
-                    .All(program => program.Status == RobotProgramStatus.Draft))
-                .ToHashSet();
+            var copyableSharedArtifactIds = observed.SharedPackageManagedArtifactIds;
             foreach (var source in observed.Artifacts
                          .Where(artifact => copyableSharedArtifactIds.Contains(artifact.Id)))
             {
@@ -397,22 +394,59 @@ public sealed class ProductionPackageInstallationService(
                     throw new DomainRuleException(
                         "Package technical ownership changed while the fork was being prepared; retry the fork.");
 
+                var createdPrograms = new List<RobotProgram>();
                 var removedProgramArtifacts = new List<RobotProgramArtifact>();
                 foreach (var program in current.Programs)
                 {
                     var replacements = program.RobotProgramArtifacts
                         .OrderBy(item => item.RunOrder)
                         .Select(item => (
-                            stagedBySourceArtifactId.TryGetValue(item.RobotArtifactId, out var clone)
+                            ArtifactId: stagedBySourceArtifactId.TryGetValue(item.RobotArtifactId, out var clone)
                                 ? clone.Id
                                 : item.RobotArtifactId,
-                            item.RunOrder,
-                            item.ParametersJson,
-                            item.ParametersSchemaVersion,
-                            item.RequiredOptionCode))
+                            RunOrder: item.RunOrder,
+                            ParametersJson: item.ParametersJson,
+                            ParametersSchemaVersion: item.ParametersSchemaVersion,
+                            RequiredOptionCode: item.RequiredOptionCode))
                         .ToArray();
-                    removedProgramArtifacts.AddRange(program.ReplaceArtifacts(replacements));
-                    program.UpdatedByAccountId = user.AccountId;
+                    if (!replacements.Any(replacement =>
+                            program.RobotProgramArtifacts.Any(item =>
+                                item.RunOrder == replacement.RunOrder &&
+                                item.RobotArtifactId != replacement.ArtifactId)))
+                    {
+                        continue;
+                    }
+
+                    if (program.Status == RobotProgramStatus.Draft)
+                    {
+                        removedProgramArtifacts.AddRange(program.ReplaceArtifacts(replacements));
+                        program.UpdatedByAccountId = user.AccountId;
+                        continue;
+                    }
+
+                    var clone = RobotProgram.CreateDraft(
+                        ProductionPackageInstallationMaterializer.ForkProgramCode(program.Code, installationId),
+                        program.Name,
+                        program.ScopeType,
+                        program.OrganizationId,
+                        program.StoreId,
+                        program.KioskId,
+                        program.DeviceId,
+                        program.Description);
+                    clone.CreatedByAccountId = user.AccountId;
+                    foreach (var replacement in replacements)
+                    {
+                        clone.AddArtifact(replacement.ArtifactId, replacement.RunOrder, replacement.ParametersJson,
+                            replacement.ParametersSchemaVersion, replacement.RequiredOptionCode);
+                    }
+                    createdPrograms.Add(clone);
+
+                    foreach (var materialization in current.Installation.Materializations.Where(item =>
+                                 item.ResourceKind == ProductionPackageResourceKind.RobotProgram &&
+                                 item.TargetKey == program.Id.ToString("D")))
+                    {
+                        materialization.Retarget(clone.Id.ToString("D"));
+                    }
                 }
 
                 foreach (var materialization in current.Installation.Materializations
@@ -430,6 +464,7 @@ public sealed class ProductionPackageInstallationService(
                 await installations.PersistForkAsync(
                     current.Installation,
                     stagedBySourceArtifactId.Values.ToArray(),
+                    createdPrograms,
                     removedProgramArtifacts,
                     ct);
                 preparedObjects.Commit();

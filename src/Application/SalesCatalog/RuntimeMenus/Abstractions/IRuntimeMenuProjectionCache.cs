@@ -8,4 +8,6 @@ public interface IRuntimeMenuProjectionCache
         Guid kioskId,
         Func<CancellationToken, Task<RuntimeMenuProjection>> factory,
         CancellationToken cancellationToken = default);
+
+    Task InvalidateAsync(Guid kioskId, CancellationToken cancellationToken = default) => Task.CompletedTask;
 }

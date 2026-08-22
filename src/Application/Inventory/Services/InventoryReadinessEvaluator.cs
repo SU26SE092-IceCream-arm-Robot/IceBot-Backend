@@ -60,8 +60,7 @@ public sealed class InventoryReadinessEvaluator(IInventoryStore inventory) : IIn
         var states = await inventory.ListStatesForInventoryTopologyAsync(kiosk.Id, cancellationToken);
         var balances = await inventory.ListKioskIngredientInventoriesAsync(kiosk.Id, cancellationToken);
         var balancesByIngredient = balances.ToLookup(balance => balance.IngredientId);
-        var statesByBalanceId = states.Where(state => state.KioskIngredientInventoryId.HasValue)
-            .ToLookup(state => state.KioskIngredientInventoryId!.Value);
+        var statesByBalanceId = states.ToLookup(state => state.KioskIngredientInventoryId);
         var warnings = BuildSensorAssistedWarnings(balances, statesByBalanceId, options);
 
         var itemsByRecipe = recipeItems.ToLookup(item => item.RecipeId);

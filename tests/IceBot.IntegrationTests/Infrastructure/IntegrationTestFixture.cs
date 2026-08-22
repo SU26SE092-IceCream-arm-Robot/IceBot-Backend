@@ -32,20 +32,10 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
             request => request.ForPort(9000).ForPath("/minio/health/live")))
         .Build();
 
-    private static bool Enabled => string.Equals(
-        Environment.GetEnvironmentVariable("ICEBOT_RUN_INTEGRATION_TESTS"),
-        "true",
-        StringComparison.OrdinalIgnoreCase);
-
     public string ConnectionString => _postgres.GetConnectionString();
 
     public async Task InitializeAsync()
     {
-        if (!Enabled)
-        {
-            return;
-        }
-
         await Task.WhenAll(_postgres.StartAsync(), _minio.StartAsync());
         await using var dbContext = CreateDbContext();
         await dbContext.Database.MigrateAsync();
@@ -53,11 +43,6 @@ public sealed class IntegrationTestFixture : IAsyncLifetime
 
     public async Task DisposeAsync()
     {
-        if (!Enabled)
-        {
-            return;
-        }
-
         await Task.WhenAll(_postgres.DisposeAsync().AsTask(), _minio.DisposeAsync().AsTask());
     }
 

@@ -37,6 +37,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
             sourceRobotArtifactTemplateId: template.Id,
             technicalContractId: contract.Id,
             technicalContractChecksum: contract.ContractChecksum);
+        existingArtifact.Publish();
 
         var packages = Substitute.For<IProductionPackageStore>();
         packages.GetVersionAsync(version.ProductionPackageId, version.Id, false, Arg.Any<CancellationToken>())
@@ -64,6 +65,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
                 Arg.Any<IReadOnlyCollection<Domain.Catalog.Entities.Product>>(),
                 Arg.Any<IReadOnlyCollection<RobotArtifact>>(),
                 Arg.Any<IReadOnlyCollection<Domain.RobotConfiguration.Programs.RobotProgram>>(),
+                Arg.Any<IReadOnlyCollection<ProductionProgramBinding>>(),
                 Arg.Any<IReadOnlyCollection<ProductionComposition>>(),
                 Arg.Any<Func<long, ConfigurationRelease>>(),
                 Arg.Any<CancellationToken>())
@@ -71,7 +73,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
             {
                 persistedArtifacts = call.ArgAt<IReadOnlyCollection<RobotArtifact>>(2).ToArray();
                 var installation = call.ArgAt<ProductionPackageInstallation>(0);
-                var release = call.ArgAt<Func<long, ConfigurationRelease>>(5)(1);
+                var release = call.ArgAt<Func<long, ConfigurationRelease>>(6)(1);
                 installation.Complete(release.Id, DateTimeOffset.UtcNow);
                 return release;
             });
@@ -173,6 +175,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
         await installations.DidNotReceive().PersistMaterializedGraphAsync(
             Arg.Any<ProductionPackageInstallation>(), Arg.Any<IReadOnlyCollection<Domain.Catalog.Entities.Product>>(),
             Arg.Any<IReadOnlyCollection<RobotArtifact>>(), Arg.Any<IReadOnlyCollection<RobotProgram>>(),
+            Arg.Any<IReadOnlyCollection<ProductionProgramBinding>>(),
             Arg.Any<IReadOnlyCollection<ProductionComposition>>(),
             Arg.Any<Func<long, ConfigurationRelease>>(), Arg.Any<CancellationToken>());
     }
@@ -251,6 +254,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
         await installations.DidNotReceive().PersistMaterializedGraphAsync(
             Arg.Any<ProductionPackageInstallation>(), Arg.Any<IReadOnlyCollection<Domain.Catalog.Entities.Product>>(),
             Arg.Any<IReadOnlyCollection<RobotArtifact>>(), Arg.Any<IReadOnlyCollection<RobotProgram>>(),
+            Arg.Any<IReadOnlyCollection<ProductionProgramBinding>>(),
             Arg.Any<IReadOnlyCollection<ProductionComposition>>(),
             Arg.Any<Func<long, ConfigurationRelease>>(), Arg.Any<CancellationToken>());
     }
@@ -286,6 +290,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
                 Arg.Any<IReadOnlyCollection<Domain.Catalog.Entities.Product>>(),
                 Arg.Any<IReadOnlyCollection<RobotArtifact>>(),
                 Arg.Any<IReadOnlyCollection<RobotProgram>>(),
+                Arg.Any<IReadOnlyCollection<ProductionProgramBinding>>(),
                 Arg.Any<IReadOnlyCollection<ProductionComposition>>(),
                 Arg.Any<Func<long, ConfigurationRelease>>(),
                 Arg.Any<CancellationToken>())
@@ -361,6 +366,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
             .Returns(graph);
         IReadOnlyCollection<RobotArtifact> persisted = [];
         installations.PersistForkAsync(installation, Arg.Any<IReadOnlyCollection<RobotArtifact>>(),
+                Arg.Any<IReadOnlyCollection<RobotProgram>>(),
                 Arg.Any<IReadOnlyCollection<RobotProgramArtifact>>(),
                 Arg.Any<CancellationToken>())
             .Returns(call =>
@@ -432,6 +438,7 @@ public sealed class ProductionPackageInstallationArtifactReuseTests
         await installations.DidNotReceive().PersistForkAsync(
             Arg.Any<ProductionPackageInstallation>(),
             Arg.Any<IReadOnlyCollection<RobotArtifact>>(),
+            Arg.Any<IReadOnlyCollection<RobotProgram>>(),
             Arg.Any<IReadOnlyCollection<RobotProgramArtifact>>(),
             Arg.Any<CancellationToken>());
     }

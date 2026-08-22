@@ -231,13 +231,20 @@ internal static class OrderItemExecutionLifecycleApplier
         var projection = OrderStatusProjector.ProjectFromOrder(order);
         context.Notifications.OrderStatusChanged = new OrderStatusChangedEvent
         {
-            OrderId = order.Id, OrderNumber = order.OrderNumber, KioskId = order.KioskId,
-            OrganizationId = order.OrganizationId, StoreId = order.StoreId,
-            OldStatus = previousOrderStatus.ToString(), NewStatus = order.Status.ToString(),
-            PaymentStatus = order.PaymentStatus.ToString(), CustomerStatus = projection.CustomerStatus,
-            CustomerStatusMessage = projection.CustomerStatusMessage, CanRetryPayment = projection.CanRetryPayment,
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            KioskId = order.KioskId,
+            OrganizationId = order.OrganizationId,
+            StoreId = order.StoreId,
+            OldStatus = previousOrderStatus.ToString(),
+            NewStatus = order.Status.ToString(),
+            PaymentStatus = order.PaymentStatus.ToString(),
+            CustomerStatus = projection.CustomerStatus,
+            CustomerStatusMessage = projection.CustomerStatusMessage,
+            CanRetryPayment = projection.CanRetryPayment,
             RequiresStaffSupport = projection.RequiresStaffSupport,
-            UpdatedAt = context.ExecutorReportedAt, Version = 1
+            UpdatedAt = context.ExecutorReportedAt,
+            Version = 1
         };
     }
 

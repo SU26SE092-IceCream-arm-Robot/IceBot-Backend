@@ -101,15 +101,30 @@ public sealed class CreateStaffWorkforceCommandHandler(
             var now = DateTimeOffset.UtcNow;
             var account = new Account
             {
-                UserName = userName, Email = email, FullName = request.FullName?.Trim(), PhoneNumber = request.PhoneNumber?.Trim(),
-                Status = AccountStatus.Active, LocalLoginEnabled = true, GoogleLoginEnabled = request.GoogleLoginEnabled,
-                GoogleEmail = googleEmail, CreatedAt = now, CreatedByAccountId = command.ActorAccountId
+                UserName = userName,
+                Email = email,
+                FullName = request.FullName?.Trim(),
+                PhoneNumber = request.PhoneNumber?.Trim(),
+                Status = AccountStatus.Active,
+                LocalLoginEnabled = true,
+                GoogleLoginEnabled = request.GoogleLoginEnabled,
+                GoogleEmail = googleEmail,
+                CreatedAt = now,
+                CreatedByAccountId = command.ActorAccountId
             };
             // Temporary demo override; the Staff invitation handler remains available.
             issuedCredentials = credentials.Prepare(account, now);
             foreach (var scope in request.StaffScopes)
-                account.AccountRoles.Add(new AccountRole { Role = staffRole, RoleId = staffRole.Id, OrganizationId = command.OrganizationId,
-                    StoreId = scope.StoreId, KioskId = scope.KioskId, AssignedAt = now, AssignedByAccountId = command.ActorAccountId });
+                account.AccountRoles.Add(new AccountRole
+                {
+                    Role = staffRole,
+                    RoleId = staffRole.Id,
+                    OrganizationId = command.OrganizationId,
+                    StoreId = scope.StoreId,
+                    KioskId = scope.KioskId,
+                    AssignedAt = now,
+                    AssignedByAccountId = command.ActorAccountId
+                });
             await accounts.AddAsync(account, cancellationToken);
             await accounts.AddCreateReplayAsync(new StaffWorkforceCreateReplay { OrganizationId = command.OrganizationId, IdempotencyKey = key, RequestFingerprint = fingerprint, AccountId = account.Id, CreatedAt = now, CreatedByAccountId = command.ActorAccountId }, cancellationToken);
             await accounts.SaveChangesAsync(cancellationToken);
@@ -206,12 +221,21 @@ public sealed class UpdateStaffWorkforceScopesCommandHandler(IStaffWorkforceStor
                 }
                 else
                 {
-                    account.AccountRoles.Add(new AccountRole { Role = staffRole, RoleId = staffRole.Id, OrganizationId = command.OrganizationId,
-                        StoreId = scope.StoreId, KioskId = scope.KioskId, AssignedAt = now, AssignedByAccountId = command.ActorAccountId });
+                    account.AccountRoles.Add(new AccountRole
+                    {
+                        Role = staffRole,
+                        RoleId = staffRole.Id,
+                        OrganizationId = command.OrganizationId,
+                        StoreId = scope.StoreId,
+                        KioskId = scope.KioskId,
+                        AssignedAt = now,
+                        AssignedByAccountId = command.ActorAccountId
+                    });
                 }
             }
             account.UpdatedAt = now; account.UpdatedByAccountId = command.ActorAccountId;
             account.WorkforceRevision++;
+            account.AuthorizationVersion++;
             await accounts.SaveChangesAsync(cancellationToken);
             return ApiResult<StaffWorkforceResult>.Success(StaffWorkforceRules.ToResult(account), "Staff scopes updated.");
         }, cancellationToken);
@@ -256,6 +280,7 @@ public sealed class ChangeStaffWorkforceLifecycleCommandHandler(IStaffWorkforceS
             account.UpdatedAt = DateTimeOffset.UtcNow;
             account.UpdatedByAccountId = command.ActorAccountId;
             account.WorkforceRevision++;
+            account.AuthorizationVersion++;
             var authorizingScope = account.AccountRoles.Where(role => role.IsActive).SelectMany(role => ScopeAccessRules.GetAuthorizingScopeSnapshots(["OrgAdmin", "Manager"], command.UserContext, role.OrganizationId, role.StoreId, role.KioskId)).FirstOrDefault();
             if (authorizingScope is null) return StaffLifecyclePersistence.Failure("Staff account is outside the current workforce scope.", 403);
             await accounts.AddLifecycleTransitionAsync(new StaffWorkforceLifecycleTransition { OrganizationId = command.OrganizationId, AccountId = account.Id, FromStatus = previousStatus, ToStatus = account.Status, Reason = command.Request.Reason.Trim(), ActorRoleCode = authorizingScope.RoleCode, ActorOrganizationId = authorizingScope.OrganizationId, ActorStoreId = authorizingScope.StoreId, RequestIdempotencyKey = key, WorkforceRevision = account.WorkforceRevision, CreatedAt = DateTimeOffset.UtcNow, CreatedByAccountId = command.ActorAccountId }, cancellationToken);

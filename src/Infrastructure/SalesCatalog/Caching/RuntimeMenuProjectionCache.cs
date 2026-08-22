@@ -97,6 +97,16 @@ public sealed class RuntimeMenuProjectionCache : IRuntimeMenuProjectionCache
         }
     }
 
+    public async Task InvalidateAsync(Guid kioskId, CancellationToken cancellationToken = default)
+    {
+        if (!_options.Enabled || _cache is null)
+        {
+            return;
+        }
+
+        await _cache.RemoveAsync($"runtime-menu:v1:kiosk:{kioskId:N}", cancellationToken);
+    }
+
     private static async Task<RuntimeMenuCachedProjection> BuildAsync(
         Func<CancellationToken, Task<RuntimeMenuProjection>> factory,
         int expirationSeconds,

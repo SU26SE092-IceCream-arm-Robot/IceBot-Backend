@@ -51,19 +51,23 @@ public sealed class ExecutionEndpointReportedDevicesMigrationTests
             Name = "Hardware report migration kiosk",
             Status = KioskStatus.Active
         };
-        var endpoint = KioskExecutionEndpoint.CreateProvisioning(
-            kiosk.Id,
-            "migration-edge",
-            KioskExecutionProfile.FullEdge,
-            ExecutionEndpointAuthenticationMode.MutualTls);
-        db.AddRange(organization, store, kiosk, endpoint);
+        db.AddRange(organization, store, kiosk);
         await db.SaveChangesAsync();
+
+        var endpointId = Guid.NewGuid();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "KioskExecutionEndpoints"
+                ("Id", "KioskId", "EndpointCode", "ExecutionProfile", "AuthenticationMode", "Status", "CreatedAt")
+            VALUES
+                ({endpointId}, {kiosk.Id}, {"migration-edge"}, {(int)KioskExecutionProfile.FullEdge},
+                 {(int)ExecutionEndpointAuthenticationMode.MutualTls}, {1}, {DateTimeOffset.UtcNow});
+            """);
 
         await db.Database.ExecuteSqlInterpolatedAsync($"""
             INSERT INTO "ExecutionEndpointSupportedRobotTargets"
                 ("Id", "KioskExecutionEndpointId", "KioskId", "RuntimeTargetCode", "MachineModelCode", "CreatedAt")
             VALUES
-                ({Guid.NewGuid()}, {endpoint.Id}, {kiosk.Id}, {"FAIRINO_LUA_V1"}, {"FR5"}, {DateTimeOffset.UtcNow});
+                ({Guid.NewGuid()}, {endpointId}, {kiosk.Id}, {"FAIRINO_LUA_V1"}, {"FR5"}, {DateTimeOffset.UtcNow});
             """);
 
         await migrator.MigrateAsync();

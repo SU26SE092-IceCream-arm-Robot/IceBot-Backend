@@ -47,10 +47,14 @@ public sealed class ManagementProductionPackageInstallationsController(
     {
         var result = await service.InstallAsync(new InstallProductionPackageCommand
         {
-            UserContext = User.GetUserContext(), OrganizationId = organizationId,
-            StoreId = request.StoreId, KioskId = request.KioskId,
-            PackageId = request.PackageId, PackageVersionId = request.PackageVersionId,
-            ProductSourceKeys = request.ProductSourceKeys, IdempotencyKey = idempotencyKey
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            StoreId = request.StoreId,
+            KioskId = request.KioskId,
+            PackageId = request.PackageId,
+            PackageVersionId = request.PackageVersionId,
+            ProductSourceKeys = request.ProductSourceKeys,
+            IdempotencyKey = idempotencyKey
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

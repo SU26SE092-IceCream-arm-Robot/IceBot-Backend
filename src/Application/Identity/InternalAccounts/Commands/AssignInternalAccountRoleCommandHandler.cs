@@ -33,7 +33,11 @@ public sealed class AssignInternalAccountRoleCommandHandler
                 "Every account role must belong to the organization in the request route.", 403);
         }
 
-        var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
+        var account = await _accounts.GetTenantManagedByIdAsync(
+            accountId,
+            command.OrganizationId,
+            asNoTracking: false,
+            cancellationToken: cancellationToken);
         if (account is null)
         {
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
@@ -51,6 +55,11 @@ public sealed class AssignInternalAccountRoleCommandHandler
         }
 
         var normalizedRoleCode = role.Code.Trim();
+        if (PlatformTechnicianBoundary.IsTechnicianRole(normalizedRoleCode))
+        {
+            return ApiResult<InternalAccountResult>.Fail(
+                "Technician role assignments are managed through platform support administration.", 403);
+        }
         var authorizationError = AccountRoleAssignmentRules.ValidateRoleAssignmentPermission(
             command.UserContext,
             command.UserRoles,

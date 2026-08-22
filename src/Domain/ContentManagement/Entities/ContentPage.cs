@@ -15,8 +15,12 @@ public sealed class ContentPage : BusinessEntity
 
     public static ContentPage Create(string key, string slug, string title, string bodyHtml, Guid actorId, DateTimeOffset now) => new()
     {
-        Key = Required(key, 100), Slug = Required(slug, 120), DraftTitle = Required(title, 300), DraftBodyHtml = Required(bodyHtml, 100_000),
-        CreatedAt = now, CreatedByAccountId = actorId
+        Key = Required(key, 100),
+        Slug = Required(slug, 120),
+        DraftTitle = Required(title, 300),
+        DraftBodyHtml = Required(bodyHtml, 100_000),
+        CreatedAt = now,
+        CreatedByAccountId = actorId
     };
 
     public void UpdateDraft(string title, string bodyHtml, int expectedRevision, Guid actorId, DateTimeOffset now)
@@ -61,7 +65,11 @@ public sealed class ContentPageRevision : GuidEntity
 
     internal static ContentPageRevision Create(Guid pageId, int revisionNumber, string title, string bodyHtml, Guid actorId, DateTimeOffset now) => new()
     {
-        ContentPageId = pageId, RevisionNumber = revisionNumber, Title = title, BodyHtml = bodyHtml,
-        PublishedByAccountId = actorId, PublishedAt = now
+        ContentPageId = pageId,
+        RevisionNumber = revisionNumber,
+        Title = title,
+        BodyHtml = bodyHtml,
+        PublishedByAccountId = actorId,
+        PublishedAt = now
     };
 }

@@ -81,22 +81,15 @@ public sealed class MaintenanceAssignmentScopeIntegrationTests(IntegrationTestFi
             Email = $"technician-{Guid.NewGuid():N}@example.test",
             Status = AccountStatus.Active
         };
-        var technician = await db.Roles.SingleOrDefaultAsync(role => role.Code == "Technician");
-        if (technician is null)
-        {
-            technician = new Role { Code = "Technician", Name = "Technician", IsSystemRole = true };
-            db.Roles.Add(technician);
-        }
-
         db.AddRange(organization, store, kiosk, account);
         await db.SaveChangesAsync();
-        db.AccountRoles.Add(new AccountRole
+        db.PlatformTechnicianProfiles.Add(new PlatformTechnicianProfile
         {
             AccountId = account.Id,
-            RoleId = technician.Id,
-            OrganizationId = organization.Id,
-            AssignedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         });
+        db.TechnicianSupportGrants.Add(TechnicianSupportGrant.Create(
+            account.Id, organization.Id, store.Id, null, DateTimeOffset.UtcNow, null));
         await db.SaveChangesAsync();
 
         var subject = new MaintenanceTicketStore(db);
@@ -142,22 +135,15 @@ public sealed class MaintenanceAssignmentScopeIntegrationTests(IntegrationTestFi
             Email = $"kiosk-technician-{Guid.NewGuid():N}@example.test",
             Status = AccountStatus.Active
         };
-        var technician = await db.Roles.SingleOrDefaultAsync(role => role.Code == "Technician");
-        if (technician is null)
-        {
-            technician = new Role { Code = "Technician", Name = "Technician", IsSystemRole = true };
-            db.Roles.Add(technician);
-        }
-
         db.AddRange(organization, store, assignedKiosk, otherKiosk, account);
         await db.SaveChangesAsync();
-        db.AccountRoles.Add(new AccountRole
+        db.PlatformTechnicianProfiles.Add(new PlatformTechnicianProfile
         {
             AccountId = account.Id,
-            RoleId = technician.Id,
-            KioskId = assignedKiosk.Id,
-            AssignedAt = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         });
+        db.TechnicianSupportGrants.Add(TechnicianSupportGrant.Create(
+            account.Id, organization.Id, null, assignedKiosk.Id, DateTimeOffset.UtcNow, null));
         await db.SaveChangesAsync();
 
         var subject = new MaintenanceTicketStore(db);

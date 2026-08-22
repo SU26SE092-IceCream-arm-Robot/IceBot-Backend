@@ -64,13 +64,18 @@ public sealed class PermissionCatalogRoleBoundaryTests
     }
 
     [Fact]
-    public void Technician_CanOperateAndProvisionEdge_ButCannotChangeKioskLifecycleOrViewCommercialDashboards()
+    public void Technician_CanOperateAndProvisionEdge_ButCannotChangeTenantLifecycleOrCommercialData()
     {
         var permissions = PermissionCatalog.ResolvePermissionCodes(["Technician"]);
 
         Assert.Contains("kiosks.operations.manage", permissions);
         Assert.Contains("execution-endpoints.provision", permissions);
         Assert.Contains("execution-endpoints.credentials.manage", permissions);
+        Assert.Contains("artifact.read", permissions);
+        Assert.Contains("program.read", permissions);
+        Assert.Contains("release.read", permissions);
+        Assert.Contains("release.deploy", permissions);
+        Assert.Contains("release.rollback", permissions);
 
         Assert.DoesNotContain("kiosks.manage", permissions);
         Assert.DoesNotContain("kiosks.update", permissions);
@@ -78,6 +83,10 @@ public sealed class PermissionCatalogRoleBoundaryTests
         Assert.DoesNotContain("notifications.view", permissions);
         Assert.DoesNotContain("inventory.refill.manage", permissions);
         Assert.DoesNotContain("inventory.adjust.manage", permissions);
+        Assert.DoesNotContain("inventory.configure", permissions);
+        Assert.DoesNotContain("devices.manage", permissions);
+        Assert.DoesNotContain("execution-endpoints.manage", permissions);
+        Assert.DoesNotContain("alerts.resolve", permissions);
     }
 
     [Fact]
@@ -107,5 +116,9 @@ public sealed class PermissionCatalogRoleBoundaryTests
         Assert.DoesNotContain("Manager", ScopeRoleSets.DevicesManage);
         Assert.Contains("Manager", ScopeRoleSets.DevicesOperationsManage);
         Assert.DoesNotContain("Technician", ScopeRoleSets.PaymentDiagnosticsView);
+        Assert.DoesNotContain("Technician", ScopeRoleSets.InventoryConfigure);
+        Assert.DoesNotContain("Technician", ScopeRoleSets.DevicesManage);
+        Assert.DoesNotContain("Technician", ScopeRoleSets.ExecutionEndpointsManage);
+        Assert.DoesNotContain("Technician", ScopeRoleSets.AlertsResolve);
     }
 }

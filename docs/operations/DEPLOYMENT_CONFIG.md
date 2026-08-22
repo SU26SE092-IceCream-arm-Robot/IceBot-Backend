@@ -221,7 +221,7 @@ Broker startup, endpoint-scoped ACL provisioning, Edge subscription behavior, an
 | Serilog OTLP sink | `Observability__Serilog__OtlpSinkEnabled` | **P2** | Default `false`; enable when an OTLP log collector is deployed. |
 | OTel metric export | `Observability__OpenTelemetry__Metrics__ExporterEnabled` | **P2** | Default `false`; enable only when the Collector metric receiver is deployed. |
 | OTel trace export | `Observability__OpenTelemetry__Tracing__ExporterEnabled` | **P2** | Default `false`; enable only when the Collector trace receiver is deployed. |
-| OTel signal endpoint/protocol | `Observability__OpenTelemetry__Metrics__OtlpEndpoint`, `__Tracing__OtlpEndpoint`, `__OtlpProtocol` | **P0 Feature** | Required for each enabled signal; point to a private Collector receiver. Shared legacy endpoint/protocol remain fallback only. |
+| OTel signal endpoint/protocol | `Observability__OpenTelemetry__Metrics__OtlpEndpoint`, `Observability__OpenTelemetry__Metrics__OtlpProtocol`, `Observability__OpenTelemetry__Tracing__OtlpEndpoint`, `Observability__OpenTelemetry__Tracing__OtlpProtocol` | **P0 Feature** | Configure each enabled signal explicitly and point it to a private Collector receiver. |
 | OTel resource identity | `Observability__DeploymentEnvironment`, `Observability__InstanceId` | **P2** | Identify environment and replica. `InstanceId` must be deployment/process identity, never tenant data. |
 | Debug body logging | `Observability__DebugBodyLogging__Enabled` | **P1** | Keep the safe appsettings default `false`; enable only for controlled debugging. |
 | Diagnostics external ping | `Diagnostics__EnableExternalPing` | **P2** | Default `false`; enable only for controlled provider diagnostics. |

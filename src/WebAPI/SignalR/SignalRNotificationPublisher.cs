@@ -1,6 +1,7 @@
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.Tenants.Abstractions;
+using Application.SalesCatalog.RuntimeMenus.Abstractions;
 using Microsoft.AspNetCore.SignalR;
 using WebAPI.SignalR.Hubs;
 
@@ -13,18 +14,21 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
     private readonly IHubContext<ManagementDashboardHub> _dashboardHubContext;
     private readonly ILogger<SignalRNotificationPublisher> _logger;
     private readonly IOrganizationAccessStateReader _organizationAccess;
+    private readonly IRuntimeMenuProjectionCache _runtimeMenuCache;
 
     public SignalRNotificationPublisher(
         IHubContext<OrderHub> orderHubContext,
         IHubContext<OperationsHub> operationsHubContext,
         IHubContext<ManagementDashboardHub> dashboardHubContext,
         IOrganizationAccessStateReader organizationAccess,
+        IRuntimeMenuProjectionCache runtimeMenuCache,
         ILogger<SignalRNotificationPublisher> logger)
     {
         _orderHubContext = orderHubContext;
         _operationsHubContext = operationsHubContext;
         _dashboardHubContext = dashboardHubContext;
         _organizationAccess = organizationAccess;
+        _runtimeMenuCache = runtimeMenuCache;
         _logger = logger;
     }
 
@@ -141,6 +145,7 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishKioskStatusChangedAsync(KioskStatusChangedEvent evt, CancellationToken ct = default)
     {
+        await InvalidateRuntimeMenuAsync(evt.KioskId, ct);
         if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
         {
             return;
@@ -217,12 +222,15 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishExecutionReadinessChangedAsync(ExecutionReadinessChangedEvent evt, CancellationToken ct = default)
     {
+        await InvalidateRuntimeMenuAsync(evt.KioskId, ct);
         try
         {
             await _operationsHubContext.Clients.Group($"kiosk:{evt.KioskId}").SendAsync("ExecutionReadinessChanged", evt, ct);
             await PublishDashboardInvalidatedAsync(new DashboardInvalidatedEvent
             {
-                Scope = "System", Reason = "ExecutionReadinessChanged", UpdatedAt = evt.OccurredAt
+                Scope = "System",
+                Reason = "ExecutionReadinessChanged",
+                UpdatedAt = evt.OccurredAt
             }, ct);
         }
         catch (Exception ex)
@@ -286,6 +294,7 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
 
     public async Task PublishInventoryChangedAsync(InventoryChangedEvent evt, CancellationToken ct = default)
     {
+        await InvalidateRuntimeMenuAsync(evt.KioskId, ct);
         if (!await CanDeliverTenantEventAsync(evt.OrganizationId, ct))
         {
             return;
@@ -309,6 +318,19 @@ public sealed class SignalRNotificationPublisher : IRealtimeNotificationPublishe
             UpdatedAt = evt.UpdatedAt
         };
         await PublishDashboardInvalidatedAsync(dashboardEvt, ct);
+    }
+
+    // Cache invalidation improves recovery latency only; admission always reads fresh evidence.
+    private async Task InvalidateRuntimeMenuAsync(Guid kioskId, CancellationToken ct)
+    {
+        try
+        {
+            await _runtimeMenuCache.InvalidateAsync(kioskId, ct);
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Failed to invalidate runtime-menu cache for kiosk {KioskId}.", kioskId);
+        }
     }
 
     public async Task PublishDashboardInvalidatedAsync(DashboardInvalidatedEvent evt, CancellationToken ct = default)

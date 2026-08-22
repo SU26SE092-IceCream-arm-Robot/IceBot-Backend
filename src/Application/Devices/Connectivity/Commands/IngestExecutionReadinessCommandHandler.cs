@@ -11,6 +11,7 @@ using Domain.Devices.ExecutionEndpoints.Projections;
 using Application.Devices.Connectivity.Rules;
 
 namespace Application.Devices.Connectivity.Commands;
+
 public sealed class IngestExecutionReadinessCommandHandler
 {
     private readonly IExecutionReadinessStore _store;
@@ -66,8 +67,10 @@ public sealed class IngestExecutionReadinessCommandHandler
 
             _store.ReplaceCapabilities(current, command.Capabilities.Select(x => new ExecutionEndpointCapabilityProjection
             {
-                CapabilityCode = x.CapabilityCode.Trim().ToUpperInvariant(), WorkcellCode = string.IsNullOrWhiteSpace(x.WorkcellCode) ? null : x.WorkcellCode.Trim().ToUpperInvariant(),
-                IsAvailable = x.IsAvailable, UnavailableReason = string.IsNullOrWhiteSpace(x.UnavailableReason) ? null : x.UnavailableReason.Trim()
+                CapabilityCode = x.CapabilityCode.Trim().ToUpperInvariant(),
+                WorkcellCode = string.IsNullOrWhiteSpace(x.WorkcellCode) ? null : x.WorkcellCode.Trim().ToUpperInvariant(),
+                IsAvailable = x.IsAvailable,
+                UnavailableReason = string.IsNullOrWhiteSpace(x.UnavailableReason) ? null : x.UnavailableReason.Trim()
             }).ToArray());
             await _store.SaveChangesAsync(innerCt);
             return ApiResult<ExecutionReadinessResult>.Success(Map(current, true, false), "Execution readiness applied.");
@@ -76,16 +79,28 @@ public sealed class IngestExecutionReadinessCommandHandler
         if (result.Succeeded && result.Data!.Applied)
             await _publisher.PublishExecutionReadinessChangedAsync(new ExecutionReadinessChangedEvent
             {
-                KioskId = command.KioskId, EndpointId = command.EndpointId, StateRevision = command.StateRevision,
-                Readiness = effective.Readiness.ToString(), Activity = command.Activity.ToString(), Safety = command.Safety.ToString(),
+                KioskId = command.KioskId,
+                EndpointId = command.EndpointId,
+                StateRevision = command.StateRevision,
+                Readiness = effective.Readiness.ToString(),
+                Activity = command.Activity.ToString(),
+                Safety = command.Safety.ToString(),
                 OccurredAt = DateTimeOffset.UtcNow
             }, ct);
         return result;
     }
 
     private static ExecutionReadinessResult Map(ExecutionEndpointReadinessProjection x, bool applied, bool duplicate) => new()
-    { EndpointId = x.KioskExecutionEndpointId, StateRevision = x.StateRevision, Applied = applied, DuplicateOrStale = duplicate,
-      Readiness = x.Readiness.ToString(), Activity = x.Activity.ToString(), Safety = x.Safety.ToString(), CloudReceivedAt = x.CloudReceivedAt };
+    {
+        EndpointId = x.KioskExecutionEndpointId,
+        StateRevision = x.StateRevision,
+        Applied = applied,
+        DuplicateOrStale = duplicate,
+        Readiness = x.Readiness.ToString(),
+        Activity = x.Activity.ToString(),
+        Safety = x.Safety.ToString(),
+        CloudReceivedAt = x.CloudReceivedAt
+    };
 
     private static bool Matches(
         ExecutionEndpointReadinessProjection current,

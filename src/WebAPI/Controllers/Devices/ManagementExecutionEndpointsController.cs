@@ -103,7 +103,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _createHandler.HandleAsync(new CreateExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, Request = request
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            Request = request
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -115,7 +117,10 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _provisionHandler.HandleAsync(new ProvisionExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId, Request = request
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            EndpointId = endpointId,
+            Request = request
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -126,7 +131,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _disableHandler.HandleAsync(new DisableExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -137,7 +144,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _reactivateHandler.HandleAsync(new ReactivateExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -148,7 +157,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _retireHandler.HandleAsync(new RetireExecutionEndpointCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -180,7 +191,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _provisionMqttHandler.HandleAsync(new ProvisionMqttEndpointCredentialCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -191,7 +204,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _rotateMqttHandler.HandleAsync(new RotateMqttEndpointCredentialCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -202,7 +217,9 @@ public sealed class ManagementExecutionEndpointsController : ControllerBase
     {
         var result = await _revokeMqttHandler.HandleAsync(new RevokeMqttEndpointCredentialCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, EndpointId = endpointId
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            EndpointId = endpointId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

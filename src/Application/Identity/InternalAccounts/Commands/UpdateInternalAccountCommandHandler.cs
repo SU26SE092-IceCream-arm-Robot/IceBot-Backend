@@ -21,7 +21,11 @@ public sealed class UpdateInternalAccountCommandHandler
         var request = command.Request;
         var updatedByAccountId = command.UpdatedByAccountId;
 
-        var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
+        var account = await _accounts.GetTenantManagedByIdAsync(
+            accountId,
+            command.OrganizationId,
+            asNoTracking: false,
+            cancellationToken: cancellationToken);
         if (account is null)
         {
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);

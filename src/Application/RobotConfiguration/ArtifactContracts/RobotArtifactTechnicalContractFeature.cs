@@ -465,7 +465,7 @@ public sealed class AssignRobotArtifactTechnicalContractHandler(
                     artifact.AssignTechnicalContract(contract.Id, contract.ContractChecksum);
                     await artifacts.SaveChangesAsync(ct);
                     return ApiResult<object>.Success(new
-                        { artifact.Id, TechnicalContractId = contract.Id, contract.ContractChecksum });
+                    { artifact.Id, TechnicalContractId = contract.Id, contract.ContractChecksum });
                 }
                 catch (DomainRuleException ex) { return ApiResult<object>.Fail(ex.Message, 400); }
             }, cancellationToken);

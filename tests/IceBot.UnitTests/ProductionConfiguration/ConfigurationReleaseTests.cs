@@ -50,9 +50,10 @@ public sealed class ConfigurationReleaseTests
                 0,
                 null,
                 Array.Empty<string>(),
-                (IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)>)
+                (IReadOnlyCollection<(Guid ProductionProgramBindingId, string ProductionProgramBindingChecksum,
+                    Guid RobotProgramId, int BindingOrder, IReadOnlyCollection<string> CapabilityCodes)>)
                 [
-                    (Guid.NewGuid(), 1, "ROBOT_ARM")
+                    (Guid.NewGuid(), new string('a', 64), Guid.NewGuid(), 1, ["ROBOT_ARM"])
                 ])
         ]);
 
@@ -80,8 +81,9 @@ public sealed class ConfigurationReleaseTests
                 0,
                 null,
                 new[] { "oreo" },
-                (IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)>)
-                [(programId, 1, "ROBOT_ARM")]
+                (IReadOnlyCollection<(Guid ProductionProgramBindingId, string ProductionProgramBindingChecksum,
+                    Guid RobotProgramId, int BindingOrder, IReadOnlyCollection<string> CapabilityCodes)>)
+                [(Guid.NewGuid(), new string('a', 64), programId, 1, ["ROBOT_ARM"])]
             )
         ]);
         var snapshots = new Dictionary<Guid, PublishedRobotProgramSnapshot>

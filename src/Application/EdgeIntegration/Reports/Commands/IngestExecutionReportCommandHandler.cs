@@ -208,12 +208,12 @@ public sealed class IngestExecutionReportCommandHandler
         IngestExecutionReportCommand command,
         bool applied,
         bool duplicate) => new()
-    {
-        CommandId = command.CommandId,
-        SourceEventId = command.SourceEventId,
-        ReportType = command.ReportType.Trim(),
-        Status = command.Status.Trim(),
-        Applied = applied,
-        Duplicate = duplicate
-    };
+        {
+            CommandId = command.CommandId,
+            SourceEventId = command.SourceEventId,
+            ReportType = command.ReportType.Trim(),
+            Status = command.Status.Trim(),
+            Applied = applied,
+            Duplicate = duplicate
+        };
 }

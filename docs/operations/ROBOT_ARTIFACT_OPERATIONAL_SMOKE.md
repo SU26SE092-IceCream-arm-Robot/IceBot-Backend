@@ -46,7 +46,6 @@ Do not point this command at a shared or production database unless that deploym
 The smoke test uses isolated PostgreSQL and MinIO Testcontainers. It applies all migrations, creates the bucket on upload, and seeds an active Full Edge endpoint with the supported robot target `FAIRINO_LUA_V1 / FR5`.
 
 ```powershell
-$env:ICEBOT_RUN_INTEGRATION_TESTS = "true"
 dotnet test tests\IceBot.IntegrationTests\IceBot.IntegrationTests.csproj --filter FullyQualifiedName~RobotArtifactOperationalSmokeTests
 ```
 
@@ -82,7 +81,6 @@ Success requires the deployment and endpoint projection to reference the active 
 The broader Edge/controller integration suite additionally verifies presigned download, byte length, SHA-256 checksum, Accepted/Rejected acknowledgement, Installed/Active/Failed reports, and duplicate `SourceEventId` handling:
 
 ```powershell
-$env:ICEBOT_RUN_INTEGRATION_TESTS = "true"
 dotnet test tests\IceBot.IntegrationTests\IceBot.IntegrationTests.csproj
 ```
 

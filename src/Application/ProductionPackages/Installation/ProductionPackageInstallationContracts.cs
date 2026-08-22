@@ -26,8 +26,13 @@ public interface IProductionPackageInstallationStore
     Task<IReadOnlySet<Guid>> ListPackageManagedArtifactIdsAsync(IReadOnlyCollection<Guid> artifactIds, CancellationToken cancellationToken);
     Task<ProductionPackageForkGraph?> GetForkGraphAsync(Guid organizationId, Guid installationId, bool tracked, CancellationToken cancellationToken);
     Task<bool> HasActiveUpgradeAsync(Guid organizationId, Guid installationId, CancellationToken cancellationToken);
-    Task PersistForkAsync(ProductionPackageInstallation installation, IReadOnlyCollection<RobotArtifact> artifacts, IReadOnlyCollection<RobotProgramArtifact> removedProgramArtifacts, CancellationToken cancellationToken);
-    Task<ConfigurationRelease> PersistMaterializedGraphAsync(ProductionPackageInstallation installation, IReadOnlyCollection<Product> products, IReadOnlyCollection<RobotArtifact> artifacts, IReadOnlyCollection<RobotProgram> programs, IReadOnlyCollection<ProductionComposition> compositions, Func<long, ConfigurationRelease> releaseFactory, CancellationToken cancellationToken);
+    Task PersistForkAsync(
+        ProductionPackageInstallation installation,
+        IReadOnlyCollection<RobotArtifact> artifacts,
+        IReadOnlyCollection<RobotProgram> programs,
+        IReadOnlyCollection<RobotProgramArtifact> removedProgramArtifacts,
+        CancellationToken cancellationToken);
+    Task<ConfigurationRelease> PersistMaterializedGraphAsync(ProductionPackageInstallation installation, IReadOnlyCollection<Product> products, IReadOnlyCollection<RobotArtifact> artifacts, IReadOnlyCollection<RobotProgram> programs, IReadOnlyCollection<ProductionProgramBinding> bindings, IReadOnlyCollection<ProductionComposition> compositions, Func<long, ConfigurationRelease> releaseFactory, CancellationToken cancellationToken);
 }
 
 public sealed record ProductionPackageInstallationInsertResult(bool Created, ProductionPackageInstallation Installation);

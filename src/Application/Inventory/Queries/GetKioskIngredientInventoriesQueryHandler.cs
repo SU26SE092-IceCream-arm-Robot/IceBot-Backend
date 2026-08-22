@@ -9,7 +9,7 @@ namespace Application.Inventory.Queries;
 
 public sealed record GetKioskIngredientInventoriesQuery(Guid KioskId, CurrentUserContext UserContext);
 
-public sealed class GetKioskIngredientInventoriesQueryHandler(IInventoryStore inventory)
+public sealed class GetKioskIngredientInventoriesQueryHandler(IInventoryWorkspaceStore inventory)
 {
     public async Task<ApiResult<IReadOnlyList<KioskIngredientInventoryResult>>> HandleAsync(GetKioskIngredientInventoriesQuery query, CancellationToken cancellationToken = default)
     {

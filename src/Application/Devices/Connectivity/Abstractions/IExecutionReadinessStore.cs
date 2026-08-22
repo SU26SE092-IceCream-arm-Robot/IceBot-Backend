@@ -3,6 +3,7 @@ using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace Application.Devices.Connectivity.Abstractions;
+
 public interface IExecutionReadinessStore
 {
     Task<T> ExecuteSerializedAsync<T>(Guid endpointId, Func<CancellationToken, Task<T>> action, CancellationToken ct = default);

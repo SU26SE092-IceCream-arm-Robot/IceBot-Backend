@@ -38,8 +38,10 @@ public static class ExecutionEndpointResultMapper
                 ExecutorReportedAt = readiness.ExecutorReportedAt,
                 Capabilities = readiness.Capabilities.OrderBy(x => x.CapabilityCode).Select(x => new ExecutionEndpointCapabilityResult
                 {
-                    CapabilityCode = x.CapabilityCode, WorkcellCode = x.WorkcellCode,
-                    IsAvailable = x.IsAvailable, UnavailableReason = x.UnavailableReason
+                    CapabilityCode = x.CapabilityCode,
+                    WorkcellCode = x.WorkcellCode,
+                    IsAvailable = x.IsAvailable,
+                    UnavailableReason = x.UnavailableReason
                 }).ToArray()
             },
             ProvisionedAt = endpoint.ProvisionedAt,

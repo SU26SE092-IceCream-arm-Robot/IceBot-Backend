@@ -47,10 +47,14 @@ public partial class Account : BusinessEntity
 
     public int FailedLoginCount { get; set; }
     public long WorkforceRevision { get; set; }
+    public long AuthorizationVersion { get; set; } = 1;
+    public PlatformTechnicianProfile? PlatformTechnicianProfile { get; set; }
 
     public virtual ICollection<AccountNotificationDevice> NotificationDevices { get; set; } = new List<AccountNotificationDevice>();
 
     public virtual ICollection<AccountRole> AccountRoles { get; set; } = new List<AccountRole>();
+
+    public virtual ICollection<TechnicianSupportGrant> TechnicianSupportGrants { get; set; } = new List<TechnicianSupportGrant>();
 
     public virtual ICollection<PasswordResetRequest> PasswordResetRequests { get; set; } = new List<PasswordResetRequest>();
 

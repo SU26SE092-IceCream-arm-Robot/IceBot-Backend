@@ -146,19 +146,19 @@ public sealed class MqttCredentialOperationalAlertReconciler(
         KioskExecutionEndpoint endpoint,
         string? oldStatus,
         DateTimeOffset observedAt) => new()
-    {
-        AlertId = alert.Id,
-        KioskId = endpoint.KioskId,
-        OrganizationId = endpoint.Kiosk.OrganizationId,
-        StoreId = endpoint.Kiosk.StoreId,
-        DeviceId = null,
-        AlertCode = alert.AlertCode,
-        Severity = alert.Severity.ToString(),
-        OldStatus = oldStatus,
-        NewStatus = alert.Status.ToString(),
-        UpdatedAt = observedAt,
-        Version = checked((int)alert.Version),
-        OccurrenceCount = alert.OccurrenceCount,
-        LastOccurredAt = alert.LastOccurredAt
-    };
+        {
+            AlertId = alert.Id,
+            KioskId = endpoint.KioskId,
+            OrganizationId = endpoint.Kiosk.OrganizationId,
+            StoreId = endpoint.Kiosk.StoreId,
+            DeviceId = null,
+            AlertCode = alert.AlertCode,
+            Severity = alert.Severity.ToString(),
+            OldStatus = oldStatus,
+            NewStatus = alert.Status.ToString(),
+            UpdatedAt = observedAt,
+            Version = checked((int)alert.Version),
+            OccurrenceCount = alert.OccurrenceCount,
+            LastOccurredAt = alert.LastOccurredAt
+        };
 }

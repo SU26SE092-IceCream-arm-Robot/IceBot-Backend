@@ -301,21 +301,35 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         order.MarkPaid(amount, DateTimeOffset.UtcNow.AddMinutes(-9));
         var previousPayment = new PaymentTransaction
         {
-            Id = Guid.NewGuid(), OrderId = order.Id, Order = order, Provider = "payos",
-            ProviderOrderCode = "1111111111111", Amount = amount, Currency = "VND",
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Order = order,
+            Provider = "payos",
+            ProviderOrderCode = "1111111111111",
+            Amount = amount,
+            Currency = "VND",
             Status = PaymentTransactionStatus.Paid
         };
         var currentPayment = new PaymentTransaction
         {
-            Id = Guid.NewGuid(), OrderId = order.Id, Order = order, Provider = "payos",
-            ProviderOrderCode = "2222222222222", Amount = amount, Currency = "VND",
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Order = order,
+            Provider = "payos",
+            ProviderOrderCode = "2222222222222",
+            Amount = amount,
+            Currency = "VND",
             Status = PaymentTransactionStatus.Pending
         };
         var notification = new ProviderPaymentNotification
         {
-            Provider = "payos", ProviderEventId = "event:second-paid",
-            ProviderOrderCode = currentPayment.ProviderOrderCode, EventType = "PAID",
-            ProviderStatus = "PAID", IsPaid = true, PaidAmount = amount,
+            Provider = "payos",
+            ProviderEventId = "event:second-paid",
+            ProviderOrderCode = currentPayment.ProviderOrderCode,
+            EventType = "PAID",
+            ProviderStatus = "PAID",
+            IsPaid = true,
+            PaidAmount = amount,
             RawPayloadJson = "{\"paid\":true}"
         };
         var store = Substitute.For<IPaymentStore>();
@@ -367,15 +381,24 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         order.Place(placedAt, placedAt.AddMinutes(15));
         var payment = new PaymentTransaction
         {
-            Id = Guid.NewGuid(), OrderId = order.Id, Order = order, Provider = "payos",
-            ProviderOrderCode = "3333333333333", Amount = amount, Currency = "VND",
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Order = order,
+            Provider = "payos",
+            ProviderOrderCode = "3333333333333",
+            Amount = amount,
+            Currency = "VND",
             Status = PaymentTransactionStatus.Expired
         };
         var notification = new ProviderPaymentNotification
         {
-            Provider = "payos", ProviderEventId = "event:late-paid",
-            ProviderOrderCode = payment.ProviderOrderCode, EventType = "PAID",
-            ProviderStatus = "PAID", IsPaid = true, PaidAmount = amount,
+            Provider = "payos",
+            ProviderEventId = "event:late-paid",
+            ProviderOrderCode = payment.ProviderOrderCode,
+            EventType = "PAID",
+            ProviderStatus = "PAID",
+            IsPaid = true,
+            PaidAmount = amount,
             RawPayloadJson = "{\"paid\":true}"
         };
         var store = Substitute.For<IPaymentStore>();
@@ -421,15 +444,24 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         order.Place(placedAt, placedAt.AddMinutes(15));
         var payment = new PaymentTransaction
         {
-            Id = Guid.NewGuid(), OrderId = order.Id, Order = order, Provider = "payos",
-            ProviderOrderCode = "4444444444444", Amount = amount, Currency = "VND",
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Order = order,
+            Provider = "payos",
+            ProviderOrderCode = "4444444444444",
+            Amount = amount,
+            Currency = "VND",
             Status = PaymentTransactionStatus.Expired
         };
         var notification = new ProviderPaymentNotification
         {
-            Provider = "payos", ProviderEventId = "event:late-session-conflict",
-            ProviderOrderCode = payment.ProviderOrderCode, EventType = "PAID",
-            ProviderStatus = "PAID", IsPaid = true, PaidAmount = amount,
+            Provider = "payos",
+            ProviderEventId = "event:late-session-conflict",
+            ProviderOrderCode = payment.ProviderOrderCode,
+            EventType = "PAID",
+            ProviderStatus = "PAID",
+            IsPaid = true,
+            PaidAmount = amount,
             RawPayloadJson = "{\"paid\":true}"
         };
         var store = Substitute.For<IPaymentStore>();

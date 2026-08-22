@@ -13,6 +13,29 @@ public static class MenuItemSellabilityRules
         DateTimeOffset now,
         bool hasActiveProductionRoute)
     {
+        var staticValidationError = ValidateStatic(item, kiosk, now);
+        if (staticValidationError is not null)
+        {
+            return staticValidationError;
+        }
+
+        if (item.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced && !hasActiveProductionRoute)
+        {
+            return $"Menu item '{item.DisplayName}' does not have an active production route for this kiosk.";
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Validates catalog facts that remain valid for the lifetime of a runtime-menu projection.
+    /// Route readiness, inventory, and kiosk operational evidence are deliberately excluded.
+    /// </summary>
+    public static string? ValidateStatic(
+        MenuItem item,
+        Kiosk kiosk,
+        DateTimeOffset now)
+    {
         if (item.Menu.Status != MenuStatus.Active ||
             !IsWithinEffectiveWindow(item.Menu.EffectiveFrom, item.Menu.EffectiveTo, now))
         {
@@ -88,11 +111,6 @@ public static class MenuItemSellabilityRules
             {
                 return $"Recipe '{recipe.Name}' references an inactive ingredient.";
             }
-        }
-
-        if (item.ProductVariant.FulfillmentType == FulfillmentType.MachineProduced && !hasActiveProductionRoute)
-        {
-            return $"Menu item '{item.DisplayName}' does not have an active production route for this kiosk.";
         }
 
         return null;

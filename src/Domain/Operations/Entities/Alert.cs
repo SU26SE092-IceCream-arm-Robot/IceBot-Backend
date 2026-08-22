@@ -237,6 +237,40 @@ public partial class Alert : SyncAggregateEntity
         };
     }
 
+    public static Alert RaiseFromOrderExecutionInvariant(
+        Guid kioskId,
+        Guid sourceCommandId,
+        string alertCode,
+        string title,
+        string message,
+        DateTimeOffset raisedAt)
+    {
+        if (kioskId == Guid.Empty || sourceCommandId == Guid.Empty ||
+            string.IsNullOrWhiteSpace(alertCode) || string.IsNullOrWhiteSpace(title) ||
+            string.IsNullOrWhiteSpace(message))
+        {
+            throw new DomainRuleException("Order-execution invariant alert identity and content are required.");
+        }
+
+        return new Alert
+        {
+            KioskId = kioskId,
+            AlertCode = alertCode.Trim(),
+            CorrelationKey = $"{NormalizeCorrelationKey(alertCode)}:{sourceCommandId:N}",
+            Severity = SeverityLevel.Critical,
+            Title = title.Trim(),
+            Message = message.Trim(),
+            Status = AlertStatus.Open,
+            SourceType = "OrderExecutionInvariant",
+            SourceId = sourceCommandId,
+            RaisedAt = raisedAt,
+            LastOccurredAt = raisedAt,
+            OccurrenceCount = 1,
+            Version = 1,
+            SyncedAt = raisedAt
+        };
+    }
+
     public void Acknowledge(Guid acknowledgedByAccountId, DateTimeOffset acknowledgedAt)
     {
         if (Status is AlertStatus.Resolved or AlertStatus.Suppressed)

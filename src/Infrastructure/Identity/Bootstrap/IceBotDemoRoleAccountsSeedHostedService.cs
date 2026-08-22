@@ -57,7 +57,7 @@ public sealed class IceBotDemoRoleAccountsSeedHostedService(
         }
 
         var now = DateTimeOffset.UtcNow;
-        var roleCodes = new[] { "OrgAdmin", "Manager", "Staff", "Technician" };
+        var roleCodes = new[] { "OrgAdmin", "Manager", "Staff" };
         var roles = await dbContext.Roles
             .Where(role => roleCodes.Contains(role.Code))
             .ToDictionaryAsync(role => role.Code, StringComparer.OrdinalIgnoreCase, cancellationToken);
@@ -65,8 +65,7 @@ public sealed class IceBotDemoRoleAccountsSeedHostedService(
         {
             new DemoAccountSeed("demo-orgadmin", "demo-orgadmin@icebot.local", "Demo Organization Admin", "OrgAdmin", organization.Id, null, null),
             new DemoAccountSeed("demo-manager", "demo-manager@icebot.local", "Demo Store Manager", "Manager", organization.Id, store.Id, null),
-            new DemoAccountSeed("demo-staff", "demo-staff@icebot.local", "Demo Store Staff", "Staff", organization.Id, store.Id, null),
-            new DemoAccountSeed("demo-technician", "demo-technician@icebot.local", "Demo Kiosk Technician", "Technician", organization.Id, store.Id, kiosk.Id)
+            new DemoAccountSeed("demo-staff", "demo-staff@icebot.local", "Demo Store Staff", "Staff", organization.Id, store.Id, null)
         };
 
         foreach (var seed in seeds)

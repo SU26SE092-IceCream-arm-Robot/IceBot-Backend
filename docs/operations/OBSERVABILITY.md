@@ -75,7 +75,7 @@ Observability settings are managed in `appsettings.json` under the `Observabilit
 ### OTLP Exporters
 
 - `OpenTelemetry:Metrics:ExporterEnabled` and `OpenTelemetry:Tracing:ExporterEnabled` are independent. Enable only the signal that the collector is configured to receive.
-- Each signal can use its own `OtlpEndpoint` and `OtlpProtocol`. When omitted, existing common `OpenTelemetry:OtlpEndpoint` and `OtlpProtocol` values remain a backward-compatible fallback.
+- Metrics and tracing each own their `OtlpEndpoint` and `OtlpProtocol`. Omitted values use the application defaults; no shared OpenTelemetry exporter keys are supported.
 - Set `Serilog:OtlpSinkEnabled: true` only when structured logs should also flow to the collector. It has its own optional `Serilog:OtlpEndpoint` and `Serilog:OtlpProtocol` overrides.
 - In `appsettings.Development.json`, exporters default to `false` so the app does not depend on Aspire being available.
 - `service.name`, `service.version`, `service.instance.id`, and `deployment.environment.name` are resource attributes. Do not use organization, kiosk, account, order, endpoint, payment, deployment, or artifact IDs as metric tags.

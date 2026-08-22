@@ -170,42 +170,12 @@ public sealed partial class OrderStore : IOrderStore
         DateTimeOffset readinessReceivedAfter,
         CancellationToken cancellationToken = default)
     {
-        var routes = await _dbContext.ExecutionEndpointReadinessProjections
-            .AsNoTracking()
-            .Where(readiness =>
-                readiness.KioskId == kioskId && readiness.Readiness == ExecutionReadinessState.Ready &&
-                readiness.Safety == ExecutionSafetyState.Safe &&
-                readiness.CloudReceivedAt >= readinessReceivedAfter &&
-                readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
-                _dbContext.ConfigurationReleases.WhereNotDeleted().Any(release =>
-                    release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
-                        ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
-                        : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
-                    release.Status == ConfigurationReleaseStatus.Published &&
-                    release.ExecutionRoutes.Any(route => route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
-                        route.RobotBindings.Any() && route.RobotBindings.All(binding =>
-                            binding.RequiredWorkcellCapabilityCode == string.Empty ||
-                            readiness.Capabilities.Any(capability =>
-                                capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
-            .SelectMany(readiness => _dbContext.ConfigurationReleases.WhereNotDeleted()
-                .Where(release => release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
-                    ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
-                    : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId))
-                .SelectMany(release => release.ExecutionRoutes.Where(route =>
-                    route.ProductVariantId == productVariantId && route.RecipeId == recipeId &&
-                    route.RobotBindings.Any() && route.RobotBindings.All(binding =>
-                        binding.RequiredWorkcellCapabilityCode == string.Empty ||
-                        readiness.Capabilities.Any(capability =>
-                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
-            .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
-            .Select(route => new { route.Id, route.SupportedOptionCodesJson, route.RequiredCapabilitiesJson })
-            .ToListAsync(cancellationToken);
-        var route = routes.FirstOrDefault(candidate =>
-            !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
-                candidate.RequiredCapabilitiesJson));
+        var routes = await Infrastructure.SalesCatalog.Persistence.ExecutionRouteAvailabilityReader.ListAsync(
+            _dbContext, kioskId, [new ActiveProductionRouteOptionPolicyKey(productVariantId, recipeId)],
+            readinessReceivedAfter, cancellationToken);
+        var route = routes.FirstOrDefault();
         return route is null ? null : new ActiveProductionRouteOptionPolicy(route.Id,
-            (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
-                .ToHashSet(StringComparer.OrdinalIgnoreCase));
+            route.SupportedOptionCodes);
     }
 
     public Task<Order?> GetOrderByIdAsync(Guid orderId, CancellationToken cancellationToken = default)

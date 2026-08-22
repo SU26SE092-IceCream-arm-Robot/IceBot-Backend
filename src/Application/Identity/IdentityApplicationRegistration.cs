@@ -14,6 +14,7 @@ using Application.Identity.Provisioning;
 using Application.Identity.Roles.Queries;
 using Application.Identity.Tokens.Services;
 using Application.Identity.Workforce.Staff;
+using Application.Identity.PlatformTechnicians;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Identity;
@@ -61,6 +62,9 @@ public static class IdentityApplicationRegistration
         services.AddScoped<ChangeStaffWorkforceLifecycleCommandHandler>();
         services.AddScoped<SendStaffWorkforceInvitationCommandHandler>();
         services.AddScoped<IStaffSessionRevoker, RefreshTokenStaffSessionRevoker>();
+        services.AddScoped<ListPlatformTechniciansQueryHandler>();
+        services.AddScoped<ReplacePlatformTechnicianScopesCommandHandler>();
+        services.AddScoped<PlatformTechnicianAccountCommandHandler>();
 
         services.AddScoped<RequestPasswordResetCommandHandler>();
         services.AddScoped<ResetPasswordCommandHandler>();

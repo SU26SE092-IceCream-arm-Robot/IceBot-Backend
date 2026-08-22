@@ -14,21 +14,21 @@ internal static class InventoryTopologyAuditFactory
         bool? beforeIsActive = null,
         decimal? beforeCapacity = null,
         string? beforeUnit = null) => new()
-    {
-        DispenserStateId = state.Id,
-        KioskId = state.KioskId ?? Guid.Empty,
-        DeviceId = state.DeviceId,
-        IngredientId = state.IngredientId,
-        ContainerCode = state.ContainerCode,
-        ChangeType = changeType,
-        BeforeIsActive = beforeIsActive,
-        AfterIsActive = changeType == InventoryTopologyChangeType.Deleted ? null : state.IsActive,
-        BeforeCapacityQuantity = beforeCapacity,
-        AfterCapacityQuantity = changeType == InventoryTopologyChangeType.Deleted ? null : state.CapacityQuantity,
-        BeforeUnit = beforeUnit,
-        AfterUnit = changeType == InventoryTopologyChangeType.Deleted ? null : state.Unit,
-        Reason = reason.Trim(),
-        CreatedAt = occurredAt,
-        CreatedByAccountId = actorId
-    };
+        {
+            DispenserStateId = state.Id,
+            KioskId = state.KioskId ?? Guid.Empty,
+            DeviceId = state.DeviceId,
+            IngredientId = state.IngredientId,
+            ContainerCode = state.ContainerCode,
+            ChangeType = changeType,
+            BeforeIsActive = beforeIsActive,
+            AfterIsActive = changeType == InventoryTopologyChangeType.Deleted ? null : state.IsActive,
+            BeforeCapacityQuantity = beforeCapacity,
+            AfterCapacityQuantity = changeType == InventoryTopologyChangeType.Deleted ? null : state.CapacityQuantity,
+            BeforeUnit = beforeUnit,
+            AfterUnit = changeType == InventoryTopologyChangeType.Deleted ? null : state.Unit,
+            Reason = reason.Trim(),
+            CreatedAt = occurredAt,
+            CreatedByAccountId = actorId
+        };
 }

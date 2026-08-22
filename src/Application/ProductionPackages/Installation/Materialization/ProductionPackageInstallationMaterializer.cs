@@ -9,6 +9,7 @@ using Domain.RobotConfiguration.ArtifactContracts;
 using Domain.RobotConfiguration.ArtifactTemplates;
 using Domain.RobotConfiguration.Artifacts;
 using Domain.RobotConfiguration.Programs;
+using Domain.RobotConfiguration.Programs.Manifests;
 
 namespace Application.ProductionPackages.Installation;
 
@@ -27,13 +28,24 @@ internal static class ProductionPackageInstallationMaterializer
             var source = ProductionPackageProductSnapshotCodec.Deserialize(definition.ProductSnapshotJson).Product;
             var product = new Product
             {
-                OrganizationId = command.OrganizationId, StoreId = command.StoreId, KioskId = command.KioskId,
-                TemplateProductId = source.Id, CategoryId = source.CategoryId,
-                Code = ApplyIdentitySuffix(source.Code, command.MaterializationIdentitySuffix), Name = source.Name,
-                DisplayName = source.DisplayName, Description = source.Description, ProductType = source.ProductType,
-                BasePrice = source.BasePrice, Currency = source.Currency, IsAvailable = false,
-                PreparationTimeSeconds = source.PreparationTimeSeconds, ImageUrl = source.ImageUrl,
-                ScopeType = scopeType, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
+                OrganizationId = command.OrganizationId,
+                StoreId = command.StoreId,
+                KioskId = command.KioskId,
+                TemplateProductId = source.Id,
+                CategoryId = source.CategoryId,
+                Code = ApplyIdentitySuffix(source.Code, command.MaterializationIdentitySuffix),
+                Name = source.Name,
+                DisplayName = source.DisplayName,
+                Description = source.Description,
+                ProductType = source.ProductType,
+                BasePrice = source.BasePrice,
+                Currency = source.Currency,
+                IsAvailable = false,
+                PreparationTimeSeconds = source.PreparationTimeSeconds,
+                ImageUrl = source.ImageUrl,
+                ScopeType = scopeType,
+                CreatedAt = now,
+                CreatedByAccountId = command.UserContext.AccountId
             };
             var variants = new Dictionary<Guid, ProductVariant>();
             var recipesByCode = new Dictionary<string, Recipe>(StringComparer.Ordinal);
@@ -44,13 +56,22 @@ internal static class ProductionPackageInstallationMaterializer
             {
                 var variant = new ProductVariant
                 {
-                    ProductId = product.Id, Code = variantSource.Code, Name = variantSource.Name,
-                    DisplayName = variantSource.DisplayName, Description = variantSource.Description,
-                    VariantType = variantSource.VariantType, FulfillmentType = variantSource.FulfillmentType,
-                    SizeCode = variantSource.SizeCode, BasePrice = variantSource.BasePrice, Currency = source.Currency,
-                    IsAvailable = false, DisplayOrder = variantSource.DisplayOrder,
-                    PreparationTimeSeconds = variantSource.PreparationTimeSeconds, ImageUrl = variantSource.ImageUrl,
-                    CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
+                    ProductId = product.Id,
+                    Code = variantSource.Code,
+                    Name = variantSource.Name,
+                    DisplayName = variantSource.DisplayName,
+                    Description = variantSource.Description,
+                    VariantType = variantSource.VariantType,
+                    FulfillmentType = variantSource.FulfillmentType,
+                    SizeCode = variantSource.SizeCode,
+                    BasePrice = variantSource.BasePrice,
+                    Currency = source.Currency,
+                    IsAvailable = false,
+                    DisplayOrder = variantSource.DisplayOrder,
+                    PreparationTimeSeconds = variantSource.PreparationTimeSeconds,
+                    ImageUrl = variantSource.ImageUrl,
+                    CreatedAt = now,
+                    CreatedByAccountId = command.UserContext.AccountId
                 };
                 product.ProductVariants.Add(variant);
                 variants[variantSource.Id] = variant;
@@ -59,20 +80,41 @@ internal static class ProductionPackageInstallationMaterializer
                     var currentRecipeRequirements = new List<IngredientQuantityRequirement>();
                     var recipe = new Recipe
                     {
-                        OrganizationId = command.OrganizationId, StoreId = command.StoreId, KioskId = command.KioskId,
-                        ProductVariantId = variant.Id, TemplateRecipeId = recipeSource.Id, Code = recipeSource.Code,
-                        Name = recipeSource.Name, Version = 1, Status = RecipeStatus.Draft,
-                        IsDefault = recipeSource.IsDefault, YieldQuantity = recipeSource.YieldQuantity, Unit = recipeSource.Unit,
-                        EstimatedDurationSeconds = recipeSource.EstimatedDurationSeconds, EffectiveFrom = recipeSource.EffectiveFrom,
-                        EffectiveTo = recipeSource.EffectiveTo, InstructionsSchemaVersion = recipeSource.InstructionsSchemaVersion,
-                        InstructionsJson = recipeSource.InstructionsJson, ScopeType = scopeType,
-                        CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
+                        OrganizationId = command.OrganizationId,
+                        StoreId = command.StoreId,
+                        KioskId = command.KioskId,
+                        ProductVariantId = variant.Id,
+                        TemplateRecipeId = recipeSource.Id,
+                        Code = recipeSource.Code,
+                        Name = recipeSource.Name,
+                        Version = 1,
+                        Status = RecipeStatus.Draft,
+                        IsDefault = recipeSource.IsDefault,
+                        YieldQuantity = recipeSource.YieldQuantity,
+                        Unit = recipeSource.Unit,
+                        EstimatedDurationSeconds = recipeSource.EstimatedDurationSeconds,
+                        EffectiveFrom = recipeSource.EffectiveFrom,
+                        EffectiveTo = recipeSource.EffectiveTo,
+                        InstructionsSchemaVersion = recipeSource.InstructionsSchemaVersion,
+                        InstructionsJson = recipeSource.InstructionsJson,
+                        ScopeType = scopeType,
+                        CreatedAt = now,
+                        CreatedByAccountId = command.UserContext.AccountId
                     };
                     foreach (var item in recipeSource.Items)
                     {
-                        recipe.RecipeItems.Add(new RecipeItem { RecipeId = recipe.Id, IngredientId = item.IngredientId,
-                            Quantity = item.Quantity, Unit = item.Unit, StepOrder = item.StepOrder, IsOptional = item.IsOptional,
-                            Notes = item.Notes, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId });
+                        recipe.RecipeItems.Add(new RecipeItem
+                        {
+                            RecipeId = recipe.Id,
+                            IngredientId = item.IngredientId,
+                            Quantity = item.Quantity,
+                            Unit = item.Unit,
+                            StepOrder = item.StepOrder,
+                            IsOptional = item.IsOptional,
+                            Notes = item.Notes,
+                            CreatedAt = now,
+                            CreatedByAccountId = command.UserContext.AccountId
+                        });
                         currentRecipeRequirements.Add(new IngredientQuantityRequirement(item.IngredientCode, item.Quantity, item.Unit, null));
                     }
                     variant.Recipes.Add(recipe);
@@ -90,26 +132,49 @@ internal static class ProductionPackageInstallationMaterializer
 
             foreach (var groupSource in source.OptionGroups)
             {
-                var group = new OptionGroup { ProductId = product.Id, Code = groupSource.Code, Name = groupSource.Name,
-                    Description = groupSource.Description, SelectionType = groupSource.SelectionType,
-                    MinSelections = groupSource.MinSelections, MaxSelections = groupSource.MaxSelections,
-                    IsRequired = groupSource.IsRequired, IsActive = groupSource.IsActive,
-                    DisplayOrder = groupSource.DisplayOrder, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId };
+                var group = new OptionGroup
+                {
+                    ProductId = product.Id,
+                    Code = groupSource.Code,
+                    Name = groupSource.Name,
+                    Description = groupSource.Description,
+                    SelectionType = groupSource.SelectionType,
+                    MinSelections = groupSource.MinSelections,
+                    MaxSelections = groupSource.MaxSelections,
+                    IsRequired = groupSource.IsRequired,
+                    IsActive = groupSource.IsActive,
+                    DisplayOrder = groupSource.DisplayOrder,
+                    CreatedAt = now,
+                    CreatedByAccountId = command.UserContext.AccountId
+                };
                 foreach (var optionSource in groupSource.Options)
                 {
                     var currentOptionRequirements = new List<IngredientQuantityRequirement>();
-                    var option = new ProductOption { OptionGroupId = group.Id, TemplateProductOptionId = optionSource.Id,
-                        Code = optionSource.Code, Name = optionSource.Name, Description = optionSource.Description,
-                        PriceDelta = optionSource.PriceDelta, ExecutionImpact = optionImpacts[optionSource.Id],
-                        IsDefault = optionSource.IsDefault, IsAvailable = false,
-                        DisplayOrder = optionSource.DisplayOrder, CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId };
+                    var option = new ProductOption
+                    {
+                        OptionGroupId = group.Id,
+                        TemplateProductOptionId = optionSource.Id,
+                        Code = optionSource.Code,
+                        Name = optionSource.Name,
+                        Description = optionSource.Description,
+                        PriceDelta = optionSource.PriceDelta,
+                        ExecutionImpact = optionImpacts[optionSource.Id],
+                        IsDefault = optionSource.IsDefault,
+                        IsAvailable = false,
+                        DisplayOrder = optionSource.DisplayOrder,
+                        CreatedAt = now,
+                        CreatedByAccountId = command.UserContext.AccountId
+                    };
                     foreach (var requirement in optionSource.IngredientRequirements)
                     {
                         option.IngredientRequirements.Add(new ProductOptionIngredientRequirement
                         {
-                            IngredientId = requirement.IngredientId, Quantity = requirement.Quantity, Unit = requirement.Unit,
+                            IngredientId = requirement.IngredientId,
+                            Quantity = requirement.Quantity,
+                            Unit = requirement.Unit,
                             RequiredWorkcellCapabilityCode = requirement.RequiredWorkcellCapabilityCode,
-                            CreatedAt = now, CreatedByAccountId = command.UserContext.AccountId
+                            CreatedAt = now,
+                            CreatedByAccountId = command.UserContext.AccountId
                         });
                         currentOptionRequirements.Add(new IngredientQuantityRequirement(
                             requirement.IngredientCode, requirement.Quantity, requirement.Unit,
@@ -167,6 +232,10 @@ internal static class ProductionPackageInstallationMaterializer
                 throw new DomainRuleException("Prepared package artifact no longer matches the locked installation state.");
             result.Add(definition.SourceKey, artifact);
             created.Add(artifact);
+            if (artifact.Status == RobotArtifactStatus.Draft)
+            {
+                artifact.Publish();
+            }
             installation.AddMaterialization(ProductionPackageResourceKind.RobotArtifact,
                 definition.SourceKey, artifact.Id.ToString("D"), artifact.Checksum);
         }
@@ -180,9 +249,11 @@ internal static class ProductionPackageInstallationMaterializer
         IReadOnlyCollection<RobotArtifactTechnicalContract> contracts,
         IReadOnlyDictionary<Guid, ProductOptionExecutionImpact> optionImpacts)
     {
+        var now = DateTimeOffset.UtcNow;
         var contractById = contracts.ToDictionary(x => x.Id);
         var artifactDefinitions = version.Artifacts.ToDictionary(x => x.SourceKey, StringComparer.Ordinal);
         var programs = new Dictionary<string, RobotProgram>(StringComparer.Ordinal);
+        var bindings = new Dictionary<string, ProductionProgramBinding>(StringComparer.Ordinal);
         var compositions = new List<ProductionComposition>();
         var selectedProductKeys = products.Select(x => x.SourceKey).ToHashSet(StringComparer.Ordinal);
         foreach (var route in version.Routes.Where(x => selectedProductKeys.Contains(x.ProductSourceKey))
@@ -217,30 +288,72 @@ internal static class ProductionPackageInstallationMaterializer
                 program.AddArtifact(artifacts[slot.ArtifactSourceKey].Id, order++,
                     requiredOptionCode: ResolveRequiredOptionCode(
                         contractById[artifactDefinitions[slot.ArtifactSourceKey].TechnicalContractId]));
+            program.Publish(now, orderedSlots.Select(slot =>
+            {
+                var artifact = artifacts[slot.ArtifactSourceKey];
+                return new RobotArtifactManifestSnapshot(
+                    artifact.Id, artifact.ArtifactCode, artifact.ArtifactName, artifact.FileName,
+                    artifact.Status, artifact.Checksum, artifact.StorageKey, artifact.RuntimeTargetCode,
+                    artifact.MachineModelCode, artifact.ContentLengthBytes, artifact.TechnicalContractId,
+                    artifact.TechnicalContractChecksum, artifact.RuntimeProfileSource);
+            }).ToArray());
             programs.Add(route.RouteCode, program);
             installation.AddMaterialization(ProductionPackageResourceKind.RobotProgram,
                 route.RouteCode, program.Id.ToString("D"));
 
-            var input = JsonSerializer.Serialize(new { version.Id, version.ManifestChecksum, route.RouteCode,
-                ProductVariantId = recipe.ProductVariantId, RecipeId = recipe.Id, blueprint.RuntimeTargetCode,
-                blueprint.MachineModelCode, SupportedOptionCodes = supportedOptionCodes.Order(StringComparer.Ordinal),
-                Slots = orderedSlots.Select(x => new { x.SlotCode, x.RequiredEffectCode,
-                    ArtifactId = artifacts[x.ArtifactSourceKey].Id, artifacts[x.ArtifactSourceKey].Checksum }) });
-            var report = JsonSerializer.Serialize(new { IsValid = true, RequiresUserAcknowledgement = true,
+            var input = JsonSerializer.Serialize(new
+            {
+                version.Id,
+                version.ManifestChecksum,
+                route.RouteCode,
+                ProductVariantId = recipe.ProductVariantId,
+                RecipeId = recipe.Id,
+                blueprint.RuntimeTargetCode,
+                blueprint.MachineModelCode,
+                SupportedOptionCodes = supportedOptionCodes.Order(StringComparer.Ordinal),
+                Slots = orderedSlots.Select(x => new
+                {
+                    x.SlotCode,
+                    x.RequiredEffectCode,
+                    ArtifactId = artifacts[x.ArtifactSourceKey].Id,
+                    artifacts[x.ArtifactSourceKey].Checksum
+                })
+            });
+            var report = JsonSerializer.Serialize(new
+            {
+                IsValid = true,
+                RequiresUserAcknowledgement = true,
                 Warnings = new[] { "Physical behavior has not been proven on the target kiosk." },
-                OrderedEffects = orderedSlots.Select(x => x.RequiredEffectCode) });
+                OrderedEffects = orderedSlots.Select(x => x.RequiredEffectCode)
+            });
             var composition = ProductionComposition.Create(installation.Id, command.OrganizationId,
                 recipe.ProductVariantId, recipe.Id, null, blueprint.RuntimeTargetCode, blueprint.MachineModelCode,
                 input, true, report);
             composition.Apply(program.Id);
             compositions.Add(composition);
+
+            var capabilityCodes = ProductionPackageDefinitionValidator.ValidateCapabilities(
+                route.RequiredCapabilitiesJson);
+            bindings.Add(route.RouteCode, ProductionProgramBinding.Create(
+                command.OrganizationId,
+                recipe.ProductVariantId,
+                recipe.Id,
+                recipe.Version,
+                program.Id,
+                program.ProgramManifestChecksum!,
+                capabilityCodes,
+                ProductionProgramBindingCapabilityEvidenceStatus.Declared,
+                ProductionProgramBindingAssurance.OperatorDeclared,
+                supportedOptionCodes,
+                command.UserContext.AccountId));
         }
-        return new ComposedPrograms(programs, compositions);
+        return new ComposedPrograms(programs, bindings, compositions);
     }
 
     internal static ConfigurationRelease CreateRelease(InstallProductionPackageCommand command,
         ProductionPackageInstallation installation, ProductionPackageVersion version, long releaseNumber,
         IReadOnlyCollection<MaterializedProduct> products, IReadOnlyDictionary<string, RobotProgram> programs,
+        IReadOnlyDictionary<string, ProductionProgramBinding> bindings,
         IReadOnlyDictionary<Guid, ProductOptionExecutionImpact> optionImpacts)
     {
         var release = ConfigurationRelease.CreateDraft(command.OrganizationId, releaseNumber);
@@ -253,16 +366,17 @@ internal static class ProductionPackageInstallationMaterializer
             if (!product.RecipesByCode.TryGetValue(
                     RecipeLookupKey(routeDefinition.ProductVariantSourceKey, routeDefinition.RecipeSourceKey), out var recipe))
                 throw new DomainRuleException("Package route Recipe source key was not materialized.");
-            var capabilityCode = ProductionPackageDefinitionValidator.ValidateSingleCapability(
-                routeDefinition.RequiredCapabilitiesJson);
-            IReadOnlyCollection<(Guid, int, string)> bindings =
-                [(programs[routeDefinition.RouteCode].Id, 1, capabilityCode)];
+            var binding = bindings[routeDefinition.RouteCode];
+            var capabilityCodes = binding.GetRequiredCapabilityCodes();
+            IReadOnlyCollection<(Guid ProductionProgramBindingId, string ProductionProgramBindingChecksum,
+                Guid RobotProgramId, int BindingOrder, IReadOnlyCollection<string> CapabilityCodes)> routeBindings =
+                [(binding.Id, binding.BindingChecksum, programs[routeDefinition.RouteCode].Id, 1, capabilityCodes)];
             var productDefinition = version.Products.Single(x => x.SourceKey == routeDefinition.ProductSourceKey);
             var supportedOptionCodes = ProductionPackageDefinitionValidator.ResolveSupportedOptionCodes(
                 routeDefinition, productDefinition.ProductSnapshotJson, optionImpacts);
             return (recipe.ProductVariantId, recipe.Id, routeDefinition.RouteCode, routeDefinition.Priority,
                 (string?)routeDefinition.RequiredCapabilitiesJson,
-                (IReadOnlyCollection<string>)supportedOptionCodes.Order(StringComparer.Ordinal).ToArray(), bindings);
+                (IReadOnlyCollection<string>)supportedOptionCodes.Order(StringComparer.Ordinal).ToArray(), routeBindings);
         }));
         return release;
     }
@@ -288,6 +402,7 @@ internal static class ProductionPackageInstallationMaterializer
         IReadOnlyDictionary<string, RobotArtifact> All,
         IReadOnlyCollection<RobotArtifact> Created);
     internal sealed record ComposedPrograms(IReadOnlyDictionary<string, RobotProgram> Programs,
+        IReadOnlyDictionary<string, ProductionProgramBinding> Bindings,
         IReadOnlyCollection<ProductionComposition> Compositions);
 
     internal static string RecipeLookupKey(string variantCode, string recipeCode) =>
@@ -300,5 +415,8 @@ internal static class ProductionPackageInstallationMaterializer
         => ProductionPackageMaterializationCode.WithSuffix(code, identitySuffix);
 
     internal static string ForkArtifactCode(string sourceCode, Guid installationId) =>
+        $"{sourceCode.Trim().ToUpperInvariant()}_FORK_{installationId:N}";
+
+    internal static string ForkProgramCode(string sourceCode, Guid installationId) =>
         $"{sourceCode.Trim().ToUpperInvariant()}_FORK_{installationId:N}";
 }

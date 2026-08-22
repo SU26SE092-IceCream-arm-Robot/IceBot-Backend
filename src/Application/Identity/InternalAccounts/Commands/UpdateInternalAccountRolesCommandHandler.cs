@@ -38,7 +38,11 @@ public sealed class UpdateInternalAccountRolesCommandHandler
             return ApiResult<InternalAccountResult>.Fail("Duplicate role assignment in request.", 400);
         }
 
-        var account = await _accounts.GetByIdAsync(command.AccountId, asNoTracking: false, cancellationToken: cancellationToken);
+        var account = await _accounts.GetTenantManagedByIdAsync(
+            command.AccountId,
+            command.OrganizationId,
+            asNoTracking: false,
+            cancellationToken: cancellationToken);
         if (account is null)
         {
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);
@@ -52,6 +56,12 @@ public sealed class UpdateInternalAccountRolesCommandHandler
         var requestedRoles = new List<(Role Role, Requests.AccountRoleScopeRequest Request)>();
         foreach (var requestRole in command.Request.Roles)
         {
+            if (PlatformTechnicianBoundary.IsTechnicianRole(requestRole.RoleCode))
+            {
+                return ApiResult<InternalAccountResult>.Fail(
+                    "Technician role assignments are managed through platform support administration.", 403);
+            }
+
             if (requestRole.OrganizationId != command.OrganizationId)
             {
                 return ApiResult<InternalAccountResult>.Fail(

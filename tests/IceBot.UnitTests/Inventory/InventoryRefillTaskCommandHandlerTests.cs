@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using Application.Abstractions.Realtime;
 using Application.Identity.Tokens.Claims;
 using Application.Inventory.Abstractions;
 using Application.Inventory.Commands;
@@ -15,7 +16,7 @@ public sealed class InventoryRefillTaskCommandHandlerTests
     [Fact]
     public async Task Request_rejects_non_positive_requested_quantity()
     {
-        var store = Substitute.For<IInventoryStore>();
+        var store = Substitute.For<IInventoryRefillTaskStore>();
         var handler = new RequestInventoryRefillTaskCommandHandler(store);
 
         var result = await handler.HandleAsync(new RequestInventoryRefillTaskCommand(
@@ -33,7 +34,7 @@ public sealed class InventoryRefillTaskCommandHandlerTests
         var inventoryId = Guid.NewGuid();
         var requestKey = "request-1";
         const decimal requestedQuantity = 10;
-        var store = Substitute.For<IInventoryStore>();
+        var store = Substitute.For<IInventoryRefillTaskStore>();
         var handler = new RequestInventoryRefillTaskCommandHandler(store);
         var balance = new KioskIngredientInventory
         {
@@ -78,8 +79,8 @@ public sealed class InventoryRefillTaskCommandHandlerTests
             KioskId = kioskId,
             KioskIngredientInventoryId = Guid.NewGuid()
         };
-        var store = Substitute.For<IInventoryStore>();
-        var handler = new CompleteInventoryRefillTaskCommandHandler(store);
+        var store = Substitute.For<IInventoryRefillTaskStore>();
+        var handler = new CompleteInventoryRefillTaskCommandHandler(store, Substitute.For<IRealtimeNotificationPublisher>());
         store.GetInventoryRefillTaskAsync(task.Id, Arg.Any<CancellationToken>())
             .Returns(Task.FromResult<InventoryRefillTask?>(task), Task.FromResult<InventoryRefillTask?>(null));
         store.AcquireKioskIngredientInventoryMutationLockAsync(task.KioskIngredientInventoryId, Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);

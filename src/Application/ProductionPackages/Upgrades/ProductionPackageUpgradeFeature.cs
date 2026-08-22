@@ -585,13 +585,13 @@ public sealed class ProductionPackageUpgradeService(
 
     internal static string MenuBindingChecksum(Guid? productId, Guid? variantId, Guid? recipeId,
         MenuItemStatus status, IEnumerable<Guid?> optionIds) => Hash(new
-    {
-        ProductId = productId,
-        ProductVariantId = variantId,
-        RecipeId = recipeId,
-        Status = status,
-        OptionIds = optionIds.Where(id => id.HasValue).Select(id => id!.Value).Order()
-    });
+        {
+            ProductId = productId,
+            ProductVariantId = variantId,
+            RecipeId = recipeId,
+            Status = status,
+            OptionIds = optionIds.Where(id => id.HasValue).Select(id => id!.Value).Order()
+        });
 
     internal static string Hash(object value)
     {

@@ -103,7 +103,7 @@ public sealed class CrossContextTenancyMatrixIntegrationTests(IntegrationTestFix
         Assert.Contains(errors.EnumerateArray(), error =>
             error.TryGetProperty("extensions", out var extensions) &&
             extensions.TryGetProperty("code", out var code) &&
-            code.GetString() is "403" or "404");
+            code.GetString() is "403" or "404" or "AUTH_NOT_AUTHORIZED");
 
         using var fulfillmentResponse = await client.PostAsJsonAsync(
             $"/api/v1/management/orders/{foreignOrderId:D}/items/{Guid.NewGuid():D}/manual-fulfillment-events",

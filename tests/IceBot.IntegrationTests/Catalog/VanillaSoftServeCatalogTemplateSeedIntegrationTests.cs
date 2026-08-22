@@ -111,8 +111,9 @@ public sealed class VanillaSoftServeCatalogTemplateSeedIntegrationTests(Integrat
         Assert.Equal(InventoryTrackingMode.ManualEstimate, state.TrackingMode);
         Assert.Equal(6000m, state.EstimatedQuantity);
         Assert.Equal(6000m, state.CapacityQuantity);
+        Assert.NotEqual(Guid.Empty, state.KioskIngredientInventoryId);
         Assert.Equal(1, await assertion.StockMovements.CountAsync(candidate =>
-            candidate.IngredientDispenserStateId == state.Id &&
+            candidate.KioskIngredientInventoryId == state.KioskIngredientInventoryId &&
             candidate.ReasonCode == "DEVELOPMENT_INITIAL_STOCK"));
     }
 
@@ -130,7 +131,7 @@ public sealed class VanillaSoftServeCatalogTemplateSeedIntegrationTests(Integrat
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DevelopmentCatalogSeed:VanillaSoftServeEnabled"] = "true"
+                ["DemoCatalogSeed:IceBotDemoEnabled"] = "true"
             })
             .Build();
         return new VanillaSoftServeCatalogTemplateSeedHostedService(
@@ -145,7 +146,8 @@ public sealed class VanillaSoftServeCatalogTemplateSeedIntegrationTests(Integrat
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["DevelopmentCatalogSeed:VanillaSoftServeEnabled"] = "true"
+                ["DemoCatalogSeed:IceBotDemoEnabled"] = "true",
+                ["DemoCatalogSeed:SeedInventoryTopology"] = "true"
             })
             .Build();
         return new DevelopmentVanillaSoftServeTopologySeedHostedService(

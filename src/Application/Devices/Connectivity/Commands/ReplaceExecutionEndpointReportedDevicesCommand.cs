@@ -94,13 +94,13 @@ public sealed class ReplaceExecutionEndpointReportedDevicesCommandHandler
     private static ReportedDeviceSnapshotResult Map(
         KioskExecutionEndpoint endpoint,
         ReportedDeviceSnapshotApplyDisposition disposition) => new()
-    {
-        EndpointId = endpoint.Id,
-        SnapshotRevision = endpoint.ReportedDevicesSnapshotRevision ?? 0,
-        Applied = disposition == ReportedDeviceSnapshotApplyDisposition.Applied,
-        DuplicateOrStale = disposition is ReportedDeviceSnapshotApplyDisposition.Duplicate or ReportedDeviceSnapshotApplyDisposition.Stale,
-        CloudReceivedAt = endpoint.ReportedDevicesReceivedAt,
-        Devices = endpoint.ReportedDevices.OrderBy(item => item.SourceDeviceKey, StringComparer.OrdinalIgnoreCase)
+        {
+            EndpointId = endpoint.Id,
+            SnapshotRevision = endpoint.ReportedDevicesSnapshotRevision ?? 0,
+            Applied = disposition == ReportedDeviceSnapshotApplyDisposition.Applied,
+            DuplicateOrStale = disposition is ReportedDeviceSnapshotApplyDisposition.Duplicate or ReportedDeviceSnapshotApplyDisposition.Stale,
+            CloudReceivedAt = endpoint.ReportedDevicesReceivedAt,
+            Devices = endpoint.ReportedDevices.OrderBy(item => item.SourceDeviceKey, StringComparer.OrdinalIgnoreCase)
             .Select(item => new ReportedDeviceResult
             {
                 SourceDeviceKey = item.SourceDeviceKey,
@@ -108,5 +108,5 @@ public sealed class ReplaceExecutionEndpointReportedDevicesCommandHandler
                 RuntimeTargetCode = item.RuntimeTargetCode,
                 MachineModelCode = item.MachineModelCode
             }).ToArray()
-    };
+        };
 }

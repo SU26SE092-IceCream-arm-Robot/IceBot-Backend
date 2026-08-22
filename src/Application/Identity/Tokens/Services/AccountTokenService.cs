@@ -45,7 +45,8 @@ namespace Application.Identity.Tokens.Services
                 refreshToken.Entity.Id,
                 account.UserName,
                 roles,
-                account.Status);
+                account.Status,
+                account.AuthorizationVersion);
             if (!accessToken.Succeeded)
             {
                 await _refreshTokens.RevokeByTokenAsync(
@@ -102,7 +103,8 @@ namespace Application.Identity.Tokens.Services
                 rotation.NewToken.Entity.Id,
                 account.UserName,
                 roles,
-                account.Status);
+                account.Status,
+                account.AuthorizationVersion);
             if (!accessToken.Succeeded)
             {
                 return ApiResult<AuthenticatedAccountResult>.Fail(accessToken.Message ?? "Failed to create access token.");
@@ -146,7 +148,7 @@ namespace Application.Identity.Tokens.Services
 
         private static IReadOnlyCollection<AccountRoleClaim> ResolveRoleClaims(Account account)
         {
-            return account.AccountRoles
+            var tenantRoles = account.AccountRoles
                        .Where(accountRole => accountRole.IsActive)
                        .Where(HasActiveOrganizationScope)
                        .OrderBy(accountRole => accountRole.Role.Priority)
@@ -156,6 +158,14 @@ namespace Application.Identity.Tokens.Services
                            accountRole.StoreId,
                            accountRole.KioskId))
                        .ToList();
+            if (account.PlatformTechnicianProfile is not null)
+            {
+                tenantRoles.AddRange(account.TechnicianSupportGrants
+                    .Where(grant => grant.IsActive && HasActiveOrganizationScope(grant))
+                    .Select(grant => new AccountRoleClaim(
+                        "Technician", grant.OrganizationId, grant.StoreId, grant.KioskId)));
+            }
+            return tenantRoles;
         }
 
         private static bool HasActiveOrganizationScope(AccountRole accountRole)
@@ -174,6 +184,11 @@ namespace Application.Identity.Tokens.Services
             return organizationStatus == EntityStatus.Active;
         }
 
+        private static bool HasActiveOrganizationScope(TechnicianSupportGrant grant) =>
+            grant.Organization?.Status == EntityStatus.Active ||
+            grant.Store?.Organization?.Status == EntityStatus.Active ||
+            grant.Kiosk?.Organization?.Status == EntityStatus.Active;
+
         private static (string Code, string Message)? ResolveOrganizationAccessError(
             Account account,
             IReadOnlyCollection<AccountRoleClaim> roles)
@@ -190,6 +205,17 @@ namespace Application.Identity.Tokens.Services
                 .Select(status => status!.Value)
                 .Distinct()
                 .ToArray();
+
+            if (account.PlatformTechnicianProfile is not null)
+            {
+                statuses = statuses.Concat(account.TechnicianSupportGrants
+                        .Where(grant => grant.IsActive)
+                        .Select(grant => grant.Organization?.Status ?? grant.Store?.Organization?.Status ?? grant.Kiosk?.Organization?.Status)
+                        .Where(status => status.HasValue)
+                        .Select(status => status!.Value))
+                    .Distinct()
+                    .ToArray();
+            }
 
             return statuses.Length == 1 && statuses[0] == EntityStatus.Suspended
                 ? ("ORGANIZATION_SUSPENDED", "This account belongs only to suspended organizations.")

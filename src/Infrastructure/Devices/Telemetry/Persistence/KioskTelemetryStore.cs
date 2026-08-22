@@ -123,7 +123,12 @@ public sealed class KioskTelemetryStore : IKioskTelemetryStore
             .Where(x => kioskIds.Contains(x.KioskId))
             .Select(x => new
             {
-                x.KioskId, x.Readiness, x.Activity, x.Safety, x.FaultCode, x.ExecutorReportedAt,
+                x.KioskId,
+                x.Readiness,
+                x.Activity,
+                x.Safety,
+                x.FaultCode,
+                x.ExecutorReportedAt,
                 Available = x.Capabilities.Count(c => c.IsAvailable),
                 Unavailable = x.Capabilities.Count(c => !c.IsAvailable)
             })

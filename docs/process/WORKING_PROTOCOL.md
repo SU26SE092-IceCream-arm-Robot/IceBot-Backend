@@ -192,11 +192,10 @@ dotnet test tests\IceBot.UnitTests\IceBot.UnitTests.csproj
 PostgreSQL and MinIO integration tests are opt-in and require Docker:
 
 ```powershell
-$env:ICEBOT_RUN_INTEGRATION_TESTS='true'
 dotnet test tests\IceBot.IntegrationTests\IceBot.IntegrationTests.csproj
 ```
 
-Without `ICEBOT_RUN_INTEGRATION_TESTS=true`, integration tests are discovered and skipped without starting containers.
+Docker-backed integration tests run by default and require a working Docker engine. Missing container infrastructure must fail verification; it must not be reported as a skipped successful suite.
 
 For documentation-only changes, no build is needed.
 

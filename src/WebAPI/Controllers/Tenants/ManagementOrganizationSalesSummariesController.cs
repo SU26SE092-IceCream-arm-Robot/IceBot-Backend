@@ -30,8 +30,13 @@ public sealed class ManagementOrganizationSalesSummariesController : ControllerB
         var userContext = User.GetUserContext();
         var result = await _listSalesSummaries.HandleAsync(new ListOrganizationSalesSummariesQuery
         {
-            UserContext = userContext, From = from, To = to, OrganizationId = organizationId, Search = search,
-            PageNumber = pageNumber, PageSize = pageSize
+            UserContext = userContext,
+            From = from,
+            To = to,
+            OrganizationId = organizationId,
+            Search = search,
+            PageNumber = pageNumber,
+            PageSize = pageSize
         }, cancellationToken);
 
         _logger.LogInformation(

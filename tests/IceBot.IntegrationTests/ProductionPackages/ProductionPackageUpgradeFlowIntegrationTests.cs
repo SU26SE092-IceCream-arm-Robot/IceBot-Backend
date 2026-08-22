@@ -13,6 +13,7 @@ using Domain.ProductionConfiguration.ValueObjects;
 using Domain.ProductionPackages;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.RobotConfiguration.ArtifactTemplates;
+using Domain.RobotConfiguration.Programs;
 using Domain.RobotConfiguration.Programs.Manifests;
 using Domain.SalesCatalog.Entities;
 using Domain.SalesCatalog.Enums;
@@ -74,10 +75,10 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
                        $"production-package-installations/{installationId:D}/upgrades";
         string previewChecksum;
         using (var previewResponse = await client.PostAsJsonAsync($"{basePath}/preview", new
-               {
-                   TargetPackageVersionId = scenario.PackageVersionId,
-                   ProductSourceKeys = new[] { scenario.ProductSourceKey }
-               }))
+        {
+            TargetPackageVersionId = scenario.PackageVersionId,
+            ProductSourceKeys = new[] { scenario.ProductSourceKey }
+        }))
         {
             Assert.Equal(HttpStatusCode.OK, previewResponse.StatusCode);
             using var preview = JsonDocument.Parse(await previewResponse.Content.ReadAsStringAsync());
@@ -1135,16 +1136,27 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
         if (!removeDefault)
             options.Insert(0, new JsonObject
             {
-                ["Id"] = Guid.NewGuid(), ["Code"] = "VANILLA", ["Name"] = "Vanilla",
-                ["PriceDelta"] = 0, ["ExecutionImpact"] = 0, ["IsDefault"] = true,
-                ["DisplayOrder"] = 1, ["IngredientRequirements"] = new JsonArray()
+                ["Id"] = Guid.NewGuid(),
+                ["Code"] = "VANILLA",
+                ["Name"] = "Vanilla",
+                ["PriceDelta"] = 0,
+                ["ExecutionImpact"] = 0,
+                ["IsDefault"] = true,
+                ["DisplayOrder"] = 1,
+                ["IngredientRequirements"] = new JsonArray()
             });
         product["OptionGroups"] = new JsonArray(new JsonObject
         {
             ["Id"] = removeDefault ? 902 : 901,
-            ["Code"] = "FLAVOR", ["Name"] = "Flavor", ["SelectionType"] = 0,
-            ["MinSelections"] = 1, ["MaxSelections"] = 1, ["IsRequired"] = true,
-            ["IsActive"] = true, ["DisplayOrder"] = 1, ["Options"] = options
+            ["Code"] = "FLAVOR",
+            ["Name"] = "Flavor",
+            ["SelectionType"] = 0,
+            ["MinSelections"] = 1,
+            ["MaxSelections"] = 1,
+            ["IsRequired"] = true,
+            ["IsActive"] = true,
+            ["DisplayOrder"] = 1,
+            ["Options"] = options
         });
         var products = new[]
         {
@@ -1289,11 +1301,14 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
                      value.ResourceKind == ProductionPackageResourceKind.RobotProgram)).TargetKey);
         var program = await dbContext.RobotPrograms.Include(value => value.RobotProgramArtifacts)
             .SingleAsync(value => value.Id == programId);
-        var artifactSnapshots = program.RobotProgramArtifacts.Select(link => new RobotArtifactManifestSnapshot(
-            artifact.Id, artifact.ArtifactCode, artifact.ArtifactName, artifact.FileName, artifact.Status,
-            artifact.Checksum, artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode,
-            artifact.ContentLengthBytes, artifact.TechnicalContractId, artifact.TechnicalContractChecksum)).ToArray();
-        program.Publish(DateTimeOffset.UtcNow, artifactSnapshots);
+        if (program.Status == RobotProgramStatus.Draft)
+        {
+            var artifactSnapshots = program.RobotProgramArtifacts.Select(link => new RobotArtifactManifestSnapshot(
+                artifact.Id, artifact.ArtifactCode, artifact.ArtifactName, artifact.FileName, artifact.Status,
+                artifact.Checksum, artifact.StorageKey, artifact.RuntimeTargetCode, artifact.MachineModelCode,
+                artifact.ContentLengthBytes, artifact.TechnicalContractId, artifact.TechnicalContractChecksum)).ToArray();
+            program.Publish(DateTimeOffset.UtcNow, artifactSnapshots);
+        }
 
         var release = await dbContext.ConfigurationReleases
             .Include(value => value.ExecutionRoutes).ThenInclude(value => value.RobotBindings)
@@ -1319,6 +1334,11 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
         await using var dbContext = fixture.CreateDbContext();
         var endpoint = await dbContext.KioskExecutionEndpoints.Include(value => value.Kiosk)
             .SingleAsync(value => value.Id == endpointId);
+        var attemptNo = await dbContext.KioskConfigurationDeployments
+            .Where(value => value.KioskId == endpoint.KioskId && value.ConfigurationReleaseId == releaseId)
+            .Select(value => (int?)value.AttemptNo)
+            .MaxAsync() ?? 0;
+        attemptNo++;
         var deployment = KioskConfigurationDeployment.CreatePending(
             endpoint.KioskId,
             endpoint.Kiosk.OrganizationId,
@@ -1326,7 +1346,7 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
             endpoint.FullEdgeRuntimeId!.Value,
             releaseId,
             releaseChecksum,
-            1,
+            attemptNo,
             $"upgrade-test-{deploymentId:N}",
             DateTimeOffset.UtcNow,
             null,
@@ -1348,6 +1368,11 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
         await using var dbContext = fixture.CreateDbContext();
         var endpoint = await dbContext.KioskExecutionEndpoints.Include(value => value.Kiosk)
             .SingleAsync(value => value.Id == endpointId);
+        var activeSetVersion = await dbContext.ControllerArtifactSetDeployments
+            .Where(value => value.ControllerId == endpoint.ControllerId!.Value)
+            .Select(value => (long?)value.ActiveSetVersion)
+            .MaxAsync() ?? 0;
+        activeSetVersion++;
         var deployment = ControllerArtifactSetDeployment.CreatePending(
             endpoint.KioskId,
             endpoint.Kiosk.OrganizationId,
@@ -1355,7 +1380,7 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
             endpoint.ControllerId!.Value,
             releaseId,
             releaseChecksum,
-            1,
+            activeSetVersion,
             $"upgrade-test-{deploymentId:N}",
             10,
             1024 * 1024,
@@ -1372,7 +1397,7 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
         deployment.MarkInstalled(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         deployment.MarkActive(Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         dbContext.ControllerArtifactSetDeployments.Add(deployment);
-        endpoint.ApplyLowCostObservedActivation(deploymentId, releaseId, releaseChecksum, 1,
+        endpoint.ApplyLowCostObservedActivation(deploymentId, releaseId, releaseChecksum, activeSetVersion,
             deployment.ActiveSetChecksum, Guid.NewGuid(), DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         await dbContext.SaveChangesAsync();
     }
@@ -1479,12 +1504,12 @@ public sealed class ProductionPackageUpgradeFlowIntegrationTests
 
         private static ConfigurationDeploymentReadModel CopyWithStatus(ConfigurationDeploymentReadModel source,
             ConfigurationDeploymentReadStatus status, string? failureCode, string? failureReason) => new()
-        {
-            Id = source.Id,
-            Status = status,
-            FailureCode = failureCode,
-            FailureReason = failureReason
-        };
+            {
+                Id = source.Id,
+                Status = status,
+                FailureCode = failureCode,
+                FailureReason = failureReason
+            };
     }
 
     private sealed class EmptyDeploymentObservationReader : IConfigurationDeploymentObservationReader

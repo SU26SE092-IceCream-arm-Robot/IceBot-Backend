@@ -6,7 +6,7 @@ using Application.Tenants;
 
 namespace Application.Inventory.Queries;
 
-public sealed class ListInventoryRefillTasksQueryHandler(IInventoryStore inventory)
+public sealed class ListInventoryRefillTasksQueryHandler(IInventoryRefillTaskReadStore inventory)
 {
     public async Task<PagedResult<InventoryRefillTaskResult>> HandleAsync(ListInventoryRefillTasksQuery query, CancellationToken cancellationToken = default)
     {
@@ -26,7 +26,7 @@ public sealed class ListInventoryRefillTasksQueryHandler(IInventoryStore invento
     }
 }
 
-public sealed class GetInventoryRefillTaskQueryHandler(IInventoryStore inventory)
+public sealed class GetInventoryRefillTaskQueryHandler(IInventoryRefillTaskReadStore inventory)
 {
     public async Task<ApiResult<InventoryRefillTaskResult>> HandleAsync(GetInventoryRefillTaskQuery query, CancellationToken cancellationToken = default)
     {

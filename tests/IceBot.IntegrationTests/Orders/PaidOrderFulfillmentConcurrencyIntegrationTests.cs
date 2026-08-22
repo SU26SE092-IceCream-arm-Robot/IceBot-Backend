@@ -153,48 +153,81 @@ public sealed class PaidOrderFulfillmentConcurrencyIntegrationTests(IntegrationT
         await using var db = fixture.CreateDbContext();
         var organization = new Organization
         {
-            Code = $"MIXED-{Guid.NewGuid():N}", Name = "Mixed fulfillment organization", Status = EntityStatus.Active
+            Code = $"MIXED-{Guid.NewGuid():N}",
+            Name = "Mixed fulfillment organization",
+            Status = EntityStatus.Active
         };
         var store = new Store
         {
-            OrganizationId = organization.Id, Code = $"STORE-{Guid.NewGuid():N}",
-            Name = "Mixed fulfillment store", Status = EntityStatus.Active
+            OrganizationId = organization.Id,
+            Code = $"STORE-{Guid.NewGuid():N}",
+            Name = "Mixed fulfillment store",
+            Status = EntityStatus.Active
         };
         var kiosk = new Kiosk
         {
-            OrganizationId = organization.Id, StoreId = store.Id,
-            Code = $"KIOSK-{Guid.NewGuid():N}", Name = "Mixed fulfillment kiosk", Status = KioskStatus.Active
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            Code = $"KIOSK-{Guid.NewGuid():N}",
+            Name = "Mixed fulfillment kiosk",
+            Status = KioskStatus.Active
         };
         var product = new Product
         {
-            OrganizationId = organization.Id, ScopeType = TenantScopeType.Organization,
-            Code = $"PRODUCT-{Guid.NewGuid():N}", Name = "Mixed product",
-            ProductType = "Mixed", BasePrice = 10_000, Currency = "VND"
+            OrganizationId = organization.Id,
+            ScopeType = TenantScopeType.Organization,
+            Code = $"PRODUCT-{Guid.NewGuid():N}",
+            Name = "Mixed product",
+            ProductType = "Mixed",
+            BasePrice = 10_000,
+            Currency = "VND"
         };
         var manualVariant = new ProductVariant
         {
-            ProductId = product.Id, Code = "MANUAL", Name = "Manual",
-            FulfillmentType = FulfillmentType.Manual, BasePrice = 10_000, Currency = "VND"
+            ProductId = product.Id,
+            Code = "MANUAL",
+            Name = "Manual",
+            FulfillmentType = FulfillmentType.Manual,
+            BasePrice = 10_000,
+            Currency = "VND"
         };
         var packagedVariant = new ProductVariant
         {
-            ProductId = product.Id, Code = "PACKAGED", Name = "Packaged",
-            FulfillmentType = FulfillmentType.Packaged, BasePrice = 10_000, Currency = "VND"
+            ProductId = product.Id,
+            Code = "PACKAGED",
+            Name = "Packaged",
+            FulfillmentType = FulfillmentType.Packaged,
+            BasePrice = 10_000,
+            Currency = "VND"
         };
         var menu = new Menu
         {
-            OrganizationId = organization.Id, StoreId = store.Id, KioskId = kiosk.Id,
-            ScopeType = TenantScopeType.Kiosk, Code = $"MENU-{Guid.NewGuid():N}", Name = "Mixed menu"
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            KioskId = kiosk.Id,
+            ScopeType = TenantScopeType.Kiosk,
+            Code = $"MENU-{Guid.NewGuid():N}",
+            Name = "Mixed menu"
         };
         var manualMenuItem = new MenuItem
         {
-            MenuId = menu.Id, ProductId = product.Id, ProductVariantId = manualVariant.Id,
-            Code = $"MANUAL-{Guid.NewGuid():N}", DisplayName = "Manual item", Price = 10_000, Currency = "VND"
+            MenuId = menu.Id,
+            ProductId = product.Id,
+            ProductVariantId = manualVariant.Id,
+            Code = $"MANUAL-{Guid.NewGuid():N}",
+            DisplayName = "Manual item",
+            Price = 10_000,
+            Currency = "VND"
         };
         var packagedMenuItem = new MenuItem
         {
-            MenuId = menu.Id, ProductId = product.Id, ProductVariantId = packagedVariant.Id,
-            Code = $"PACKAGED-{Guid.NewGuid():N}", DisplayName = "Packaged item", Price = 10_000, Currency = "VND"
+            MenuId = menu.Id,
+            ProductId = product.Id,
+            ProductVariantId = packagedVariant.Id,
+            Code = $"PACKAGED-{Guid.NewGuid():N}",
+            DisplayName = "Packaged item",
+            Price = 10_000,
+            Currency = "VND"
         };
         product.ProductVariants.Add(manualVariant);
         product.ProductVariants.Add(packagedVariant);
@@ -211,7 +244,9 @@ public sealed class PaidOrderFulfillmentConcurrencyIntegrationTests(IntegrationT
 
         var order = new Order
         {
-            OrganizationId = organization.Id, StoreId = store.Id, KioskId = kiosk.Id,
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            KioskId = kiosk.Id,
             OrderNumber = $"ORDER-{Guid.NewGuid():N}"
         };
         order.SetCurrency("VND");

@@ -62,4 +62,5 @@ public sealed class RuntimeMenuProductOptionResult
     public decimal PriceDelta { get; set; }
     public string Currency { get; set; } = null!;
     public bool IsDefault { get; set; }
+    public string ExecutionImpact { get; set; } = null!;
 }

@@ -56,9 +56,13 @@ public sealed class DeploymentIdempotencyTests
 
         var result = await handler.HandleAsync(new DeployFullEdgeConfigurationCommand
         {
-            UserContext = TestData.SystemAdmin(), KioskId = kioskId,
-            ConfigurationReleaseId = release.Id, KioskExecutionEndpointId = endpointId,
-            IdempotencyKey = Guid.NewGuid().ToString("N"), Reason = "Test deployment request", DeploymentPreviewChecksum = new string('a', 64)
+            UserContext = TestData.SystemAdmin(),
+            KioskId = kioskId,
+            ConfigurationReleaseId = release.Id,
+            KioskExecutionEndpointId = endpointId,
+            IdempotencyKey = Guid.NewGuid().ToString("N"),
+            Reason = "Test deployment request",
+            DeploymentPreviewChecksum = new string('a', 64)
         });
 
         Assert.False(result.Succeeded);

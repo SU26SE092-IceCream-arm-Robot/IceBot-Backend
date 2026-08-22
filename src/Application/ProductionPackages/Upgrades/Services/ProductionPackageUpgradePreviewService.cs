@@ -217,54 +217,90 @@ public sealed class ProductionPackageUpgradePreviewService(
         ProductionPackageUpgradeSourceState source,
         ProductionPackageVersion target,
         IReadOnlyCollection<string> selectedKeys) => ProductionPackageUpgradeService.Hash(new
-    {
-        source.SourceInstallation.Id,
-        source.SourceInstallation.PackageManifestChecksum,
-        TargetManifestChecksum = target.ManifestChecksum,
-        Selected = selectedKeys.Order(StringComparer.Ordinal),
-        Commercial = source.SourceResources.Products.OrderBy(item => item.Key).Select(item => new
         {
-            item.Key, item.Value.Name, item.Value.DisplayName, item.Value.Description, item.Value.BasePrice,
-            item.Value.Currency, item.Value.ImageUrl, item.Value.CategoryId, item.Value.IsAvailable,
-            Variants = item.Value.ProductVariants.OrderBy(value => value.Code).Select(value => new
+            source.SourceInstallation.Id,
+            source.SourceInstallation.PackageManifestChecksum,
+            TargetManifestChecksum = target.ManifestChecksum,
+            Selected = selectedKeys.Order(StringComparer.Ordinal),
+            Commercial = source.SourceResources.Products.OrderBy(item => item.Key).Select(item => new
             {
-                value.Code, value.Name, value.DisplayName, value.Description, value.BasePrice,
-                value.Currency, value.ImageUrl, value.DisplayOrder, value.IsAvailable
+                item.Key,
+                item.Value.Name,
+                item.Value.DisplayName,
+                item.Value.Description,
+                item.Value.BasePrice,
+                item.Value.Currency,
+                item.Value.ImageUrl,
+                item.Value.CategoryId,
+                item.Value.IsAvailable,
+                Variants = item.Value.ProductVariants.OrderBy(value => value.Code).Select(value => new
+                {
+                    value.Code,
+                    value.Name,
+                    value.DisplayName,
+                    value.Description,
+                    value.BasePrice,
+                    value.Currency,
+                    value.ImageUrl,
+                    value.DisplayOrder,
+                    value.IsAvailable
+                }),
+                Options = item.Value.OptionGroups.SelectMany(group => group.ProductOptions)
+                    .OrderBy(value => value.Code).Select(value => new
+                    { value.Code, value.Name, value.Description, value.PriceDelta, value.DisplayOrder, value.IsAvailable, value.IsDefault })
             }),
-            Options = item.Value.OptionGroups.SelectMany(group => group.ProductOptions)
-                .OrderBy(value => value.Code).Select(value => new
-                { value.Code, value.Name, value.Description, value.PriceDelta, value.DisplayOrder, value.IsAvailable, value.IsDefault })
-        }),
-        Menus = source.MenuItems.OrderBy(item => item.Id).Select(item => new
-        {
-            item.Id, item.ProductId, item.ProductVariantId, item.RecipeId, item.Status,
-            Options = item.ProductOptions.Select(option => option.ProductOptionId).Order()
-        }),
-        Endpoints = source.EndpointTargets.OrderBy(item => item.Endpoint.Id).Select(item => new
-        { item.Endpoint.Id, item.ActiveReleaseId, item.ActiveDeploymentId })
-    });
+            Menus = source.MenuItems.OrderBy(item => item.Id).Select(item => new
+            {
+                item.Id,
+                item.ProductId,
+                item.ProductVariantId,
+                item.RecipeId,
+                item.Status,
+                Options = item.ProductOptions.Select(option => option.ProductOptionId).Order()
+            }),
+            Endpoints = source.EndpointTargets.OrderBy(item => item.Endpoint.Id).Select(item => new
+            { item.Endpoint.Id, item.ActiveReleaseId, item.ActiveDeploymentId })
+        });
 
     private static string TechnicalProductChecksum(Product product) => ProductionPackageUpgradeService.Hash(new
     {
-        product.Code, product.ProductType, product.PreparationTimeSeconds,
+        product.Code,
+        product.ProductType,
+        product.PreparationTimeSeconds,
         Variants = product.ProductVariants.OrderBy(item => item.Code).Select(item => new
         {
-            item.Code, item.VariantType, item.FulfillmentType, item.SizeCode, item.PreparationTimeSeconds,
+            item.Code,
+            item.VariantType,
+            item.FulfillmentType,
+            item.SizeCode,
+            item.PreparationTimeSeconds,
             Recipes = item.Recipes.OrderBy(recipe => recipe.Code).Select(recipe => new
             {
-                recipe.Code, recipe.IsDefault, YieldQuantity = CanonicalDecimal(recipe.YieldQuantity), recipe.Unit,
-                recipe.EstimatedDurationSeconds, recipe.EffectiveFrom, recipe.EffectiveTo,
-                recipe.InstructionsSchemaVersion, recipe.InstructionsJson,
+                recipe.Code,
+                recipe.IsDefault,
+                YieldQuantity = CanonicalDecimal(recipe.YieldQuantity),
+                recipe.Unit,
+                recipe.EstimatedDurationSeconds,
+                recipe.EffectiveFrom,
+                recipe.EffectiveTo,
+                recipe.InstructionsSchemaVersion,
+                recipe.InstructionsJson,
                 Items = recipe.RecipeItems.OrderBy(value => value.StepOrder).Select(value => new
                 { value.IngredientId, Quantity = CanonicalDecimal(value.Quantity), value.Unit, value.StepOrder, value.IsOptional, value.Notes })
             })
         }),
         Groups = product.OptionGroups.OrderBy(item => item.Code).Select(item => new
         {
-            item.Code, item.SelectionType, item.MinSelections, item.MaxSelections, item.IsRequired, item.IsActive,
+            item.Code,
+            item.SelectionType,
+            item.MinSelections,
+            item.MaxSelections,
+            item.IsRequired,
+            item.IsActive,
             Options = item.ProductOptions.OrderBy(option => option.Code).Select(option => new
             {
-                option.Code, option.ExecutionImpact,
+                option.Code,
+                option.ExecutionImpact,
                 Requirements = option.IngredientRequirements.OrderBy(value => value.IngredientId).Select(value => new
                 { value.IngredientId, Quantity = CanonicalDecimal(value.Quantity), value.Unit, value.RequiredWorkcellCapabilityCode })
             })
@@ -274,25 +310,43 @@ public sealed class ProductionPackageUpgradePreviewService(
     private static string TechnicalProductChecksum(ProductionPackageProductSnapshot product) =>
         ProductionPackageUpgradeService.Hash(new
         {
-            product.Code, product.ProductType, product.PreparationTimeSeconds,
+            product.Code,
+            product.ProductType,
+            product.PreparationTimeSeconds,
             Variants = product.Variants.OrderBy(item => item.Code).Select(item => new
             {
-                item.Code, item.VariantType, item.FulfillmentType, item.SizeCode, item.PreparationTimeSeconds,
+                item.Code,
+                item.VariantType,
+                item.FulfillmentType,
+                item.SizeCode,
+                item.PreparationTimeSeconds,
                 Recipes = item.Recipes.OrderBy(recipe => recipe.Code).Select(recipe => new
                 {
-                    recipe.Code, recipe.IsDefault, YieldQuantity = CanonicalDecimal(recipe.YieldQuantity), recipe.Unit,
-                    recipe.EstimatedDurationSeconds, recipe.EffectiveFrom, recipe.EffectiveTo,
-                    recipe.InstructionsSchemaVersion, recipe.InstructionsJson,
+                    recipe.Code,
+                    recipe.IsDefault,
+                    YieldQuantity = CanonicalDecimal(recipe.YieldQuantity),
+                    recipe.Unit,
+                    recipe.EstimatedDurationSeconds,
+                    recipe.EffectiveFrom,
+                    recipe.EffectiveTo,
+                    recipe.InstructionsSchemaVersion,
+                    recipe.InstructionsJson,
                     Items = recipe.Items.OrderBy(value => value.StepOrder).Select(value => new
                     { value.IngredientId, Quantity = CanonicalDecimal(value.Quantity), value.Unit, value.StepOrder, value.IsOptional, value.Notes })
                 })
             }),
             Groups = product.OptionGroups.OrderBy(item => item.Code).Select(item => new
             {
-                item.Code, item.SelectionType, item.MinSelections, item.MaxSelections, item.IsRequired, item.IsActive,
+                item.Code,
+                item.SelectionType,
+                item.MinSelections,
+                item.MaxSelections,
+                item.IsRequired,
+                item.IsActive,
                 Options = item.Options.OrderBy(option => option.Code).Select(option => new
                 {
-                    option.Code, option.ExecutionImpact,
+                    option.Code,
+                    option.ExecutionImpact,
                     Requirements = option.IngredientRequirements.OrderBy(value => value.IngredientId).Select(value => new
                     { value.IngredientId, Quantity = CanonicalDecimal(value.Quantity), value.Unit, value.RequiredWorkcellCapabilityCode })
                 })

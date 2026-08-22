@@ -50,7 +50,7 @@ public sealed class GetKioskInventoryWorkspaceQueryHandlerTests
             RequestedAt = DateTimeOffset.UtcNow,
             Unit = "gram"
         };
-        var store = Substitute.For<IInventoryStore>();
+        var store = Substitute.For<IInventoryWorkspaceStore>();
         store.GetKioskForInventoryTopologyAsync(kioskId, Arg.Any<CancellationToken>())
             .Returns(kiosk);
         store.ListKioskIngredientInventoriesAsync(kioskId, Arg.Any<CancellationToken>())
@@ -76,7 +76,7 @@ public sealed class GetKioskInventoryWorkspaceQueryHandlerTests
     public async Task Rejects_inventory_workspace_outside_actor_scope()
     {
         var kioskId = Guid.NewGuid();
-        var store = Substitute.For<IInventoryStore>();
+        var store = Substitute.For<IInventoryWorkspaceStore>();
         store.GetKioskForInventoryTopologyAsync(kioskId, Arg.Any<CancellationToken>())
             .Returns(new Kiosk
             {

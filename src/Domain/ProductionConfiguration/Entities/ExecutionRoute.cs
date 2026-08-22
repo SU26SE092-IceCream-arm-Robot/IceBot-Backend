@@ -97,8 +97,8 @@ public class ExecutionRoute : BusinessEntity
         JsonSerializer.Deserialize<string[]>(SupportedOptionCodesJson) ?? [];
 
     internal ExecutionRouteRobotBinding AddRobotBinding(
-        Guid? productionProgramBindingId,
-        string? productionProgramBindingChecksum,
+        Guid productionProgramBindingId,
+        string productionProgramBindingChecksum,
         Guid robotProgramId,
         int bindingOrder,
         IReadOnlyCollection<string> requiredCapabilityCodes)
@@ -117,12 +117,6 @@ public class ExecutionRoute : BusinessEntity
         _robotBindings.Add(binding);
         return binding;
     }
-
-    internal ExecutionRouteRobotBinding AddRobotBinding(
-        Guid robotProgramId,
-        int bindingOrder,
-        string requiredWorkcellCapabilityCode) =>
-        AddRobotBinding(null, null, robotProgramId, bindingOrder, [requiredWorkcellCapabilityCode]);
 
     public void SetPublishedProductionDefinition(int schemaVersion, string definitionJson, string checksum)
     {

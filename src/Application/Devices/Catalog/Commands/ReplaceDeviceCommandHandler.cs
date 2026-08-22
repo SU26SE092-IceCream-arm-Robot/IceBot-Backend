@@ -100,6 +100,7 @@ public sealed class ReplaceDeviceCommandHandler(
                 DeviceId = target.Id,
                 KioskId = sourceState.KioskId,
                 IngredientId = sourceState.IngredientId,
+                KioskIngredientInventoryId = sourceState.KioskIngredientInventoryId,
                 ContainerCode = sourceState.ContainerCode,
                 CurrentLevelStatus = previousLevel,
                 LastMeasuredAt = now,
@@ -118,24 +119,18 @@ public sealed class ReplaceDeviceCommandHandler(
             var transferredQuantity = 0m;
             if (previousEstimate is > 0)
             {
-                var transferOut = sourceState.AdjustEstimate(
+                sourceState.AdjustEstimate(
                     0,
                     now,
                     "DEVICE_REPLACEMENT_TRANSFER_OUT",
                     reportedLevelAfter: IngredientLevelStatus.Unknown);
-                EnrichMovement(transferOut, sourceState, command.UserContext.AccountId, now, replacement.Id);
-                await inventory.AddStockMovementAsync(transferOut, cancellationToken);
 
                 transferredQuantity = previousEstimate.Value;
-                var transferIn = replacement.AdjustEstimate(
+                replacement.AdjustEstimate(
                     transferredQuantity,
                     now,
                     "DEVICE_REPLACEMENT_TRANSFER_IN",
                     reportedLevelAfter: previousLevel);
-                EnrichMovement(transferIn, replacement, command.UserContext.AccountId, now, sourceState.Id);
-                transferIn.OrganizationId = source.Kiosk.OrganizationId;
-                transferIn.StoreId = source.Kiosk.StoreId;
-                await inventory.AddStockMovementAsync(transferIn, cancellationToken);
             }
 
             sourceState.Retire(command.UserContext.AccountId, now);
@@ -181,18 +176,4 @@ public sealed class ReplaceDeviceCommandHandler(
         }, "Device replaced and dispenser topology rebound.");
     }
 
-    private static void EnrichMovement(
-        StockMovement movement,
-        IngredientDispenserState state,
-        Guid actorId,
-        DateTimeOffset now,
-        Guid relatedStateId)
-    {
-        movement.OrganizationId = state.Kiosk?.OrganizationId;
-        movement.StoreId = state.Kiosk?.StoreId;
-        movement.ReferenceType = "DeviceReplacement";
-        movement.ReferenceId = relatedStateId;
-        movement.CreatedAt = now;
-        movement.CreatedByAccountId = actorId;
-    }
 }

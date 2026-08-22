@@ -133,6 +133,23 @@ public sealed class RebindDispenserStateCommandHandler(IInventoryStore inventory
         }
 
         var now = DateTimeOffset.UtcNow;
+        var targetBalance = await inventory.GetKioskIngredientInventoryAsync(
+            source.Kiosk.Id, targetIngredient.Id, unit, cancellationToken);
+        if (targetBalance is null)
+        {
+            targetBalance = new KioskIngredientInventory
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = source.Kiosk.OrganizationId,
+                StoreId = source.Kiosk.StoreId,
+                KioskId = source.Kiosk.Id,
+                IngredientId = targetIngredient.Id,
+                CreatedAt = now,
+                CreatedByAccountId = command.UserContext.AccountId
+            };
+            targetBalance.Configure(unit, null, null, null, source.TrackingMode, now);
+            await inventory.AddKioskIngredientInventoryAsync(targetBalance, cancellationToken);
+        }
         var previousEstimate = source.EstimatedQuantity;
         var previousLevel = source.CurrentLevelStatus;
         var replacement = new IngredientDispenserState
@@ -140,6 +157,7 @@ public sealed class RebindDispenserStateCommandHandler(IInventoryStore inventory
             DeviceId = targetDevice.Id,
             KioskId = source.KioskId,
             IngredientId = targetIngredient.Id,
+            KioskIngredientInventoryId = targetBalance.Id,
             ContainerCode = containerCode,
             CurrentLevelStatus = IngredientLevelStatus.Unknown,
             LastMeasuredAt = now,
@@ -158,28 +176,22 @@ public sealed class RebindDispenserStateCommandHandler(IInventoryStore inventory
         var transferredQuantity = 0m;
         if (previousEstimate is > 0)
         {
-            var removal = source.AdjustEstimate(
+            source.AdjustEstimate(
                 0,
                 now,
                 request.EstimateDisposition == InventoryEstimateDisposition.Transfer
                     ? "REBIND_TRANSFER_OUT"
                     : "REBIND_DISCARD",
                 reportedLevelAfter: IngredientLevelStatus.Unknown);
-            EnrichMovement(removal, source, command.UserContext.AccountId, now, "InventoryTopologyRebind", replacement.Id);
-            await inventory.AddStockMovementAsync(removal, cancellationToken);
 
             if (request.EstimateDisposition == InventoryEstimateDisposition.Transfer)
             {
                 transferredQuantity = previousEstimate.Value;
-                var addition = replacement.AdjustEstimate(
+                replacement.AdjustEstimate(
                     transferredQuantity,
                     now,
                     "REBIND_TRANSFER_IN",
                     reportedLevelAfter: previousLevel);
-                EnrichMovement(addition, replacement, command.UserContext.AccountId, now, "InventoryTopologyRebind", source.Id);
-                addition.OrganizationId = source.Kiosk.OrganizationId;
-                addition.StoreId = source.Kiosk.StoreId;
-                await inventory.AddStockMovementAsync(addition, cancellationToken);
             }
         }
 
@@ -246,19 +258,4 @@ public sealed class RebindDispenserStateCommandHandler(IInventoryStore inventory
         return null;
     }
 
-    private static void EnrichMovement(
-        StockMovement movement,
-        IngredientDispenserState state,
-        Guid actorId,
-        DateTimeOffset now,
-        string referenceType,
-        Guid referenceId)
-    {
-        movement.OrganizationId = state.Kiosk?.OrganizationId;
-        movement.StoreId = state.Kiosk?.StoreId;
-        movement.ReferenceType = referenceType;
-        movement.ReferenceId = referenceId;
-        movement.CreatedAt = now;
-        movement.CreatedByAccountId = actorId;
-    }
 }

@@ -144,6 +144,22 @@ public sealed class OrganizationStore : IOrganizationStore
             .ToListAsync(cancellationToken);
     }
 
+    public async Task AcquireLifecycleMutationLockAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default)
+    {
+        if (_dbContext.Database.CurrentTransaction is null)
+        {
+            throw new InvalidOperationException(
+                "Organization lifecycle mutation locks require an active database transaction.");
+        }
+
+        var lockKey = BitConverter.ToInt64(organizationId.ToByteArray(), 0);
+        await _dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"SELECT pg_advisory_xact_lock({lockKey});",
+            cancellationToken);
+    }
+
     public Task AddAsync(Organization organization, CancellationToken cancellationToken = default)
     {
         return _dbContext.Organizations.AddAsync(organization, cancellationToken).AsTask();
@@ -170,7 +186,7 @@ public sealed class OrganizationStore : IOrganizationStore
         return await strategy.ExecuteAsync(async () =>
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable,
+                IsolationLevel.ReadCommitted,
                 cancellationToken);
             var result = await operation();
             await transaction.CommitAsync(cancellationToken);

@@ -47,7 +47,11 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
     {
         var result = await _list.HandleAsync(new ListRobotArtifactTemplatesQuery
         {
-            UserContext = User.GetUserContext(), Search = search, Status = status, PageNumber = pageNumber, PageSize = pageSize
+            UserContext = User.GetUserContext(),
+            Search = search,
+            Status = status,
+            PageNumber = pageNumber,
+            PageSize = pageSize
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -84,10 +88,18 @@ public sealed class ManagementRobotArtifactTemplatesController : ControllerBase
                 var stream = file.OpenReadStream(); streams.Add(stream);
                 return new UploadRobotArtifactTemplateCommand
                 {
-                    UserContext = User.GetUserContext(), FileName = RobotArtifactMultipartManifestParser.NormalizeFileName(file.FileName)!, ContentType = file.ContentType,
-                    ContentLengthBytes = file.Length, Content = stream, TemplateCode = item.TemplateCode, TemplateName = item.TemplateName,
-                    RuntimeTargetCode = item.RuntimeTargetCode, MachineModelCode = item.MachineModelCode, ExportedAt = item.ExportedAt,
-                    Description = item.Description, MetadataJson = item.MetadataJson
+                    UserContext = User.GetUserContext(),
+                    FileName = RobotArtifactMultipartManifestParser.NormalizeFileName(file.FileName)!,
+                    ContentType = file.ContentType,
+                    ContentLengthBytes = file.Length,
+                    Content = stream,
+                    TemplateCode = item.TemplateCode,
+                    TemplateName = item.TemplateName,
+                    RuntimeTargetCode = item.RuntimeTargetCode,
+                    MachineModelCode = item.MachineModelCode,
+                    ExportedAt = item.ExportedAt,
+                    Description = item.Description,
+                    MetadataJson = item.MetadataJson
                 };
             }).ToArray();
             var result = await _bulkUpload.HandleAsync(new BulkUploadRobotArtifactTemplatesCommand { UserContext = User.GetUserContext(), Items = items }, cancellationToken);

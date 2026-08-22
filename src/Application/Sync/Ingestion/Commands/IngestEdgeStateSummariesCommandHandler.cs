@@ -138,13 +138,13 @@ public sealed class IngestEdgeStateSummariesCommandHandler
 
     private static EdgeStateSummarySyncItemResult Result(
         string kind, long revision, string status, int statusCode, string message) => new()
-    {
-        SummaryKind = kind,
-        StateRevision = revision,
-        Status = status,
-        StatusCode = statusCode,
-        Message = message
-    };
+        {
+            SummaryKind = kind,
+            StateRevision = revision,
+            Status = status,
+            StatusCode = statusCode,
+            Message = message
+        };
 
     private static bool IsValidJson(string payloadJson)
     {

@@ -104,12 +104,14 @@ namespace Infrastructure
             services.AddIdentityInfrastructure(config);
             services.AddScoped<DevelopmentIceBotDemoReset>();
             services.AddScoped<IceBotDemoRuntimeRepair>();
-            services.AddHostedService<IceBotDemoTenantSeedHostedService>();
-            services.AddHostedService<VanillaSoftServeCatalogTemplateSeedHostedService>();
-            services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
-            services.AddHostedService<DevelopmentVanillaSoftServeTopologySeedHostedService>();
-            services.AddHostedService<IceBotDemoRoleAccountsSeedHostedService>();
-            services.AddHostedService<IceBotDemoRuntimeRepairHostedService>();
+            if (IceBotDemoTenantSeedHostedService.IsEnabled(config))
+            {
+                services.AddHostedService<VanillaSoftServeCatalogTemplateSeedHostedService>();
+                services.AddHostedService<IceBotDemoTenantSeedHostedService>();
+                services.AddHostedService<DevelopmentExecutionEndpointSeedHostedService>();
+                services.AddHostedService<DevelopmentVanillaSoftServeTopologySeedHostedService>();
+                services.AddHostedService<IceBotDemoRoleAccountsSeedHostedService>();
+            }
             services.AddOrdersInfrastructure();
             services.AddOptions<Application.Orders.Management.Automation.FulfillmentReminderOptions>()
                 .Bind(config.GetSection(Application.Orders.Management.Automation.FulfillmentReminderOptions.SectionName))
@@ -121,7 +123,12 @@ namespace Infrastructure
             services.AddSalesCatalogInfrastructure(config);
             services.AddServiceRegistrationInfrastructure();
             services.AddTenantsInfrastructure();
-            services.AddScoped<IInventoryStore, InventoryStore>();
+            services.AddScoped<InventoryStore>();
+            services.AddScoped<IInventoryStore>(provider => provider.GetRequiredService<InventoryStore>());
+            services.AddScoped<IKioskIngredientInventoryStore>(provider => provider.GetRequiredService<InventoryStore>());
+            services.AddScoped<IInventoryRefillTaskReadStore>(provider => provider.GetRequiredService<InventoryStore>());
+            services.AddScoped<IInventoryRefillTaskStore>(provider => provider.GetRequiredService<InventoryStore>());
+            services.AddScoped<IInventoryWorkspaceStore>(provider => provider.GetRequiredService<InventoryStore>());
             services.AddScoped<IInventorySensorObservationStore, InventorySensorObservationStore>();
             services.AddOptions<Persistence.Jobs.DataRetentionOptions>()
                 .Bind(config.GetSection(Persistence.Jobs.DataRetentionOptions.SectionName))
@@ -233,9 +240,9 @@ namespace Infrastructure
             services.AddScoped<Application.Shared.Concurrency.ITechnicalResourceMutationCoordinator,
                 Concurrency.PostgresTechnicalResourceMutationCoordinator>();
             services.AddScoped<IConfigurationReleaseStore, ConfigurationReleaseStore>();
-              services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
-              services.AddScoped<Application.ProductionConfiguration.Bindings.IProductionProgramBindingStore,
-                  ProductionProgramBindingStore>();
+            services.AddScoped<IConfigurationRouteStore, ConfigurationRouteStore>();
+            services.AddScoped<Application.ProductionConfiguration.Bindings.IProductionProgramBindingStore,
+                ProductionProgramBindingStore>();
             services.AddScoped<ConfigurationDeploymentStore>();
             services.AddScoped<IConfigurationDeploymentStore>(provider =>
                 provider.GetRequiredService<ConfigurationDeploymentStore>());

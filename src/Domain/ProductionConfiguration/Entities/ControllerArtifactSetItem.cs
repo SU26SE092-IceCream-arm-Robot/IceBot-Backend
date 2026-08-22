@@ -39,13 +39,19 @@ public class ControllerArtifactSetItem : AuditedEntity
         return new ControllerArtifactSetItem
         {
             ControllerArtifactSetDeploymentId = deploymentId,
-            ExecutionRouteId = snapshot.ExecutionRouteId, RobotProgramId = snapshot.RobotProgramId,
+            ExecutionRouteId = snapshot.ExecutionRouteId,
+            RobotProgramId = snapshot.RobotProgramId,
             RobotProgramManifestChecksum = snapshot.RobotProgramManifestChecksum,
-            RobotArtifactId = snapshot.RobotArtifactId, ArtifactChecksum = snapshot.ArtifactChecksum,
-            StorageKey = snapshot.StorageKey, RuntimeTargetCode = snapshot.RuntimeTargetCode,
-            MachineModelCode = snapshot.MachineModelCode, DeviceId = snapshot.DeviceId,
-            ContentLengthBytes = snapshot.ContentLengthBytes, RunOrder = snapshot.RunOrder,
-            ParametersSchemaVersion = snapshot.ParametersSchemaVersion, ParametersJson = snapshot.ParametersJson,
+            RobotArtifactId = snapshot.RobotArtifactId,
+            ArtifactChecksum = snapshot.ArtifactChecksum,
+            StorageKey = snapshot.StorageKey,
+            RuntimeTargetCode = snapshot.RuntimeTargetCode,
+            MachineModelCode = snapshot.MachineModelCode,
+            DeviceId = snapshot.DeviceId,
+            ContentLengthBytes = snapshot.ContentLengthBytes,
+            RunOrder = snapshot.RunOrder,
+            ParametersSchemaVersion = snapshot.ParametersSchemaVersion,
+            ParametersJson = snapshot.ParametersJson,
             RequiredOptionCode = snapshot.RequiredOptionCode
         };
     }

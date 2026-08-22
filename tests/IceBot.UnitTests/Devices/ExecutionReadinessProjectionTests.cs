@@ -6,6 +6,7 @@ using Domain.ProductionExecution.Enums;
 using Domain.Devices.ExecutionEndpoints.Projections;
 
 namespace IceBot.UnitTests.Devices;
+
 public sealed class ExecutionReadinessProjectionTests
 {
     [Fact]

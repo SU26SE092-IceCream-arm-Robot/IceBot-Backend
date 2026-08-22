@@ -65,6 +65,12 @@ public sealed class CreateInternalAccountCommandHandler
         var roles = new List<(Role Role, AccountRoleScopeRequest Scope)>();
         foreach (var roleScope in request.Roles)
         {
+            if (PlatformTechnicianBoundary.IsTechnicianRole(roleScope.RoleCode))
+            {
+                return ApiResult<InternalAccountResult>.Fail(
+                    "Technician accounts are platform-owned and must be created through platform support administration.", 403);
+            }
+
             if (roleScope.OrganizationId != command.OrganizationId)
             {
                 return ApiResult<InternalAccountResult>.Fail(

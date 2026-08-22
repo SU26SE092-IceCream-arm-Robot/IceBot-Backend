@@ -23,6 +23,20 @@ public static class PermissionCatalog
         },
         new()
         {
+            Policy = "platform-technicians.read",
+            Description = "View platform-owned Technician accounts and their assigned support scopes.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
+            Policy = "platform-technicians.manage",
+            Description = "Create, update, scope, deactivate, and reactivate platform-owned Technician accounts.",
+            Roles = new[] { "SystemAdmin" },
+            ScopeRequired = false
+        },
+        new()
+        {
             Policy = "accounts.read",
             Description = "View internal accounts within assigned scope.",
             Roles = new[] { "SystemAdmin", "OrgAdmin" },
@@ -305,7 +319,7 @@ public static class PermissionCatalog
         {
             Policy = "inventory.configure",
             Description = "Provision, configure, activate/retire, and safely delete kiosk dispenser topology.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },
         new()
@@ -375,7 +389,7 @@ public static class PermissionCatalog
         {
             Policy = "devices.manage",
             Description = "Create, update, replace, or retire devices/hardware within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },
         new()
@@ -389,7 +403,7 @@ public static class PermissionCatalog
         {
             Policy = "execution-endpoints.manage",
             Description = "Create or retire Edge execution endpoints within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin" },
             ScopeRequired = true
         },
         new()
@@ -445,7 +459,7 @@ public static class PermissionCatalog
         {
             Policy = "alerts.resolve",
             Description = "Resolve actionable telemetry alerts within allowed scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
             ScopeRequired = true
         },
         new()
@@ -459,7 +473,8 @@ public static class PermissionCatalog
         {
             Policy = "artifact.read",
             Description = "Read robot artifact metadata within assigned scope.",
-            Roles = ["SystemAdmin", "OrgAdmin"]
+            Roles = ["SystemAdmin", "OrgAdmin", "Technician"],
+            ScopeRequired = true
         },
         new()
         {
@@ -486,7 +501,7 @@ public static class PermissionCatalog
         {
             Policy = "program.read",
             Description = "Read robot programs within assigned organization, store, or kiosk scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
         new()
@@ -500,7 +515,7 @@ public static class PermissionCatalog
         {
             Policy = "release.read",
             Description = "Read production configuration releases and authoring options within assigned scope.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
         new()
@@ -521,14 +536,14 @@ public static class PermissionCatalog
         {
             Policy = "release.deploy",
             Description = "Deploy production configuration to assigned kiosks.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
         new()
         {
             Policy = "release.rollback",
             Description = "Deploy a previously validated release to assigned kiosks as rollback.",
-            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager" },
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
             ScopeRequired = true
         },
         new()

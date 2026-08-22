@@ -84,9 +84,14 @@ public sealed class DevelopmentVanillaSoftServeTopologySeedHostedService : IHost
         {
             balance = new KioskIngredientInventory
             {
-                Id = Guid.NewGuid(), OrganizationId = kiosk.OrganizationId, StoreId = kiosk.StoreId,
-                KioskId = kiosk.Id, IngredientId = ingredient.Id, OriginNodeId = Guid.Empty,
-                Version = 1, CreatedAt = now
+                Id = Guid.NewGuid(),
+                OrganizationId = kiosk.OrganizationId,
+                StoreId = kiosk.StoreId,
+                KioskId = kiosk.Id,
+                IngredientId = ingredient.Id,
+                OriginNodeId = Guid.Empty,
+                Version = 1,
+                CreatedAt = now
             };
             balance.Configure("gram", InitialQuantity, null, null, InventoryTrackingMode.ManualEstimate, now);
             dbContext.KioskIngredientInventories.Add(balance);
@@ -124,10 +129,20 @@ public sealed class DevelopmentVanillaSoftServeTopologySeedHostedService : IHost
         {
             state = new IngredientDispenserState
             {
-                Id = Guid.NewGuid(), DeviceId = device.Id, KioskId = kiosk.Id, IngredientId = ingredient.Id,
-                ContainerCode = ContainerCode, CurrentLevelStatus = IngredientLevelStatus.Full,
-                EstimatedQuantity = InitialQuantity, CapacityQuantity = InitialQuantity, Unit = "gram",
-                LastMeasuredAt = now, IsActive = true, OriginNodeId = Guid.Empty, Version = 1, CreatedAt = now
+                Id = Guid.NewGuid(),
+                DeviceId = device.Id,
+                KioskId = kiosk.Id,
+                IngredientId = ingredient.Id,
+                ContainerCode = ContainerCode,
+                CurrentLevelStatus = IngredientLevelStatus.Full,
+                EstimatedQuantity = InitialQuantity,
+                CapacityQuantity = InitialQuantity,
+                Unit = "gram",
+                LastMeasuredAt = now,
+                IsActive = true,
+                OriginNodeId = Guid.Empty,
+                Version = 1,
+                CreatedAt = now
             };
             state.ChangeTrackingMode(InventoryTrackingMode.ManualEstimate);
             dbContext.IngredientDispenserStates.Add(state);

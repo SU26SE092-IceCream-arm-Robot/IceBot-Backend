@@ -133,7 +133,8 @@ public sealed class ProductionPackageWorkspaceStore(
                 x.CloudReceivedAt >= DateTimeOffset.UtcNow.AddSeconds(-telemetryOptions.Value.ReadinessTimeoutSeconds))
             .ToDictionaryAsync(x => x.KioskExecutionEndpointId, cancellationToken);
         var requiredCapabilityCodes = release?.ExecutionRoutes.SelectMany(x => x.RobotBindings)
-            .Select(x => x.RequiredWorkcellCapabilityCode).Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
+            .SelectMany(x => x.GetRequiredCapabilityCodes())
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToArray() ?? [];
         var artifactsById = artifacts.ToDictionary(x => x.Id);
         var releaseProgramIds = release?.ExecutionRoutes.SelectMany(x => x.RobotBindings)
             .Select(x => x.RobotProgramId).ToHashSet() ?? [];

@@ -69,6 +69,7 @@ public interface IExecutionStockEvidenceStore
     Task AcquireDispenserMutationLocksAsync(IEnumerable<Guid> dispenserStateIds, CancellationToken cancellationToken = default);
     Task AcquireKioskIngredientInventoryMutationLocksAsync(IEnumerable<Guid> inventoryIds, CancellationToken cancellationToken = default);
     Task<IngredientDispenserState?> GetDispenserStateAsync(Guid dispenserStateId, CancellationToken cancellationToken = default);
+    Task<IReadOnlyList<IngredientDispenserState>> GetDispenserStatesAsync(IReadOnlyCollection<Guid> dispenserStateIds, CancellationToken cancellationToken = default);
     Task<bool> IsIngredientExpectedForOrderItemAsync(Guid orderId, Guid orderItemId, Guid ingredientId, CancellationToken cancellationToken = default);
     Task<StockMovement?> GetStockMovementBySourceEventIdAsync(Guid sourceEventId, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ExpectedInventoryRequirement>> ListExpectedInventoryRequirementsAsync(

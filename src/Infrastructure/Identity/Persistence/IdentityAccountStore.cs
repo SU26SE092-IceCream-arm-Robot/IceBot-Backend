@@ -23,6 +23,22 @@ namespace Infrastructure.Identity.Persistence
                 .FirstOrDefaultAsync(account => account.Id == accountId, cancellationToken);
         }
 
+        public Task<Account?> GetTenantManagedByIdAsync(
+            Guid accountId,
+            Guid organizationId,
+            bool asNoTracking = true,
+            CancellationToken cancellationToken = default)
+        {
+            return BuildAccountQuery(asNoTracking)
+                .Where(account => account.PlatformTechnicianProfile == null)
+                .Where(account => account.AccountRoles.Any(role =>
+                    role.IsActive &&
+                    (role.OrganizationId == organizationId ||
+                     (role.Store != null && role.Store.OrganizationId == organizationId) ||
+                     (role.Kiosk != null && role.Kiosk.OrganizationId == organizationId))))
+                .FirstOrDefaultAsync(account => account.Id == accountId, cancellationToken);
+        }
+
         public Task<Account?> GetByEmailOrUserNameAsync(string emailOrUserName, bool asNoTracking = true, CancellationToken cancellationToken = default)
         {
             return BuildAccountQuery(asNoTracking)
@@ -178,6 +194,35 @@ namespace Infrastructure.Identity.Persistence
             return _dbContext.SaveChangesAsync(cancellationToken);
         }
 
+        public Task<List<Account>> ListTechniciansAsync(string? search, int pageNumber, int pageSize, CancellationToken cancellationToken = default)
+        {
+            var query = BuildAccountQuery(asNoTracking: true)
+                .Where(account => account.PlatformTechnicianProfile != null);
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                var value = search.Trim().ToLowerInvariant();
+                query = query.Where(account => account.UserName.ToLower().Contains(value) || account.Email.ToLower().Contains(value));
+            }
+            return query.OrderBy(account => account.UserName).Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
+        }
+
+        public Task<int> CountTechniciansAsync(string? search, CancellationToken cancellationToken = default)
+        {
+            var query = _dbContext.Accounts.WhereNotDeleted()
+                .Where(account => account.PlatformTechnicianProfile != null);
+            if (!string.IsNullOrWhiteSpace(search)) { var value = search.Trim().ToLowerInvariant(); query = query.Where(account => account.UserName.ToLower().Contains(value) || account.Email.ToLower().Contains(value)); }
+            return query.CountAsync(cancellationToken);
+        }
+
+        public Task<TechnicianSupportScopeReplay?> GetTechnicianScopeReplayAsync(Guid accountId, string idempotencyKey, CancellationToken cancellationToken = default) =>
+            _dbContext.TechnicianSupportScopeReplays.SingleOrDefaultAsync(item => item.AccountId == accountId && item.IdempotencyKey == idempotencyKey, cancellationToken);
+
+        public Task AddTechnicianScopeReplayAsync(TechnicianSupportScopeReplay replay, CancellationToken cancellationToken = default) =>
+            _dbContext.TechnicianSupportScopeReplays.AddAsync(replay, cancellationToken).AsTask();
+
+        public Task AddTechnicianGrantHistoryAsync(TechnicianSupportGrantHistory history, CancellationToken cancellationToken = default) =>
+            _dbContext.TechnicianSupportGrantHistories.AddAsync(history, cancellationToken).AsTask();
+
         public Task AcquireCreateLockAsync(Guid organizationId, string idempotencyKey, CancellationToken cancellationToken = default) =>
             _dbContext.Database.ExecuteSqlInterpolatedAsync(
                 $"SELECT pg_advisory_xact_lock(hashtextextended({$"identity-staff-create:{organizationId:D}:{idempotencyKey}"}, 0))",
@@ -248,6 +293,15 @@ namespace Infrastructure.Identity.Persistence
         private IQueryable<Account> BuildAccountQuery(bool asNoTracking)
         {
             var query = _dbContext.Accounts.WhereNotDeleted()
+                .Include(account => account.PlatformTechnicianProfile)
+                .Include(account => account.TechnicianSupportGrants)
+                    .ThenInclude(grant => grant.Organization)
+                .Include(account => account.TechnicianSupportGrants)
+                    .ThenInclude(grant => grant.Store)
+                        .ThenInclude(store => store!.Organization)
+                .Include(account => account.TechnicianSupportGrants)
+                    .ThenInclude(grant => grant.Kiosk)
+                        .ThenInclude(kiosk => kiosk!.Organization)
                 .Include(account => account.AccountRoles)
                     .ThenInclude(accountRole => accountRole.Role)
                 .Include(account => account.AccountRoles)
@@ -273,6 +327,9 @@ namespace Infrastructure.Identity.Persistence
             IReadOnlySet<Guid> allowedStoreIds,
             IReadOnlySet<Guid> allowedKioskIds)
         {
+            // Platform technicians are intentionally absent from organization workforce APIs.
+            query = query.Where(account => account.PlatformTechnicianProfile == null);
+
             query = query.Where(account => account.AccountRoles.Any(role =>
                 role.IsActive &&
                 (role.OrganizationId == organizationId ||

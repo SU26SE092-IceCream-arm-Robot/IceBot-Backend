@@ -53,8 +53,14 @@ public sealed class AssignMaintenanceTicketNotificationTests
     {
         var ticket = new MaintenanceTicket
         {
-            Id = Guid.NewGuid(), OrganizationId = Guid.NewGuid(), StoreId = Guid.NewGuid(), KioskId = Guid.NewGuid(),
-            TicketNumber = "MT-TENANT", IssueCode = "TEST", Title = "Test", ReportedAt = DateTimeOffset.UtcNow
+            Id = Guid.NewGuid(),
+            OrganizationId = Guid.NewGuid(),
+            StoreId = Guid.NewGuid(),
+            KioskId = Guid.NewGuid(),
+            TicketNumber = "MT-TENANT",
+            IssueCode = "TEST",
+            Title = "Test",
+            ReportedAt = DateTimeOffset.UtcNow
         };
         var store = Substitute.For<IMaintenanceTicketStore>();
         store.GetByIdAsync(ticket.Id, Arg.Any<CancellationToken>()).Returns(ticket);

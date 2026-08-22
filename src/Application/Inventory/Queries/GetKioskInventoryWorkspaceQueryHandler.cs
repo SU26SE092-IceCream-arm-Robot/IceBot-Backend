@@ -10,7 +10,7 @@ namespace Application.Inventory.Queries;
 
 public sealed record GetKioskInventoryWorkspaceQuery(Guid KioskId, CurrentUserContext UserContext);
 
-public sealed class GetKioskInventoryWorkspaceQueryHandler(IInventoryStore inventory)
+public sealed class GetKioskInventoryWorkspaceQueryHandler(IInventoryWorkspaceStore inventory)
 {
     private const int ActiveRefillTaskLimit = 20;
 

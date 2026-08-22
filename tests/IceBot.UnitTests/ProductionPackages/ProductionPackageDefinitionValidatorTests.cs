@@ -26,7 +26,7 @@ public sealed class ProductionPackageDefinitionValidatorTests
             ProductionPackageDefinitionValidator.ValidateEffects(
                 blueprint.Slots.ToArray(),
                 new Dictionary<string, ProductionPackageArtifactDefinition>(StringComparer.Ordinal)
-                    { [definition.SourceKey] = definition },
+                { [definition.SourceKey] = definition },
                 new Dictionary<Guid, RobotArtifactTechnicalContract> { [contract.Id] = contract },
                 [new IngredientRequirement("NUTS", 10, "g", "TOPPING_B")]));
 
@@ -34,16 +34,14 @@ public sealed class ProductionPackageDefinitionValidatorTests
     }
 
     [Fact]
-    public void ValidateSingleCapability_RejectsMultipleCapabilitiesInV1()
+    public void ValidateCapabilities_AcceptsMultipleCapabilities()
     {
         const string json = """
             {"schemaVersion":1,"requires":[{"code":"ROBOT_ARM"},{"code":"TOPPING_STATION"}]}
             """;
 
-        var exception = Assert.Throws<DomainRuleException>(() =>
-            ProductionPackageDefinitionValidator.ValidateSingleCapability(json));
-
-        Assert.Contains("exactly one", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(["ROBOT_ARM", "TOPPING_STATION"],
+            ProductionPackageDefinitionValidator.ValidateCapabilities(json));
     }
 
     [Fact]

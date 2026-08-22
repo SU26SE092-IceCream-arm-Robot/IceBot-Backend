@@ -64,7 +64,9 @@ public sealed class StaffWorkforceCommandTests
     private static Account StaffAccount(Guid organizationId, long workforceRevision) => new()
     {
         Id = Guid.NewGuid(),
-        UserName = "staff", Email = "staff@example.test", WorkforceRevision = workforceRevision,
+        UserName = "staff",
+        Email = "staff@example.test",
+        WorkforceRevision = workforceRevision,
         AccountRoles = [new AccountRole { IsActive = true, OrganizationId = organizationId, Role = new Role { Code = "Staff" } }]
     };
 

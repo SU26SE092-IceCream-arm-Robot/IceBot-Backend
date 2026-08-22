@@ -101,8 +101,12 @@ public static class ProductionPackageWorkspaceRules
     public static IReadOnlyCollection<WorkspaceActionResult> BuildRequiredOptionGroupActions(
         IReadOnlyCollection<WorkspaceOptionAvailabilityInput> options) => options
         .GroupBy(option => option.OptionGroupId)
-        .Select(group => new { Group = group.First(), Available = group.Count(option => option.OptionIsAvailable),
-            Candidates = group.Where(option => !option.OptionIsAvailable).Select(option => option.OptionId).ToArray() })
+        .Select(group => new
+        {
+            Group = group.First(),
+            Available = group.Count(option => option.OptionIsAvailable),
+            Candidates = group.Where(option => !option.OptionIsAvailable).Select(option => option.OptionId).ToArray()
+        })
         .Where(group => group.Group.GroupIsActive && group.Group.GroupIsRequired &&
                         group.Available < group.Group.MinimumSelections)
         .Select(group => new WorkspaceActionResult("RestoreRequiredOptionGroupAvailability", "OptionGroup", null,

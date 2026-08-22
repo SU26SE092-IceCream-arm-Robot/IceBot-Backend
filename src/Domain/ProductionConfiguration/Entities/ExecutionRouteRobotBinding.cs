@@ -14,15 +14,11 @@ public class ExecutionRouteRobotBinding : BusinessEntity
 
     public string RequiredCapabilityCodesJson { get; private set; } = "[]";
 
-    // Retained as a SQL-filterable primary capability projection for existing runtime-readiness queries.
-    // The immutable capability set above is authoritative for release and dispatch contracts.
-    public string RequiredWorkcellCapabilityCode { get; private set; } = string.Empty;
-
     public Guid RobotProgramId { get; private set; }
 
-    public Guid? ProductionProgramBindingId { get; private set; }
+    public Guid ProductionProgramBindingId { get; private set; }
 
-    public string? ProductionProgramBindingChecksum { get; private set; }
+    public string ProductionProgramBindingChecksum { get; private set; } = null!;
 
     public virtual ExecutionRoute ExecutionRoute { get; private set; } = null!;
 
@@ -33,13 +29,13 @@ public class ExecutionRouteRobotBinding : BusinessEntity
     }
 
     internal static ExecutionRouteRobotBinding Create(
-        Guid? productionProgramBindingId,
-        string? productionProgramBindingChecksum,
+        Guid productionProgramBindingId,
+        string productionProgramBindingChecksum,
         Guid robotProgramId,
         int bindingOrder,
         IReadOnlyCollection<string> requiredCapabilityCodes)
     {
-        if ((productionProgramBindingId.HasValue && productionProgramBindingId == Guid.Empty) || robotProgramId == Guid.Empty)
+        if (productionProgramBindingId == Guid.Empty || robotProgramId == Guid.Empty)
         {
             throw new DomainRuleException("Production binding and robot program ids are required.");
         }
@@ -54,12 +50,10 @@ public class ExecutionRouteRobotBinding : BusinessEntity
         return new ExecutionRouteRobotBinding
         {
             ProductionProgramBindingId = productionProgramBindingId,
-            ProductionProgramBindingChecksum = productionProgramBindingId.HasValue
-                ? RequireChecksum(productionProgramBindingChecksum!) : null,
+            ProductionProgramBindingChecksum = RequireChecksum(productionProgramBindingChecksum),
             RobotProgramId = robotProgramId,
             BindingOrder = bindingOrder,
-            RequiredCapabilityCodesJson = JsonSerializer.Serialize(normalizedCapabilityCodes),
-            RequiredWorkcellCapabilityCode = normalizedCapabilityCodes.FirstOrDefault() ?? string.Empty
+            RequiredCapabilityCodesJson = JsonSerializer.Serialize(normalizedCapabilityCodes)
         };
     }
 

@@ -40,8 +40,13 @@ public sealed class ManagementServiceRegistrationsController(ServiceRegistration
     {
         var result = await service.ListAsync(new ServiceRegistrationManagementQuery
         {
-            UserContext = User.GetUserContext(), Status = status, Search = search,
-            CreatedFrom = createdFrom, CreatedTo = createdTo, PageNumber = pageNumber, PageSize = pageSize
+            UserContext = User.GetUserContext(),
+            Status = status,
+            Search = search,
+            CreatedFrom = createdFrom,
+            CreatedTo = createdTo,
+            PageNumber = pageNumber,
+            PageSize = pageSize
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

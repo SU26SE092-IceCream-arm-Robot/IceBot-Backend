@@ -145,7 +145,7 @@ public sealed class ProductionPackageUpgradeStore(IceBotDbContext db) : IProduct
             return new ProductionPackageUpgradeInsertResult(true, upgrade);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException
-               { SqlState: PostgresErrorCodes.UniqueViolation })
+        { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             entry.State = EntityState.Detached;
             var existing = await FindByIdempotencyKeyAsync(
@@ -188,7 +188,7 @@ public sealed class ProductionPackageUpgradeStore(IceBotDbContext db) : IProduct
             await db.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException
-               { SqlState: PostgresErrorCodes.UniqueViolation })
+        { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             db.ChangeTracker.Clear();
             throw new Domain.Common.DomainRuleException(

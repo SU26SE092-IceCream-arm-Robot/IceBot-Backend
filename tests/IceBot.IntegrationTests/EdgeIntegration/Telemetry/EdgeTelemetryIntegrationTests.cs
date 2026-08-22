@@ -194,6 +194,13 @@ public sealed class EdgeTelemetryIntegrationTests(IntegrationTestFixture fixture
         var reportedAt = DateTimeOffset.UtcNow.AddSeconds(-5);
         var publisher = new NoOpRealtimeNotificationPublisher();
 
+        await using (var setupContext = _fixture.CreateDbContext())
+        {
+            await setupContext.KioskConnectivityProjections
+                .Where(item => item.KioskId == graph.KioskId)
+                .ExecuteDeleteAsync();
+        }
+
         async Task<Application.Shared.Wrappers.ApiResult<Application.Devices.Telemetry.Results.HeartbeatIngestResult>> IngestAsync(
             long sequence,
             KioskHeartbeatStatus status)
@@ -264,6 +271,9 @@ public sealed class EdgeTelemetryIntegrationTests(IntegrationTestFixture fixture
             var setupKiosk = await setupContext.Kiosks.SingleAsync(item => item.Id == graph.KioskId);
             setupKiosk.Status = KioskStatus.Active;
             setupKiosk.LastOnlineAt = observedAt.AddMinutes(-5);
+            await setupContext.KioskConnectivityProjections
+                .Where(item => item.KioskId == graph.KioskId)
+                .ExecuteDeleteAsync();
             var setupConnectivity = KioskConnectivityProjection.Create(graph.KioskId, observedAt.AddMinutes(-10));
             setupConnectivity.Observe(
                 KioskConnectivityStatus.Online,

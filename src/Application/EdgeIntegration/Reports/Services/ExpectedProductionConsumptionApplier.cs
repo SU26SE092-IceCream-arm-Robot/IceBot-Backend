@@ -66,9 +66,16 @@ internal static class ExpectedProductionConsumptionApplier
                 applied = true;
                 context.Notifications.InventoryChanged.Add(new InventoryChangedEvent
                 {
-                    DispenserStateId = Guid.Empty, KioskId = balance.KioskId, OrganizationId = balance.OrganizationId, StoreId = balance.StoreId,
-                    IngredientName = balance.Ingredient.Name, EstimatedQuantity = balance.EstimatedQuantity,
-                    Unit = balance.Unit, Status = "Balance", UpdatedAt = context.CloudReceivedAt, Version = checked((int)balance.Version)
+                    DispenserStateId = Guid.Empty,
+                    KioskId = balance.KioskId,
+                    OrganizationId = balance.OrganizationId,
+                    StoreId = balance.StoreId,
+                    IngredientName = balance.Ingredient.Name,
+                    EstimatedQuantity = balance.EstimatedQuantity,
+                    Unit = balance.Unit,
+                    Status = "Balance",
+                    UpdatedAt = context.CloudReceivedAt,
+                    Version = checked((int)balance.Version)
                 });
             }
 
@@ -80,10 +87,18 @@ internal static class ExpectedProductionConsumptionApplier
                 {
                     await store.AddInventoryReconciliationCaseAsync(new InventoryReconciliationCase
                     {
-                        Id = Guid.NewGuid(), OrganizationId = context.Endpoint.Kiosk.OrganizationId, StoreId = context.Endpoint.Kiosk.StoreId,
-                        KioskId = context.Endpoint.KioskId, IngredientId = requirement.IngredientId, KioskIngredientInventoryId = balance?.Id,
-                        SourceEventId = sourceEventId, ExpectedQuantity = required, AppliedQuantity = appliedQuantity,
-                        Unit = requirement.Unit.Trim().ToLowerInvariant(), ReasonCode = reasonCode, CreatedAt = context.CloudReceivedAt
+                        Id = Guid.NewGuid(),
+                        OrganizationId = context.Endpoint.Kiosk.OrganizationId,
+                        StoreId = context.Endpoint.Kiosk.StoreId,
+                        KioskId = context.Endpoint.KioskId,
+                        IngredientId = requirement.IngredientId,
+                        KioskIngredientInventoryId = balance?.Id,
+                        SourceEventId = sourceEventId,
+                        ExpectedQuantity = required,
+                        AppliedQuantity = appliedQuantity,
+                        Unit = requirement.Unit.Trim().ToLowerInvariant(),
+                        ReasonCode = reasonCode,
+                        CreatedAt = context.CloudReceivedAt
                     }, cancellationToken);
                 }
             }

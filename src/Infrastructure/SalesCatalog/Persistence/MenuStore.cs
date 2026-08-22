@@ -144,55 +144,14 @@ public sealed partial class MenuStore : IMenuStore
             return new Dictionary<ActiveProductionRouteOptionPolicyKey, ActiveProductionRouteOptionPolicy>();
         }
 
-        var productVariantIds = keys.Select(key => key.ProductVariantId).Distinct().ToArray();
-        var recipeIds = keys.Select(key => key.RecipeId).Distinct().ToArray();
         var requestedKeys = keys.ToHashSet();
-        var routes = await _dbContext.ExecutionEndpointReadinessProjections
-            .AsNoTracking()
-            .Where(readiness =>
-                readiness.KioskId == kioskId &&
-                readiness.Readiness == ExecutionReadinessState.Ready &&
-                readiness.Safety == ExecutionSafetyState.Safe &&
-                readiness.CloudReceivedAt >= readinessReceivedAfter &&
-                readiness.KioskExecutionEndpoint.Status == KioskExecutionEndpointStatus.Active &&
-                _dbContext.ConfigurationReleases.WhereNotDeleted().Any(release =>
-                    release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
-                        ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
-                        : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId) &&
-                    release.Status == ConfigurationReleaseStatus.Published &&
-                    release.ExecutionRoutes.Any(route => productVariantIds.Contains(route.ProductVariantId) &&
-                        recipeIds.Contains(route.RecipeId) && route.RobotBindings.Any() &&
-                        route.RobotBindings.All(binding =>
-                            binding.RequiredWorkcellCapabilityCode == string.Empty ||
-                            readiness.Capabilities.Any(capability =>
-                                capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
-            .SelectMany(readiness => _dbContext.ConfigurationReleases.WhereNotDeleted()
-                .Where(release => release.Id == (readiness.KioskExecutionEndpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
-                    ? readiness.KioskExecutionEndpoint.ActiveConfigurationReleaseId
-                    : readiness.KioskExecutionEndpoint.ActiveArtifactSetReleaseId))
-                .SelectMany(release => release.ExecutionRoutes.Where(route =>
-                    productVariantIds.Contains(route.ProductVariantId) && recipeIds.Contains(route.RecipeId) &&
-                    route.RobotBindings.Any() && route.RobotBindings.All(binding =>
-                        binding.RequiredWorkcellCapabilityCode == string.Empty ||
-                        readiness.Capabilities.Any(capability =>
-                            capability.IsAvailable && capability.CapabilityCode == binding.RequiredWorkcellCapabilityCode)))))
-            .OrderBy(route => route.Priority).ThenBy(route => route.RouteCode)
-            .Select(route => new
-            {
-                route.Id,
-                route.ProductVariantId,
-                route.RecipeId,
-                route.SupportedOptionCodesJson,
-                route.RequiredCapabilitiesJson
-            })
-            .ToListAsync(cancellationToken);
+        var routes = await ExecutionRouteAvailabilityReader.ListAsync(
+            _dbContext, kioskId, keys, readinessReceivedAfter, cancellationToken);
 
         return routes
             .Where(candidate => requestedKeys.Contains(new ActiveProductionRouteOptionPolicyKey(
                 candidate.ProductVariantId,
                 candidate.RecipeId)))
-            .Where(candidate => !ExecutionRouteRequiredCapabilitiesContract.HasUnverifiableRequiredVersion(
-                candidate.RequiredCapabilitiesJson))
             .GroupBy(candidate => new ActiveProductionRouteOptionPolicyKey(
                 candidate.ProductVariantId,
                 candidate.RecipeId))
@@ -201,10 +160,7 @@ public sealed partial class MenuStore : IMenuStore
                 group =>
                 {
                     var route = group.First();
-                    return new ActiveProductionRouteOptionPolicy(
-                        route.Id,
-                        (JsonSerializer.Deserialize<string[]>(route.SupportedOptionCodesJson) ?? [])
-                        .ToHashSet(StringComparer.OrdinalIgnoreCase));
+                    return new ActiveProductionRouteOptionPolicy(route.Id, route.SupportedOptionCodes);
                 });
     }
 

@@ -144,7 +144,8 @@ public sealed class IngestInventorySensorObservationsCommandHandler(
                             "InventorySensorObservation",
                             input.SourceEventId,
                             input.SourceEventId,
-                            isEstimated: true), cancellationToken);
+                            isEstimated: true,
+                            ingredientDispenserStateId: state.Id), cancellationToken);
                     }
                 }
                 applied++;

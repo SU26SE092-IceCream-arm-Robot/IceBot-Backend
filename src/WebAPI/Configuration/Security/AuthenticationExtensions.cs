@@ -1,3 +1,5 @@
+using Application.Identity.Abstractions;
+using Domain.Identity.Enums;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.IdentityModel.Tokens;
@@ -94,6 +96,24 @@ public static class AuthenticationExtensions
                     }
 
                     return Task.CompletedTask;
+                },
+                OnTokenValidated = async context =>
+                {
+                    var accountIdValue = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    var versionValue = context.Principal?.FindFirst("authorization_version")?.Value;
+                    if (!Guid.TryParse(accountIdValue, out var accountId) ||
+                        !long.TryParse(versionValue, out var tokenVersion))
+                    {
+                        context.Fail("The access token does not contain a valid authorization version.");
+                        return;
+                    }
+
+                    var accounts = context.HttpContext.RequestServices.GetRequiredService<IIdentityAccountStore>();
+                    var account = await accounts.GetByIdAsync(accountId, asNoTracking: true, context.HttpContext.RequestAborted);
+                    if (account is null || account.Status != AccountStatus.Active || account.AuthorizationVersion != tokenVersion)
+                    {
+                        context.Fail("The access token is no longer authorized.");
+                    }
                 }
             };
         });

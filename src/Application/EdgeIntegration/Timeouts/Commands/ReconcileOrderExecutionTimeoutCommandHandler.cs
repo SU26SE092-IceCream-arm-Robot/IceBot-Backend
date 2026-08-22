@@ -1,7 +1,4 @@
 using Domain.Devices.Telemetry;
-using Domain.Devices.ExecutionEndpoints;
-using Application.EdgeIntegration.Dispatch.Contracts;
-using Application.EdgeIntegration.Reports.Contracts;
 using Application.Abstractions.Realtime;
 using Application.Abstractions.Realtime.Events;
 using Application.EdgeIntegration.Abstractions;
@@ -15,6 +12,7 @@ using Domain.Sync.Enums;
 using Application.EdgeIntegration.Dispatch;
 using Microsoft.Extensions.Options;
 using Application.EdgeIntegration.Observability;
+using Domain.Operations.Entities;
 
 namespace Application.EdgeIntegration.Timeouts.Commands;
 
@@ -120,8 +118,28 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
             return null;
         }
 
-        var record = await _store.GetOrderExecutionRecordAsync(edgeCommand.Id, cancellationToken)
-            ?? await CreateLegacyProvisionalRecordAsync(edgeCommand, command.ObservedAt, cancellationToken);
+        var record = await _store.GetOrderExecutionRecordAsync(edgeCommand.Id, cancellationToken);
+        if (record is null)
+        {
+            if (!await _store.HasActiveMissingExecutionRecordAlertAsync(edgeCommand.Id, cancellationToken))
+            {
+                await _store.AddAlertAsync(
+                    Alert.RaiseFromOrderExecutionInvariant(
+                        edgeCommand.KioskId,
+                        edgeCommand.Id,
+                        "ORDER_EXECUTION_RECORD_MISSING",
+                        "Accepted execution is missing its projection",
+                        $"Accepted execute-order command {edgeCommand.Id} has no order execution record. Technical reconciliation is required.",
+                        command.ObservedAt),
+                    cancellationToken);
+                await _store.SaveChangesAsync(cancellationToken);
+            }
+
+            return new ReconciliationNotifications(
+                BuildDashboardEvent(order, command.ObservedAt, "OrderExecutionRecordMissing"),
+                null,
+                null);
+        }
         var cutoff = record.Status == ProductionExecutionStatus.Running
             ? command.ObservedAt.AddMinutes(-_options.RunningReportTimeoutMinutes)
             : command.ObservedAt.AddMinutes(-_options.AcceptedReportTimeoutMinutes);
@@ -167,35 +185,6 @@ public sealed class ReconcileOrderExecutionTimeoutCommandHandler
                         : "OrderExecutionStale"),
             BuildOrderExecutionObservationEvent(order, record, command.ObservedAt),
             null);
-    }
-
-    private async Task<OrderExecutionRecord> CreateLegacyProvisionalRecordAsync(
-        Domain.Sync.Entities.EdgeCommand edgeCommand,
-        DateTimeOffset observedAt,
-        CancellationToken cancellationToken)
-    {
-        var endpoint = edgeCommand.TargetExecutionEndpoint;
-        var sourceExecutorId = endpoint.ExecutionProfile == KioskExecutionProfile.FullEdge
-            ? endpoint.FullEdgeRuntimeId
-            : endpoint.ControllerId;
-        if (!sourceExecutorId.HasValue)
-        {
-            throw new Domain.Common.DomainRuleException("Execution endpoint profile identity is missing.");
-        }
-
-        var payload = ExecuteOrderCommandPayloadCodec.ReadProvenance(edgeCommand.PayloadJson);
-        var record = OrderExecutionRecord.CreateProvisionalAccepted(
-            edgeCommand.OrderId!.Value,
-            edgeCommand.Id,
-            edgeCommand.DispatchAttemptNo!.Value,
-            endpoint.Id,
-            endpoint.ExecutionProfile,
-            sourceExecutorId.Value,
-            payload.ConfigurationReleaseId,
-            payload.ReleaseChecksum,
-            edgeCommand.RespondedAt ?? observedAt);
-        await _store.AddOrderExecutionRecordAsync(record, cancellationToken);
-        return record;
     }
 
     private static DashboardInvalidatedEvent BuildDashboardEvent(

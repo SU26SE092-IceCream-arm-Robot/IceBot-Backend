@@ -109,7 +109,6 @@ internal sealed class ExecutionRouteRobotBindingConfiguration : IEntityTypeConfi
         entity.HasIndex(x => x.RobotProgramId);
         entity.HasIndex(x => x.ProductionProgramBindingId);
         entity.Property(x => x.ProductionProgramBindingChecksum).HasMaxLength(64);
-        entity.Property(x => x.RequiredWorkcellCapabilityCode).HasMaxLength(500);
         entity.Property(x => x.RequiredCapabilityCodesJson).HasColumnType("jsonb").HasMaxLength(10000)
             .HasDefaultValueSql("'[]'::jsonb");
         entity.HasOne(x => x.ExecutionRoute)

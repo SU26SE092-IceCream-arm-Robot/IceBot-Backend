@@ -10,6 +10,8 @@ using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Application.Orders.Support;
 using Application.EdgeIntegration.CommandDelivery.Services;
+using Domain.Operations.Entities;
+using Domain.Operations.Enums;
 
 namespace Infrastructure.EdgeIntegration.Persistence;
 
@@ -50,6 +52,12 @@ public sealed class OrderExecutionTimeoutStore : IOrderExecutionTimeoutStore
                     (command.Status == EdgeCommandStatus.PendingDelivery || command.Status == EdgeCommandStatus.Delivered)) ||
                  (command.Status == EdgeCommandStatus.Accepted &&
                     ((!_dbContext.OrderExecutionRecords.Any(record => record.SourceCommandId == command.Id) &&
+                        !_dbContext.Alerts.Any(alert =>
+                            alert.DeletedAt == null &&
+                            alert.SourceType == "OrderExecutionInvariant" &&
+                            alert.SourceId == command.Id &&
+                            alert.Status != AlertStatus.Resolved &&
+                            alert.Status != AlertStatus.Suppressed) &&
                         command.RespondedAt <= acceptedCutoff) ||
                      _dbContext.OrderExecutionRecords.Any(record =>
                          record.SourceCommandId == command.Id &&
@@ -104,12 +112,19 @@ public sealed class OrderExecutionTimeoutStore : IOrderExecutionTimeoutStore
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public Task AddOrderExecutionRecordAsync(
-        OrderExecutionRecord record,
-        CancellationToken cancellationToken = default)
-    {
-        return _dbContext.OrderExecutionRecords.AddAsync(record, cancellationToken).AsTask();
-    }
+    public Task<bool> HasActiveMissingExecutionRecordAlertAsync(
+        Guid sourceCommandId,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.Alerts.AnyAsync(alert =>
+            alert.DeletedAt == null &&
+            alert.SourceType == "OrderExecutionInvariant" &&
+            alert.SourceId == sourceCommandId &&
+            alert.Status != AlertStatus.Resolved &&
+            alert.Status != AlertStatus.Suppressed,
+            cancellationToken);
+
+    public Task AddAlertAsync(Alert alert, CancellationToken cancellationToken = default) =>
+        _dbContext.Alerts.AddAsync(alert, cancellationToken).AsTask();
 
     public Task AddOrderStatusHistoryAsync(
         OrderStatusHistory history,

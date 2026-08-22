@@ -75,7 +75,7 @@ Creation is intentionally part of authenticated device-event ingestion rather th
 | --- | --- | --- |
 | `alerts.view` | SystemAdmin, OrgAdmin, Manager, Staff, Technician | Read alerts inside assigned tenant scope |
 | `alerts.acknowledge` | SystemAdmin, OrgAdmin, Manager, Staff, Technician | Acknowledge alerts inside assigned tenant scope |
-| `alerts.resolve` | SystemAdmin, OrgAdmin, Manager, Technician | Resolve alerts with an outcome inside assigned tenant scope |
+| `alerts.resolve` | SystemAdmin, OrgAdmin, Manager | Resolve alerts with an outcome inside assigned tenant scope |
 
 ## Realtime
 
@@ -96,7 +96,7 @@ push.
 
 Recipient policy:
 
-1. Select distinct active Technician and Manager accounts whose active role
+1. Select distinct active platform Technician and Manager accounts whose active role
    scope matches the Alert kiosk, store, or organization and which have an
    active notification-device registration.
 2. If that set is empty, select active OrgAdmin accounts assigned to the exact
@@ -142,7 +142,7 @@ recipient or mark it notified without a delivery. Recipient-less failures are
 excluded before the bounded batch is selected, so they cannot starve later
 deliverable failures. One failed candidate is isolated and does not stop the
 remaining items in the batch.
-Maintenance assignment accepts only an active Technician, Manager, or OrgAdmin
+Maintenance assignment accepts only an active platform Technician, Manager, or OrgAdmin
 in the ticket tenant scope. It notifies that assignee when an active notification
 device exists. Requeueing a permanently failed delivery repeats delivery only;
 it never repeats the source business transition.

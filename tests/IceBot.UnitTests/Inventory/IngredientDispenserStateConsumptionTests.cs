@@ -13,12 +13,9 @@ public sealed class IngredientDispenserStateConsumptionTests
     {
         var state = State(100);
 
-        var movement = state.ConsumeWithEvidence(10, OccurredAt, null, "Order", Guid.NewGuid());
+        state.ConsumeWithEvidence(10, OccurredAt, null, "Order", Guid.NewGuid());
 
         Assert.Equal(90, state.EstimatedQuantity);
-        Assert.Equal(100, movement.BalanceBefore);
-        Assert.Equal(90, movement.BalanceAfter);
-        Assert.Equal(-10, movement.Quantity);
     }
 
     [Fact]
@@ -26,10 +23,9 @@ public sealed class IngredientDispenserStateConsumptionTests
     {
         var state = State(100);
 
-        var movement = state.ConsumeWithEvidence(10, OccurredAt, 90);
+        state.ConsumeWithEvidence(10, OccurredAt, 90);
 
         Assert.Equal(90, state.EstimatedQuantity);
-        Assert.Equal(90, movement.BalanceAfter);
     }
 
     [Fact]
@@ -51,11 +47,9 @@ public sealed class IngredientDispenserStateConsumptionTests
     {
         var state = State(null);
 
-        var movement = state.ConsumeWithEvidence(10, OccurredAt, 40);
+        state.ConsumeWithEvidence(10, OccurredAt, 40);
 
         Assert.Equal(40, state.EstimatedQuantity);
-        Assert.Null(movement.BalanceBefore);
-        Assert.Equal(40, movement.BalanceAfter);
     }
 
     [Fact]
@@ -63,11 +57,9 @@ public sealed class IngredientDispenserStateConsumptionTests
     {
         var state = State(null);
 
-        var movement = state.ConsumeWithEvidence(10, OccurredAt, null);
+        state.ConsumeWithEvidence(10, OccurredAt, null);
 
         Assert.Null(state.EstimatedQuantity);
-        Assert.Null(movement.BalanceBefore);
-        Assert.Null(movement.BalanceAfter);
     }
 
     private static IngredientDispenserState State(decimal? estimate) => new()

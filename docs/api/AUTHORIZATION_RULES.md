@@ -21,8 +21,18 @@ This document only defines authorization direction for those surfaces.
 | `SystemAdmin` | System-wide administration, accounts, permissions, security, and platform health |
 | `Manager` | Business/operations management across kiosks, reports, menus, pricing, and maintenance coordination |
 | `Staff` | On-site operations such as refill, cleaning, status checks, issue reporting, and manual support/refund handling |
-| `Technician` | Installation, robot/kiosk setup, technical maintenance, troubleshooting, and device/robot configuration |
+| `Technician` | IceBot Platform software/Edge integration support. It is not tenant workforce; SystemAdmin grants explicit Store/Kiosk access. |
 | `OrgAdmin` | Organization admin who can view and manage resources within their assigned organization scope |
+
+Platform Technicians are managed only by SystemAdmin through
+`/api/v1/management/platform/technicians` (list, get, create, update, complete
+Store/Kiosk scope replacement, deactivate, reactivate). This surface does not
+expose tenant workforce membership, passwords, tokens, or credentials. Scope
+replacement requires an `Idempotency-Key`, authorization version, and reason,
+and atomically records revoked and granted support grants.
+`PlatformTechnicianProfiles` identifies the platform actor;
+`TechnicianSupportGrants` is the only active Store/Kiosk support-scope store.
+Database constraints reject `Technician` rows in tenant `AccountRoles`.
 
 ## OrgAdmin Flow
 
@@ -147,9 +157,9 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `kiosks.update` | `SystemAdmin`, `OrgAdmin`, `Manager` | Update kiosk business and location details. Scoped to assigned organization/store/kiosk |
 | `kiosks.operations.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Change operational and maintenance state without changing kiosk lifecycle or location metadata |
 | `devices.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View devices/hardware details within assigned scope |
-| `devices.manage` | `SystemAdmin`, `OrgAdmin`, `Technician` | Create, update, replace, or retire physical devices/hardware within assigned scope |
+| `devices.manage` | `SystemAdmin`, `OrgAdmin` | Create, update, replace, or retire physical devices/hardware within assigned scope |
 | `devices.operations.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Change the operational status of a non-retired device within assigned scope |
-| `execution-endpoints.manage` | `SystemAdmin`, `OrgAdmin`, `Technician` | Create or retire Edge execution endpoints within assigned scope |
+| `execution-endpoints.manage` | `SystemAdmin`, `OrgAdmin` | Create or retire Edge execution endpoints within assigned scope |
 | `execution-endpoints.operations.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Disable or reactivate Edge execution endpoints within assigned scope |
 | `execution-endpoints.provision` | `SystemAdmin`, `OrgAdmin`, `Technician` | Provision endpoint identity and profile without exposing private key material |
 | `execution-endpoints.credentials.manage` | `SystemAdmin`, `OrgAdmin`, `Technician` | Rotate mTLS identity and provision, rotate, or revoke MQTT credentials |
@@ -192,7 +202,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `inventory.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View dispenser states and stock movements within assigned scope |
 | `inventory.refill.manage` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff` | Request, start, complete, or cancel an audited physical refill task within assigned scope |
 | `inventory.adjust.manage` | `SystemAdmin`, `OrgAdmin`, `Manager` | Correct an inventory estimate outside the refill workflow within assigned scope |
-| `inventory.configure` | `SystemAdmin`, `OrgAdmin`, `Technician` | Provision balances or dispenser topology, configure tracking, activate/retire states, and delete only unused states within assigned scope |
+| `inventory.configure` | `SystemAdmin`, `OrgAdmin` | Provision balances or dispenser topology, configure tracking, activate/retire states, and delete only unused states within assigned scope |
 | `operations.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View kiosk heartbeat history, device events, and curated operation logs within assigned scope |
 | `operations.diagnostics` | `SystemAdmin`, `Technician` | View raw operation-log payloads and order execution diagnostics within assigned kiosk scope |
 | `payments.diagnostics.view` | `OrgAdmin`, `Manager` | View bounded payment-session diagnostics within assigned scope; raw provider request/response payloads are never returned |
@@ -204,7 +214,7 @@ Register backend authorization policies in `src/WebAPI/Authorization/Authorizati
 | `sync-dead-letters.manage` | `SystemAdmin` | Inspect retry audit, replay supported sync event types, and resolve/ignore Cloud dead letters. Raw replay control is intentionally not tenant-admin self-service in V1 |
 | `alerts.view` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | View actionable telemetry alerts within assigned scope |
 | `alerts.acknowledge` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Staff`, `Technician` | Acknowledge actionable telemetry alerts within assigned scope |
-| `alerts.resolve` | `SystemAdmin`, `OrgAdmin`, `Manager`, `Technician` | Resolve actionable telemetry alerts with an outcome/reason within assigned scope |
+| `alerts.resolve` | `SystemAdmin`, `OrgAdmin`, `Manager` | Resolve actionable telemetry alerts with an outcome/reason within assigned scope |
 | `robot-config.manage` | `SystemAdmin`, `Technician` | Robot program/config/profile setup |
 | `reports.view` | `SystemAdmin`, `Manager`, `OrgAdmin` | Scope filtering must be enforced when scoped authorization is implemented |
 

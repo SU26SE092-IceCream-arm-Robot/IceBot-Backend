@@ -35,7 +35,11 @@ public sealed class SetInternalAccountPasswordCommandHandler
             return ApiResult<InternalAccountResult>.Fail("New password is required.");
         }
 
-        var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
+        var account = await _accounts.GetTenantManagedByIdAsync(
+            accountId,
+            command.OrganizationId,
+            asNoTracking: false,
+            cancellationToken: cancellationToken);
         if (account is null)
         {
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);

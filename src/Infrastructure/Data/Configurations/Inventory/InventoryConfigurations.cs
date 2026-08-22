@@ -37,6 +37,7 @@ internal sealed class IngredientDispenserStateConfiguration : IEntityTypeConfigu
         entity.HasOne(x => x.KioskIngredientInventory)
             .WithMany()
             .HasForeignKey(x => x.KioskIngredientInventoryId)
+            .IsRequired()
             .OnDelete(DeleteBehavior.Restrict);
 
     }
@@ -96,7 +97,7 @@ internal sealed class StockMovementConfiguration : IEntityTypeConfiguration<Stoc
         entity.HasOne(x => x.Device).WithMany().HasForeignKey(x => x.DeviceId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Ingredient).WithMany().HasForeignKey(x => x.IngredientId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.IngredientDispenserState).WithMany().HasForeignKey(x => x.IngredientDispenserStateId).OnDelete(DeleteBehavior.Restrict);
-        entity.HasOne(x => x.KioskIngredientInventory).WithMany().HasForeignKey(x => x.KioskIngredientInventoryId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.KioskIngredientInventory).WithMany().HasForeignKey(x => x.KioskIngredientInventoryId).IsRequired().OnDelete(DeleteBehavior.Restrict);
         entity.HasIndex(x => x.KioskIngredientInventoryId);
 
     }

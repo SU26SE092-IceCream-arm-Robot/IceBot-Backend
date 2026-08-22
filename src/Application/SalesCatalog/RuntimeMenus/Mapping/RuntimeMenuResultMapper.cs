@@ -71,7 +71,8 @@ internal static class RuntimeMenuResultMapper
                             Description = option.Description,
                             PriceDelta = option.PriceDelta,
                             Currency = item.Currency,
-                            IsDefault = option.IsDefault
+                            IsDefault = option.IsDefault,
+                            ExecutionImpact = option.ExecutionImpact.ToString()
                         }).ToList()
                 }).ToList()
         };

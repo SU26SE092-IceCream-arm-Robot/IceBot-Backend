@@ -29,7 +29,8 @@ namespace Infrastructure.Identity.Security
             Guid sessionId,
             string accountUserName,
             IReadOnlyCollection<AccountRoleClaim> roles,
-            AccountStatus accountStatus)
+            AccountStatus accountStatus,
+            long authorizationVersion)
         {
             if (roles.Count == 0)
             {
@@ -56,7 +57,8 @@ namespace Infrastructure.Identity.Security
                 new(ClaimTypes.NameIdentifier, accountId.ToString()),
                 new("session_id", sessionId.ToString()),
                 new(ClaimTypes.Name, accountUserName),
-                new("account_status", accountStatus.ToString())
+                new("account_status", accountStatus.ToString()),
+                new("authorization_version", authorizationVersion.ToString(System.Globalization.CultureInfo.InvariantCulture))
             };
 
             foreach (var role in roles)

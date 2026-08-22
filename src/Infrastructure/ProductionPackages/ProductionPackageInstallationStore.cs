@@ -186,11 +186,13 @@ public sealed class ProductionPackageInstallationStore(IceBotDbContext db) : IPr
     public async Task PersistForkAsync(
         ProductionPackageInstallation installation,
         IReadOnlyCollection<RobotArtifact> artifacts,
+        IReadOnlyCollection<RobotProgram> programs,
         IReadOnlyCollection<RobotProgramArtifact> removedProgramArtifacts,
         CancellationToken cancellationToken)
     {
         db.RobotProgramArtifacts.RemoveRange(removedProgramArtifacts);
         db.RobotArtifacts.AddRange(artifacts);
+        db.RobotPrograms.AddRange(programs);
         await db.SaveChangesAsync(cancellationToken);
     }
 
@@ -368,6 +370,7 @@ public sealed class ProductionPackageInstallationStore(IceBotDbContext db) : IPr
         IReadOnlyCollection<Product> products,
         IReadOnlyCollection<RobotArtifact> artifacts,
         IReadOnlyCollection<RobotProgram> programs,
+        IReadOnlyCollection<ProductionProgramBinding> bindings,
         IReadOnlyCollection<ProductionComposition> compositions,
         Func<long, ConfigurationRelease> releaseFactory,
         CancellationToken cancellationToken)
@@ -388,6 +391,7 @@ public sealed class ProductionPackageInstallationStore(IceBotDbContext db) : IPr
         db.Products.AddRange(products);
         db.RobotArtifacts.AddRange(artifacts);
         db.RobotPrograms.AddRange(programs);
+        db.ProductionProgramBindings.AddRange(bindings);
         db.ProductionCompositions.AddRange(compositions);
         db.ConfigurationReleases.Add(release);
         await db.SaveChangesAsync(cancellationToken);

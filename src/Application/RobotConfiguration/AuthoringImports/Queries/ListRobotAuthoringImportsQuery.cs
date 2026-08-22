@@ -248,13 +248,13 @@ public static class RobotAuthoringImportLifecycleProjection
         RobotAuthoringImportStatus status,
         bool canMaterialize,
         DateTimeOffset? publishedAt) => status switch
-    {
-        RobotAuthoringImportStatus.Uploaded => ["ResumeImport", "DiscardImport"],
-        RobotAuthoringImportStatus.Validated when canMaterialize => ["ResumeImport", "DiscardImport"],
-        RobotAuthoringImportStatus.Validated => ["ResolveArtifactRevisionConflict", "DiscardImport"],
-        RobotAuthoringImportStatus.Applied when publishedAt.HasValue => ["CreateProductionBinding"],
-        RobotAuthoringImportStatus.Applied => ["PublishImportResources"],
-        RobotAuthoringImportStatus.Failed => ["ResumeImport", "DiscardImport"],
-        _ => []
-    };
+        {
+            RobotAuthoringImportStatus.Uploaded => ["ResumeImport", "DiscardImport"],
+            RobotAuthoringImportStatus.Validated when canMaterialize => ["ResumeImport", "DiscardImport"],
+            RobotAuthoringImportStatus.Validated => ["ResolveArtifactRevisionConflict", "DiscardImport"],
+            RobotAuthoringImportStatus.Applied when publishedAt.HasValue => ["CreateProductionBinding"],
+            RobotAuthoringImportStatus.Applied => ["PublishImportResources"],
+            RobotAuthoringImportStatus.Failed => ["ResumeImport", "DiscardImport"],
+            _ => []
+        };
 }

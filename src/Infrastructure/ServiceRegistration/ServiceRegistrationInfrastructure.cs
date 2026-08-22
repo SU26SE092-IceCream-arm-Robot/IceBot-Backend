@@ -121,17 +121,28 @@ public sealed class ServiceRegistrationProvisioner(
                 var now = DateTimeOffset.UtcNow;
                 var organization = new Organization
                 {
-                    Code = organizationCode, Name = request.OrganizationName.Trim(), LegalName = TrimOrNull(request.OrganizationLegalName),
-                    TaxCode = TrimOrNull(request.OrganizationTaxCode), Email = adminEmail, PhoneNumber = registration.PhoneNumber,
-                    Address = registration.Address, Status = EntityStatus.Active, CreatedAt = now, CreatedByAccountId = actorId
+                    Code = organizationCode,
+                    Name = request.OrganizationName.Trim(),
+                    LegalName = TrimOrNull(request.OrganizationLegalName),
+                    TaxCode = TrimOrNull(request.OrganizationTaxCode),
+                    Email = adminEmail,
+                    PhoneNumber = registration.PhoneNumber,
+                    Address = registration.Address,
+                    Status = EntityStatus.Active,
+                    CreatedAt = now,
+                    CreatedByAccountId = actorId
                 };
                 account = new Account
                 {
-                    UserName = adminUserName, Email = adminEmail, FullName = TrimOrNull(request.AdminFullName) ?? registration.ContactName,
+                    UserName = adminUserName,
+                    Email = adminEmail,
+                    FullName = TrimOrNull(request.AdminFullName) ?? registration.ContactName,
                     Status = AccountStatus.Active,
                     LocalLoginEnabled = true,
                     GoogleLoginEnabled = request.GoogleLoginEnabled,
-                    GoogleEmail = request.GoogleLoginEnabled ? adminEmail : null, CreatedAt = now, CreatedByAccountId = actorId
+                    GoogleEmail = request.GoogleLoginEnabled ? adminEmail : null,
+                    CreatedAt = now,
+                    CreatedByAccountId = actorId
                 };
                 account.AccountRoles.Add(new AccountRole { RoleId = orgAdmin.Id, Role = orgAdmin, OrganizationId = organization.Id, AssignedAt = now, AssignedByAccountId = actorId });
                 // Temporary demo override. Durable invitation entities and acceptance APIs

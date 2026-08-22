@@ -265,18 +265,18 @@ public sealed class EdgeUplinkMessageDispatcher(
         Guid kioskId,
         Guid endpointId,
         EdgeReportedDevicesUplink payload) => new()
-    {
-        KioskId = kioskId,
-        EndpointId = endpointId,
-        SourceExecutorId = payload.SourceExecutorId,
-        SnapshotRevision = payload.SnapshotRevision,
-        ObservedAt = payload.ObservedAt,
-        Devices = payload.Devices.Select(item => new Domain.Devices.ExecutionEndpoints.ReportedDeviceSnapshotItem(
-            item.SourceDeviceKey,
-            item.DeviceId,
-            item.RuntimeTargetCode,
-            item.MachineModelCode)).ToArray()
-    };
+        {
+            KioskId = kioskId,
+            EndpointId = endpointId,
+            SourceExecutorId = payload.SourceExecutorId,
+            SnapshotRevision = payload.SnapshotRevision,
+            ObservedAt = payload.ObservedAt,
+            Devices = payload.Devices.Select(item => new Domain.Devices.ExecutionEndpoints.ReportedDeviceSnapshotItem(
+                item.SourceDeviceKey,
+                item.DeviceId,
+                item.RuntimeTargetCode,
+                item.MachineModelCode)).ToArray()
+        };
 
     private static IngestExecutionReportCommand MapExecutionReport(
         Guid kioskId,

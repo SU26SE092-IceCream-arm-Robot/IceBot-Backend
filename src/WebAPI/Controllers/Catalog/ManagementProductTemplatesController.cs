@@ -88,7 +88,9 @@ public sealed class ManagementProductTemplatesController : ControllerBase
         request.KioskId = null;
         var result = await _create.HandleAsync(new CreateProductCommand
         {
-            Scope = Scope(), Request = request, CreatedByAccountId = User.GetUserContext().AccountId
+            Scope = Scope(),
+            Request = request,
+            CreatedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -99,7 +101,10 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     {
         var result = await _update.HandleAsync(new UpdateProductCommand
         {
-            Scope = Scope(), ProductId = productId, Request = request, UpdatedByAccountId = User.GetUserContext().AccountId
+            Scope = Scope(),
+            ProductId = productId,
+            Request = request,
+            UpdatedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -110,7 +115,10 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     {
         var result = await _setAvailability.HandleAsync(new SetProductAvailabilityCommand
         {
-            Scope = Scope(), ProductId = productId, IsAvailable = request.IsAvailable, UpdatedByAccountId = User.GetUserContext().AccountId
+            Scope = Scope(),
+            ProductId = productId,
+            IsAvailable = request.IsAvailable,
+            UpdatedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -121,7 +129,9 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     {
         var result = await _delete.HandleAsync(new DeleteProductCommand
         {
-            Scope = Scope(), ProductId = productId, DeletedByAccountId = User.GetUserContext().AccountId
+            Scope = Scope(),
+            ProductId = productId,
+            DeletedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -132,7 +142,10 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     {
         var result = await _addVariant.HandleAsync(new AddProductVariantCommand
         {
-            Scope = Scope(), ProductId = productId, Request = request, CreatedByAccountId = User.GetUserContext().AccountId
+            Scope = Scope(),
+            ProductId = productId,
+            Request = request,
+            CreatedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -143,7 +156,11 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     {
         var result = await _updateVariant.HandleAsync(new UpdateProductVariantCommand
         {
-            Scope = Scope(), ProductId = productId, VariantId = variantId, Request = request, UpdatedByAccountId = User.GetUserContext().AccountId
+            Scope = Scope(),
+            ProductId = productId,
+            VariantId = variantId,
+            Request = request,
+            UpdatedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -154,7 +171,10 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     {
         var result = await _setVariantAvailability.HandleAsync(new SetProductVariantAvailabilityCommand
         {
-            Scope = Scope(), ProductId = productId, VariantId = variantId, IsAvailable = request.IsAvailable,
+            Scope = Scope(),
+            ProductId = productId,
+            VariantId = variantId,
+            IsAvailable = request.IsAvailable,
             UpdatedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
@@ -166,7 +186,10 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     {
         var result = await _deleteVariant.HandleAsync(new DeleteProductVariantCommand
         {
-            Scope = Scope(), ProductId = productId, VariantId = variantId, DeletedByAccountId = User.GetUserContext().AccountId
+            Scope = Scope(),
+            ProductId = productId,
+            VariantId = variantId,
+            DeletedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

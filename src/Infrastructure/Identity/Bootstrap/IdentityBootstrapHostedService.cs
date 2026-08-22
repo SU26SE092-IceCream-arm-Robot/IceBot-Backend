@@ -164,7 +164,7 @@ public class IdentityBootstrapHostedService : IHostedService
         IPasswordHasher passwordHasher,
         CancellationToken cancellationToken)
     {
-        var roleCodes = new[] { "OrgAdmin", "Manager", "Staff", "Technician" };
+        var roleCodes = new[] { "OrgAdmin", "Manager", "Staff" };
         var options = _configuration.GetSection(DevelopmentRoleAccountsBootstrapOptions.SectionName)
             .Get<DevelopmentRoleAccountsBootstrapOptions>();
         if (!_hostEnvironment.IsDevelopment() || options?.Enabled != true)
@@ -212,8 +212,7 @@ public class IdentityBootstrapHostedService : IHostedService
         {
             new DevelopmentRoleAccountSeed("orgadmin", "orgadmin@icebot.local", "Organization Admin", "OrgAdmin", organization.Id, null, null),
             new DevelopmentRoleAccountSeed("manager", "manager@icebot.local", "Store Manager", "Manager", organization.Id, store.Id, null),
-            new DevelopmentRoleAccountSeed("staff", "staff@icebot.local", "Store Staff", "Staff", organization.Id, store.Id, null),
-            new DevelopmentRoleAccountSeed("technician", "technician@icebot.local", "Kiosk Technician", "Technician", organization.Id, store.Id, kiosk.Id)
+            new DevelopmentRoleAccountSeed("staff", "staff@icebot.local", "Store Staff", "Staff", organization.Id, store.Id, null)
         }.Where(seed => missingRoleCodes.Contains(seed.RoleCode));
 
         foreach (var seed in seeds)

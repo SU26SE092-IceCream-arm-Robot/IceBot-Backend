@@ -23,18 +23,24 @@ public sealed class PaymentInterventionNotificationIntegrationTests(IntegrationT
         await using var db = fixture.CreateDbContext();
         var organization = new Organization
         {
-            Code = $"PAY-NOTIFY-{Guid.NewGuid():N}", Name = "Payment notification organization",
+            Code = $"PAY-NOTIFY-{Guid.NewGuid():N}",
+            Name = "Payment notification organization",
             Status = EntityStatus.Active
         };
         var store = new Store
         {
-            OrganizationId = organization.Id, Code = $"STORE-{Guid.NewGuid():N}",
-            Name = "Payment notification store", Status = EntityStatus.Active
+            OrganizationId = organization.Id,
+            Code = $"STORE-{Guid.NewGuid():N}",
+            Name = "Payment notification store",
+            Status = EntityStatus.Active
         };
         var kiosk = new Kiosk
         {
-            OrganizationId = organization.Id, StoreId = store.Id, Code = $"KIOSK-{Guid.NewGuid():N}",
-            Name = "Payment notification kiosk", Status = KioskStatus.Active
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            Code = $"KIOSK-{Guid.NewGuid():N}",
+            Name = "Payment notification kiosk",
+            Status = KioskStatus.Active
         };
         var account = new Account
         {

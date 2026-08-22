@@ -25,6 +25,12 @@ internal static class ExecutionStockEvidenceApplier
         await store.AcquireDispenserMutationLocksAsync(
             command.StockMovements.Select(evidence => evidence.IngredientDispenserStateId),
             cancellationToken);
+        var states = (await store.GetDispenserStatesAsync(
+                command.StockMovements.Select(evidence => evidence.IngredientDispenserStateId).Distinct().ToArray(),
+                cancellationToken))
+            .ToDictionary(state => state.Id);
+        await store.AcquireKioskIngredientInventoryMutationLocksAsync(
+            states.Values.Select(state => state.KioskIngredientInventoryId), cancellationToken);
         var applied = false;
 
         foreach (var evidence in command.StockMovements)
@@ -50,8 +56,8 @@ internal static class ExecutionStockEvidenceApplier
 
                 continue;
             }
-            var state = await store.GetDispenserStateAsync(evidence.IngredientDispenserStateId, cancellationToken)
-                ?? throw new DomainRuleException("Stock movement dispenser state was not found.");
+            if (!states.TryGetValue(evidence.IngredientDispenserStateId, out var state))
+                throw new DomainRuleException("Stock movement dispenser state was not found.");
             if (state.KioskId != endpoint.KioskId || state.Kiosk is null)
                 throw new DomainRuleException("Stock movement dispenser state does not belong to the reporting kiosk.");
             if (!state.IsActive)
@@ -63,17 +69,22 @@ internal static class ExecutionStockEvidenceApplier
             }
 
             var occurredAt = evidence.OccurredAt ?? command.EdgeCreatedAt;
-            var movement = state.ConsumeWithEvidence(
+            var balance = state.KioskIngredientInventory;
+            var balanceBefore = balance.EstimatedQuantity;
+            if (balanceBefore.HasValue && balance.ConsumeAvailable(evidence.QuantityConsumed, occurredAt) != evidence.QuantityConsumed)
+                throw new DomainRuleException("Not enough canonical kiosk inventory for reported consumption.");
+            state.ConsumeWithEvidence(
                 evidence.QuantityConsumed,
                 occurredAt,
                 evidence.BalanceAfter,
                 "OrderItem",
                 evidence.OrderItemId,
                 evidence.SourceEventId);
-            movement.OrganizationId = state.Kiosk.OrganizationId;
-            movement.StoreId = state.Kiosk.StoreId;
-            movement.ReasonCode = "PRODUCTION_EXECUTION";
-            movement.IsEstimated = evidence.IsEstimated;
+            var movement = StockMovement.CreateForKioskInventory(
+                balance.Id, balance.OrganizationId, balance.StoreId, balance.KioskId, balance.IngredientId,
+                "CONSUME", -evidence.QuantityConsumed, balanceBefore, balance.EstimatedQuantity, balance.Unit,
+                occurredAt, "PRODUCTION_EXECUTION", "OrderItem", evidence.OrderItemId,
+                evidence.SourceEventId, evidence.IsEstimated, state.Id);
             movement.OriginNodeId = context.SourceExecutorId;
             movement.Version = command.SequenceNumber;
             movement.CorrelationId = edgeCommand.OrderId;
@@ -83,11 +94,16 @@ internal static class ExecutionStockEvidenceApplier
 
             notifications.InventoryChanged.Add(new InventoryChangedEvent
             {
-                DispenserStateId = state.Id, KioskId = state.KioskId!.Value,
-                OrganizationId = state.Kiosk.OrganizationId, StoreId = state.Kiosk.StoreId,
+                DispenserStateId = state.Id,
+                KioskId = state.KioskId!.Value,
+                OrganizationId = state.Kiosk.OrganizationId,
+                StoreId = state.Kiosk.StoreId,
                 IngredientName = state.Ingredient.Name,
                 EstimatedQuantity = state.EstimatedQuantity,
-                Unit = state.Unit, Status = state.CurrentLevelStatus.ToString(), UpdatedAt = occurredAt, Version = 1
+                Unit = state.Unit,
+                Status = state.CurrentLevelStatus.ToString(),
+                UpdatedAt = occurredAt,
+                Version = 1
             });
         }
 

@@ -5,6 +5,11 @@ namespace Application.Identity.Abstractions
     public interface IIdentityAccountStore
     {
         Task<Account?> GetByIdAsync(Guid accountId, bool asNoTracking = true, CancellationToken cancellationToken = default);
+        Task<Account?> GetTenantManagedByIdAsync(
+            Guid accountId,
+            Guid organizationId,
+            bool asNoTracking = true,
+            CancellationToken cancellationToken = default);
         Task<Account?> GetByEmailOrUserNameAsync(string emailOrUserName, bool asNoTracking = true, CancellationToken cancellationToken = default);
         Task<Account?> GetByGoogleEmailAsync(string googleEmail, bool asNoTracking = true, CancellationToken cancellationToken = default);
         Task<Account?> GetByGoogleSubjectIdAsync(string googleSubjectId, bool asNoTracking = true, CancellationToken cancellationToken = default);
@@ -37,6 +42,12 @@ namespace Application.Identity.Abstractions
         Task<bool> UserNameExistsAsync(string userName, CancellationToken cancellationToken = default);
         Task AddAsync(Account account, CancellationToken cancellationToken = default);
         Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+        Task<List<Account>> ListTechniciansAsync(string? search, int pageNumber, int pageSize, CancellationToken cancellationToken = default);
+        Task<int> CountTechniciansAsync(string? search, CancellationToken cancellationToken = default);
+        Task<TechnicianSupportScopeReplay?> GetTechnicianScopeReplayAsync(Guid accountId, string idempotencyKey, CancellationToken cancellationToken = default);
+        Task AddTechnicianScopeReplayAsync(TechnicianSupportScopeReplay replay, CancellationToken cancellationToken = default);
+        Task AddTechnicianGrantHistoryAsync(TechnicianSupportGrantHistory history, CancellationToken cancellationToken = default);
+        Task AcquireAccountLockAsync(Guid accountId, CancellationToken cancellationToken = default);
         Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> operation, CancellationToken cancellationToken = default);
     }
 }

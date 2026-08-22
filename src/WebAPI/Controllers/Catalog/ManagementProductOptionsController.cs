@@ -28,7 +28,10 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await createGroup.HandleAsync(new CreateOptionGroupCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, Request = request, CreatedByAccountId = CurrentAccountId()
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            Request = request,
+            CreatedByAccountId = CurrentAccountId()
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -38,8 +41,11 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await updateGroup.HandleAsync(new UpdateOptionGroupCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
-            Request = request, UpdatedByAccountId = CurrentAccountId()
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            Request = request,
+            UpdatedByAccountId = CurrentAccountId()
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -49,8 +55,11 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await setGroupStatus.HandleAsync(new SetOptionGroupStatusCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
-            IsActive = request.IsActive, UpdatedByAccountId = CurrentAccountId()
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            IsActive = request.IsActive,
+            UpdatedByAccountId = CurrentAccountId()
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -60,7 +69,9 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await deleteGroup.HandleAsync(new DeleteOptionGroupCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -70,8 +81,11 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await createOption.HandleAsync(new CreateProductOptionCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
-            Request = request, CreatedByAccountId = CurrentAccountId()
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            Request = request,
+            CreatedByAccountId = CurrentAccountId()
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -81,8 +95,12 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await updateOption.HandleAsync(new UpdateProductOptionCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
-            ProductOptionId = productOptionId, Request = request, UpdatedByAccountId = CurrentAccountId()
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            ProductOptionId = productOptionId,
+            Request = request,
+            UpdatedByAccountId = CurrentAccountId()
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -94,8 +112,12 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await replaceIngredientRequirements.HandleAsync(new ReplaceProductOptionIngredientRequirementsCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
-            ProductOptionId = productOptionId, Request = request, UpdatedByAccountId = CurrentAccountId()
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            ProductOptionId = productOptionId,
+            Request = request,
+            UpdatedByAccountId = CurrentAccountId()
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -105,8 +127,12 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await setOptionAvailability.HandleAsync(new SetProductOptionAvailabilityCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId,
-            ProductOptionId = productOptionId, IsAvailable = request.IsAvailable, UpdatedByAccountId = CurrentAccountId()
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            ProductOptionId = productOptionId,
+            IsAvailable = request.IsAvailable,
+            UpdatedByAccountId = CurrentAccountId()
         }, ct);
         return StatusCode(result.StatusCode, result);
     }
@@ -116,7 +142,10 @@ public sealed class ManagementProductOptionsController(
     {
         var result = await deleteOption.HandleAsync(new DeleteProductOptionCommand
         {
-            Scope = Scope(organizationId), ProductId = productId, OptionGroupId = optionGroupId, ProductOptionId = productOptionId
+            Scope = Scope(organizationId),
+            ProductId = productId,
+            OptionGroupId = optionGroupId,
+            ProductOptionId = productOptionId
         }, ct);
         return StatusCode(result.StatusCode, result);
     }

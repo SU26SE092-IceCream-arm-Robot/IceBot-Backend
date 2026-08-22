@@ -18,7 +18,10 @@ public sealed class GetInternalAccountQueryHandler
         GetInternalAccountQuery query,
         CancellationToken cancellationToken = default)
     {
-        var account = await _accounts.GetByIdAsync(query.AccountId, cancellationToken: cancellationToken);
+        var account = await _accounts.GetTenantManagedByIdAsync(
+            query.AccountId,
+            query.OrganizationId,
+            cancellationToken: cancellationToken);
         if (account is null)
         {
             return ApiResult<InternalAccountResult>.Fail("Account not found.", 404);

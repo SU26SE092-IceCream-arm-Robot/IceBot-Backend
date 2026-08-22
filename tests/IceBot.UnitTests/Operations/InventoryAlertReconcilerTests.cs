@@ -113,8 +113,12 @@ public sealed class InventoryAlertReconcilerTests
         var kiosk = new Kiosk { Id = Guid.NewGuid(), OrganizationId = Guid.NewGuid(), StoreId = Guid.NewGuid(), Code = "KIOSK-01" };
         var balance = new KioskIngredientInventory
         {
-            Id = Guid.NewGuid(), OrganizationId = kiosk.OrganizationId, StoreId = kiosk.StoreId,
-            KioskId = kiosk.Id, IngredientId = Guid.NewGuid(), Kiosk = kiosk,
+            Id = Guid.NewGuid(),
+            OrganizationId = kiosk.OrganizationId,
+            StoreId = kiosk.StoreId,
+            KioskId = kiosk.Id,
+            IngredientId = Guid.NewGuid(),
+            Kiosk = kiosk,
             Ingredient = new Ingredient { Id = Guid.NewGuid(), Name = "Vanilla" }
         };
         balance.Configure("gram", quantity, threshold, null, InventoryTrackingMode.ManualEstimate, Now);

@@ -78,40 +78,64 @@ public sealed class FulfillmentReminderIntegrationTests(IntegrationTestFixture f
         await using var db = fixture.CreateDbContext();
         var organization = new Organization
         {
-            Code = $"FULFILL-{Guid.NewGuid():N}", Name = "Fulfillment organization", Status = EntityStatus.Active
+            Code = $"FULFILL-{Guid.NewGuid():N}",
+            Name = "Fulfillment organization",
+            Status = EntityStatus.Active
         };
         var store = new Store
         {
-            OrganizationId = organization.Id, Code = $"STORE-{Guid.NewGuid():N}",
-            Name = "Fulfillment store", Status = EntityStatus.Active
+            OrganizationId = organization.Id,
+            Code = $"STORE-{Guid.NewGuid():N}",
+            Name = "Fulfillment store",
+            Status = EntityStatus.Active
         };
         var kiosk = new Kiosk
         {
-            OrganizationId = organization.Id, StoreId = store.Id,
-            Code = $"KIOSK-{Guid.NewGuid():N}", Name = "Fulfillment kiosk", Status = KioskStatus.Active
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            Code = $"KIOSK-{Guid.NewGuid():N}",
+            Name = "Fulfillment kiosk",
+            Status = KioskStatus.Active
         };
         var product = new Product
         {
-            OrganizationId = organization.Id, ScopeType = TenantScopeType.Organization,
-            Code = $"PRODUCT-{Guid.NewGuid():N}", Name = "Packaged product",
-            ProductType = "Packaged", BasePrice = 10_000, Currency = "VND"
+            OrganizationId = organization.Id,
+            ScopeType = TenantScopeType.Organization,
+            Code = $"PRODUCT-{Guid.NewGuid():N}",
+            Name = "Packaged product",
+            ProductType = "Packaged",
+            BasePrice = 10_000,
+            Currency = "VND"
         };
         var variant = new ProductVariant
         {
-            ProductId = product.Id, Code = "DEFAULT", Name = "Default",
-            FulfillmentType = FulfillmentType.Packaged, BasePrice = 10_000,
-            Currency = "VND", PreparationTimeSeconds = 1
+            ProductId = product.Id,
+            Code = "DEFAULT",
+            Name = "Default",
+            FulfillmentType = FulfillmentType.Packaged,
+            BasePrice = 10_000,
+            Currency = "VND",
+            PreparationTimeSeconds = 1
         };
         var menu = new Menu
         {
-            OrganizationId = organization.Id, StoreId = store.Id, KioskId = kiosk.Id,
-            ScopeType = TenantScopeType.Kiosk, Code = $"MENU-{Guid.NewGuid():N}", Name = "Menu"
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            KioskId = kiosk.Id,
+            ScopeType = TenantScopeType.Kiosk,
+            Code = $"MENU-{Guid.NewGuid():N}",
+            Name = "Menu"
         };
         var menuItem = new MenuItem
         {
-            MenuId = menu.Id, ProductId = product.Id, ProductVariantId = variant.Id,
-            Code = $"ITEM-{Guid.NewGuid():N}", DisplayName = "Ready item",
-            Price = 10_000, Currency = "VND", PreparationTimeSeconds = 1
+            MenuId = menu.Id,
+            ProductId = product.Id,
+            ProductVariantId = variant.Id,
+            Code = $"ITEM-{Guid.NewGuid():N}",
+            DisplayName = "Ready item",
+            Price = 10_000,
+            Currency = "VND",
+            PreparationTimeSeconds = 1
         };
         product.ProductVariants.Add(variant);
         menu.MenuItems.Add(menuItem);
@@ -122,13 +146,17 @@ public sealed class FulfillmentReminderIntegrationTests(IntegrationTestFixture f
         {
             account = new Account
             {
-                UserName = $"staff-{Guid.NewGuid():N}", Email = $"staff-{Guid.NewGuid():N}@example.test",
+                UserName = $"staff-{Guid.NewGuid():N}",
+                Email = $"staff-{Guid.NewGuid():N}@example.test",
                 Status = AccountStatus.Active
             };
             account.NotificationDevices.Add(new AccountNotificationDevice
             {
-                AccountId = account.Id, InstallationId = Guid.NewGuid(), Platform = "Android",
-                PushToken = $"token-{Guid.NewGuid():N}", PushTokenHash = $"hash-{Guid.NewGuid():N}"
+                AccountId = account.Id,
+                InstallationId = Guid.NewGuid(),
+                Platform = "Android",
+                PushToken = $"token-{Guid.NewGuid():N}",
+                PushTokenHash = $"hash-{Guid.NewGuid():N}"
             });
             staffRole = await db.Roles.SingleOrDefaultAsync(x => x.Code == "Staff");
             if (staffRole is null)
@@ -145,14 +173,20 @@ public sealed class FulfillmentReminderIntegrationTests(IntegrationTestFixture f
         {
             db.AccountRoles.Add(new AccountRole
             {
-                AccountId = account.Id, RoleId = staffRole.Id, OrganizationId = organization.Id,
-                StoreId = store.Id, KioskId = kiosk.Id, AssignedAt = DateTimeOffset.UtcNow
+                AccountId = account.Id,
+                RoleId = staffRole.Id,
+                OrganizationId = organization.Id,
+                StoreId = store.Id,
+                KioskId = kiosk.Id,
+                AssignedAt = DateTimeOffset.UtcNow
             });
         }
 
         var order = new Order
         {
-            OrganizationId = organization.Id, StoreId = store.Id, KioskId = kiosk.Id,
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            KioskId = kiosk.Id,
             OrderNumber = $"ORDER-{Guid.NewGuid():N}"
         };
         order.SetCurrency("VND");

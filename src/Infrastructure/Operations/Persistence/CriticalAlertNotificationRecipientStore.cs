@@ -24,14 +24,19 @@ public sealed class CriticalAlertNotificationRecipientStore(IceBotDbContext db)
                     device.InvalidatedAt == null &&
                     device.PushToken != null));
 
-        var primary = await eligibleRoles
-            .Where(accountRole =>
-                (accountRole.Role.Code == "Technician" &&
-                 (accountRole.KioskId == kioskId || accountRole.StoreId == storeId)) ||
-                (accountRole.Role.Code == "Manager" &&
-                 (accountRole.StoreId == storeId || accountRole.OrganizationId == organizationId)))
-            .Select(accountRole => accountRole.AccountId)
-            .Distinct()
+        var managers = eligibleRoles
+            .Where(accountRole => accountRole.Role.Code == "Manager" &&
+                 (accountRole.StoreId == storeId || accountRole.OrganizationId == organizationId))
+            .Select(accountRole => accountRole.AccountId);
+        var technicians = db.TechnicianSupportGrants.AsNoTracking()
+            .Where(grant => grant.IsActive && grant.DeletedAt == null &&
+                grant.Account.Status == AccountStatus.Active && grant.Account.DeletedAt == null &&
+                grant.Account.PlatformTechnicianProfile != null &&
+                (grant.KioskId == kioskId || grant.StoreId == storeId) &&
+                grant.Account.NotificationDevices.Any(device => device.DeletedAt == null &&
+                    device.InvalidatedAt == null && device.PushToken != null))
+            .Select(grant => grant.AccountId);
+        var primary = await managers.Concat(technicians).Distinct()
             .ToArrayAsync(cancellationToken);
 
         if (primary.Length > 0)

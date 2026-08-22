@@ -152,9 +152,16 @@ public sealed class InventoryReadinessEvaluatorTests
         var device = Device.CreateProvisioning(1, null, kiosk.Id, "MIXER", "Mixer", null, null, null, null);
         var state = new IngredientDispenserState
         {
-            DeviceId = device.Id, Device = device, KioskId = kiosk.Id, Kiosk = kiosk,
-            IngredientId = ingredient.Id, Ingredient = ingredient, ContainerCode = "MIX-HOPPER",
-            EstimatedQuantity = 100, Unit = "gram", IsActive = true
+            DeviceId = device.Id,
+            Device = device,
+            KioskId = kiosk.Id,
+            Kiosk = kiosk,
+            IngredientId = ingredient.Id,
+            Ingredient = ingredient,
+            ContainerCode = "MIX-HOPPER",
+            EstimatedQuantity = 100,
+            Unit = "gram",
+            IsActive = true
         };
         store.GetKioskForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(kiosk);
         store.ListRequiredRecipeItemsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([
@@ -183,9 +190,17 @@ public sealed class InventoryReadinessEvaluatorTests
         device.SetStatus(DeviceStatus.Online);
         var state = new IngredientDispenserState
         {
-            DeviceId = device.Id, Device = device, KioskId = kiosk.Id, Kiosk = kiosk,
-            IngredientId = ingredient.Id, Ingredient = ingredient, ContainerCode = "MIX-HOPPER",
-            EstimatedQuantity = 100, Unit = "gram", IsActive = true, LevelToQuantityProfileJson = "[]"
+            DeviceId = device.Id,
+            Device = device,
+            KioskId = kiosk.Id,
+            Kiosk = kiosk,
+            IngredientId = ingredient.Id,
+            Ingredient = ingredient,
+            ContainerCode = "MIX-HOPPER",
+            EstimatedQuantity = 100,
+            Unit = "gram",
+            IsActive = true,
+            LevelToQuantityProfileJson = "[]"
         };
         state.ChangeTrackingMode(InventoryTrackingMode.SensorRequired);
         store.GetKioskForInventoryTopologyAsync(kiosk.Id, Arg.Any<CancellationToken>()).Returns(kiosk);
@@ -214,8 +229,13 @@ public sealed class InventoryReadinessEvaluatorTests
     {
         var balance = new KioskIngredientInventory
         {
-            Id = Guid.NewGuid(), OrganizationId = kiosk.OrganizationId, StoreId = kiosk.StoreId,
-            KioskId = kiosk.Id, IngredientId = ingredient.Id, Kiosk = kiosk, Ingredient = ingredient
+            Id = Guid.NewGuid(),
+            OrganizationId = kiosk.OrganizationId,
+            StoreId = kiosk.StoreId,
+            KioskId = kiosk.Id,
+            IngredientId = ingredient.Id,
+            Kiosk = kiosk,
+            Ingredient = ingredient
         };
         balance.Configure("gram", quantity, null, null, trackingMode, DateTimeOffset.UtcNow);
         return balance;

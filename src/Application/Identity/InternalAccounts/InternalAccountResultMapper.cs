@@ -33,12 +33,12 @@ internal static class InternalAccountResultMapper
                 .Where(accountRole => !organizationId.HasValue ||
                     AccountManagementAccessRules.BelongsToOrganization(accountRole, organizationId.Value))
                 .Select(accountRole => new InternalAccountRoleResult
-            {
-                RoleCode = accountRole.Role.Code,
-                OrganizationId = accountRole.OrganizationId,
-                StoreId = accountRole.StoreId,
-                KioskId = accountRole.KioskId
-            }).ToList()
+                {
+                    RoleCode = accountRole.Role.Code,
+                    OrganizationId = accountRole.OrganizationId,
+                    StoreId = accountRole.StoreId,
+                    KioskId = accountRole.KioskId
+                }).ToList()
         };
     }
 }

@@ -50,6 +50,7 @@ using Application.ProductionPackages.Ownership;
 using Application.Inventory.Services;
 using Application.Inventory.Commands;
 using Application.SalesCatalog.Availability;
+using Application.SalesCatalog.Admission.Services;
 using Application.RobotConfiguration.Artifacts.Commands;
 using Application.RobotConfiguration.Storage.Services;
 using Domain.Catalog.Entities;
@@ -114,6 +115,17 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var order = await PlaceCustomerOrderAsync(graph);
         Assert.Equal(OrderStatus.PendingPayment, order.Status);
 
+        await using (var recipeMutationContext = _fixture.CreateDbContext())
+        {
+            var recipeId = await recipeMutationContext.OrderItems
+                .Where(item => item.OrderId == order.Id)
+                .Select(item => item.RecipeId!.Value)
+                .SingleAsync();
+            await recipeMutationContext.RecipeItems
+                .Where(item => item.RecipeId == recipeId)
+                .ExecuteUpdateAsync(update => update.SetProperty(item => item.Quantity, 75m));
+        }
+
         var paymentSession = await CreateCashPaymentSessionAsync(order);
         Assert.Equal(Domain.Payments.Enums.PaymentTransactionStatus.Pending, paymentSession.Status);
         Assert.Equal(order.Id, paymentSession.OrderId);
@@ -151,10 +163,107 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var completedOrder = await completedContext.Orders.SingleAsync(candidate => candidate.Id == order.Id);
         Assert.Equal(OrderStatus.Completed, completedOrder.Status);
         Assert.Equal(Domain.Orders.Enums.PaymentStatus.Paid, completedOrder.PaymentStatus);
-        Assert.Equal(90m, await completedContext.IngredientDispenserStates
-            .Where(candidate => candidate.Id == graph.DispenserStateId)
+        Assert.Equal(90m, await completedContext.KioskIngredientInventories
+            .Where(candidate => candidate.KioskId == graph.KioskId && candidate.IngredientId == graph.IngredientId)
             .Select(candidate => candidate.EstimatedQuantity)
             .SingleAsync());
+    }
+
+    [IntegrationFact]
+    public async Task AcceptedCommandWithoutExecutionRecord_RaisesInvariantAlertWithoutReconstructingProjection()
+    {
+        var runtime = await CreateActiveRuntimeAsync();
+        var graph = runtime.Graph;
+        await EnsureCashPaymentMethodAsync();
+        var order = await PlaceCustomerOrderAsync(graph);
+        var paymentSession = await CreateCashPaymentSessionAsync(order);
+        var staff = new CurrentUserContext
+        {
+            AccountId = runtime.User.AccountId,
+            RoleScopes = [new UserRoleScope("Staff", graph.OrganizationId, graph.StoreId, null)]
+        };
+        await ConfirmCashPaymentAsync(staff, order.Id, paymentSession.PaymentTransactionId);
+
+        Guid commandId;
+        await using (var commandContext = _fixture.CreateDbContext())
+        {
+            commandId = await commandContext.EdgeCommands
+                .Where(candidate => candidate.OrderId == order.Id && candidate.CommandType == EdgeCommandType.ExecuteOrder)
+                .Select(candidate => candidate.Id)
+                .SingleAsync();
+        }
+
+        await PullAndAcknowledgeAsync(graph, commandId, "Accepted");
+        DateTimeOffset respondedAt;
+        await using (var corruptionContext = _fixture.CreateDbContext())
+        {
+            var record = await corruptionContext.OrderExecutionRecords.SingleAsync(candidate => candidate.SourceCommandId == commandId);
+            corruptionContext.OrderExecutionRecords.Remove(record);
+            respondedAt = await corruptionContext.EdgeCommands
+                .Where(candidate => candidate.Id == commandId)
+                .Select(candidate => candidate.RespondedAt!.Value)
+                .SingleAsync();
+            await corruptionContext.SaveChangesAsync();
+        }
+
+        await ReconcileTimeoutAsync(graph, commandId, respondedAt.AddMinutes(6));
+
+        await using var assertionContext = _fixture.CreateDbContext();
+        Assert.False(await assertionContext.OrderExecutionRecords.AnyAsync(candidate => candidate.SourceCommandId == commandId));
+        var alert = await assertionContext.Alerts.SingleAsync(candidate =>
+            candidate.SourceType == "OrderExecutionInvariant" && candidate.SourceId == commandId);
+        Assert.Equal("ORDER_EXECUTION_RECORD_MISSING", alert.AlertCode);
+
+        var store = new OrderExecutionTimeoutStore(assertionContext);
+        var candidates = await store.ListCandidateCommandIdsAsync(
+            respondedAt.AddMinutes(7),
+            respondedAt.AddMinutes(2),
+            respondedAt.AddMinutes(-23),
+            100);
+        Assert.DoesNotContain(commandId, candidates);
+    }
+
+    [IntegrationFact]
+    public async Task Admission_RequiresEveryCapabilityDeclaredByEveryRouteBinding()
+    {
+        var runtime = await CreateActiveRuntimeAsync();
+        await using var dbContext = _fixture.CreateDbContext();
+        var bindingId = await dbContext.ExecutionRouteRobotBindings
+            .Where(binding => binding.ExecutionRoute.ConfigurationReleaseId == runtime.ReleaseId)
+            .Select(binding => binding.Id)
+            .SingleAsync();
+        await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            UPDATE "ExecutionRouteRobotBindings"
+            SET "RequiredCapabilityCodesJson" = '["CUP_DISPENSER","ICE_CREAM"]'::jsonb
+            WHERE "Id" = {bindingId};
+            """);
+
+        var store = new OperationalAdmissionReadStore(dbContext);
+        var blocked = await store.GetActiveProductionRouteOptionPolicyAsync(
+            runtime.Graph.KioskId,
+            runtime.Graph.ProductVariantId,
+            runtime.Graph.RecipeId,
+            DateTimeOffset.UtcNow.AddMinutes(-5));
+        Assert.Null(blocked);
+
+        var readinessId = await dbContext.ExecutionEndpointReadinessProjections
+            .Where(readiness => readiness.KioskId == runtime.Graph.KioskId)
+            .Select(readiness => readiness.Id)
+            .SingleAsync();
+        dbContext.ExecutionEndpointCapabilityProjections.Add(new ExecutionEndpointCapabilityProjection
+        {
+            ExecutionEndpointReadinessProjectionId = readinessId,
+            CapabilityCode = "CUP_DISPENSER",
+            IsAvailable = true
+        });
+        await dbContext.SaveChangesAsync();
+
+        var available = await store.GetActiveProductionRouteOptionPolicyAsync(
+            runtime.Graph.KioskId,
+            runtime.Graph.ProductVariantId,
+            runtime.Graph.RecipeId,
+            DateTimeOffset.UtcNow.AddMinutes(-5));
+        Assert.NotNull(available);
     }
 
     [IntegrationFact]
@@ -177,12 +286,16 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var inventory = new MachineProductionInventoryGate(
             new InventoryReadinessEvaluator(new InventoryStore(dbContext)),
             telemetryOptions);
+        var admissionStore = new OperationalAdmissionReadStore(dbContext);
         var handler = new PlaceOrderCommandHandler(
             orders,
             new NoOpRealtimeNotificationPublisher(),
             new PlaceOrderItemAppender(orders, availability, telemetryOptions, inventory),
             Options.Create(new OrderPaymentWindowOptions()),
-            Options.Create(new KioskSalesAdmissionOptions()));
+            new KioskSalesAdmissionEvaluator(
+                admissionStore,
+                Options.Create(new KioskSalesAdmissionOptions()),
+                telemetryOptions));
         var result = await handler.HandleAsync(new PlaceOrderCommand
         {
             IdempotencyKey = $"customer-attended-{Guid.NewGuid():N}",
@@ -212,7 +325,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             new PaymentStore(dbContext),
             new UnusedPaymentGateway(),
             new OrderPaymentSellabilityGuard(orders, availability, inventory, telemetryOptions),
-            Options.Create(new KioskSalesAdmissionOptions()));
+            new KioskSalesAdmissionEvaluator(
+                new OperationalAdmissionReadStore(dbContext),
+                Options.Create(new KioskSalesAdmissionOptions()),
+                telemetryOptions));
         var result = await handler.HandleAsync(new CreatePaymentSessionCommand
         {
             OrderId = order.Id,
@@ -416,8 +532,10 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
                 x.ReferenceType == "OrderItemProductionUnit");
             Assert.Equal(-10, expectedMovement.Quantity);
             Assert.True(expectedMovement.IsEstimated);
-            Assert.Equal(80, (await completedContext.IngredientDispenserStates
+            Assert.Equal(90, (await completedContext.IngredientDispenserStates
                 .SingleAsync(x => x.Id == graph.DispenserStateId)).EstimatedQuantity);
+            Assert.Equal(80, (await completedContext.KioskIngredientInventories
+                .SingleAsync(x => x.KioskId == graph.KioskId && x.IngredientId == graph.IngredientId)).EstimatedQuantity);
 
             var attempts = await new GetOrderExecutionAttemptsQueryHandler(new OrderStore(completedContext))
                 .HandleAsync(new GetOrderExecutionAttemptsQuery
@@ -825,15 +943,25 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             await refillArrangeContext.SaveChangesAsync();
         }
 
-        var refillReasonOne = $"CONCURRENT_REFILL_{Guid.NewGuid():N}";
-        var refillReasonTwo = $"CONCURRENT_REFILL_{Guid.NewGuid():N}";
-        await Task.WhenAll(
-            RefillAsync(graph, user, 5, refillReasonOne),
-            RefillAsync(graph, user, 5, refillReasonTwo));
+        decimal refillStartingQuantity;
+        await using (var refillStartingContext = _fixture.CreateDbContext())
+        {
+            refillStartingQuantity = (await refillStartingContext.KioskIngredientInventories
+                .SingleAsync(balance => balance.KioskId == graph.KioskId &&
+                    balance.IngredientId == graph.IngredientId)).EstimatedQuantity ?? 0;
+        }
+
+        var refillReasonOne = $"REFILL_{Guid.NewGuid():N}";
+        var refillReasonTwo = $"REFILL_{Guid.NewGuid():N}";
+        await RefillAsync(graph, user, 5, refillReasonOne);
+        await RefillAsync(graph, user, 5, refillReasonTwo);
         await using (var refillAssertionContext = _fixture.CreateDbContext())
         {
-            Assert.Equal(93, (await refillAssertionContext.IngredientDispenserStates
+            Assert.Equal(83, (await refillAssertionContext.IngredientDispenserStates
                 .SingleAsync(state => state.Id == graph.DispenserStateId)).EstimatedQuantity);
+            Assert.Equal(refillStartingQuantity + 10, (await refillAssertionContext.KioskIngredientInventories
+                .SingleAsync(balance => balance.KioskId == graph.KioskId &&
+                    balance.IngredientId == graph.IngredientId)).EstimatedQuantity);
             Assert.Equal(2, await refillAssertionContext.StockMovements.CountAsync(movement =>
                 movement.ReasonCode == refillReasonOne || movement.ReasonCode == refillReasonTwo));
         }

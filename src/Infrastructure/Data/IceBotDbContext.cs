@@ -111,7 +111,11 @@ public class IceBotDbContext : DbContext
     }
 
     public DbSet<Account> Accounts => Set<Account>();
+    public DbSet<PlatformTechnicianProfile> PlatformTechnicianProfiles => Set<PlatformTechnicianProfile>();
     public DbSet<AccountRole> AccountRoles => Set<AccountRole>();
+    public DbSet<TechnicianSupportGrant> TechnicianSupportGrants => Set<TechnicianSupportGrant>();
+    public DbSet<TechnicianSupportGrantHistory> TechnicianSupportGrantHistories => Set<TechnicianSupportGrantHistory>();
+    public DbSet<TechnicianSupportScopeReplay> TechnicianSupportScopeReplays => Set<TechnicianSupportScopeReplay>();
     public DbSet<AccountNotificationDevice> AccountNotificationDevices => Set<AccountNotificationDevice>();
     public DbSet<PasswordResetRequest> PasswordResetRequests => Set<PasswordResetRequest>();
     public DbSet<AccountInvitation> AccountInvitations => Set<AccountInvitation>();

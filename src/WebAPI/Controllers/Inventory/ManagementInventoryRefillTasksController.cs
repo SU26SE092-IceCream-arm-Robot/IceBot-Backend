@@ -61,7 +61,7 @@ public sealed class ManagementInventoryRefillTasksController(
 
     [HttpPost("balances/{inventoryId:guid}/refill-tasks")]
     [Authorize(Policy = "inventory.refill.manage")]
-    public async Task<IActionResult> Request(
+    public async Task<IActionResult> RequestRefillTask(
         Guid kioskId,
         Guid inventoryId,
         [FromBody] RequestInventoryRefillTaskRequest request,

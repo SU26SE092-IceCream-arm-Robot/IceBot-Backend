@@ -33,4 +33,26 @@ public sealed class IceBotObservabilitySettingsTests
         Assert.Equal("Staging", settings.DeploymentEnvironment);
         Assert.Equal("instance-1", settings.InstanceId);
     }
+
+    [Fact]
+    public void IgnoresRemovedSharedOtlpKeys()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Observability:OpenTelemetry:OtlpExporterEnabled"] = "true",
+                ["Observability:OpenTelemetry:OtlpEndpoint"] = "http://removed:4317",
+                ["Observability:OpenTelemetry:OtlpProtocol"] = "http/protobuf"
+            })
+            .Build();
+
+        var settings = IceBotObservabilitySettingsReader.Read(configuration, "Production", "instance-2");
+
+        Assert.False(settings.MetricsExporter.Enabled);
+        Assert.False(settings.TracingExporter.Enabled);
+        Assert.Equal("http://localhost:18889", settings.MetricsExporter.Endpoint);
+        Assert.Equal("http://localhost:18889", settings.TracingExporter.Endpoint);
+        Assert.Equal("grpc", settings.MetricsExporter.Protocol);
+        Assert.Equal("grpc", settings.TracingExporter.Protocol);
+    }
 }

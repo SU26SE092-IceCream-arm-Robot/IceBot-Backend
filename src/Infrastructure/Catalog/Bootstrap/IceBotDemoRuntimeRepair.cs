@@ -119,9 +119,14 @@ public sealed class IceBotDemoRuntimeRepair(IceBotDbContext dbContext)
         {
             balance = new KioskIngredientInventory
             {
-                Id = Guid.NewGuid(), OrganizationId = kiosk.OrganizationId, StoreId = kiosk.StoreId,
-                KioskId = kiosk.Id, IngredientId = ingredient.Id, OriginNodeId = Guid.Empty,
-                Version = 1, CreatedAt = now
+                Id = Guid.NewGuid(),
+                OrganizationId = kiosk.OrganizationId,
+                StoreId = kiosk.StoreId,
+                KioskId = kiosk.Id,
+                IngredientId = ingredient.Id,
+                OriginNodeId = Guid.Empty,
+                Version = 1,
+                CreatedAt = now
             };
             balance.Configure("gram", InitialQuantity, null, null, InventoryTrackingMode.ManualEstimate, now);
             dbContext.KioskIngredientInventories.Add(balance);

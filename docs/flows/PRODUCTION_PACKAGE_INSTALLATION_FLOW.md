@@ -75,10 +75,11 @@ impact is resolved from both ingredient requirements and option codes declared
 by the package's artifact technical contracts. New and replaced package
 definitions are always written as V2; V1 snapshots are not rewritten.
 
-Package V1 accepts exactly one required capability code per route because one
-route currently materializes one RobotProgram binding. Multi-workcell package
-routes require a later binding contract instead of silently choosing the first
-capability.
+Each package route requires at least one distinct capability code and may
+declare several. Installation snapshots the complete normalized capability set
+into its immutable `ProductionProgramBinding` and release binding. Admission,
+deployment, and dispatch require every code in that set; no layer selects only
+the first capability.
 
 One package version may include each source Product only once. Different
 `SourceKey` values cannot alias the same `SourceProductId`; V1 rejects that

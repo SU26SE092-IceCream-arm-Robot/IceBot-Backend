@@ -24,27 +24,20 @@ public static class IceBotObservabilitySettingsReader
         string instanceId)
     {
         var otelSection = configuration.GetSection("Observability:OpenTelemetry");
-        var legacyEndpoint = otelSection.GetValue<string>("OtlpEndpoint") ?? DefaultOtlpEndpoint;
-        var legacyProtocol = otelSection.GetValue<string>("OtlpProtocol") ?? DefaultOtlpProtocol;
-        var legacyExporterEnabled = otelSection.GetValue("OtlpExporterEnabled", false);
 
         return new IceBotObservabilitySettings(
             configuration.GetValue<string>("Observability:ServiceName") ?? DefaultServiceName,
             otelSection.GetValue("Enabled", true),
-            ReadSignalExporter(otelSection.GetSection("Metrics"), legacyExporterEnabled, legacyEndpoint, legacyProtocol),
-            ReadSignalExporter(otelSection.GetSection("Tracing"), legacyExporterEnabled, legacyEndpoint, legacyProtocol),
-            configuration.GetValue<string>("Observability:Serilog:OtlpEndpoint") ?? legacyEndpoint,
-            configuration.GetValue<string>("Observability:Serilog:OtlpProtocol") ?? legacyProtocol,
+            ReadSignalExporter(otelSection.GetSection("Metrics")),
+            ReadSignalExporter(otelSection.GetSection("Tracing")),
+            configuration.GetValue<string>("Observability:Serilog:OtlpEndpoint") ?? DefaultOtlpEndpoint,
+            configuration.GetValue<string>("Observability:Serilog:OtlpProtocol") ?? DefaultOtlpProtocol,
             configuration.GetValue<string>("Observability:DeploymentEnvironment") ?? environmentName,
             configuration.GetValue<string>("Observability:InstanceId") ?? instanceId);
     }
 
-    private static OtlpSignalExporterSettings ReadSignalExporter(
-        IConfigurationSection section,
-        bool legacyExporterEnabled,
-        string legacyEndpoint,
-        string legacyProtocol) => new(
-        section.GetValue<bool?>("ExporterEnabled") ?? legacyExporterEnabled,
-        section.GetValue<string>("OtlpEndpoint") ?? legacyEndpoint,
-        section.GetValue<string>("OtlpProtocol") ?? legacyProtocol);
+    private static OtlpSignalExporterSettings ReadSignalExporter(IConfigurationSection section) => new(
+        section.GetValue("ExporterEnabled", false),
+        section.GetValue<string>("OtlpEndpoint") ?? DefaultOtlpEndpoint,
+        section.GetValue<string>("OtlpProtocol") ?? DefaultOtlpProtocol);
 }

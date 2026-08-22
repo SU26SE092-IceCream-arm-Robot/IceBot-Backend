@@ -90,20 +90,20 @@ public sealed class CancelPendingOrderCommandHandler
         Order order,
         OrderResult result,
         OrderStatus fromStatus) => new()
-    {
-        OrderId = order.Id,
-        OrderNumber = order.OrderNumber,
-        KioskId = order.KioskId,
-        OrganizationId = order.OrganizationId,
-        StoreId = order.StoreId,
-        OldStatus = fromStatus.ToString(),
-        NewStatus = result.Status.ToString(),
-        PaymentStatus = result.PaymentStatus.ToString(),
-        CustomerStatus = result.CustomerStatus,
-        CustomerStatusMessage = result.CustomerStatusMessage,
-        CanRetryPayment = result.CanRetryPayment,
-        RequiresStaffSupport = result.RequiresStaffSupport,
-        UpdatedAt = result.CancelledAt ?? DateTimeOffset.UtcNow,
-        Version = 1
-    };
+        {
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            KioskId = order.KioskId,
+            OrganizationId = order.OrganizationId,
+            StoreId = order.StoreId,
+            OldStatus = fromStatus.ToString(),
+            NewStatus = result.Status.ToString(),
+            PaymentStatus = result.PaymentStatus.ToString(),
+            CustomerStatus = result.CustomerStatus,
+            CustomerStatusMessage = result.CustomerStatusMessage,
+            CanRetryPayment = result.CanRetryPayment,
+            RequiresStaffSupport = result.RequiresStaffSupport,
+            UpdatedAt = result.CancelledAt ?? DateTimeOffset.UtcNow,
+            Version = 1
+        };
 }

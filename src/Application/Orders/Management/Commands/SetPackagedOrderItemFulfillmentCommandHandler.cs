@@ -146,33 +146,40 @@ public sealed class SetPackagedOrderItemFulfillmentCommandHandler(
         OrderItem item,
         OrderItemStatus oldStatus,
         DateTimeOffset changedAt) => new()
-    {
-        OrderId = order.Id,
-        OrderItemId = item.Id,
-        OrderNumber = order.OrderNumber,
-        KioskId = order.KioskId,
-        OrganizationId = order.OrganizationId,
-        StoreId = order.StoreId,
-        FulfillmentType = item.FulfillmentType.ToString(),
-        OldStatus = oldStatus.ToString(),
-        NewStatus = item.Status.ToString(),
-        Quantity = item.Quantity,
-        UpdatedAt = changedAt,
-        Version = 1
-    };
+        {
+            OrderId = order.Id,
+            OrderItemId = item.Id,
+            OrderNumber = order.OrderNumber,
+            KioskId = order.KioskId,
+            OrganizationId = order.OrganizationId,
+            StoreId = order.StoreId,
+            FulfillmentType = item.FulfillmentType.ToString(),
+            OldStatus = oldStatus.ToString(),
+            NewStatus = item.Status.ToString(),
+            Quantity = item.Quantity,
+            UpdatedAt = changedAt,
+            Version = 1
+        };
 
     private Task PublishStatusChangedAsync(Order order, OrderStatus oldStatus, CancellationToken cancellationToken)
     {
         var projection = OrderStatusProjector.ProjectFromOrder(order);
         return publisher.PublishOrderStatusChangedAsync(new OrderStatusChangedEvent
         {
-            OrderId = order.Id, OrderNumber = order.OrderNumber, KioskId = order.KioskId,
-            OrganizationId = order.OrganizationId, StoreId = order.StoreId,
-            OldStatus = oldStatus.ToString(), NewStatus = order.Status.ToString(),
-            PaymentStatus = order.PaymentStatus.ToString(), CustomerStatus = projection.CustomerStatus,
-            CustomerStatusMessage = projection.CustomerStatusMessage, CanRetryPayment = projection.CanRetryPayment,
+            OrderId = order.Id,
+            OrderNumber = order.OrderNumber,
+            KioskId = order.KioskId,
+            OrganizationId = order.OrganizationId,
+            StoreId = order.StoreId,
+            OldStatus = oldStatus.ToString(),
+            NewStatus = order.Status.ToString(),
+            PaymentStatus = order.PaymentStatus.ToString(),
+            CustomerStatus = projection.CustomerStatus,
+            CustomerStatusMessage = projection.CustomerStatusMessage,
+            CanRetryPayment = projection.CanRetryPayment,
             RequiresStaffSupport = projection.RequiresStaffSupport,
-            UpdatedAt = order.UpdatedAt ?? DateTimeOffset.UtcNow, Version = 1
+            UpdatedAt = order.UpdatedAt ?? DateTimeOffset.UtcNow,
+            Version = 1
         }, cancellationToken);
     }
 }

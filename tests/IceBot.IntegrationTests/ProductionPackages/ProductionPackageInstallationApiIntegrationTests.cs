@@ -41,8 +41,6 @@ public sealed class ProductionPackageInstallationApiIntegrationTests(Integration
         Guid productId;
         Guid variantId;
         Guid recipeId;
-        Guid artifactId;
-        Guid programId;
         Guid releaseId;
         using (var installResponse = await SendInstallAsync(client, basePath, idempotencyKey, requestBody))
         {
@@ -72,20 +70,12 @@ public sealed class ProductionPackageInstallationApiIntegrationTests(Integration
             productId = data.GetProperty("products")[0].GetProperty("id").GetGuid();
             variantId = data.GetProperty("productVariants")[0].GetProperty("id").GetGuid();
             recipeId = data.GetProperty("recipes")[0].GetProperty("id").GetGuid();
-            artifactId = data.GetProperty("artifacts")[0].GetProperty("id").GetGuid();
-            programId = data.GetProperty("programs")[0].GetProperty("id").GetGuid();
             releaseId = data.GetProperty("release").GetProperty("id").GetGuid();
         }
 
-        await AssertSuccessfulAsync(await client.PatchAsync(
-            $"/api/v1/management/organizations/{scenario.OrganizationId:D}/robot-artifacts/{artifactId:D}/publish",
-            null));
         await AssertSuccessfulAsync(await client.PatchAsJsonAsync(
             $"/api/v1/management/organizations/{scenario.OrganizationId:D}/products/{productId:D}/variants/{variantId:D}/recipes/{recipeId:D}/status",
             new { Status = "Published" }));
-        await AssertSuccessfulAsync(await client.PatchAsync(
-            $"/api/v1/management/organizations/{scenario.OrganizationId:D}/robot-programs/{programId:D}/publish",
-            null));
         await AssertSuccessfulAsync(await client.PatchAsync(
             $"/api/v1/management/organizations/{scenario.OrganizationId:D}/configuration-releases/{releaseId:D}/publish",
             null));
@@ -114,6 +104,7 @@ public sealed class ProductionPackageInstallationApiIntegrationTests(Integration
             ConfigurationReleaseId = releaseId,
             KioskExecutionEndpointId = scenario.ExecutionEndpointId,
             DeploymentPreviewChecksum = deploymentChecksum,
+            Reason = "Install published package",
             AcknowledgeRemainingRisk = true
         };
         using (var stalePreviewResponse = await SendWithIdempotencyKeyAsync(
@@ -125,6 +116,7 @@ public sealed class ProductionPackageInstallationApiIntegrationTests(Integration
                        ConfigurationReleaseId = releaseId,
                        KioskExecutionEndpointId = scenario.ExecutionEndpointId,
                        DeploymentPreviewChecksum = new string('0', 64),
+                       Reason = "Verify stale deployment preview",
                        AcknowledgeRemainingRisk = true
                    }))
         {
@@ -253,8 +245,6 @@ public sealed class ProductionPackageInstallationApiIntegrationTests(Integration
             });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        using var error = await ReadJsonAsync(response);
-        Assert.False(error.RootElement.GetProperty("succeeded").GetBoolean());
     }
 
     private static Task<HttpResponseMessage> SendInstallAsync(

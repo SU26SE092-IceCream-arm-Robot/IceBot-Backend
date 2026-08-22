@@ -228,8 +228,7 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
             return Task.FromResult(false);
         }
 
-        return QueryAssignableAccountRoles(organizationId, storeId, kioskId)
-            .AnyAsync(accountRole => accountRole.AccountId == accountId, cancellationToken);
+        return CanAssignAccountCoreAsync(accountId, organizationId, storeId, kioskId, cancellationToken);
     }
 
     public async Task<List<MaintenanceAssigneeOptionResult>> ListAssignableAccountsAsync(
@@ -238,14 +237,11 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
         Guid kioskId,
         CancellationToken cancellationToken = default)
     {
-        var rows = await QueryAssignableAccountRoles(organizationId, storeId, kioskId)
-            .Select(accountRole => new
-            {
-                accountRole.AccountId,
-                DisplayName = accountRole.Account.FullName ?? accountRole.Account.UserName,
-                RoleCode = accountRole.Role.Code
-            })
+        var managers = await QueryAssignableManagers(organizationId, storeId, kioskId)
             .ToListAsync(cancellationToken);
+        var technicians = await QueryAssignableTechnicians(storeId, kioskId)
+            .ToListAsync(cancellationToken);
+        var rows = managers.Concat(technicians);
 
         return rows
             .GroupBy(row => new
@@ -267,7 +263,39 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
             .ToList();
     }
 
-    private IQueryable<Domain.Identity.Entities.AccountRole> QueryAssignableAccountRoles(
+    private async Task<bool> CanAssignAccountCoreAsync(
+        Guid accountId,
+        Guid organizationId,
+        Guid storeId,
+        Guid kioskId,
+        CancellationToken cancellationToken)
+    {
+        var isManager = await _dbContext.AccountRoles.AsNoTracking().AnyAsync(accountRole =>
+            accountRole.AccountId == accountId &&
+            accountRole.IsActive &&
+            accountRole.Account.DeletedAt == null &&
+            accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+            accountRole.Role.Code == "Manager" &&
+            (accountRole.KioskId == kioskId ||
+             (!accountRole.KioskId.HasValue && accountRole.StoreId == storeId) ||
+             (!accountRole.KioskId.HasValue && !accountRole.StoreId.HasValue &&
+              accountRole.OrganizationId == organizationId)), cancellationToken);
+        if (isManager)
+        {
+            return true;
+        }
+
+        return await _dbContext.TechnicianSupportGrants.AsNoTracking().AnyAsync(grant =>
+            grant.AccountId == accountId &&
+            grant.IsActive &&
+            grant.DeletedAt == null &&
+            grant.Account.DeletedAt == null &&
+            grant.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+            grant.Account.PlatformTechnicianProfile != null &&
+            (grant.KioskId == kioskId || grant.StoreId == storeId), cancellationToken);
+    }
+
+    private IQueryable<AssignableAccountRow> QueryAssignableManagers(
         Guid organizationId,
         Guid storeId,
         Guid kioskId)
@@ -276,15 +304,30 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
             accountRole.IsActive &&
             accountRole.Account.DeletedAt == null &&
             accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
-            (
-                (MaintenanceTicketAccessRules.AssigneeRoles.Contains(accountRole.Role.Code) &&
-                 (accountRole.KioskId == kioskId ||
-                  (!accountRole.KioskId.HasValue && accountRole.StoreId == storeId) ||
-                  (!accountRole.KioskId.HasValue &&
-                   !accountRole.StoreId.HasValue &&
-                   accountRole.OrganizationId == organizationId)))
-            ));
+            accountRole.Role.Code == "Manager" &&
+            (accountRole.KioskId == kioskId ||
+             (!accountRole.KioskId.HasValue && accountRole.StoreId == storeId) ||
+             (!accountRole.KioskId.HasValue && !accountRole.StoreId.HasValue &&
+              accountRole.OrganizationId == organizationId)))
+            .Select(accountRole => new AssignableAccountRow(
+                accountRole.AccountId,
+                accountRole.Account.FullName ?? accountRole.Account.UserName,
+                "Manager"));
     }
+
+    private IQueryable<AssignableAccountRow> QueryAssignableTechnicians(Guid storeId, Guid kioskId) =>
+        _dbContext.TechnicianSupportGrants.AsNoTracking().Where(grant =>
+                grant.IsActive && grant.DeletedAt == null &&
+                grant.Account.DeletedAt == null &&
+                grant.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+                grant.Account.PlatformTechnicianProfile != null &&
+                (grant.KioskId == kioskId || grant.StoreId == storeId))
+            .Select(grant => new AssignableAccountRow(
+                grant.AccountId,
+                grant.Account.FullName ?? grant.Account.UserName,
+                "Technician"));
+
+    private sealed record AssignableAccountRow(Guid AccountId, string DisplayName, string RoleCode);
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -299,8 +342,10 @@ public sealed class MaintenanceTicketStore : IMaintenanceTicketStore
             return true;
         }
         catch (DbUpdateException ex) when (ex.InnerException is PostgresException
-               { SqlState: PostgresErrorCodes.UniqueViolation,
-                 ConstraintName: "IX_MaintenanceTickets_TicketNumber" })
+        {
+            SqlState: PostgresErrorCodes.UniqueViolation,
+            ConstraintName: "IX_MaintenanceTickets_TicketNumber"
+        })
         {
             return false;
         }

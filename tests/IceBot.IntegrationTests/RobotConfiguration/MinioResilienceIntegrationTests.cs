@@ -9,6 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace IceBot.IntegrationTests.RobotConfiguration;
 
+[Collection(IntegrationTestFixture.CollectionName)]
 public sealed class MinioResilienceIntegrationTests
 {
     [IntegrationFact]

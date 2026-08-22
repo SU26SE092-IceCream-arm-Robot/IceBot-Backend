@@ -387,18 +387,44 @@ public abstract class EdgeOperationalIntegrationTestBase
         string reasonCode)
     {
         await using var dbContext = _fixture.CreateDbContext();
-        var result = await new RefillDispenserCommandHandler(
-                new InventoryStore(dbContext),
+        var dispenserState = await dbContext.IngredientDispenserStates
+            .AsNoTracking()
+            .SingleAsync(state => state.Id == graph.DispenserStateId);
+        var store = new InventoryStore(dbContext);
+        var request = await new RequestInventoryRefillTaskCommandHandler(store)
+            .HandleAsync(new RequestInventoryRefillTaskCommand(
+                graph.KioskId,
+                dispenserState.KioskIngredientInventoryId,
+                quantity,
+                dispenserState.Id,
+                reasonCode,
+                null,
+                $"request-{Guid.NewGuid():N}",
+                user));
+        Assert.True(request.Succeeded, request.Message);
+
+        var start = await new StartInventoryRefillTaskCommandHandler(store)
+            .HandleAsync(new StartInventoryRefillTaskCommand(
+                graph.KioskId,
+                request.Data!.Id,
+                $"start-{Guid.NewGuid():N}",
+                user));
+        Assert.True(start.Succeeded, start.Message);
+
+        var complete = await new CompleteInventoryRefillTaskCommandHandler(
+                store,
                 new NoOpRealtimeNotificationPublisher())
-            .HandleAsync(new RefillDispenserCommand
-            {
-                KioskId = graph.KioskId,
-                DispenserStateId = graph.DispenserStateId,
-                UserContext = user,
-                Quantity = quantity,
-                ReasonCode = reasonCode
-            });
-        Assert.True(result.Succeeded, result.Message);
+            .HandleAsync(new CompleteInventoryRefillTaskCommand(
+                graph.KioskId,
+                request.Data.Id,
+                quantity,
+                dispenserState.Id,
+                reasonCode,
+                null,
+                null,
+                $"complete-{Guid.NewGuid():N}",
+                user));
+        Assert.True(complete.Succeeded, complete.Message);
     }
 
     protected static void AssertPostgresTimestampEqual(DateTimeOffset expected, DateTimeOffset actual)
@@ -633,6 +659,24 @@ public abstract class EdgeOperationalIntegrationTestBase
                 """[{"Level":1,"EstimatedQuantity":10},{"Level":2,"EstimatedQuantity":50},{"Level":3,"EstimatedQuantity":100}]""",
             LastMeasuredAt = DateTimeOffset.UtcNow
         };
+        var inventory = new KioskIngredientInventory
+        {
+            OrganizationId = organization.Id,
+            StoreId = store.Id,
+            KioskId = kiosk.Id,
+            Kiosk = kiosk,
+            IngredientId = ingredient.Id,
+            Ingredient = ingredient
+        };
+        inventory.Configure(
+            "gram",
+            estimatedQuantity: 100,
+            lowStockThreshold: 20,
+            expiresAt: null,
+            InventoryTrackingMode.ManualEstimate,
+            DateTimeOffset.UtcNow);
+        dispenserState.KioskIngredientInventoryId = inventory.Id;
+        dispenserState.KioskIngredientInventory = inventory;
         var menu = new Menu
         {
             OrganizationId = organization.Id,
@@ -677,6 +721,7 @@ public abstract class EdgeOperationalIntegrationTestBase
             device,
             ingredient,
             dispenserState,
+            inventory,
             endpoint);
         await dbContext.SaveChangesAsync();
 

@@ -27,7 +27,11 @@ public sealed class CreateInternalAccountInvitationCommandHandler
         var invitedByAccountId = command.InvitedByAccountId;
         var sendEmail = command.SendEmail;
 
-        var account = await _accounts.GetByIdAsync(accountId, asNoTracking: false, cancellationToken: cancellationToken);
+        var account = await _accounts.GetTenantManagedByIdAsync(
+            accountId,
+            command.OrganizationId,
+            asNoTracking: false,
+            cancellationToken: cancellationToken);
         if (account is null)
         {
             return ApiResult<AccountInvitationResult>.Fail("Account not found.", 404);

@@ -67,9 +67,13 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
             .Take(pageSize)
             .Select(release => new ConfigurationReleaseSummaryReadModel
             {
-                Id = release.Id, OrganizationId = release.OrganizationId, ReleaseNumber = release.ReleaseNumber,
-                Status = release.Status.ToString(), ReleaseChecksum = release.ReleaseChecksum,
-                PublishedAt = release.PublishedAt, PublishedByAccountId = release.PublishedByAccountId,
+                Id = release.Id,
+                OrganizationId = release.OrganizationId,
+                ReleaseNumber = release.ReleaseNumber,
+                Status = release.Status.ToString(),
+                ReleaseChecksum = release.ReleaseChecksum,
+                PublishedAt = release.PublishedAt,
+                PublishedByAccountId = release.PublishedByAccountId,
                 RouteCount = release.ExecutionRoutes.Count
             }).ToListAsync(cancellationToken);
 
@@ -90,10 +94,17 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         var variants = await variantQuery.OrderBy(variant => variant.Product.Name).ThenBy(variant => variant.DisplayOrder).ThenBy(variant => variant.Name).Take(limit)
             .Select(variant => new ConfigurationAuthoringProductVariantOption
             {
-                Id = variant.Id, ProductId = variant.ProductId, ProductCode = variant.Product.Code, ProductName = variant.Product.Name,
-                Code = variant.Code, Name = variant.Name, FulfillmentType = variant.FulfillmentType.ToString(),
-                IsAvailable = variant.IsAvailable && variant.Product.IsAvailable, OrganizationId = variant.Product.OrganizationId,
-                StoreId = variant.Product.StoreId, KioskId = variant.Product.KioskId
+                Id = variant.Id,
+                ProductId = variant.ProductId,
+                ProductCode = variant.Product.Code,
+                ProductName = variant.Product.Name,
+                Code = variant.Code,
+                Name = variant.Name,
+                FulfillmentType = variant.FulfillmentType.ToString(),
+                IsAvailable = variant.IsAvailable && variant.Product.IsAvailable,
+                OrganizationId = variant.Product.OrganizationId,
+                StoreId = variant.Product.StoreId,
+                KioskId = variant.Product.KioskId
             }).ToListAsync(cancellationToken);
 
         var recipeQuery = _dbContext.Recipes.AsNoTracking().Where(recipe =>
@@ -109,11 +120,21 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         var recipes = await recipeQuery.OrderBy(recipe => recipe.ProductVariantId).ThenByDescending(recipe => recipe.IsDefault).ThenByDescending(recipe => recipe.Version).Take(limit)
             .Select(recipe => new ConfigurationAuthoringRecipeOption
             {
-                Id = recipe.Id, ProductId = recipe.ProductVariant.ProductId, ProductCode = recipe.ProductVariant.Product.Code,
-                ProductName = recipe.ProductVariant.Product.Name, ProductVariantId = recipe.ProductVariantId, ProductVariantCode = recipe.ProductVariant.Code,
-                ProductVariantName = recipe.ProductVariant.Name, Code = recipe.Code, Name = recipe.Name, Version = recipe.Version,
-                Status = recipe.Status.ToString(), IsDefault = recipe.IsDefault, OrganizationId = recipe.OrganizationId,
-                StoreId = recipe.StoreId, KioskId = recipe.KioskId
+                Id = recipe.Id,
+                ProductId = recipe.ProductVariant.ProductId,
+                ProductCode = recipe.ProductVariant.Product.Code,
+                ProductName = recipe.ProductVariant.Product.Name,
+                ProductVariantId = recipe.ProductVariantId,
+                ProductVariantCode = recipe.ProductVariant.Code,
+                ProductVariantName = recipe.ProductVariant.Name,
+                Code = recipe.Code,
+                Name = recipe.Name,
+                Version = recipe.Version,
+                Status = recipe.Status.ToString(),
+                IsDefault = recipe.IsDefault,
+                OrganizationId = recipe.OrganizationId,
+                StoreId = recipe.StoreId,
+                KioskId = recipe.KioskId
             }).ToListAsync(cancellationToken);
 
         var productIds = recipes.Select(recipe => recipe.ProductId).Distinct().ToArray();
@@ -174,9 +195,16 @@ public sealed class ConfigurationReleaseStore : IConfigurationReleaseStore
         var programs = await programQuery.OrderBy(program => program.Code).Take(limit)
             .Select(program => new ConfigurationAuthoringRobotProgramOption
             {
-                Id = program.Id, Code = program.Code, Name = program.Name, ScopeType = program.ScopeType.ToString(),
-                OrganizationId = program.OrganizationId, StoreId = program.StoreId, KioskId = program.KioskId, DeviceId = program.DeviceId,
-                ProgramManifestChecksum = program.ProgramManifestChecksum!, ArtifactCount = program.RobotProgramArtifacts.Count
+                Id = program.Id,
+                Code = program.Code,
+                Name = program.Name,
+                ScopeType = program.ScopeType.ToString(),
+                OrganizationId = program.OrganizationId,
+                StoreId = program.StoreId,
+                KioskId = program.KioskId,
+                DeviceId = program.DeviceId,
+                ProgramManifestChecksum = program.ProgramManifestChecksum!,
+                ArtifactCount = program.RobotProgramArtifacts.Count
             }).ToListAsync(cancellationToken);
 
         var programIds = programs.Select(program => program.Id).ToArray();

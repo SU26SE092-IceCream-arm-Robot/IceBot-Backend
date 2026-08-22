@@ -334,13 +334,13 @@ public static class RobotAuthoringBundleCodec
     private static RobotAuthoringSidecar CreateMinimalSidecar(
         RobotAuthoringManifestProgram program,
         RobotAuthoringManifestArtifact item) => new()
-    {
-        SchemaVersion = 1,
-        ArtifactCode = item.ArtifactCode,
-        ArtifactFileName = item.FileName,
-        RuntimeTargetCode = program.RuntimeTargetCode,
-        MachineModelCode = program.MachineModelCode
-    };
+        {
+            SchemaVersion = 1,
+            ArtifactCode = item.ArtifactCode,
+            ArtifactFileName = item.FileName,
+            RuntimeTargetCode = program.RuntimeTargetCode,
+            MachineModelCode = program.MachineModelCode
+        };
 
     private static byte[] ReadEntry(IReadOnlyDictionary<string, ZipArchiveEntry> entries, string path, long maximumBytes)
     {

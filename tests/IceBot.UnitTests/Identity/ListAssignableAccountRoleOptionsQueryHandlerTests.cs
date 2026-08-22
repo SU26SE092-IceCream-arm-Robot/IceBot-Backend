@@ -35,7 +35,7 @@ public sealed class ListAssignableAccountRoleOptionsQueryHandlerTests
         Assert.True(result.Succeeded);
         var roles = result.Data!.ToArray();
         Assert.Equal(
-            ["Manager", "OrgAdmin", "Staff", "Technician"],
+            ["Manager", "OrgAdmin", "Staff"],
             roles.Select(role => role.Code).OrderBy(code => code));
         Assert.All(roles, role => Assert.NotEmpty(role.AllowedScopeTypes));
     }

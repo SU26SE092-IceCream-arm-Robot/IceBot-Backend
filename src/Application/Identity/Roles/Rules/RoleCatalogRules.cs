@@ -9,7 +9,9 @@ internal static class RoleCatalogRules
         ["SystemAdmin"] = ("System Admin. Full platform-wide administrative control.", new[] { TenantScopeType.Global }, false),
         ["OrgAdmin"] = ("Organization Admin. Manage assigned organization resources.", new[] { TenantScopeType.Organization }, true),
         ["Manager"] = ("Manager. Operations management across organizations and stores.", new[] { TenantScopeType.Organization, TenantScopeType.Store }, true),
-        ["Technician"] = ("Technician. Installation, maintenance, and robot/kiosk configuration.", new[] { TenantScopeType.Store, TenantScopeType.Kiosk }, true),
+        // Technician is a platform-owned role. Its support grants are still represented by
+        // AccountRole rows, but are assigned only through the platform support surface.
+        ["Technician"] = ("Platform technician. Scoped software and Edge integration support.", new[] { TenantScopeType.Store, TenantScopeType.Kiosk }, true),
         ["Staff"] = ("Staff. On-site kiosk operations.", new[] { TenantScopeType.Store, TenantScopeType.Kiosk }, true)
     };
 
@@ -29,14 +31,12 @@ internal static class RoleCatalogRules
         {
             return string.Equals(targetRoleCode, "OrgAdmin", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(targetRoleCode, "Manager", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(targetRoleCode, "Staff", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(targetRoleCode, "Technician", StringComparison.OrdinalIgnoreCase);
+                   string.Equals(targetRoleCode, "Staff", StringComparison.OrdinalIgnoreCase);
         }
 
         if (string.Equals(userRoleCode, "Manager", StringComparison.OrdinalIgnoreCase))
         {
-            return string.Equals(targetRoleCode, "Staff", StringComparison.OrdinalIgnoreCase) ||
-                   string.Equals(targetRoleCode, "Technician", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(targetRoleCode, "Staff", StringComparison.OrdinalIgnoreCase);
         }
 
         return false;

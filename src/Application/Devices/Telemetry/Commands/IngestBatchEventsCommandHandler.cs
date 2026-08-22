@@ -227,13 +227,13 @@ public sealed class IngestBatchEventsCommandHandler
         string? message,
         Guid? resourceId = null,
         long? acknowledgedSequenceNumber = null) => new()
-    {
-        EventId = item.EventId,
-        EventType = item.EventType.ToString(),
-        Status = status,
-        StatusCode = statusCode,
-        Message = message,
-        ResourceId = resourceId,
-        AcknowledgedSequenceNumber = acknowledgedSequenceNumber
-    };
+        {
+            EventId = item.EventId,
+            EventType = item.EventType.ToString(),
+            Status = status,
+            StatusCode = statusCode,
+            Message = message,
+            ResourceId = resourceId,
+            AcknowledgedSequenceNumber = acknowledgedSequenceNumber
+        };
 }

@@ -9,6 +9,7 @@ using Domain.Tenants.Entities;
 using Application.Devices.Telemetry;
 using Application.Inventory.Abstractions;
 using Application.SalesCatalog.Availability;
+using Application.SalesCatalog.Admission.Services;
 using Microsoft.Extensions.Options;
 
 namespace Application.Orders.PlaceOrder.Services;
@@ -19,7 +20,8 @@ public sealed class PlaceOrderItemAppender(
     IOrderStore orderStore,
     IMenuItemOperationalAvailabilityReader operationalAvailability,
     IOptions<EdgeTelemetryIngestionOptions> options,
-    MachineProductionInventoryGate? inventoryGate = null)
+    MachineProductionInventoryGate? inventoryGate = null,
+    MenuItemOperationalAdmissionEvaluator? operationalAdmission = null)
 {
     private readonly EdgeTelemetryIngestionOptions _options = options.Value;
 
@@ -103,7 +105,27 @@ public sealed class PlaceOrderItemAppender(
         if (optionIngredientRequirements.Any(requirement => !requirement.IsIngredientActive))
             return new("One or more selected options require an inactive ingredient.", 409);
 
-        var inventoryDecision = inventoryGate is null
+        if (operationalAdmission is not null)
+        {
+            var decision = await operationalAdmission.EvaluateAsync(
+                kiosk,
+                menuItem.Id,
+                itemRequest.Quantity,
+                optionIngredientRequirements.Select(requirement => new InventoryIngredientRequirementInput(
+                    requirement.IngredientId,
+                    requirement.IngredientCode,
+                    requirement.IngredientName,
+                    requirement.Quantity,
+                    requirement.Unit)).ToArray(),
+                now,
+                cancellationToken);
+            if (!decision.CanSell)
+            {
+                return new(decision.ToDisplayMessage(menuItem.DisplayName)!, 409);
+            }
+        }
+
+        var inventoryDecision = operationalAdmission is not null || inventoryGate is null
             ? MachineProductionInventoryGateResult.Sellable
             : await inventoryGate.EvaluateAsync(
                 kiosk,

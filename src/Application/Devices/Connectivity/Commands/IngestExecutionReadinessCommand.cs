@@ -4,6 +4,7 @@ using Domain.ProductionExecution.Enums;
 using Application.Devices.Connectivity.Contracts;
 
 namespace Application.Devices.Connectivity.Commands;
+
 public sealed class IngestExecutionReadinessCommand
 {
     public required Guid KioskId { get; init; }

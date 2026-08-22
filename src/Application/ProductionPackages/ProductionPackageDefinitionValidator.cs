@@ -74,7 +74,7 @@ public static class ProductionPackageDefinitionValidator
                 new ProductionOptionExecutionInput(option.Code, optionImpacts[option.Id],
                     option.IngredientRequirements.Count > 0)).ToArray(), optionEffects, route.RouteCode);
             ValidateEffects(orderedSlots, artifacts, contractsById, requirements);
-            ValidateSingleCapability(route.RequiredCapabilitiesJson);
+            ValidateCapabilities(route.RequiredCapabilitiesJson);
         }
     }
 
@@ -142,7 +142,7 @@ public static class ProductionPackageDefinitionValidator
         }
     }
 
-    public static string ValidateSingleCapability(string json)
+    public static IReadOnlyCollection<string> ValidateCapabilities(string json)
     {
         using var document = JsonDocument.Parse(json);
         var codes = document.RootElement.TryGetProperty("requires", out var requires) && requires.ValueKind == JsonValueKind.Array
@@ -150,11 +150,11 @@ public static class ProductionPackageDefinitionValidator
                 .Select(x => x.GetProperty("code").GetString()?.Trim().ToUpperInvariant())
                 .Where(x => !string.IsNullOrWhiteSpace(x)).Cast<string>().Distinct(StringComparer.Ordinal).ToArray()
             : [];
-        if (codes.Length != 1)
-            throw new DomainRuleException("Production package V1 routes require exactly one capability code.");
+        if (codes.Length == 0)
+            throw new DomainRuleException("Production package routes require at least one capability code.");
         var error = ExecutionRouteRequiredCapabilitiesContract.Validate(json, codes);
         if (error is not null) throw new DomainRuleException(error);
-        return codes[0];
+        return codes;
     }
 
     private static bool Matches(IngredientRequirement requirement, RobotArtifactDeclaredEffect effect) =>
@@ -245,8 +245,13 @@ public static class ProductionPackageDefinitionValidator
 
     private static int PhaseRank(string phase) => phase.Trim().ToUpperInvariant() switch
     {
-        "PREPARE" => 0, "BASE" => 100, "OPTION" => 200, "FINISH" => 300,
-        "DELIVER" => 400, "CLEANUP" => 500, _ => 250
+        "PREPARE" => 0,
+        "BASE" => 100,
+        "OPTION" => 200,
+        "FINISH" => 300,
+        "DELIVER" => 400,
+        "CLEANUP" => 500,
+        _ => 250
     };
 }
 

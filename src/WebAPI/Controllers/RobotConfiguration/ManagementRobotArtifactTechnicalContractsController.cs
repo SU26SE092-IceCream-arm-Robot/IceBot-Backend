@@ -232,19 +232,19 @@ public sealed class ManagementRobotArtifactTechnicalContractsController(
 
     private CreateRobotArtifactTechnicalContractCommand ToCommand(
         RobotArtifactTechnicalContractRequest request, Guid? organizationId) => new()
-    {
-        UserContext = User.GetUserContext(),
-        OrganizationId = organizationId,
-        ContractCode = request.ContractCode,
-        ContractVersion = request.ContractVersion,
-        RuntimeTargetCode = request.RuntimeTargetCode,
-        MachineModelCode = request.MachineModelCode,
-        Effects = request.Effects.Select(x => new RobotArtifactEffectRequest(x.EffectCode, x.EffectKind,
-            x.IngredientCode, x.OptionCode, x.QuantityMode, x.FixedQuantity, x.Unit,
-            x.RequiredWorkcellCapabilityCode)).ToArray(),
-        OrderingConstraints = request.OrderingConstraints.Select(x => new RobotArtifactOrderingConstraintRequest(
-            x.ConstraintType, x.Value, x.SortHint)).ToArray()
-    };
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            ContractCode = request.ContractCode,
+            ContractVersion = request.ContractVersion,
+            RuntimeTargetCode = request.RuntimeTargetCode,
+            MachineModelCode = request.MachineModelCode,
+            Effects = request.Effects.Select(x => new RobotArtifactEffectRequest(x.EffectCode, x.EffectKind,
+                x.IngredientCode, x.OptionCode, x.QuantityMode, x.FixedQuantity, x.Unit,
+                x.RequiredWorkcellCapabilityCode)).ToArray(),
+            OrderingConstraints = request.OrderingConstraints.Select(x => new RobotArtifactOrderingConstraintRequest(
+                x.ConstraintType, x.Value, x.SortHint)).ToArray()
+        };
 
     private ReplaceRobotArtifactTechnicalContractCommand ToReplaceCommand(
         RobotArtifactTechnicalContractDefinitionRequest request, Guid? organizationId, Guid contractId) => new(
@@ -254,17 +254,17 @@ public sealed class ManagementRobotArtifactTechnicalContractsController(
 
     private ImportRobotArtifactTechnicalContractSidecarCommand ToSidecarCommand(
         RobotArtifactSidecarImportRequest request, Guid organizationId) => new()
-    {
-        UserContext = User.GetUserContext(),
-        OrganizationId = organizationId,
-        ContractCode = request.ArtifactCode,
-        ContractVersion = request.ContractVersion,
-        SchemaVersion = request.SchemaVersion,
-        RuntimeTargetCode = request.RuntimeTargetCode,
-        MachineModelCode = request.MachineModelCode,
-        Effects = request.Effects.Select(ToEffect).ToArray(),
-        OrderingConstraints = request.OrderingConstraints.Select(ToConstraint).ToArray()
-    };
+        {
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            ContractCode = request.ArtifactCode,
+            ContractVersion = request.ContractVersion,
+            SchemaVersion = request.SchemaVersion,
+            RuntimeTargetCode = request.RuntimeTargetCode,
+            MachineModelCode = request.MachineModelCode,
+            Effects = request.Effects.Select(ToEffect).ToArray(),
+            OrderingConstraints = request.OrderingConstraints.Select(ToConstraint).ToArray()
+        };
 
     private static RobotArtifactEffectRequest ToEffect(RobotArtifactEffectContractRequest x) => new(
         x.EffectCode, x.EffectKind, x.IngredientCode, x.OptionCode, x.QuantityMode, x.FixedQuantity,

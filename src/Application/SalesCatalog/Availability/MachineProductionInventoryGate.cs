@@ -2,6 +2,7 @@ using Application.Devices.Telemetry;
 using Application.Inventory.Abstractions;
 using Application.SalesCatalog.ReadModels;
 using Domain.Catalog.Enums;
+using Domain.Inventory.Enums;
 using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
 using Microsoft.Extensions.Options;
@@ -63,15 +64,20 @@ public sealed class MachineProductionInventoryGate(
         // balance, that balance becomes authoritative. Physical topology is
         // optional evidence only. Without any balance, robot and
         // operational readiness gates still apply elsewhere in the flow.
-        return result is { HasConfiguredInventoryBalance: false }
+        return result is null
+            ? new(false, "Inventory readiness could not be evaluated.")
+            : result is { HasConfiguredInventoryBalance: false }
             ? MachineProductionInventoryGateResult.Sellable
             : result is { IsReady: true }
             ? MachineProductionInventoryGateResult.Sellable
-            : new(false, "Current inventory evidence does not support producing this menu item.");
+            : new(false, "Current inventory evidence does not support producing this menu item.", result.OverallStatus);
     }
 }
 
-public sealed record MachineProductionInventoryGateResult(bool CanSell, string? Reason)
+public sealed record MachineProductionInventoryGateResult(
+    bool CanSell,
+    string? Reason,
+    InventoryReadinessStatus? Status = null)
 {
     public static readonly MachineProductionInventoryGateResult Sellable = new(true, null);
 }

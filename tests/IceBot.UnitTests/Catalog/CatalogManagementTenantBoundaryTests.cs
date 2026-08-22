@@ -67,11 +67,11 @@ public sealed class CatalogManagementTenantBoundaryTests
             store,
             Substitute.For<ITechnicalResourceMutationPolicy>(),
             InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateProductCommand
-        {
-            Scope = new ProductManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
-            ProductId = product.Id,
-            Request = new UpdateProductRequest { Name = "Cross tenant update" }
-        });
+            {
+                Scope = new ProductManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
+                ProductId = product.Id,
+                Request = new UpdateProductRequest { Name = "Cross tenant update" }
+            });
 
         Assert.False(result.Succeeded);
         Assert.Equal(404, result.StatusCode);
@@ -92,11 +92,11 @@ public sealed class CatalogManagementTenantBoundaryTests
 
         var result = await new UpdateProductCommandHandler(
             store, ownership, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateProductCommand
-        {
-            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
-            ProductId = product.Id,
-            Request = new UpdateProductRequest { Code = "CHANGED" }
-        });
+            {
+                Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+                ProductId = product.Id,
+                Request = new UpdateProductRequest { Code = "CHANGED" }
+            });
 
         Assert.False(result.Succeeded);
         Assert.Equal(409, result.StatusCode);
@@ -116,11 +116,11 @@ public sealed class CatalogManagementTenantBoundaryTests
             store,
             Substitute.For<ITechnicalResourceMutationPolicy>(),
             InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateProductCommand
-        {
-            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
-            ProductId = product.Id,
-            Request = new UpdateProductRequest { Currency = "USD" }
-        });
+            {
+                Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+                ProductId = product.Id,
+                Request = new UpdateProductRequest { Currency = "USD" }
+            });
 
         Assert.False(result.Succeeded);
         Assert.Equal(409, result.StatusCode);
@@ -141,10 +141,10 @@ public sealed class CatalogManagementTenantBoundaryTests
             store,
             Substitute.For<ITechnicalResourceMutationPolicy>(),
             InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new DeleteProductCommand
-        {
-            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
-            ProductId = product.Id
-        });
+            {
+                Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+                ProductId = product.Id
+            });
 
         Assert.False(result.Succeeded);
         Assert.Equal(409, result.StatusCode);
@@ -175,11 +175,11 @@ public sealed class CatalogManagementTenantBoundaryTests
             store,
             Substitute.For<ITechnicalResourceMutationPolicy>(),
             InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new DeleteProductVariantCommand
-        {
-            Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
-            ProductId = product.Id,
-            VariantId = variant.Id
-        });
+            {
+                Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
+                ProductId = product.Id,
+                VariantId = variant.Id
+            });
 
         Assert.False(result.Succeeded);
         Assert.Equal(409, result.StatusCode);
@@ -230,11 +230,11 @@ public sealed class CatalogManagementTenantBoundaryTests
 
         var result = await new UpdateMenuCommandHandler(
             store, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(new UpdateMenuCommand
-        {
-            Scope = new MenuManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
-            MenuId = menu.Id,
-            Request = new UpdateMenuRequest { Name = "Cross tenant update" }
-        });
+            {
+                Scope = new MenuManagementCommandScope(Manager(routeOrganizationId), routeOrganizationId),
+                MenuId = menu.Id,
+                Request = new UpdateMenuRequest { Name = "Cross tenant update" }
+            });
 
         Assert.False(result.Succeeded);
         Assert.Equal(404, result.StatusCode);

@@ -53,9 +53,15 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     {
         var result = await _listHandler.HandleAsync(new ListConfigurationDeploymentsQuery
         {
-            UserContext = User.GetUserContext(), OrganizationId = organizationId, StoreId = storeId,
-            KioskId = kioskId, ConfigurationReleaseId = configurationReleaseId, Profile = profile,
-            Status = status, PageNumber = pageNumber, PageSize = pageSize
+            UserContext = User.GetUserContext(),
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            ConfigurationReleaseId = configurationReleaseId,
+            Profile = profile,
+            Status = status,
+            PageNumber = pageNumber,
+            PageSize = pageSize
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -113,7 +119,9 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     {
         var result = await _rollbackHandler.HandleAsync(new RollbackConfigurationDeploymentCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId, TargetDeploymentId = deploymentId,
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
+            TargetDeploymentId = deploymentId,
             IdempotencyKey = idempotencyKey,
             Reason = request.Reason,
             ExpectedActiveDeploymentId = request.ExpectedActiveDeploymentId
@@ -129,7 +137,8 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     {
         var result = await _fullEdgeHandler.HandleAsync(new DeployFullEdgeConfigurationCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId,
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,
@@ -166,7 +175,8 @@ public sealed class ManagementConfigurationDeploymentsController : ControllerBas
     {
         var result = await _lowCostHandler.HandleAsync(new DeployLowCostArtifactSetCommand
         {
-            UserContext = User.GetUserContext(), KioskId = kioskId,
+            UserContext = User.GetUserContext(),
+            KioskId = kioskId,
             ConfigurationReleaseId = request.ConfigurationReleaseId,
             KioskExecutionEndpointId = request.KioskExecutionEndpointId,
             IdempotencyKey = idempotencyKey,

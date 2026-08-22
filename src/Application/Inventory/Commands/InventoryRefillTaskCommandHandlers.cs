@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 using Application.Inventory.Abstractions;
 using Application.Inventory.Mapping;
 using Application.Inventory.Results;
@@ -11,7 +13,7 @@ using Domain.Inventory.Enums;
 
 namespace Application.Inventory.Commands;
 
-public sealed class RequestInventoryRefillTaskCommandHandler(IInventoryStore inventory)
+public sealed class RequestInventoryRefillTaskCommandHandler(IInventoryRefillTaskStore inventory)
 {
     public async Task<ApiResult<InventoryRefillTaskResult>> HandleAsync(RequestInventoryRefillTaskCommand command, CancellationToken cancellationToken = default)
     {
@@ -86,7 +88,7 @@ public sealed class RequestInventoryRefillTaskCommandHandler(IInventoryStore inv
 
 }
 
-public sealed class StartInventoryRefillTaskCommandHandler(IInventoryStore inventory)
+public sealed class StartInventoryRefillTaskCommandHandler(IInventoryRefillTaskStore inventory)
 {
     public Task<ApiResult<InventoryRefillTaskResult>> HandleAsync(StartInventoryRefillTaskCommand command, CancellationToken cancellationToken = default) =>
         TransitionAsync(command.KioskId, command.TaskId, command.IdempotencyKey, command.UserContext, InventoryRefillTaskStatus.InProgress, null, cancellationToken);
@@ -122,16 +124,19 @@ public sealed class StartInventoryRefillTaskCommandHandler(IInventoryStore inven
     }
 }
 
-public sealed class CompleteInventoryRefillTaskCommandHandler(IInventoryStore inventory)
+public sealed class CompleteInventoryRefillTaskCommandHandler(
+    IInventoryRefillTaskStore inventory,
+    IRealtimeNotificationPublisher publisher)
 {
     public async Task<ApiResult<InventoryRefillTaskResult>> HandleAsync(CompleteInventoryRefillTaskCommand command, CancellationToken cancellationToken = default)
     {
         if (InventoryRefillTaskCommandValidation.ValidateCompletion(command) is { } validationError)
             return ApiResult<InventoryRefillTaskResult>.Fail(validationError, 400);
         var fingerprint = RefillTaskRequestFingerprint.Create("complete", command.TaskId, command.ActualQuantity, command.IngredientDispenserStateId, command.ReasonCode, command.Notes, command.ExternalLotReference);
+        InventoryChangedEvent? notification = null;
         try
         {
-            return await inventory.ExecuteInTransactionAsync(async ct =>
+            var result = await inventory.ExecuteInTransactionAsync(async ct =>
         {
             var task = await inventory.GetInventoryRefillTaskAsync(command.TaskId, ct);
             if (task is null || task.KioskId != command.KioskId) return ApiResult<InventoryRefillTaskResult>.Fail("Inventory refill task was not found.", 404);
@@ -184,8 +189,28 @@ public sealed class CompleteInventoryRefillTaskCommandHandler(IInventoryStore in
                 inventory, task, from, InventoryRefillTaskStatus.Completed, command.UserContext,
                 command.IdempotencyKey, fingerprint, command.ReasonCode, command.ActualQuantity, now, ct);
             await inventory.SaveChangesAsync(ct);
+            notification = new InventoryChangedEvent
+            {
+                // A refill can update a Cloud balance without any connected dispenser.
+                DispenserStateId = evidenceId ?? Guid.Empty,
+                KioskId = balance.KioskId,
+                OrganizationId = balance.OrganizationId,
+                StoreId = balance.StoreId,
+                IngredientName = balance.Ingredient.Name,
+                EstimatedQuantity = balance.EstimatedQuantity,
+                Unit = balance.Unit,
+                Status = balance.IsActive ? "Active" : "Inactive",
+                UpdatedAt = now,
+                Version = 1
+            };
             return ApiResult<InventoryRefillTaskResult>.Success(InventoryRefillTaskResultMapper.ToResult(task));
         }, cancellationToken);
+            if (result.Succeeded && notification is not null)
+            {
+                await publisher.PublishInventoryChangedAsync(notification!, cancellationToken);
+            }
+
+            return result;
         }
         catch (DomainRuleException ex) { return ApiResult<InventoryRefillTaskResult>.Fail(ex.Message, 409); }
     }
@@ -195,7 +220,7 @@ public sealed class CompleteInventoryRefillTaskCommandHandler(IInventoryStore in
         (!balance.LowStockThreshold.HasValue || balance.EstimatedQuantity > balance.LowStockThreshold);
 }
 
-public sealed class CancelInventoryRefillTaskCommandHandler(IInventoryStore inventory)
+public sealed class CancelInventoryRefillTaskCommandHandler(IInventoryRefillTaskStore inventory)
 {
     public async Task<ApiResult<InventoryRefillTaskResult>> HandleAsync(CancelInventoryRefillTaskCommand command, CancellationToken cancellationToken = default)
     {
@@ -232,7 +257,7 @@ public sealed class CancelInventoryRefillTaskCommandHandler(IInventoryStore inve
 internal static class InventoryRefillTaskCommandSupport
 {
     public static async Task<bool> IsValidEvidenceAsync(
-        IInventoryStore inventory,
+        IInventoryRefillTaskStore inventory,
         Guid dispenserStateId,
         KioskIngredientInventory balance,
         CancellationToken cancellationToken)
@@ -245,7 +270,7 @@ internal static class InventoryRefillTaskCommandSupport
     }
 
     public static async Task AddTransitionAsync(
-        IInventoryStore inventory,
+        IInventoryRefillTaskStore inventory,
         InventoryRefillTask task,
         InventoryRefillTaskStatus? from,
         InventoryRefillTaskStatus to,

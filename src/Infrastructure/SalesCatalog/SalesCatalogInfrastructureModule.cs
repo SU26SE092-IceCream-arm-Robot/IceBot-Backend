@@ -1,4 +1,5 @@
 using Application.SalesCatalog.Abstractions;
+using Application.SalesCatalog.Admission.Abstractions;
 using Application.SalesCatalog.RuntimeMenus.Abstractions;
 using Infrastructure.SalesCatalog.Caching;
 using Infrastructure.SalesCatalog.Persistence;
@@ -12,6 +13,7 @@ public static class SalesCatalogInfrastructureModule
     public static IServiceCollection AddSalesCatalogInfrastructure(this IServiceCollection services, IConfiguration config)
     {
         services.AddScoped<IMenuStore, MenuStore>();
+        services.AddScoped<IOperationalAdmissionReadStore, OperationalAdmissionReadStore>();
         services.AddOptions<RuntimeMenuCacheOptions>()
             .Bind(config.GetSection(RuntimeMenuCacheOptions.SectionName))
             .Validate(options =>

@@ -128,22 +128,41 @@ public sealed class ConfirmCashPaymentCommandHandlerTests
     {
         var organization = new Organization
         {
-            Id = Guid.NewGuid(), Code = "ORG", Name = "Organization", Status = EntityStatus.Active
+            Id = Guid.NewGuid(),
+            Code = "ORG",
+            Name = "Organization",
+            Status = EntityStatus.Active
         };
         var store = new Store
         {
-            Id = Guid.NewGuid(), OrganizationId = organization.Id, Organization = organization,
-            Code = "STORE", Name = "Store", Status = EntityStatus.Active
+            Id = Guid.NewGuid(),
+            OrganizationId = organization.Id,
+            Organization = organization,
+            Code = "STORE",
+            Name = "Store",
+            Status = EntityStatus.Active
         };
         var kiosk = new Kiosk
         {
-            Id = Guid.NewGuid(), OrganizationId = organization.Id, Organization = organization,
-            StoreId = store.Id, Store = store, Code = "KIOSK", Name = "Kiosk", Status = KioskStatus.Active
+            Id = Guid.NewGuid(),
+            OrganizationId = organization.Id,
+            Organization = organization,
+            StoreId = store.Id,
+            Store = store,
+            Code = "KIOSK",
+            Name = "Kiosk",
+            Status = KioskStatus.Active
         };
         var order = new Order
         {
-            Id = Guid.NewGuid(), OrderNumber = "ORDER-CASH", KioskId = kiosk.Id, Kiosk = kiosk,
-            OrganizationId = organization.Id, Organization = organization, StoreId = store.Id, Store = store
+            Id = Guid.NewGuid(),
+            OrderNumber = "ORDER-CASH",
+            KioskId = kiosk.Id,
+            Kiosk = kiosk,
+            OrganizationId = organization.Id,
+            Organization = organization,
+            StoreId = store.Id,
+            Store = store
         };
         order.AddItem(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
@@ -153,14 +172,26 @@ public sealed class ConfirmCashPaymentCommandHandlerTests
 
         var paymentMethod = new PaymentMethod
         {
-            Id = 1, Code = "cash", Name = "Cash", Provider = "Cash", IsOnline = false, IsActive = true
+            Id = 1,
+            Code = "cash",
+            Name = "Cash",
+            Provider = "Cash",
+            IsOnline = false,
+            IsActive = true
         };
         var payment = new PaymentTransaction
         {
-            Id = Guid.NewGuid(), OrderId = order.Id, Order = order,
-            PaymentMethodId = paymentMethod.Id, PaymentMethod = paymentMethod,
-            TransactionNumber = "CASH-1", Provider = "Cash", Amount = 30_000, Currency = "VND",
-            Status = PaymentTransactionStatus.Pending, RequestedAt = DateTimeOffset.UtcNow
+            Id = Guid.NewGuid(),
+            OrderId = order.Id,
+            Order = order,
+            PaymentMethodId = paymentMethod.Id,
+            PaymentMethod = paymentMethod,
+            TransactionNumber = "CASH-1",
+            Provider = "Cash",
+            Amount = 30_000,
+            Currency = "VND",
+            Status = PaymentTransactionStatus.Pending,
+            RequestedAt = DateTimeOffset.UtcNow
         };
         var user = new CurrentUserContext
         {

@@ -21,12 +21,12 @@ Catalog
 
 - Catalog owns product definitions and recipes.
 - Sales Catalog owns sellable menu items and prices.
-- Cloud runtime-menu reads require the Store to be open according to its typed schedule and `Store.TimeZone`. A closed Store returns `409` and no sellable snapshot is issued.
+- Cloud runtime-menu reads expose only active organization/store/kiosk catalog data; temporary admission blockers such as store closure, Edge loss, or an occupied customer session return a bounded unavailable state with no sellable items.
 - An empty Store schedule means no opening-hours restriction. Once any day is configured, an omitted day is treated as closed; opening is inclusive and closing is exclusive. `OpensAt > ClosesAt` represents an overnight interval that continues until the following day's close time.
-- Runtime menu from Cloud is a sales catalog snapshot, not a live machine readiness guarantee.
-- Kiosk connectivity/operational state and Store sales admission are evaluated on every runtime-menu request before any cached projection is read. A paused, closed, offline, or non-operational kiosk therefore receives no stale cached menu.
-- A kiosk-scoped menu-item operational pause is evaluated after the cached catalog projection is read and before the runtime snapshot is returned. The cache stores only base catalog sellability; an operator pause therefore takes effect immediately without mutating shared menu authoring data.
-- The optional Redis cache stores only the kiosk-specific sellable projection (`Revision` and items), never request-scoped `SnapshotId` or `GeneratedAt`. Each successful request creates a new snapshot identity after reading the projection.
+- Runtime menu is a static catalog projection overlaid with fresh operational admission evidence; it is not a machine-readiness guarantee retained in cache.
+- Kiosk connectivity, lifecycle, store admission, customer-session occupancy, route/readiness/capability, inventory, and menu-item pause are evaluated on every request; the customer receives only safe blocker codes and scopes.
+- A kiosk-scoped pause or recovery takes effect without changing shared catalog data. SignalR/cache invalidation improves recovery latency only; authoritative checkout evaluates fresh evidence.
+- The optional Redis cache stores static kiosk catalog candidates (`Revision` and items), never request-scoped `SnapshotId`, generated time, inventory, route, or readiness evidence.
 - Redis caching is bounded-TTL acceleration, not sales authority: cache failure falls back to the database projection, and checkout still revalidates sellability transactionally. Cache expiry may delay static catalog visibility by at most the configured distributed TTL plus a short process-local TTL.
 - Each snapshot has a random request identity and a deterministic content `Revision`. The runtime endpoint returns that revision as `ETag`; clients may revalidate with `If-None-Match` after `ExpiresAt` and receive `304` when sellable content is unchanged.
 - Edge projection may include inventory, device, queue, and robot availability.
@@ -35,7 +35,7 @@ Catalog
 - Checkout also revalidates the current kiosk menu-item operational pause. A client that retained an older runtime snapshot receives `409` instead of creating a new order for a paused item.
 - Product/ProductVariant deletion and Product currency changes are rejected while a non-deleted MenuItem references them. Menu currency changes are rejected once the Menu contains items. These rules prevent active menu references from retaining deleted catalog definitions or a currency mismatch.
 - Activating a MenuItem performs static authoring preflight for Product/Variant/Recipe ownership, recipe lifecycle and ingredients, currency, and option satisfiability. Dynamic route, connectivity, and inventory readiness remain runtime or deployment concerns.
-- Inventory V1 is reporting/operations only and does not decide runtime menu sellability.
+- Cloud inventory balances, with optional sensor/topology evidence, decide machine-produced runtime sellability once a kiosk opts into balance tracking.
 
 ## Related Docs
 

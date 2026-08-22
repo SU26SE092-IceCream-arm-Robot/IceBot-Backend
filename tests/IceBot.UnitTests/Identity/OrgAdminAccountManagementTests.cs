@@ -83,7 +83,12 @@ public sealed class OrgAdminAccountManagementTests
             OrganizationId = Guid.NewGuid()
         });
         var accounts = CreateStore();
-        accounts.GetByIdAsync(target.Id, false, Arg.Any<CancellationToken>()).Returns(target);
+        accounts.GetTenantManagedByIdAsync(
+                target.Id,
+                actorOrganizationId,
+                false,
+                Arg.Any<CancellationToken>())
+            .Returns(target);
         var handler = new DisableInternalAccountCommandHandler(accounts, null!);
 
         var result = await handler.HandleAsync(new DisableInternalAccountCommand

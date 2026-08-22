@@ -173,6 +173,17 @@ internal static class ProductionPackageInstallationScenarioSeed
                     """[{"Level":1,"EstimatedQuantity":100},{"Level":2,"EstimatedQuantity":500},{"Level":3,"EstimatedQuantity":1000}]""",
                 LastMeasuredAt = DateTimeOffset.UtcNow
             };
+            var inventory = new KioskIngredientInventory
+            {
+                OrganizationId = organization.Id,
+                StoreId = store.Id,
+                KioskId = kiosk.Id,
+                IngredientId = ingredient.Id
+            };
+            inventory.Configure("gram", 1000, 100, null, InventoryTrackingMode.ManualEstimate,
+                DateTimeOffset.UtcNow);
+            dispenserState.KioskIngredientInventoryId = inventory.Id;
+            dispenserState.KioskIngredientInventory = inventory;
             var endpoint = KioskExecutionEndpoint.CreateProvisioning(
                 kiosk.Id,
                 $"EDGE-{Guid.NewGuid():N}",
@@ -192,6 +203,7 @@ internal static class ProductionPackageInstallationScenarioSeed
                 version,
                 device,
                 dispenserState,
+                inventory,
                 endpoint);
             await dbContext.SaveChangesAsync();
             var credential = endpoint.ProvisionCredential($"cert-{Guid.NewGuid():N}", DateTimeOffset.UtcNow);

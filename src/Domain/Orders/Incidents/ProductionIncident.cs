@@ -56,16 +56,26 @@ public sealed class ProductionIncident : BusinessEntity
             : (ProductionInspectionOutcome?)null;
         var incident = new ProductionIncident
         {
-            Id = Guid.NewGuid(), OrganizationId = organizationId, StoreId = storeId, KioskId = kioskId,
-            OrderId = orderId, OrderItemId = orderItemId, SourceCommandId = sourceCommandId,
-            SourceProductionJobId = sourceProductionJobId, ProductionUnitNo = unitNo,
-            ProductionUnitQuantity = quantity, Trigger = trigger, PhysicalOutputState = physicalOutputState,
+            Id = Guid.NewGuid(),
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            OrderId = orderId,
+            OrderItemId = orderItemId,
+            SourceCommandId = sourceCommandId,
+            SourceProductionJobId = sourceProductionJobId,
+            ProductionUnitNo = unitNo,
+            ProductionUnitQuantity = quantity,
+            Trigger = trigger,
+            PhysicalOutputState = physicalOutputState,
             OrderNumberSnapshot = RequireText(orderNumber, "Order number"),
             ProductNameSnapshot = RequireText(productName, "Product name"),
             ProductVariantNameSnapshot = RequireText(productVariantName, "Product variant name"),
             Status = inferredInspection.HasValue ? ProductionIncidentStatus.Open : ProductionIncidentStatus.AwaitingInspection,
-            InspectionOutcome = inferredInspection, ErrorCodeSnapshot = Normalize(errorCode, 100),
-            ErrorMessageSnapshot = Normalize(errorMessage, 500), OpenedByAccountId = openedByAccountId,
+            InspectionOutcome = inferredInspection,
+            ErrorCodeSnapshot = Normalize(errorCode, 100),
+            ErrorMessageSnapshot = Normalize(errorMessage, 500),
+            OpenedByAccountId = openedByAccountId,
             CreatedAt = openedAt
         };
         incident.AddHistory("OpenedFromExecution", null, incident.Status, openedByAccountId,

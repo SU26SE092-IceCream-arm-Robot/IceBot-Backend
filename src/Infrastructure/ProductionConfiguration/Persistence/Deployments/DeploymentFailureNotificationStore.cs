@@ -43,36 +43,48 @@ public sealed class DeploymentFailureNotificationStore(IceBotDbContext db) : IDe
             x.Status == KioskConfigurationDeploymentStatus.Failed && x.FailureCode != null &&
             !db.NotificationDeliveries.Any(delivery =>
                 delivery.NotificationType == "deployment_failed" && delivery.SubjectId == x.Id) &&
-            db.AccountRoles.Any(accountRole =>
+            (db.AccountRoles.Any(accountRole =>
                 accountRole.IsActive &&
                 accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
                 accountRole.Account.DeletedAt == null &&
                 accountRole.Account.NotificationDevices.Any(device =>
                     device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
-                ((accountRole.Role.Code == "Technician" &&
-                  (accountRole.KioskId == x.KioskId ||
-                   accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId)) ||
-                 (accountRole.Role.Code == "Manager" &&
+                ((accountRole.Role.Code == "Manager" &&
                   (accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId ||
                    accountRole.OrganizationId == x.OrganizationId)) ||
-                 (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))));
+                 (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))) ||
+             db.TechnicianSupportGrants.Any(grant =>
+                 grant.IsActive && grant.DeletedAt == null &&
+                 grant.Account.PlatformTechnicianProfile != null &&
+                 grant.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+                 grant.Account.DeletedAt == null &&
+                 grant.Account.NotificationDevices.Any(device =>
+                     device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+                 (grant.KioskId == x.KioskId ||
+                  grant.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId))));
 
     private IQueryable<Domain.ProductionConfiguration.Entities.ControllerArtifactSetDeployment> ControllerCandidates() =>
         db.ControllerArtifactSetDeployments.AsNoTracking().Where(x =>
             x.Status == ControllerArtifactSetDeploymentStatus.Failed && x.FailureCode != null &&
             !db.NotificationDeliveries.Any(delivery =>
                 delivery.NotificationType == "deployment_failed" && delivery.SubjectId == x.Id) &&
-            db.AccountRoles.Any(accountRole =>
+            (db.AccountRoles.Any(accountRole =>
                 accountRole.IsActive &&
                 accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
                 accountRole.Account.DeletedAt == null &&
                 accountRole.Account.NotificationDevices.Any(device =>
                     device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
-                ((accountRole.Role.Code == "Technician" &&
-                  (accountRole.KioskId == x.KioskId ||
-                   accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId)) ||
-                 (accountRole.Role.Code == "Manager" &&
+                ((accountRole.Role.Code == "Manager" &&
                   (accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId ||
                    accountRole.OrganizationId == x.OrganizationId)) ||
-                 (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))));
+                 (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))) ||
+             db.TechnicianSupportGrants.Any(grant =>
+                 grant.IsActive && grant.DeletedAt == null &&
+                 grant.Account.PlatformTechnicianProfile != null &&
+                 grant.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
+                 grant.Account.DeletedAt == null &&
+                 grant.Account.NotificationDevices.Any(device =>
+                     device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+                 (grant.KioskId == x.KioskId ||
+                  grant.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId))));
 }

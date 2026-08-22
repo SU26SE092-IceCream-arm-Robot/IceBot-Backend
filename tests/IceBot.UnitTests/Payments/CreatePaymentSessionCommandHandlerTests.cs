@@ -17,6 +17,8 @@ using Domain.Devices.Connectivity;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Application.SalesCatalog.Availability;
+using Application.SalesCatalog.Admission.Abstractions;
+using Application.SalesCatalog.Admission.Services;
 using Application.Tenants.Kiosks.Rules;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -223,13 +225,22 @@ public sealed class CreatePaymentSessionCommandHandlerTests
         var scenario = ProviderCreateScenario.Create(placedAt, placedAt.AddMinutes(15));
         var paymentMethod = new PaymentMethod
         {
-            Id = 1, Code = "payos", Name = "PayOS", Provider = "PayOS", IsActive = true
+            Id = 1,
+            Code = "payos",
+            Name = "PayOS",
+            Provider = "PayOS",
+            IsActive = true
         };
         var existing = new PaymentTransaction
         {
-            Id = Guid.NewGuid(), OrderId = scenario.Order.Id, Order = scenario.Order,
-            PaymentMethodId = paymentMethod.Id, PaymentMethod = paymentMethod,
-            Provider = "PayOS", Amount = 30_000, Currency = "VND",
+            Id = Guid.NewGuid(),
+            OrderId = scenario.Order.Id,
+            Order = scenario.Order,
+            PaymentMethodId = paymentMethod.Id,
+            PaymentMethod = paymentMethod,
+            Provider = "PayOS",
+            Amount = 30_000,
+            Currency = "VND",
             Status = PaymentTransactionStatus.Pending,
             CheckoutUrl = "https://payments.example/stale"
         };
@@ -302,24 +313,41 @@ public sealed class CreatePaymentSessionCommandHandlerTests
         {
             var organization = new Organization
             {
-                Id = Guid.NewGuid(), Code = "ORG", Name = "Organization", Status = EntityStatus.Active
+                Id = Guid.NewGuid(),
+                Code = "ORG",
+                Name = "Organization",
+                Status = EntityStatus.Active
             };
             var storeEntity = new Store
             {
-                Id = Guid.NewGuid(), OrganizationId = organization.Id, Organization = organization,
-                Code = "STORE", Name = "Store", Status = EntityStatus.Active
+                Id = Guid.NewGuid(),
+                OrganizationId = organization.Id,
+                Organization = organization,
+                Code = "STORE",
+                Name = "Store",
+                Status = EntityStatus.Active
             };
             var kiosk = new Kiosk
             {
-                Id = Guid.NewGuid(), OrganizationId = organization.Id, Organization = organization,
-                StoreId = storeEntity.Id, Store = storeEntity, Code = "KIOSK", Name = "Kiosk",
+                Id = Guid.NewGuid(),
+                OrganizationId = organization.Id,
+                Organization = organization,
+                StoreId = storeEntity.Id,
+                Store = storeEntity,
+                Code = "KIOSK",
+                Name = "Kiosk",
                 Status = KioskStatus.Active
             };
             var order = new Order
             {
-                Id = Guid.NewGuid(), OrderNumber = "ORDER-1", KioskId = kiosk.Id, Kiosk = kiosk,
-                OrganizationId = organization.Id, Organization = organization,
-                StoreId = storeEntity.Id, Store = storeEntity
+                Id = Guid.NewGuid(),
+                OrderNumber = "ORDER-1",
+                KioskId = kiosk.Id,
+                Kiosk = kiosk,
+                OrganizationId = organization.Id,
+                Organization = organization,
+                StoreId = storeEntity.Id,
+                Store = storeEntity
             };
             order.AddItem(
                 Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null,
@@ -335,7 +363,11 @@ public sealed class CreatePaymentSessionCommandHandlerTests
                 DateTimeOffset.UtcNow);
             var paymentMethod = new PaymentMethod
             {
-                Id = 1, Code = "payos", Name = "PayOS", Provider = "PayOS", IsActive = true
+                Id = 1,
+                Code = "payos",
+                Name = "PayOS",
+                Provider = "PayOS",
+                IsActive = true
             };
             var paymentStore = Substitute.For<IPaymentStore>();
             var gateway = Substitute.For<IPaymentGateway>();
@@ -401,6 +433,9 @@ public sealed class CreatePaymentSessionCommandHandlerTests
             paymentStore,
             paymentGateway,
             sellabilityGuard,
-            Options.Create(new KioskSalesAdmissionOptions()));
+            new KioskSalesAdmissionEvaluator(
+                Substitute.For<IOperationalAdmissionReadStore>(),
+                Options.Create(new KioskSalesAdmissionOptions { RequireConnectivity = false }),
+                Options.Create(new EdgeTelemetryIngestionOptions())));
     }
 }

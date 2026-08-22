@@ -185,8 +185,19 @@ public sealed class ExecutionReportStore :
         return _dbContext.IngredientDispenserStates
             .Include(state => state.Kiosk)
             .Include(state => state.Ingredient)
+            .Include(state => state.KioskIngredientInventory)
             .FirstOrDefaultAsync(state => state.Id == dispenserStateId, cancellationToken);
     }
+
+    public async Task<IReadOnlyList<IngredientDispenserState>> GetDispenserStatesAsync(
+        IReadOnlyCollection<Guid> dispenserStateIds,
+        CancellationToken cancellationToken = default) =>
+        await _dbContext.IngredientDispenserStates
+            .Include(state => state.Kiosk)
+            .Include(state => state.Ingredient)
+            .Include(state => state.KioskIngredientInventory)
+            .Where(state => dispenserStateIds.Contains(state.Id))
+            .ToListAsync(cancellationToken);
 
     public async Task AcquireDispenserMutationLocksAsync(
         IEnumerable<Guid> dispenserStateIds,
@@ -222,7 +233,7 @@ public sealed class ExecutionReportStore :
     {
         var item = await _dbContext.OrderItems.AsNoTracking()
             .Where(candidate => candidate.Id == orderItemId && candidate.OrderId == orderId)
-            .Select(candidate => new { candidate.RecipeId, candidate.RecipeSnapshotSchemaVersion, candidate.RecipeSnapshotJson })
+            .Select(candidate => new { candidate.RecipeSnapshotSchemaVersion, candidate.RecipeSnapshotJson })
             .FirstOrDefaultAsync(cancellationToken);
         if (item is null) return false;
 
@@ -244,14 +255,6 @@ public sealed class ExecutionReportStore :
                 return false;
             }
         }
-        else if (item.RecipeId.HasValue)
-        {
-            var legacyRecipeIngredientExists = await _dbContext.RecipeItems.AnyAsync(
-                recipeItem => recipeItem.RecipeId == item.RecipeId.Value && recipeItem.IngredientId == ingredientId,
-                cancellationToken);
-            if (legacyRecipeIngredientExists) return true;
-        }
-
         return await (
             from optionRequirement in _dbContext.OrderItemOptionIngredientRequirements
             join option in _dbContext.OrderItemOptions on optionRequirement.OrderItemOptionId equals option.Id
@@ -276,12 +279,11 @@ public sealed class ExecutionReportStore :
     {
         var item = await _dbContext.OrderItems.AsNoTracking()
             .Where(candidate => candidate.Id == orderItemId && candidate.OrderId == orderId)
-            .Select(candidate => new { candidate.RecipeId, candidate.RecipeSnapshotSchemaVersion, candidate.RecipeSnapshotJson })
+            .Select(candidate => new { candidate.RecipeSnapshotSchemaVersion, candidate.RecipeSnapshotJson })
             .FirstOrDefaultAsync(cancellationToken);
         if (item is null) return [];
 
         var requirements = new List<ExpectedInventoryRequirement>();
-        var snapshotDeclaresIngredients = false;
         if (item.RecipeSnapshotSchemaVersion >= 2 && !string.IsNullOrWhiteSpace(item.RecipeSnapshotJson))
         {
             try
@@ -290,7 +292,6 @@ public sealed class ExecutionReportStore :
                 if (document.RootElement.TryGetProperty("Ingredients", out var ingredients) &&
                     ingredients.ValueKind == JsonValueKind.Array)
                 {
-                    snapshotDeclaresIngredients = true;
                     foreach (var entry in ingredients.EnumerateArray())
                     {
                         if (entry.TryGetProperty("IsOptional", out var optional) && optional.GetBoolean()) continue;
@@ -306,18 +307,6 @@ public sealed class ExecutionReportStore :
             {
                 return [];
             }
-        }
-
-        // Some pre-snapshot order items retained RecipeId but have no ingredient
-        // snapshot. Preserve the historical fallback without overriding an
-        // explicit snapshot that intentionally declares no required ingredients.
-        if (!snapshotDeclaresIngredients && item.RecipeId.HasValue)
-        {
-            requirements.AddRange(await _dbContext.RecipeItems.AsNoTracking()
-                .Where(recipeItem => recipeItem.RecipeId == item.RecipeId.Value && !recipeItem.IsOptional)
-                .Select(recipeItem => new ExpectedInventoryRequirement(
-                    recipeItem.IngredientId, recipeItem.Quantity, recipeItem.Unit))
-                .ToListAsync(cancellationToken));
         }
 
         var selectedOptionRequirements = await (

@@ -11,6 +11,7 @@ namespace Application.Identity.Abstractions
             Guid sessionId,
             string accountUserName,
             IReadOnlyCollection<AccountRoleClaim> roles,
-            AccountStatus accountStatus);
+            AccountStatus accountStatus,
+            long authorizationVersion);
     }
 }

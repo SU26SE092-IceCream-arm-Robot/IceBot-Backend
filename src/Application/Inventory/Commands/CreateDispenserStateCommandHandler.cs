@@ -49,11 +49,30 @@ public sealed class CreateDispenserStateCommandHandler(IInventoryStore inventory
             return ApiResult<DispenserStateResult>.Fail("Container code already exists for this device.", 409);
 
         var now = DateTimeOffset.UtcNow;
+        var unit = request.Unit.Trim().ToLowerInvariant();
+        var balance = await inventory.GetKioskIngredientInventoryAsync(command.KioskId, ingredient.Id, unit, ct);
+        if (balance is null)
+        {
+            balance = new KioskIngredientInventory
+            {
+                Id = Guid.NewGuid(),
+                OrganizationId = device.Kiosk.OrganizationId,
+                StoreId = device.Kiosk.StoreId,
+                KioskId = command.KioskId,
+                IngredientId = ingredient.Id,
+                CreatedAt = now,
+                CreatedByAccountId = command.UserContext.AccountId
+            };
+            balance.Configure(unit, null, null, null,
+                request.TrackingMode ?? InventoryTrackingMode.ManualEstimate, now);
+            await inventory.AddKioskIngredientInventoryAsync(balance, ct);
+        }
         var state = new IngredientDispenserState
         {
             DeviceId = device.Id,
             KioskId = command.KioskId,
             IngredientId = ingredient.Id,
+            KioskIngredientInventoryId = balance.Id,
             ContainerCode = containerCode,
             CurrentLevelStatus = IngredientLevelStatus.Unknown,
             LastMeasuredAt = now,
@@ -64,7 +83,7 @@ public sealed class CreateDispenserStateCommandHandler(IInventoryStore inventory
             CreatedByAccountId = command.UserContext.AccountId
         };
         state.ChangeTrackingMode(request.TrackingMode ?? InventoryTrackingMode.ManualEstimate);
-        state.ConfigureContainer(request.CapacityQuantity, request.Unit,
+        state.ConfigureContainer(request.CapacityQuantity, unit,
             DispenserLevelQuantityProfileContract.Serialize(request.LevelToQuantityProfile));
         await inventory.AddDispenserStateAsync(state, ct);
         await inventory.AddTopologyChangeRecordAsync(

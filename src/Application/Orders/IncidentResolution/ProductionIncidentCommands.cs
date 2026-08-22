@@ -137,7 +137,9 @@ public sealed class SelectProductionIncidentResolutionCommandHandler(
                 "Refund and voucher resolutions require acknowledgement that V1 compensates the full order.", 409);
         var flagged = await refundRequiredHandler.HandleAsync(new MarkOrderRefundRequiredCommand
         {
-            OrderId = command.OrderId, UserContext = command.UserContext, Reason = command.Reason
+            OrderId = command.OrderId,
+            UserContext = command.UserContext,
+            Reason = command.Reason
         }, ct);
         if (!flagged.Succeeded)
             return ApiResult<ProductionIncidentResult>.Fail(flagged.Message ?? "Order could not be flagged for refund.", flagged.StatusCode);

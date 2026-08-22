@@ -1,3 +1,5 @@
+using Application.Abstractions.Realtime;
+using Application.Abstractions.Realtime.Events;
 using Application.Inventory.Abstractions;
 using Application.Inventory.Mapping;
 using Application.Inventory.Results;
@@ -9,7 +11,7 @@ using Domain.Inventory.Enums;
 
 namespace Application.Inventory.Commands;
 
-public sealed class CreateKioskIngredientInventoryCommandHandler(IInventoryStore inventory)
+public sealed class CreateKioskIngredientInventoryCommandHandler(IKioskIngredientInventoryStore inventory)
 {
     public async Task<ApiResult<KioskIngredientInventoryResult>> HandleAsync(CreateKioskIngredientInventoryCommand command, CancellationToken cancellationToken = default)
     {
@@ -54,7 +56,7 @@ public sealed class CreateKioskIngredientInventoryCommandHandler(IInventoryStore
     }
 }
 
-public sealed class UpdateKioskIngredientInventoryCommandHandler(IInventoryStore inventory)
+public sealed class UpdateKioskIngredientInventoryCommandHandler(IKioskIngredientInventoryStore inventory)
 {
     public async Task<ApiResult<KioskIngredientInventoryResult>> HandleAsync(UpdateKioskIngredientInventoryCommand command, CancellationToken cancellationToken = default)
     {
@@ -75,13 +77,16 @@ public sealed class UpdateKioskIngredientInventoryCommandHandler(IInventoryStore
     }
 }
 
-public sealed class AdjustKioskIngredientInventoryCommandHandler(IInventoryStore inventory)
+public sealed class AdjustKioskIngredientInventoryCommandHandler(
+    IKioskIngredientInventoryStore inventory,
+    IRealtimeNotificationPublisher publisher)
 {
     public async Task<ApiResult<KioskIngredientInventoryResult>> HandleAsync(AdjustKioskIngredientInventoryCommand command, CancellationToken cancellationToken = default)
     {
+        InventoryChangedEvent? notification = null;
         try
         {
-            return await inventory.ExecuteInTransactionAsync(async token =>
+            var result = await inventory.ExecuteInTransactionAsync(async token =>
         {
             await inventory.AcquireKioskIngredientInventoryMutationLockAsync(command.InventoryId, token);
             var balance = await inventory.GetKioskIngredientInventoryAsync(command.InventoryId, token);
@@ -94,8 +99,28 @@ public sealed class AdjustKioskIngredientInventoryCommandHandler(IInventoryStore
             if (delta != 0)
                 await inventory.AddStockMovementAsync(StockMovement.CreateForKioskInventory(balance.Id, balance.OrganizationId, balance.StoreId, balance.KioskId, balance.IngredientId, "ManualAdjustment", delta, before, balance.EstimatedQuantity, balance.Unit, now, command.ReasonCode, "KioskIngredientInventory", balance.Id, isEstimated: true), token);
             await inventory.SaveChangesAsync(token);
+            notification = new InventoryChangedEvent
+            {
+                // Cloud balances are valid without a physical dispenser topology.
+                DispenserStateId = Guid.Empty,
+                KioskId = balance.KioskId,
+                OrganizationId = balance.OrganizationId,
+                StoreId = balance.StoreId,
+                IngredientName = balance.Ingredient.Name,
+                EstimatedQuantity = balance.EstimatedQuantity,
+                Unit = balance.Unit,
+                Status = balance.IsActive ? "Active" : "Inactive",
+                UpdatedAt = now,
+                Version = 1
+            };
             return ApiResult<KioskIngredientInventoryResult>.Success(KioskIngredientInventoryResultMapper.ToResult(balance));
         }, cancellationToken);
+            if (result.Succeeded && notification is not null)
+            {
+                await publisher.PublishInventoryChangedAsync(notification, cancellationToken);
+            }
+
+            return result;
         }
         catch (DomainRuleException ex) { return ApiResult<KioskIngredientInventoryResult>.Fail(ex.Message, 409); }
     }

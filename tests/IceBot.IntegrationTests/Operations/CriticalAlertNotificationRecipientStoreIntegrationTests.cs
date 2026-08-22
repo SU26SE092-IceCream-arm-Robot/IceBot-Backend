@@ -48,14 +48,19 @@ public sealed class CriticalAlertNotificationRecipientStoreIntegrationTests(Inte
                 Name = "Notification policy kiosk",
                 Status = KioskStatus.Active
             });
-            var technicianRole = await GetOrCreateRoleAsync(seed, "Technician");
             var managerRole = await GetOrCreateRoleAsync(seed, "Manager");
             var organizationAdminRole = await GetOrCreateRoleAsync(seed, "OrgAdmin");
             await seed.SaveChangesAsync();
             seed.Accounts.AddRange(technician, managerWithoutDevice, organizationAdmin);
+            seed.PlatformTechnicianProfiles.Add(new PlatformTechnicianProfile
+            {
+                AccountId = technician.Id,
+                CreatedAt = DateTimeOffset.UtcNow
+            });
+            seed.TechnicianSupportGrants.Add(TechnicianSupportGrant.Create(
+                technician.Id, organizationId, storeId, null, DateTimeOffset.UtcNow, null));
             seed.AccountRoles.AddRange(
-                CreateRole(technician.Id, technicianRole.Id, storeId: storeId),
-                CreateRole(managerWithoutDevice.Id, managerRole.Id, kioskId: kioskId),
+                CreateRole(managerWithoutDevice.Id, managerRole.Id, organizationId, storeId, kioskId),
                 CreateRole(organizationAdmin.Id, organizationAdminRole.Id, organizationId: organizationId));
             seed.AccountNotificationDevices.AddRange(
                 CreateDevice(technician.Id, "technician"),
@@ -73,8 +78,8 @@ public sealed class CriticalAlertNotificationRecipientStoreIntegrationTests(Inte
 
         await using (var mutation = fixture.CreateDbContext())
         {
-            var role = await mutation.AccountRoles.SingleAsync(x => x.AccountId == technician.Id);
-            role.IsActive = false;
+            var grant = await mutation.TechnicianSupportGrants.SingleAsync(x => x.AccountId == technician.Id);
+            grant.Revoke(DateTimeOffset.UtcNow, null);
             await mutation.SaveChangesAsync();
         }
 
@@ -98,15 +103,15 @@ public sealed class CriticalAlertNotificationRecipientStoreIntegrationTests(Inte
         Guid? organizationId = null,
         Guid? storeId = null,
         Guid? kioskId = null) => new()
-    {
-        AccountId = accountId,
-        RoleId = roleId,
-        OrganizationId = organizationId,
-        StoreId = storeId,
-        KioskId = kioskId,
-        IsActive = true,
-        AssignedAt = DateTimeOffset.UtcNow
-    };
+        {
+            AccountId = accountId,
+            RoleId = roleId,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            IsActive = true,
+            AssignedAt = DateTimeOffset.UtcNow
+        };
 
     private static AccountNotificationDevice CreateDevice(Guid accountId, string prefix) => new()
     {

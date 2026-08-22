@@ -35,9 +35,17 @@ public sealed class ProductionDefinitionPublicationService
                     program.ManifestChecksum,
                     Artifacts = program.Artifacts.OrderBy(x => x.RunOrder).Select(x => new
                     {
-                        x.ProgramArtifactId, x.RobotArtifactId, x.RunOrder, x.ParametersSchemaVersion,
-                        x.ParametersJson, x.Checksum, x.RuntimeTargetCode, x.MachineModelCode,
-                        x.TechnicalContractId, x.TechnicalContractChecksum, x.RequiredOptionCode
+                        x.ProgramArtifactId,
+                        x.RobotArtifactId,
+                        x.RunOrder,
+                        x.ParametersSchemaVersion,
+                        x.ParametersJson,
+                        x.Checksum,
+                        x.RuntimeTargetCode,
+                        x.MachineModelCode,
+                        x.TechnicalContractId,
+                        x.TechnicalContractChecksum,
+                        x.RequiredOptionCode
                     })
                 };
             }).ToArray();
@@ -63,7 +71,10 @@ public sealed class ProductionDefinitionPublicationService
                 route.RecipeId,
                 Recipe = new
                 {
-                    route.Recipe.Code, route.Recipe.Version, route.Recipe.YieldQuantity, route.Recipe.Unit,
+                    route.Recipe.Code,
+                    route.Recipe.Version,
+                    route.Recipe.YieldQuantity,
+                    route.Recipe.Unit,
                     Items = route.Recipe.RecipeItems.Where(x => x.DeletedAt == null).OrderBy(x => x.StepOrder)
                         .ThenBy(x => x.IngredientId).Select(x => new
                         { x.IngredientId, IngredientCode = x.Ingredient.Code, x.Quantity, x.Unit, x.StepOrder, x.IsOptional })
@@ -72,18 +83,23 @@ public sealed class ProductionDefinitionPublicationService
                     .Where(group => group.ProductOptions.Any(option => option.DeletedAt == null &&
                         supportedOptionCodes.Contains(option.Code)))
                     .OrderBy(x => x.DisplayOrder).Select(group => new
-                {
-                    group.Code, group.SelectionType, group.MinSelections, group.MaxSelections, group.IsRequired,
-                    Options = group.ProductOptions.Where(x => x.DeletedAt == null &&
-                            supportedOptionCodes.Contains(x.Code)).OrderBy(x => x.DisplayOrder)
+                    {
+                        group.Code,
+                        group.SelectionType,
+                        group.MinSelections,
+                        group.MaxSelections,
+                        group.IsRequired,
+                        Options = group.ProductOptions.Where(x => x.DeletedAt == null &&
+                                supportedOptionCodes.Contains(x.Code)).OrderBy(x => x.DisplayOrder)
                         .Select(option => new
                         {
-                            option.Id, option.Code,
+                            option.Id,
+                            option.Code,
                             IngredientRequirements = option.IngredientRequirements.Where(x => x.DeletedAt == null)
                                 .OrderBy(x => x.IngredientId).Select(x => new
                                 { x.IngredientId, IngredientCode = x.Ingredient.Code, x.Quantity, x.Unit, x.RequiredWorkcellCapabilityCode })
                         })
-                }),
+                    }),
                 route.RequiredCapabilitiesJson,
                 RobotPrograms = programs
             };

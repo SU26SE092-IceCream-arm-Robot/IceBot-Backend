@@ -26,9 +26,15 @@ public sealed class ProductionIncidentHistory : GuidEntity
             throw new DomainRuleException("Incident history reason is required and cannot exceed 1000 characters.");
         return new ProductionIncidentHistory
         {
-            Id = Guid.NewGuid(), ProductionIncidentId = incidentId, Action = action.Trim(),
-            FromStatus = from, ToStatus = to, ActorAccountId = actorId,
-            Reason = reason.Trim(), OccurredAt = at, RelatedEntityId = relatedEntityId
+            Id = Guid.NewGuid(),
+            ProductionIncidentId = incidentId,
+            Action = action.Trim(),
+            FromStatus = from,
+            ToStatus = to,
+            ActorAccountId = actorId,
+            Reason = reason.Trim(),
+            OccurredAt = at,
+            RelatedEntityId = relatedEntityId
         };
     }
 }

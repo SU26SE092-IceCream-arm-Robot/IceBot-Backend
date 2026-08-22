@@ -70,9 +70,11 @@ public sealed class ConfigurationDeploymentPreviewRulesTests
     private static ConfigurationRelease ReleaseWithBindings(params Guid[] programIds)
     {
         var release = ConfigurationRelease.CreateDraft(Guid.NewGuid(), 1);
-        IReadOnlyCollection<(Guid RobotProgramId, int BindingOrder, string CapabilityCode)> bindings =
+        IReadOnlyCollection<(Guid ProductionProgramBindingId, string ProductionProgramBindingChecksum,
+            Guid RobotProgramId, int BindingOrder, IReadOnlyCollection<string> CapabilityCodes)> bindings =
             programIds.Select((programId, index) =>
-                (programId, index + 1, $"CAPABILITY_{index + 1}")).ToArray();
+                (Guid.NewGuid(), new string('a', 64), programId, index + 1,
+                    (IReadOnlyCollection<string>)[$"CAPABILITY_{index + 1}"])).ToArray();
         release.ReplaceRoutes(
         [
             (

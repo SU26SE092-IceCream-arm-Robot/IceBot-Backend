@@ -14,7 +14,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     public Guid IngredientId { get; set; }
 
-    public Guid? KioskIngredientInventoryId { get; set; }
+    public Guid KioskIngredientInventoryId { get; set; }
 
     public string ContainerCode { get; set; } = null!;
 
@@ -58,7 +58,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     public virtual Ingredient Ingredient { get; set; } = null!;
 
-    public virtual KioskIngredientInventory? KioskIngredientInventory { get; set; }
+    public virtual KioskIngredientInventory KioskIngredientInventory { get; set; } = null!;
 
     public void ConfigureContainer(decimal? capacityQuantity, string unit, string? levelToQuantityProfileJson = null)
     {
@@ -136,7 +136,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         TrackingMode = trackingMode;
     }
 
-    public StockMovement Refill(
+    public void Refill(
         decimal quantity,
         DateTimeOffset occurredAt,
         string? reasonCode = "REFILL",
@@ -149,7 +149,6 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             throw new DomainRuleException("Refill quantity must be greater than zero.");
         }
 
-        var previousEstimate = EstimatedQuantity;
         if (EstimatedQuantity.HasValue)
         {
             var newEstimatedQuantity = EstimatedQuantity.Value + quantity;
@@ -170,10 +169,9 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         LastRefilledAt = occurredAt;
         LastMeasuredAt = occurredAt;
 
-        return AddMovement("REFILL", quantity, previousEstimate, occurredAt, reasonCode, sourceEventId: sourceEventId);
     }
 
-    public StockMovement Consume(
+    public void Consume(
         decimal quantity,
         DateTimeOffset occurredAt,
         string? referenceType = null,
@@ -181,7 +179,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
         Guid? sourceEventId = null,
         IngredientLevelStatus? reportedLevelAfter = null)
     {
-        return ConsumeWithEvidence(
+        ConsumeWithEvidence(
             quantity,
             occurredAt,
             reportedBalanceAfter: null,
@@ -191,7 +189,7 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             reportedLevelAfter);
     }
 
-    public StockMovement ConsumeWithEvidence(
+    public void ConsumeWithEvidence(
         decimal quantity,
         DateTimeOffset occurredAt,
         decimal? reportedBalanceAfter,
@@ -245,10 +243,9 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
         LastMeasuredAt = occurredAt;
 
-        return AddMovement("CONSUME", -quantity, previousEstimate, occurredAt, null, referenceType, referenceId, sourceEventId);
     }
 
-    public StockMovement AdjustEstimate(
+    public void AdjustEstimate(
         decimal estimatedQuantity,
         DateTimeOffset occurredAt,
         string reasonCode,
@@ -266,9 +263,6 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             throw new DomainRuleException("Estimated quantity exceeds dispenser capacity.");
         }
 
-        var previousEstimate = EstimatedQuantity;
-        var delta = previousEstimate.HasValue ? estimatedQuantity - previousEstimate.Value : estimatedQuantity;
-
         EstimatedQuantity = estimatedQuantity;
         LastMeasuredAt = occurredAt;
 
@@ -277,7 +271,6 @@ public partial class IngredientDispenserState : SyncAggregateEntity
             CurrentLevelStatus = reportedLevelAfter.Value;
         }
 
-        return AddMovement("ADJUST_ESTIMATE", delta, previousEstimate, occurredAt, reasonCode, sourceEventId: sourceEventId, isEstimated: true);
     }
 
     public bool IsLow()
@@ -315,36 +308,4 @@ public partial class IngredientDispenserState : SyncAggregateEntity
 
     }
 
-    private StockMovement AddMovement(
-        string movementType,
-        decimal quantity,
-        decimal? balanceBefore,
-        DateTimeOffset occurredAt,
-        string? reasonCode = null,
-        string? referenceType = null,
-        Guid? referenceId = null,
-        Guid? sourceEventId = null,
-        bool isEstimated = false)
-    {
-        var movement = StockMovement.Create(
-            Id,
-            null,
-            null,
-            KioskId,
-            DeviceId,
-            IngredientId,
-            movementType,
-            quantity,
-            balanceBefore,
-            EstimatedQuantity,
-            Unit,
-            occurredAt,
-            reasonCode,
-            referenceType,
-            referenceId,
-            sourceEventId,
-            isEstimated);
-
-        return movement;
-    }
 }

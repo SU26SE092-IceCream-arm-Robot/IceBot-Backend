@@ -1,4 +1,5 @@
 namespace Application.Devices.Connectivity.Results;
+
 public sealed class ExecutionReadinessResult
 {
     public Guid EndpointId { get; init; }

@@ -316,9 +316,17 @@ public sealed class ProductionPackageRouteBlueprint : BusinessEntity
     }
     public IReadOnlyCollection<string> GetSupportedOptionCodes() =>
         JsonSerializer.Deserialize<string[]>(SupportedOptionCodesJson) ?? [];
-    internal object ToManifest() => new { RouteCode, ProductSourceKey, ProductVariantSourceKey, RecipeSourceKey,
-        SupportedOptionCodes = GetSupportedOptionCodes(), ProgramBlueprintCode,
-        RequiredCapabilities = JsonDocument.Parse(RequiredCapabilitiesJson).RootElement, Priority };
+    internal object ToManifest() => new
+    {
+        RouteCode,
+        ProductSourceKey,
+        ProductVariantSourceKey,
+        RecipeSourceKey,
+        SupportedOptionCodes = GetSupportedOptionCodes(),
+        ProgramBlueprintCode,
+        RequiredCapabilities = JsonDocument.Parse(RequiredCapabilitiesJson).RootElement,
+        Priority
+    };
 }
 
 public sealed class ProductionPackageInstallation : BusinessEntity
@@ -354,9 +362,13 @@ public sealed class ProductionPackageInstallation : BusinessEntity
             throw new DomainRuleException("Installation scope, package version, request checksum, and idempotency key are required.");
         return new ProductionPackageInstallation
         {
-            OrganizationId = organizationId, StoreId = storeId, KioskId = kioskId,
-            PackageVersionId = versionId, PackageManifestChecksum = manifestChecksum.Trim(),
-            RequestChecksum = requestChecksum.Trim(), IdempotencyKey = idempotencyKey.Trim(),
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            PackageVersionId = versionId,
+            PackageManifestChecksum = manifestChecksum.Trim(),
+            RequestChecksum = requestChecksum.Trim(),
+            IdempotencyKey = idempotencyKey.Trim(),
             MaterializationIdentitySuffix = ProductionPackage.NormalizeOptional(materializationIdentitySuffix),
             SelectedProductSourceKeysJson = JsonSerializer.Serialize(selectedProductSourceKeys
                 .Select(x => ProductionPackage.RequireCode(x, "Selected product source key"))
@@ -440,8 +452,10 @@ public sealed class ProductionPackageMaterialization : BusinessEntity
     private ProductionPackageMaterialization() { }
     internal static ProductionPackageMaterialization Create(ProductionPackageResourceKind kind, string sourceKey, string targetKey, string? checksum) => new()
     {
-        ResourceKind = kind, SourceKey = ProductionPackage.RequireCode(sourceKey, "Materialization source key"),
-        TargetKey = ProductionPackage.RequireText(targetKey, "Materialization target key"), TargetChecksum = ProductionPackage.NormalizeOptional(checksum)
+        ResourceKind = kind,
+        SourceKey = ProductionPackage.RequireCode(sourceKey, "Materialization source key"),
+        TargetKey = ProductionPackage.RequireText(targetKey, "Materialization target key"),
+        TargetChecksum = ProductionPackage.NormalizeOptional(checksum)
     };
 
     public void Retarget(string targetKey, string? checksum = null)
@@ -473,11 +487,15 @@ public sealed class ProductionComposition : BusinessEntity
         ProductionPackageProductDefinition.ValidateJson(reportJson, "Composition report");
         return new ProductionComposition
         {
-            InstallationId = installationId, OrganizationId = organizationId, ProductVariantId = variantId,
-            RecipeId = recipeId, TargetExecutionEndpointId = endpointId,
+            InstallationId = installationId,
+            OrganizationId = organizationId,
+            ProductVariantId = variantId,
+            RecipeId = recipeId,
+            TargetExecutionEndpointId = endpointId,
             RuntimeTargetCode = ProductionPackage.RequireCode(runtimeTarget, "Runtime target"),
             MachineModelCode = ProductionPackage.RequireCode(machineModel, "Machine model"),
-            InputJson = inputJson, InputChecksum = ProductionPackageVersion.Sha256(inputJson),
+            InputJson = inputJson,
+            InputChecksum = ProductionPackageVersion.Sha256(inputJson),
             Status = valid ? ProductionCompositionStatus.Valid : ProductionCompositionStatus.Invalid,
             ReportJson = reportJson
         };

@@ -165,26 +165,26 @@ public sealed class MqttEdgeUplinkConsumer : BackgroundService
                 "Retained MQTT uplink messages are not accepted.");
         }
         else try
-        {
-            using var scope = _scopeFactory.CreateScope();
-            var dispatcher = scope.ServiceProvider.GetRequiredService<IEdgeUplinkMessageDispatcher>();
-            result = await dispatcher.DispatchAsync(
-                endpointId,
-                messageType,
-                envelope,
-                cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _logger.LogError(
-                ex,
-                "MQTT Edge uplink {MessageId} failed for endpoint {EndpointId}.",
-                envelope.MessageId,
-                endpointId);
-            result = TransportResult(
-                endpointId, messageType, envelope.MessageId, 503,
-                "Cloud processing failed; retry the same message.");
-        }
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var dispatcher = scope.ServiceProvider.GetRequiredService<IEdgeUplinkMessageDispatcher>();
+                result = await dispatcher.DispatchAsync(
+                    endpointId,
+                    messageType,
+                    envelope,
+                    cancellationToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(
+                    ex,
+                    "MQTT Edge uplink {MessageId} failed for endpoint {EndpointId}.",
+                    envelope.MessageId,
+                    endpointId);
+                result = TransportResult(
+                    endpointId, messageType, envelope.MessageId, 503,
+                    "Cloud processing failed; retry the same message.");
+            }
 
         await PublishResultAsync(endpointId, result, cancellationToken);
         IceBotEdgeMetrics.RecordMqttUplink(

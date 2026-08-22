@@ -30,8 +30,12 @@ public sealed class ManagementPaymentReconciliationController : ControllerBase
     {
         var result = await _dailyHandler.HandleAsync(new DailyPaymentReconciliationQuery
         {
-            UserContext = User.GetUserContext(), Date = date, OrganizationId = organizationId,
-            StoreId = storeId, KioskId = kioskId, Provider = provider
+            UserContext = User.GetUserContext(),
+            Date = date,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            Provider = provider
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
@@ -44,9 +48,14 @@ public sealed class ManagementPaymentReconciliationController : ControllerBase
     {
         var result = await _discrepanciesHandler.HandleAsync(new PaymentReconciliationDiscrepanciesQuery
         {
-            UserContext = User.GetUserContext(), Date = date, OrganizationId = organizationId,
-            StoreId = storeId, KioskId = kioskId, Provider = provider,
-            PageNumber = pageNumber, PageSize = pageSize
+            UserContext = User.GetUserContext(),
+            Date = date,
+            OrganizationId = organizationId,
+            StoreId = storeId,
+            KioskId = kioskId,
+            Provider = provider,
+            PageNumber = pageNumber,
+            PageSize = pageSize
         }, cancellationToken);
         return StatusCode(result.StatusCode, result);
     }

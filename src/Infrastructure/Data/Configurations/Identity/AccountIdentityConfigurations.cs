@@ -32,6 +32,7 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         entity.HasIndex(x => x.GoogleSubjectId).IsUnique().HasFilter(EfModelConfigurationConstants.NotNullAndActive(nameof(Account.GoogleSubjectId)));
         entity.HasIndex(x => x.GoogleEmail).HasFilter("\"GoogleEmail\" IS NOT NULL");
         entity.Property(x => x.WorkforceRevision).IsConcurrencyToken();
+        entity.Property(x => x.AuthorizationVersion).IsConcurrencyToken();
 
         entity.Property(x => x.Password)
             .HasConversion(
@@ -45,6 +46,16 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .HasForeignKey(x => x.AccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        entity.HasMany(x => x.TechnicianSupportGrants)
+            .WithOne(x => x.Account)
+            .HasForeignKey(x => x.AccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        entity.HasOne(x => x.PlatformTechnicianProfile)
+            .WithOne(x => x.Account)
+            .HasForeignKey<PlatformTechnicianProfile>(x => x.AccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         entity.HasMany(x => x.Stores)
             .WithMany()
             .UsingEntity<Dictionary<string, object>>(
@@ -57,6 +68,15 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
                     join.HasKey("AccountId", "StoreId");
                 });
 
+    }
+}
+
+internal sealed class PlatformTechnicianProfileConfiguration : IEntityTypeConfiguration<PlatformTechnicianProfile>
+{
+    public void Configure(EntityTypeBuilder<PlatformTechnicianProfile> entity)
+    {
+        entity.ToTable("PlatformTechnicianProfiles");
+        entity.HasIndex(x => x.AccountId).IsUnique();
     }
 }
 
@@ -89,8 +109,20 @@ internal sealed class AccountRoleConfiguration : IEntityTypeConfiguration<Accoun
     public void Configure(EntityTypeBuilder<AccountRole> entity)
     {
         entity.ToTable("AccountRoles");
-        entity.HasIndex(x => new { x.AccountId, x.RoleId, x.OrganizationId, x.StoreId, x.KioskId }).IsUnique();
+        entity.HasIndex(x => new { x.AccountId, x.RoleId }).IsUnique()
+            .HasFilter("\"IsActive\" = TRUE AND \"OrganizationId\" IS NULL AND \"StoreId\" IS NULL AND \"KioskId\" IS NULL");
+        entity.HasIndex(x => new { x.AccountId, x.RoleId, x.OrganizationId }).IsUnique()
+            .HasFilter("\"IsActive\" = TRUE AND \"OrganizationId\" IS NOT NULL AND \"StoreId\" IS NULL AND \"KioskId\" IS NULL");
+        entity.HasIndex(x => new { x.AccountId, x.RoleId, x.OrganizationId, x.StoreId }).IsUnique()
+            .HasFilter("\"IsActive\" = TRUE AND \"OrganizationId\" IS NOT NULL AND \"StoreId\" IS NOT NULL AND \"KioskId\" IS NULL");
+        entity.HasIndex(x => new { x.AccountId, x.RoleId, x.OrganizationId, x.StoreId, x.KioskId }).IsUnique()
+            .HasFilter("\"IsActive\" = TRUE AND \"OrganizationId\" IS NOT NULL AND \"StoreId\" IS NOT NULL AND \"KioskId\" IS NOT NULL");
         entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId });
+        entity.ToTable(table => table.HasCheckConstraint("CK_AccountRoles_ScopeHierarchy",
+            "(\"OrganizationId\" IS NULL AND \"StoreId\" IS NULL AND \"KioskId\" IS NULL) OR " +
+            "(\"OrganizationId\" IS NOT NULL AND \"StoreId\" IS NULL AND \"KioskId\" IS NULL) OR " +
+            "(\"OrganizationId\" IS NOT NULL AND \"StoreId\" IS NOT NULL AND \"KioskId\" IS NULL) OR " +
+            "(\"OrganizationId\" IS NOT NULL AND \"StoreId\" IS NOT NULL AND \"KioskId\" IS NOT NULL)"));
         entity.HasOne(x => x.Role)
             .WithMany(x => x.AccountRoles)
             .HasForeignKey(x => x.RoleId)
@@ -112,6 +144,50 @@ internal sealed class AccountRoleConfiguration : IEntityTypeConfiguration<Accoun
             .HasForeignKey(x => x.AssignedByAccountId)
             .OnDelete(DeleteBehavior.Restrict);
 
+    }
+}
+
+internal sealed class TechnicianSupportGrantConfiguration : IEntityTypeConfiguration<TechnicianSupportGrant>
+{
+    public void Configure(EntityTypeBuilder<TechnicianSupportGrant> entity)
+    {
+        entity.ToTable("TechnicianSupportGrants", table => table.HasCheckConstraint(
+            "CK_TechnicianSupportGrants_ConcreteScope",
+            "\"OrganizationId\" IS NOT NULL AND ((\"StoreId\" IS NOT NULL AND \"KioskId\" IS NULL) OR (\"StoreId\" IS NULL AND \"KioskId\" IS NOT NULL))"));
+        entity.HasIndex(x => new { x.AccountId, x.OrganizationId, x.StoreId }).IsUnique()
+            .HasFilter("\"IsActive\" = TRUE AND \"StoreId\" IS NOT NULL AND \"KioskId\" IS NULL AND \"DeletedAt\" IS NULL");
+        entity.HasIndex(x => new { x.AccountId, x.OrganizationId, x.KioskId }).IsUnique()
+            .HasFilter("\"IsActive\" = TRUE AND \"StoreId\" IS NULL AND \"KioskId\" IS NOT NULL AND \"DeletedAt\" IS NULL");
+        entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Account>().WithMany().HasForeignKey(x => x.AssignedByAccountId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Account>().WithMany().HasForeignKey(x => x.RevokedByAccountId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class TechnicianSupportGrantHistoryConfiguration : IEntityTypeConfiguration<TechnicianSupportGrantHistory>
+{
+    public void Configure(EntityTypeBuilder<TechnicianSupportGrantHistory> entity)
+    {
+        entity.ToTable("TechnicianSupportGrantHistories");
+        entity.Property(x => x.Action).HasMaxLength(32).IsRequired();
+        entity.Property(x => x.Reason).HasMaxLength(1000).IsRequired();
+        entity.HasIndex(x => new { x.AccountId, x.CreatedAt });
+        entity.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne<Account>().WithMany().HasForeignKey(x => x.ActorAccountId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class TechnicianSupportScopeReplayConfiguration : IEntityTypeConfiguration<TechnicianSupportScopeReplay>
+{
+    public void Configure(EntityTypeBuilder<TechnicianSupportScopeReplay> entity)
+    {
+        entity.ToTable("TechnicianSupportScopeReplays");
+        entity.Property(x => x.IdempotencyKey).HasMaxLength(128).IsRequired();
+        entity.Property(x => x.RequestFingerprint).HasMaxLength(64).IsRequired();
+        entity.HasIndex(x => new { x.AccountId, x.IdempotencyKey }).IsUnique();
+        entity.HasOne<Account>().WithMany().HasForeignKey(x => x.AccountId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

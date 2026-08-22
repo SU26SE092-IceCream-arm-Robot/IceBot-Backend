@@ -15,9 +15,8 @@ using System.Text.Json;
 namespace Infrastructure.Catalog.Bootstrap;
 
 /// <summary>
-/// Ensures the global vanilla soft-serve catalog template exists in every environment.
-/// It only creates missing template data or repairs its category reference; it never
-/// creates tenant, kiosk, inventory, or account data outside Development.
+/// Ensures the global vanilla soft-serve catalog template exists when the explicit
+/// demo-catalog bootstrap is enabled. Normal production startup does not register it.
 /// </summary>
 public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedService
 {

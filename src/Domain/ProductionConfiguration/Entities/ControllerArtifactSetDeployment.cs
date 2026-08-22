@@ -81,9 +81,12 @@ public class ControllerArtifactSetDeployment : AuditedEntity
 
         var deployment = new ControllerArtifactSetDeployment
         {
-            KioskId = kioskId, OrganizationId = organizationId,
-            KioskExecutionEndpointId = endpointId, ControllerId = controllerId,
-            SourceConfigurationReleaseId = releaseId, ReleaseChecksum = releaseChecksum,
+            KioskId = kioskId,
+            OrganizationId = organizationId,
+            KioskExecutionEndpointId = endpointId,
+            ControllerId = controllerId,
+            SourceConfigurationReleaseId = releaseId,
+            ReleaseChecksum = releaseChecksum,
             ActiveSetVersion = activeSetVersion,
             IdempotencyKey = idempotencyKey.Trim(),
             MaxArtifactCount = maxArtifactCount,

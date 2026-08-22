@@ -288,31 +288,72 @@ internal static class ProductionPackageProductSnapshotCodec
             SchemaVersion = 2,
             Product = new
             {
-                product.Id, product.Code, product.Name, product.DisplayName, product.Description, product.ProductType,
-                product.BasePrice, product.Currency, product.PreparationTimeSeconds, product.ImageUrl, product.CategoryId,
+                product.Id,
+                product.Code,
+                product.Name,
+                product.DisplayName,
+                product.Description,
+                product.ProductType,
+                product.BasePrice,
+                product.Currency,
+                product.PreparationTimeSeconds,
+                product.ImageUrl,
+                product.CategoryId,
                 Variants = product.ProductVariants.Where(x => x.DeletedAt == null).OrderBy(x => x.DisplayOrder).Select(variant => new
                 {
-                    variant.Id, variant.Code, variant.Name, variant.DisplayName, variant.Description, variant.VariantType,
-                    variant.FulfillmentType, variant.SizeCode, variant.BasePrice, variant.DisplayOrder,
-                    variant.PreparationTimeSeconds, variant.ImageUrl,
+                    variant.Id,
+                    variant.Code,
+                    variant.Name,
+                    variant.DisplayName,
+                    variant.Description,
+                    variant.VariantType,
+                    variant.FulfillmentType,
+                    variant.SizeCode,
+                    variant.BasePrice,
+                    variant.DisplayOrder,
+                    variant.PreparationTimeSeconds,
+                    variant.ImageUrl,
                     Recipes = variant.Recipes.Where(x => x.DeletedAt == null && x.Status != Domain.Catalog.Enums.RecipeStatus.Draft)
                         .OrderBy(x => x.Code).ThenByDescending(x => x.Version).Select(recipe => new
                         {
-                            recipe.Id, recipe.Code, recipe.Name, recipe.Version, recipe.IsDefault, recipe.YieldQuantity,
-                            recipe.Unit, recipe.EstimatedDurationSeconds, recipe.EffectiveFrom, recipe.EffectiveTo,
-                            recipe.InstructionsSchemaVersion, recipe.InstructionsJson,
+                            recipe.Id,
+                            recipe.Code,
+                            recipe.Name,
+                            recipe.Version,
+                            recipe.IsDefault,
+                            recipe.YieldQuantity,
+                            recipe.Unit,
+                            recipe.EstimatedDurationSeconds,
+                            recipe.EffectiveFrom,
+                            recipe.EffectiveTo,
+                            recipe.InstructionsSchemaVersion,
+                            recipe.InstructionsJson,
                             Items = recipe.RecipeItems.Where(x => x.DeletedAt == null).OrderBy(x => x.StepOrder).Select(item => new
                             { item.Id, item.IngredientId, IngredientCode = item.Ingredient.Code, item.Quantity, item.Unit, item.StepOrder, item.IsOptional, item.Notes })
                         })
                 }),
                 OptionGroups = product.OptionGroups.OrderBy(x => x.DisplayOrder).Select(group => new
                 {
-                    group.Id, group.Code, group.Name, group.Description, group.SelectionType, group.MinSelections,
-                    group.MaxSelections, group.IsRequired, group.IsActive, group.DisplayOrder,
+                    group.Id,
+                    group.Code,
+                    group.Name,
+                    group.Description,
+                    group.SelectionType,
+                    group.MinSelections,
+                    group.MaxSelections,
+                    group.IsRequired,
+                    group.IsActive,
+                    group.DisplayOrder,
                     Options = group.ProductOptions.Where(x => x.DeletedAt == null).OrderBy(x => x.DisplayOrder).Select(option => new
                     {
-                        option.Id, option.Code, option.Name, option.Description, option.PriceDelta, option.IsDefault,
-                        option.ExecutionImpact, option.DisplayOrder,
+                        option.Id,
+                        option.Code,
+                        option.Name,
+                        option.Description,
+                        option.PriceDelta,
+                        option.IsDefault,
+                        option.ExecutionImpact,
+                        option.DisplayOrder,
                         IngredientRequirements = option.IngredientRequirements.Where(x => x.DeletedAt == null)
                             .OrderBy(x => x.IngredientId).Select(requirement => new
                             { requirement.IngredientId, IngredientCode = requirement.Ingredient.Code, requirement.Quantity, requirement.Unit, requirement.RequiredWorkcellCapabilityCode })

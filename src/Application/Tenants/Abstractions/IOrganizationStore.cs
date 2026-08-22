@@ -41,6 +41,10 @@ public interface IOrganizationStore
         Guid organizationId,
         CancellationToken cancellationToken = default);
 
+    Task AcquireLifecycleMutationLockAsync(
+        Guid organizationId,
+        CancellationToken cancellationToken = default);
+
     Task AddAsync(Organization organization, CancellationToken cancellationToken = default);
 
     Task AddStatusTransitionAsync(OrganizationStatusTransition transition, CancellationToken cancellationToken = default);

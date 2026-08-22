@@ -25,7 +25,8 @@ public sealed class OrganizationScopeTokenTests
                 Arg.Any<Guid>(),
                 account.UserName,
                 Arg.Any<IReadOnlyCollection<AccountRoleClaim>>(),
-                AccountStatus.Active)
+                AccountStatus.Active,
+                account.AuthorizationVersion)
             .Returns(ApiResult<string>.Success("access-token"));
         var refreshStore = CreateRefreshStore();
         var service = new AccountTokenService(generator, new RefreshTokenService(refreshStore), Substitute.For<IIdentityAccountStore>());
@@ -68,7 +69,8 @@ public sealed class OrganizationScopeTokenTests
                 Arg.Any<Guid>(),
                 account.UserName,
                 Arg.Any<IReadOnlyCollection<AccountRoleClaim>>(),
-                AccountStatus.Active)
+                AccountStatus.Active,
+                account.AuthorizationVersion)
             .Returns(ApiResult<string>.Success("access-token"));
         var service = new AccountTokenService(
             generator,

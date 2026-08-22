@@ -105,12 +105,15 @@ Kiosk management APIs live under:
 ```
 
 `SystemAdmin` owns platform-level kiosk operations.
-`OrgAdmin`, `Manager`, and `Technician` own kiosk management operations within their assigned scope:
+`OrgAdmin` and `Manager` own tenant kiosk management operations within their
+assigned `AccountRoles` scope. Platform `Technician` access is authorized only
+through an explicit Store/Kiosk `TechnicianSupportGrant`:
 - **Create Kiosk:** Can create kiosks under their assigned store. Validates parent store and organization are active, and Kiosk's OrganizationId matches Store's OrganizationId.
 - **Update Kiosk:** Can update kiosk details within scope. `Code`, `StoreId`, and `OrganizationId` are immutable.
 - **Status Change:** Can change kiosk status. Setting to `Active` requires parent store and organization to be active.
 
-Kiosk-scoped roles (e.g. Technician with KioskId scope) can access only their assigned kiosk.
+Kiosk-scoped tenant roles and Technician support grants can access only their
+assigned kiosk.
 
 Kiosk persistence ports:
 
@@ -161,7 +164,11 @@ GET /api/v1/management/role-scope-options?roleCode={roleCode}
 First select a role from the assignable-role list, then request its scope options. Both endpoints require `accounts.manage`; the mutation handler revalidates the selected role and scope. The scope lookup projects allowed scope types:
 - `OrgAdmin` allows Organization scope.
 - `Manager` allows Organization and Store scope.
-- `Technician` / `Staff` allows Store and Kiosk scope.
+- `Staff` allows Store and Kiosk scope.
+
+Technician scope is not returned by tenant role-scope options. SystemAdmin
+manages it through the platform Technician API, and active support scope is
+stored in `TechnicianSupportGrants`, never `AccountRoles`.
 
 ## Tenant Scope Enforcement
 

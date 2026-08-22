@@ -36,18 +36,11 @@ GET /api/v1/kiosks/{kioskId}/runtime-menu
 
 The response should contain the demo vanilla product in `items`.
 
-`DemoCatalogSeed:SeedInventoryTopology=true` is enabled in the production
-configuration for the demo fixture. It creates missing topology on startup;
-the repair command is still required once when older records already exist in
-an inactive or stale state.
-
-For the current demo deployment, `DemoCatalogSeed:RepairExistingDataOnStartup`
-is temporarily enabled in production configuration. The repair runs from a
-hosted service after the demo tenant, catalog, and topology seed services have
-completed; it does not execute before Kestrel startup. If the repair fails, the
-failure is logged and the API host remains available. After the production demo
-data has been verified, set this flag back to `false` in the deployment
-configuration and deploy again.
+Production startup does not seed or repair the demo tenant. Run this command as
+an explicit deployment/bootstrap operation when the isolated fixture is needed.
+Command failure returns a failed process and must be corrected before treating
+the fixture as ready; the API host never hides repair failures during normal
+startup.
 
 ## Search Keywords
 

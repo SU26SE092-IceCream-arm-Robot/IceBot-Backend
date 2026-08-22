@@ -37,11 +37,46 @@ This is the main implementation repository for IceBot backend work.
 - Before implementing a feature, define the complete vertical slice and its affected contracts so the work is not delivered as disconnected file-level patches.
 - Make the smallest scoped change, then verify with the narrowest relevant check.
 - After meaningful backend code/API/domain changes, run backend preflight as the final check.
+- When the user requests a plan be implemented or completed, treat every item in
+  the approved plan as one completion contract. Do not stop after a partial
+  slice, report an intermediate result as a final answer, or ask the user to
+  restate the remaining items. Continue through implementation, migration,
+  tests, documentation, and verification until every included item has
+  evidence, unless a real external blocker prevents progress.
+- "Every included item" means every promised feature, endpoint, command,
+  handler, persistence model, migration, contract cleanup,
+  documentation change, and test in the approved plan. Completing one feature
+  out of a larger plan never creates a valid stopping point.
+- Do not convert unfinished plan items into "remaining work", "follow-up",
+  "next slice", "next pass", or recommendations in a final response. Those
+  labels do not change the completion contract. Continue implementing them in
+  the same task.
+- Progress updates are allowed only in commentary while work continues. They
+  must not be used as a substitute for completing the rest of the plan. A final
+  response is allowed only after the plan ledger has zero pending included
+  items, or after a concrete external blocker has been exhausted and reported
+  with evidence.
+- A build, a focused test, or preflight passing is not permission to end work
+  while an approved plan still has pending implementation or verification
+  items. Before a final response, compare the final repository state against
+  the plan and explicitly verify every completion gate.
+- If an interruption happens during an approved plan, resume the same plan on
+  the next instruction. Do not narrow scope or convert unfinished work into a
+  recommendation without the user's explicit direction.
 
 ## Change Guardrails
 
 - Preserve existing API route contracts unless the user explicitly asks to change them.
-- Do not keep backward-compatibility or legacy response/request fields unless the user explicitly asks for compatibility, especially before first deployment.
+- This project has completed demos but has no real production users and remains
+  under active development. A demo deployment is not a compatibility boundary.
+- Do not retain legacy endpoints, fallback branches, duplicate representations,
+  deprecated fields, compatibility adapters, or migration shims unless the user
+  explicitly requests a concrete compatibility requirement.
+- When replacing a pre-release contract, update all callers/tests/docs and remove
+  the superseded path in the same vertical slice. Do not mark old code deprecated
+  and leave it active.
+- Prefer a migration that rejects invalid pre-release data with an actionable
+  diagnostic over runtime compatibility code that perpetuates an invalid model.
 - Keep changes scoped to the requested work.
 - Do not default to preserving the current design. Existing code is evidence, not proof that the boundary is correct.
 - For meaningful changes, evaluate three options before choosing:

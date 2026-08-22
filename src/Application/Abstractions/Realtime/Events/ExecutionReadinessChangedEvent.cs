@@ -1,4 +1,5 @@
 namespace Application.Abstractions.Realtime.Events;
+
 public sealed record ExecutionReadinessChangedEvent
 {
     public string Type => "ExecutionReadinessChanged";
