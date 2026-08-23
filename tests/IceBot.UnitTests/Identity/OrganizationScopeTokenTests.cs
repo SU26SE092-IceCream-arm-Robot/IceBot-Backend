@@ -1,4 +1,5 @@
 using Application.Identity.Abstractions;
+using Application.Identity;
 using Application.Identity.Tokens.Claims;
 using Application.Identity.Tokens.Services;
 using Application.Shared.Wrappers;
@@ -55,7 +56,7 @@ public sealed class OrganizationScopeTokenTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(403, result.StatusCode);
-        Assert.Equal("ORGANIZATION_SUSPENDED", result.BusinessError);
+        Assert.Equal(IdentityErrors.OrganizationSuspended.Code, result.BusinessError);
         await refreshStore.DidNotReceive().AddAsync(Arg.Any<RefreshToken>(), Arg.Any<CancellationToken>());
     }
 

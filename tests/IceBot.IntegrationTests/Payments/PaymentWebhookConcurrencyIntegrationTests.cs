@@ -1,7 +1,10 @@
 using Application.EdgeIntegration.Dispatch;
+using System.Text.Json;
 using Application.EdgeIntegration.Dispatch.Commands;
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
+using Application.Payments.PaymentSessions.Notifications;
+using Application.Identity.Tokens.Claims;
 using Application.Payments.PaymentSessions.Requests;
 using Application.Payments.Providers;
 using Application.Orders.PlaceOrder.Commands;
@@ -20,6 +23,7 @@ using IceBot.IntegrationTests.Infrastructure;
 using Infrastructure.EdgeIntegration.Persistence;
 using Infrastructure.Payments.Persistence;
 using Infrastructure.Orders.Persistence;
+using Infrastructure.Operations.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -45,6 +49,43 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
         Assert.Equal(PaymentTransactionStatus.Paid, payment.Status);
         Assert.Equal(seed.Amount, order.PaidAmount);
         Assert.Equal(2, await assertionContext.PaymentCallbacks.CountAsync(x => x.PaymentTransactionId == seed.PaymentId));
+    }
+
+    [IntegrationFact]
+    public async Task ConcurrentReplayOfTheSameVerifiedEvent_IsIdempotent()
+    {
+        var seed = await SeedAsync();
+        var first = HandleAsync(seed, "event:replayed");
+        var second = HandleAsync(seed, "event:replayed");
+
+        var results = await Task.WhenAll(first, second);
+
+        Assert.All(results, result => Assert.True(result.Succeeded, result.Message));
+        await using var assertionContext = fixture.CreateDbContext();
+        var payment = await assertionContext.PaymentTransactions.SingleAsync(x => x.Id == seed.PaymentId);
+        var order = await assertionContext.Orders.SingleAsync(x => x.Id == seed.OrderId);
+        Assert.Equal(PaymentTransactionStatus.Paid, payment.Status);
+        Assert.Equal(seed.Amount, order.PaidAmount);
+        Assert.Single(await assertionContext.PaymentCallbacks
+            .Where(callback => callback.PaymentTransactionId == seed.PaymentId && callback.ProviderEventId == "event:replayed")
+            .ToListAsync());
+    }
+
+    [IntegrationFact]
+    public async Task VerifiedEventIdentityWithChangedPayload_IsAcknowledgedWithoutReplacingOriginalEvidence()
+    {
+        var seed = await SeedAsync();
+        var first = await HandleAsync(seed, "event:identity-conflict", "{\"amount\":30000}");
+        var second = await HandleAsync(seed, "event:identity-conflict", "{\"amount\":30001}");
+
+        Assert.True(first.Succeeded, first.Message);
+        Assert.True(second.Succeeded, second.Message);
+        await using var assertionContext = fixture.CreateDbContext();
+        var callback = await assertionContext.PaymentCallbacks.SingleAsync(candidate =>
+            candidate.PaymentTransactionId == seed.PaymentId &&
+            candidate.ProviderEventId == "event:identity-conflict");
+        using var payload = JsonDocument.Parse(callback.PayloadJson);
+        Assert.Equal(30_000, payload.RootElement.GetProperty("amount").GetDecimal());
     }
 
     [IntegrationFact]
@@ -164,8 +205,35 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
         Assert.DoesNotContain(denied, item => item.Id == seed.PaymentId);
     }
 
+    [IntegrationFact]
+    public async Task ManualReconciliation_IsDeniedForAnotherKioskScopeBeforeProviderOrAuditWork()
+    {
+        var seed = await SeedAsync();
+        await using var dbContext = fixture.CreateDbContext();
+        var gateway = new FixedNotificationGateway(new ProviderPaymentNotification());
+        var paymentStore = new PaymentStore(dbContext);
+        var handler = new ManuallyReconcilePaymentSessionCommandHandler(
+            paymentStore,
+            new OperationLogStore(dbContext),
+            new ReconcilePendingPaymentSessionCommandHandler(paymentStore, gateway, new NoOpPaymentInterventionNotifier()));
+
+        var result = await handler.HandleAsync(new ManuallyReconcilePaymentSessionCommand(
+            seed.OrderId,
+            seed.PaymentId,
+            "Investigate payment session.",
+            new CurrentUserContext
+            {
+                AccountId = Guid.NewGuid(),
+                RoleScopes = [new UserRoleScope("Manager", null, null, Guid.NewGuid())]
+            }));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(403, result.StatusCode);
+        Assert.Empty(await dbContext.OperationLogs.Where(log => log.OrderId == seed.OrderId).ToListAsync());
+    }
+
     private async Task<Application.Shared.Wrappers.ApiResult<Application.Payments.PaymentSessions.Results.PaymentNotificationResult>>
-        HandleAsync(Seed seed, string eventId)
+        HandleAsync(Seed seed, string eventId, string rawPayload = "{}")
     {
         await using var dbContext = fixture.CreateDbContext();
         var gateway = new FixedNotificationGateway(new ProviderPaymentNotification
@@ -178,7 +246,7 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
             IsPaid = true,
             PaidAmount = seed.Amount,
             ProviderPaidAt = DateTimeOffset.UtcNow,
-            RawPayloadJson = "{}"
+            RawPayloadJson = rawPayload
         });
         var handler = new HandlePaymentProviderNotificationCommandHandler(
             new PaymentStore(dbContext),
@@ -193,7 +261,7 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
             NullLogger<HandlePaymentProviderNotificationCommandHandler>.Instance);
         return await handler.HandleAsync(new HandlePaymentProviderNotificationCommand
         {
-            Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{}" }
+            Request = new HandlePaymentProviderNotificationRequest { RawPayload = rawPayload }
         });
     }
 
@@ -325,5 +393,14 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
             string rawPayload,
             string? signature,
             CancellationToken cancellationToken = default) => Task.FromResult(notification);
+    }
+
+    private sealed class NoOpPaymentInterventionNotifier : IPaymentInterventionNotifier
+    {
+        public Task NotifyIfRequiredAsync(
+            PaymentTransaction payment,
+            PaymentSessionReconciliationOutcome outcome,
+            DateTimeOffset observedAt,
+            CancellationToken cancellationToken = default) => Task.CompletedTask;
     }
 }

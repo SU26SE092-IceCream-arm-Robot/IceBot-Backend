@@ -6,6 +6,7 @@ using Application.EdgeIntegration.Dispatch.Services;
 using Application.Devices.Telemetry;
 using Application.Tenants.Abstractions;
 using Application.Payments.Abstractions;
+using Application.Payments.PaymentSessions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
 using Application.Payments.PaymentSessions.Results;
@@ -49,8 +50,8 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         var store = Substitute.For<IPaymentStore>();
         var gateway = Substitute.For<IPaymentGateway>();
         gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
-            .Returns<Task<ProviderPaymentNotification>>(_ =>
-                throw new InvalidOperationException("Invalid PayOS webhook signature."));
+            .Returns<Task<ProviderPaymentNotification>>(_ => throw new ProviderPaymentNotificationVerificationException(
+                ProviderPaymentNotificationVerificationFailureKind.InvalidSignature));
 
         var result = await CreateHandler(store, gateway).HandleAsync(
             new HandlePaymentProviderNotificationCommand
@@ -60,7 +61,46 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
 
         Assert.False(result.Succeeded);
         Assert.Equal(400, result.StatusCode);
+        Assert.Equal(PaymentErrors.WebhookVerificationFailed.Code, result.BusinessError);
         Assert.Empty(store.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task WebhookVerificationConfigurationFailure_IsSafeAndRetryable()
+    {
+        var store = Substitute.For<IPaymentStore>();
+        var gateway = Substitute.For<IPaymentGateway>();
+        gateway.ParseAndVerifyNotificationAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ProviderPaymentNotification>>(_ => throw new ProviderPaymentNotificationVerificationException(
+                ProviderPaymentNotificationVerificationFailureKind.ConfigurationUnavailable));
+
+        var result = await CreateHandler(store, gateway).HandleAsync(new HandlePaymentProviderNotificationCommand
+        {
+            Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{\"data\":{}}" }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(503, result.StatusCode);
+        Assert.Equal(PaymentErrors.WebhookConfigurationUnavailable.Code, result.BusinessError);
+        Assert.Empty(store.ReceivedCalls());
+    }
+
+    [Fact]
+    public async Task EmptyWebhookPayload_ReturnsFieldValidationWithoutGatewayAccess()
+    {
+        var store = Substitute.For<IPaymentStore>();
+        var gateway = Substitute.For<IPaymentGateway>();
+
+        var result = await CreateHandler(store, gateway).HandleAsync(new HandlePaymentProviderNotificationCommand
+        {
+            Request = new HandlePaymentProviderNotificationRequest { RawPayload = " " }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Contains("rawPayload", result.ValidationErrors!.Keys);
+        await gateway.DidNotReceive().ParseAndVerifyNotificationAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -113,7 +153,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
     }
 
     [Fact]
-    public async Task PaidWebhookWithMismatchedAmount_IsRejectedBeforeStateMutation()
+    public async Task PaidWebhookWithMismatchedAmount_IsAcknowledgedAfterItIsRecordedAsIgnored()
     {
         var order = new Order { Id = Guid.NewGuid(), KioskId = Guid.NewGuid() };
         var payment = new PaymentTransaction
@@ -158,15 +198,13 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
             Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{}" }
         });
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(409, result.StatusCode);
-        Assert.Contains("does not match", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(200, result.StatusCode);
         Assert.Equal(Domain.Payments.Enums.PaymentTransactionStatus.Pending, payment.Status);
         await store.Received(1).AddPaymentCallbackAsync(
             Arg.Is<PaymentCallback>(callback =>
                 callback.ProcessingStatus == Domain.Payments.Enums.PaymentCallbackProcessingStatus.Ignored &&
-                callback.LastError != null &&
-                callback.LastError.Contains("does not match", StringComparison.OrdinalIgnoreCase)),
+                callback.LastError == "PAID_AMOUNT_MISMATCH"),
             Arg.Any<CancellationToken>());
         await store.Received(1).SaveChangesAsync(Arg.Any<CancellationToken>());
         await dispatchStore.DidNotReceive().ExecuteSerializedAsync(
@@ -176,7 +214,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
     }
 
     [Fact]
-    public async Task DuplicateProviderEventWithDifferentPayload_IsRejected()
+    public async Task DuplicateProviderEventWithDifferentPayload_IsAcknowledgedWithoutMutation()
     {
         var payment = new PaymentTransaction
         {
@@ -223,9 +261,8 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
                 Request = new HandlePaymentProviderNotificationRequest { RawPayload = "{}" }
             });
 
-        Assert.False(result.Succeeded);
-        Assert.Equal(409, result.StatusCode);
-        Assert.Contains("different payment or payload", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.True(result.Succeeded, result.Message);
+        Assert.Equal(200, result.StatusCode);
         await store.DidNotReceive().SaveChangesAsync(Arg.Any<CancellationToken>());
     }
 

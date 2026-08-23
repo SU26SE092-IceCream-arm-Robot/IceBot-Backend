@@ -1,4 +1,5 @@
 using Application.Orders.Abstractions;
+using Application.Orders.PlaceOrder;
 using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Support;
 using Application.SalesCatalog.ReadModels;
@@ -8,10 +9,12 @@ using Domain.Orders.Entities;
 using Domain.Tenants.Entities;
 using Application.Inventory.Abstractions;
 using Application.SalesCatalog.Admission.Abstractions;
+using Application.SalesCatalog.Admission;
+using Application.Shared.Wrappers;
 
 namespace Application.Orders.PlaceOrder.Services;
 
-public sealed record PlaceOrderItemAppendFailure(string Message, int StatusCode);
+public sealed record PlaceOrderItemAppendFailure(string Message, int StatusCode, ApiBusinessErrorDefinition? BusinessError = null);
 
 public sealed class PlaceOrderItemAppender(
     IOrderStore orderStore,
@@ -31,7 +34,7 @@ public sealed class PlaceOrderItemAppender(
             kiosk.Id,
             cancellationToken);
         if (menuItem is null)
-            return new($"Menu item '{itemRequest.MenuItemId}' not found.", 404);
+            return new("Menu item not found.", 404);
 
         var product = menuItem.Product;
         var productVariant = menuItem.ProductVariant;
@@ -40,14 +43,14 @@ public sealed class PlaceOrderItemAppender(
         if (!order.OrderItems.Any())
             order.SetCurrency(menuItem.Currency);
         else if (!string.Equals(order.Currency, menuItem.Currency, StringComparison.OrdinalIgnoreCase))
-            return new("All order items must use the same currency.", 400);
+            return new(OrderErrors.CurrencyMismatch.Message, OrderErrors.CurrencyMismatch.StatusCode, OrderErrors.CurrencyMismatch);
 
         var selectableOptions = await orderStore.ListMenuItemProductOptionsAsync(menuItem.Id, cancellationToken);
         var optionGroups = await orderStore.ListMenuItemOptionGroupsAsync(menuItem.Id, cancellationToken);
         var selectedOptionIds = itemRequest.SelectedOptions.Select(option => option.ProductOptionId).ToArray();
         var optionError = ProductOptionSelectionRules.Validate(optionGroups, selectableOptions, selectedOptionIds);
         if (optionError is not null)
-            return new(optionError, 409);
+            return new(optionError.Message, OrderErrors.OptionSelectionInvalid.StatusCode, OrderErrors.OptionSelectionInvalid);
 
         var selectedOptions = selectableOptions
             .Where(option => selectedOptionIds.Contains(option.ProductOptionId))
@@ -58,12 +61,16 @@ public sealed class PlaceOrderItemAppender(
                 option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting))
             return new(
                 $"Packaged menu item '{menuItem.DisplayName}' cannot use production-affecting options. Use a product variant for physical packaged choices.",
-                409);
+                409,
+                OrderErrors.PackagedOptionUnsupported);
 
         var optionIngredientRequirements = await orderStore.ListProductOptionIngredientRequirementsAsync(
             selectedOptions.Select(option => option.ProductOptionId).ToArray(), cancellationToken);
         if (optionIngredientRequirements.Any(requirement => !requirement.IsIngredientActive))
-            return new("One or more selected options require an inactive ingredient.", 409);
+            return new(
+                "One or more selected options require an inactive ingredient.",
+                409,
+                SalesAdmissionErrors.For(SalesAdmissionBlockerCode.CatalogUnavailable));
 
         var decision = await operationalAdmission.EvaluateAsync(
             kiosk,
@@ -79,7 +86,12 @@ public sealed class PlaceOrderItemAppender(
             cancellationToken);
         if (!decision.CanSell)
         {
-            return new(decision.ToDisplayMessage(menuItem.DisplayName)!, 409);
+            var blocker = decision.PrimaryBlocker
+                ?? throw new InvalidOperationException("Blocked menu item admission must provide a blocker.");
+            return new(
+                decision.ToDisplayMessage(menuItem.DisplayName)!,
+                409,
+                SalesAdmissionErrors.For(blocker.Code));
         }
 
         if (productVariant.FulfillmentType == FulfillmentType.MachineProduced &&
@@ -89,7 +101,8 @@ public sealed class PlaceOrderItemAppender(
         {
             return new(
                 $"One or more selected options are not supported by the active production route for '{menuItem.DisplayName}'.",
-                409);
+                409,
+                SalesAdmissionErrors.For(SalesAdmissionBlockerCode.ProductionRouteUnavailable));
         }
 
         var orderItem = order.AddItem(

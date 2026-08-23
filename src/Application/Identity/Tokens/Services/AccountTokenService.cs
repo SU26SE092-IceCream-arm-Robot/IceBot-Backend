@@ -33,10 +33,7 @@ namespace Application.Identity.Tokens.Services
             var organizationAccessError = ResolveOrganizationAccessError(account, roles);
             if (organizationAccessError is not null)
             {
-                return ApiResult<AuthenticatedAccountResult>.Fail(
-                    organizationAccessError.Value.Message,
-                    403,
-                    organizationAccessError.Value.Code);
+                return ApiResult<AuthenticatedAccountResult>.BusinessFailure(organizationAccessError);
             }
 
             var refreshToken = await _refreshTokens.CreateAsync(account.Id, ipAddress, userAgent);
@@ -89,13 +86,10 @@ namespace Application.Identity.Tokens.Services
             {
                 await _refreshTokens.RevokeAllForAccountAsync(
                     account.Id,
-                    organizationAccessError.Value.Code,
+                    organizationAccessError.Code,
                     ipAddress,
                     userAgent);
-                return ApiResult<AuthenticatedAccountResult>.Fail(
-                    organizationAccessError.Value.Message,
-                    403,
-                    organizationAccessError.Value.Code);
+                return ApiResult<AuthenticatedAccountResult>.BusinessFailure(organizationAccessError);
             }
 
             var accessToken = _accessTokenGenerator.GenerateAccessToken(
@@ -189,7 +183,7 @@ namespace Application.Identity.Tokens.Services
             grant.Store?.Organization?.Status == EntityStatus.Active ||
             grant.Kiosk?.Organization?.Status == EntityStatus.Active;
 
-        private static (string Code, string Message)? ResolveOrganizationAccessError(
+        private static ApiBusinessErrorDefinition? ResolveOrganizationAccessError(
             Account account,
             IReadOnlyCollection<AccountRoleClaim> roles)
         {
@@ -218,10 +212,10 @@ namespace Application.Identity.Tokens.Services
             }
 
             return statuses.Length == 1 && statuses[0] == EntityStatus.Suspended
-                ? ("ORGANIZATION_SUSPENDED", "This account belongs only to suspended organizations.")
+                ? IdentityErrors.OrganizationSuspended
                 : statuses.Length == 1 && statuses[0] == EntityStatus.Inactive
-                    ? ("ORGANIZATION_INACTIVE", "This account belongs only to inactive organizations.")
-                    : ("ORGANIZATION_ACCESS_UNAVAILABLE", "This account has no active organization scope.");
+                    ? IdentityErrors.OrganizationInactive
+                    : IdentityErrors.OrganizationAccessUnavailable;
         }
     }
 }

@@ -1,4 +1,5 @@
 using Application.Payments.Abstractions;
+using Application.Payments.PaymentSessions;
 using Application.Devices.Telemetry;
 using Application.Orders.Admission;
 using Application.Payments.PaymentSessions.Commands;
@@ -144,11 +145,13 @@ public sealed class CreatePaymentSessionCommandHandlerTests
                 Arg.Any<PaymentTransaction>(), scenario.Order, Arg.Any<CancellationToken>())
             .Returns<Task<ProviderPaymentSession>>(_ => throw new ProviderPaymentSessionCreationException(
                 "response lost",
-                outcomeUnknown: true));
+                ProviderPaymentSessionFailureKind.OutcomeUnknown));
 
         var result = await scenario.Handler.HandleAsync(CreateCommand(scenario.Order.Id));
 
         Assert.False(result.Succeeded);
+        Assert.Equal(PaymentErrors.ProviderOutcomeUnknown.Code, result.BusinessError);
+        Assert.DoesNotContain("response lost", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(scenario.Payment);
         Assert.Equal(PaymentTransactionStatus.Pending, scenario.Payment.Status);
         Assert.Equal("PROVIDER_SESSION_CREATE_OUTCOME_UNKNOWN", scenario.Payment.LastErrorCode);
@@ -165,14 +168,68 @@ public sealed class CreatePaymentSessionCommandHandlerTests
                 Arg.Any<PaymentTransaction>(), scenario.Order, Arg.Any<CancellationToken>())
             .Returns<Task<ProviderPaymentSession>>(_ => throw new ProviderPaymentSessionCreationException(
                 "request rejected",
-                outcomeUnknown: false));
+                ProviderPaymentSessionFailureKind.Rejected));
 
         var result = await scenario.Handler.HandleAsync(CreateCommand(scenario.Order.Id));
 
         Assert.False(result.Succeeded);
+        Assert.Equal(PaymentErrors.ProviderRejected.Code, result.BusinessError);
+        Assert.DoesNotContain("request rejected", result.Message, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(scenario.Payment);
         Assert.Equal(PaymentTransactionStatus.Failed, scenario.Payment.Status);
         Assert.Equal("PROVIDER_SESSION_CREATE_REJECTED", scenario.Payment.FailureCode);
+    }
+
+    [Fact]
+    public async Task ProviderUnavailable_LeavesTransactionPendingAndAllowsSameKeyRetry()
+    {
+        var scenario = ProviderCreateScenario.Create();
+        scenario.Gateway.CreatePaymentSessionAsync(
+                Arg.Any<PaymentTransaction>(), scenario.Order, Arg.Any<CancellationToken>())
+            .Returns<Task<ProviderPaymentSession>>(_ => throw new ProviderPaymentSessionCreationException(
+                "provider unavailable",
+                ProviderPaymentSessionFailureKind.Unavailable));
+
+        var result = await scenario.Handler.HandleAsync(CreateCommand(scenario.Order.Id));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(503, result.StatusCode);
+        Assert.Equal(PaymentErrors.ProviderUnavailable.Code, result.BusinessError);
+        Assert.DoesNotContain("provider unavailable", result.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.NotNull(scenario.Payment);
+        Assert.Equal(PaymentTransactionStatus.Pending, scenario.Payment.Status);
+        Assert.Equal("PROVIDER_SESSION_CREATE_UNAVAILABLE", scenario.Payment.LastErrorCode);
+        Assert.Equal(1, scenario.Payment.RetryCount);
+    }
+
+    [Fact]
+    public async Task InvalidPaymentRequest_ReturnsFieldValidationWithoutProviderCall()
+    {
+        var store = Substitute.For<IPaymentStore>();
+        var gateway = Substitute.For<IPaymentGateway>();
+        var handler = CreateHandler(store, gateway);
+
+        var result = await handler.HandleAsync(new CreatePaymentSessionCommand
+        {
+            OrderId = Guid.NewGuid(),
+            IdempotencyKey = "payment-validation",
+            Request = new CreatePaymentSessionRequest
+            {
+                PaymentMethodCode = "unsupported",
+                ExpectedAmount = 0,
+                ExpectedCurrency = "VN"
+            }
+        });
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Null(result.BusinessError);
+        Assert.NotNull(result.ValidationErrors);
+        Assert.Contains("paymentMethodCode", result.ValidationErrors.Keys);
+        Assert.Contains("expectedAmount", result.ValidationErrors.Keys);
+        Assert.Contains("expectedCurrency", result.ValidationErrors.Keys);
+        await gateway.DidNotReceive().CreatePaymentSessionAsync(
+            Arg.Any<PaymentTransaction>(), Arg.Any<Order>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]

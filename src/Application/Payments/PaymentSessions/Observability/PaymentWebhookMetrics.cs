@@ -10,6 +10,12 @@ public static class PaymentWebhookMetrics
         "icebot.payment.webhook.verified_unmatched",
         "{callback}",
         "Verified provider callbacks acknowledged without a matching local payment transaction.");
+    private static readonly Counter<long> VerifiedEventConflicts = Meter.CreateCounter<long>(
+        "icebot.payment.webhook.verified_event_conflict",
+        "{callback}",
+        "Verified provider callbacks whose event identity conflicts with a prior callback.");
 
     public static void RecordVerifiedUnmatched() => VerifiedUnmatchedCallbacks.Add(1);
+
+    public static void RecordVerifiedEventConflict() => VerifiedEventConflicts.Add(1);
 }

@@ -2,6 +2,7 @@ using Application.Abstractions.Realtime;
 using Application.ClientDevices;
 using Application.Abstractions.Realtime.Events;
 using Application.Orders.Abstractions;
+using Application.Orders.PlaceOrder;
 using Application.Orders.PlaceOrder.Mapping;
 using Application.Orders.PlaceOrder.Results;
 using Application.Orders.PlaceOrder.Requests;
@@ -13,6 +14,7 @@ using Application.Shared.Idempotency;
 using Application.SalesCatalog.Admission;
 using Application.SalesCatalog.Admission.Services;
 using Domain.Orders.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Application.Orders.PlaceOrder.Commands;
@@ -54,17 +56,16 @@ public sealed class PlaceOrderCommandHandler
             return ApiResult<OrderResult>.Fail("An authenticated client device scope is required.", 401);
         }
 
-        var validationError = PlaceOrderRequestValidator.Validate(request, _runtimeLimits);
-        if (validationError is not null)
+        var validationErrors = PlaceOrderRequestValidator.Validate(request, _runtimeLimits);
+        if (validationErrors is not null)
         {
-            return ApiResult<OrderResult>.Fail(validationError);
+            return ApiResult<OrderResult>.ValidationFailure(validationErrors);
         }
 
         if (!ScopedIdempotencyKey.TryNormalize(command.IdempotencyKey, out var idempotencyKey))
         {
-            return ApiResult<OrderResult>.Fail(
-                $"Idempotency-Key is required and must be at most {ScopedIdempotencyKey.MaxClientKeyLength} characters.",
-                400);
+            return ApiResult<OrderResult>.BusinessFailure(
+                OrderErrors.IdempotencyKeyInvalid);
         }
         var scopedIdempotencyKey = ScopedIdempotencyKey.ForClientDevice(command.SourceClientDeviceId, idempotencyKey);
         var clientOrderId = NormalizeOptional(request.ClientOrderId);
@@ -73,120 +74,146 @@ public sealed class PlaceOrderCommandHandler
             : $"client-order:{command.KioskId:N}:{clientOrderId}";
 
         OrderStatusChangedEvent? statusChangedEvent = null;
-        var result = await _orderStore.ExecuteCheckoutTransactionAsync(async ct =>
+        ApiResult<OrderResult> result;
+        try
         {
-            foreach (var lockKey in new[] { scopedIdempotencyKey, clientOrderLockKey }
-                .Where(lockKey => lockKey is not null)
-                .Cast<string>()
-                .Distinct(StringComparer.Ordinal)
-                .OrderBy(lockKey => lockKey, StringComparer.Ordinal))
+            result = await _orderStore.ExecuteCheckoutTransactionAsync(async ct =>
             {
-                await _orderStore.AcquireIdempotencyLockAsync(lockKey, ct);
-            }
-
-            var existingByIdempotencyKey = await _orderStore.GetOrderByIdempotencyKeyAsync(scopedIdempotencyKey, ct);
-            if (existingByIdempotencyKey is not null)
-            {
-                return IsEquivalentIdempotentRequest(existingByIdempotencyKey, command, request)
-                    ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByIdempotencyKey), "Order already created.")
-                    : ApiResult<OrderResult>.Fail("Idempotency key was already used for a different order request.", 409);
-            }
-
-            if (clientOrderId is not null)
-            {
-                var existingByClientOrderId = await _orderStore.GetOrderByClientOrderIdAsync(command.KioskId, clientOrderId, ct);
-                if (existingByClientOrderId is not null)
+                foreach (var lockKey in new[] { scopedIdempotencyKey, clientOrderLockKey }
+                    .Where(lockKey => lockKey is not null)
+                    .Cast<string>()
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(lockKey => lockKey, StringComparer.Ordinal))
                 {
-                    return IsEquivalentIdempotentRequest(existingByClientOrderId, command, request)
-                        ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByClientOrderId), "Order already created.")
-                        : ApiResult<OrderResult>.Fail("Client order id was already used for a different order request.", 409);
+                    await _orderStore.AcquireIdempotencyLockAsync(lockKey, ct);
                 }
-            }
 
-            var kiosk = await _orderStore.GetKioskByIdAsync(command.KioskId, ct);
-            if (kiosk is null)
-            {
-                return ApiResult<OrderResult>.Fail("Kiosk not found.", 404);
-            }
+                var existingByIdempotencyKey = await _orderStore.GetOrderByIdempotencyKeyAsync(scopedIdempotencyKey, ct);
+                if (existingByIdempotencyKey is not null)
+                {
+                    return IsEquivalentIdempotentRequest(existingByIdempotencyKey, command, request)
+                        ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByIdempotencyKey), "Order already created.")
+                        : ApiResult<OrderResult>.BusinessFailure(
+                            OrderErrors.IdempotencyConflict);
+                }
 
-            await _orderStore.AcquireKioskOperationalLockAsync(kiosk.Id, ct);
+                if (clientOrderId is not null)
+                {
+                    var existingByClientOrderId = await _orderStore.GetOrderByClientOrderIdAsync(command.KioskId, clientOrderId, ct);
+                    if (existingByClientOrderId is not null)
+                    {
+                        return IsEquivalentIdempotentRequest(existingByClientOrderId, command, request)
+                            ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByClientOrderId), "Order already created.")
+                            : ApiResult<OrderResult>.BusinessFailure(
+                                OrderErrors.ClientOrderIdConflict);
+                    }
+                }
 
-            var now = DateTimeOffset.UtcNow;
-            var admission = await _admissionEvaluator.EvaluateAsync(kiosk, new KioskSalesAdmissionRequest(now), ct);
-            if (!admission.CanPlaceOrder)
-            {
-                return ApiResult<OrderResult>.Fail(admission.ToDisplayMessage()!, 409);
-            }
+                var kiosk = await _orderStore.GetKioskByIdAsync(command.KioskId, ct);
+                if (kiosk is null)
+                {
+                    return ApiResult<OrderResult>.Fail("Kiosk not found.", 404);
+                }
 
-            var order = new Order
-            {
-                OrganizationId = kiosk.OrganizationId,
-                StoreId = kiosk.StoreId,
-                KioskId = kiosk.Id,
-                SourceClientDeviceId = command.SourceClientDeviceId,
-                OrderNumber = OrderNumberGenerator.GenerateOrderNumber(now),
-                IdempotencyKey = scopedIdempotencyKey,
-                ClientOrderId = clientOrderId,
-                Channel = Domain.Orders.Enums.OrderChannel.Tablet,
-                CustomerName = NormalizeOptional(request.CustomerName),
-                CustomerPhoneNumber = NormalizeOptional(request.CustomerPhoneNumber),
-                Notes = NormalizeOptional(request.Notes),
-                CreatedAt = now
-            };
-            order.SetCurrency(DefaultCurrency);
+                await _orderStore.AcquireKioskOperationalLockAsync(kiosk.Id, ct);
 
-            foreach (var itemRequest in request.Items)
-            {
-                var itemFailure = await _itemAppender.AppendAsync(order, kiosk, itemRequest, now, ct);
-                if (itemFailure is not null)
-                    return ApiResult<OrderResult>.Fail(itemFailure.Message, itemFailure.StatusCode);
-            }
+                var now = DateTimeOffset.UtcNow;
+                var admission = await _admissionEvaluator.EvaluateAsync(kiosk, new KioskSalesAdmissionRequest(now), ct);
+                if (!admission.CanPlaceOrder)
+                {
+                    var blocker = admission.PrimaryBlocker
+                        ?? throw new InvalidOperationException("Blocked kiosk admission must provide a blocker.");
+                    return ApiResult<OrderResult>.BusinessFailure(
+                        SalesAdmissionErrors.For(blocker.Code));
+                }
 
-            order.Place(now, now.AddMinutes(_paymentWindow.DurationMinutes));
+                var order = new Order
+                {
+                    OrganizationId = kiosk.OrganizationId,
+                    StoreId = kiosk.StoreId,
+                    KioskId = kiosk.Id,
+                    SourceClientDeviceId = command.SourceClientDeviceId,
+                    OrderNumber = OrderNumberGenerator.GenerateOrderNumber(now),
+                    IdempotencyKey = scopedIdempotencyKey,
+                    ClientOrderId = clientOrderId,
+                    Channel = Domain.Orders.Enums.OrderChannel.Tablet,
+                    CustomerName = NormalizeOptional(request.CustomerName),
+                    CustomerPhoneNumber = NormalizeOptional(request.CustomerPhoneNumber),
+                    Notes = NormalizeOptional(request.Notes),
+                    CreatedAt = now
+                };
+                order.SetCurrency(DefaultCurrency);
 
-            if (request.ClientTotalAmount.HasValue && request.ClientTotalAmount.Value != order.TotalAmount)
-            {
-                return ApiResult<OrderResult>.Fail("Client total does not match calculated total.", 409)
-                    .AddDetail("clientTotalAmount", request.ClientTotalAmount.Value)
-                    .AddDetail("calculatedTotalAmount", order.TotalAmount);
-            }
+                foreach (var itemRequest in request.Items)
+                {
+                    var itemFailure = await _itemAppender.AppendAsync(order, kiosk, itemRequest, now, ct);
+                    if (itemFailure is not null)
+                        return itemFailure.BusinessError is null
+                            ? ApiResult<OrderResult>.Fail(itemFailure.Message, itemFailure.StatusCode)
+                            : ApiResult<OrderResult>.BusinessFailure(itemFailure.BusinessError);
+                }
 
-            await _orderStore.AddOrderAsync(order, ct);
+                order.Place(now, now.AddMinutes(_paymentWindow.DurationMinutes));
 
-            var history = new OrderStatusHistory
-            {
-                Id = Guid.NewGuid(),
-                OrderId = order.Id,
-                FromStatus = Domain.Orders.Enums.OrderStatus.Draft,
-                ToStatus = Domain.Orders.Enums.OrderStatus.PendingPayment,
-                ChangedAt = now,
-                Reason = "Order placed by customer."
-            };
-            await _orderStore.AddOrderStatusHistoryAsync(history, ct);
+                if (request.ClientTotalAmount.HasValue && request.ClientTotalAmount.Value != order.TotalAmount)
+                {
+                    return ApiResult<OrderResult>.BusinessFailure(
+                            OrderErrors.ClientTotalMismatch)
+                        .AddDetail("clientTotalAmount", request.ClientTotalAmount.Value)
+                        .AddDetail("calculatedTotalAmount", order.TotalAmount);
+                }
 
-            await _orderStore.SaveChangesAsync(ct);
+                await _orderStore.AddOrderAsync(order, ct);
 
-            var orderResult = OrderResultMapper.ToResult(order);
-            statusChangedEvent = new OrderStatusChangedEvent
-            {
-                OrderId = order.Id,
-                OrderNumber = order.OrderNumber,
-                KioskId = order.KioskId,
-                OrganizationId = order.OrganizationId,
-                StoreId = order.StoreId,
-                OldStatus = "None",
-                NewStatus = orderResult.Status.ToString(),
-                PaymentStatus = orderResult.PaymentStatus.ToString(),
-                CustomerStatus = orderResult.CustomerStatus,
-                CustomerStatusMessage = orderResult.CustomerStatusMessage,
-                CanRetryPayment = orderResult.CanRetryPayment,
-                RequiresStaffSupport = orderResult.RequiresStaffSupport,
-                UpdatedAt = orderResult.PlacedAt,
-                Version = 1
-            };
+                var history = new OrderStatusHistory
+                {
+                    Id = Guid.NewGuid(),
+                    OrderId = order.Id,
+                    FromStatus = Domain.Orders.Enums.OrderStatus.Draft,
+                    ToStatus = Domain.Orders.Enums.OrderStatus.PendingPayment,
+                    ChangedAt = now,
+                    Reason = "Order placed by customer."
+                };
+                await _orderStore.AddOrderStatusHistoryAsync(history, ct);
 
-            return ApiResult<OrderResult>.Success(orderResult, "Order created.", 201);
-        }, cancellationToken);
+                await _orderStore.SaveChangesAsync(ct);
+
+                var orderResult = OrderResultMapper.ToResult(order);
+                statusChangedEvent = new OrderStatusChangedEvent
+                {
+                    OrderId = order.Id,
+                    OrderNumber = order.OrderNumber,
+                    KioskId = order.KioskId,
+                    OrganizationId = order.OrganizationId,
+                    StoreId = order.StoreId,
+                    OldStatus = "None",
+                    NewStatus = orderResult.Status.ToString(),
+                    PaymentStatus = orderResult.PaymentStatus.ToString(),
+                    CustomerStatus = orderResult.CustomerStatus,
+                    CustomerStatusMessage = orderResult.CustomerStatusMessage,
+                    CanRetryPayment = orderResult.CanRetryPayment,
+                    RequiresStaffSupport = orderResult.RequiresStaffSupport,
+                    UpdatedAt = orderResult.PlacedAt,
+                    Version = 1
+                };
+
+                return ApiResult<OrderResult>.Success(orderResult, "Order created.", 201);
+            }, cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            statusChangedEvent = null;
+            var replay = await ResolveConcurrentReplayAsync(
+                scopedIdempotencyKey,
+                command,
+                request,
+                clientOrderId,
+                cancellationToken);
+            if (replay is null)
+                throw;
+
+            result = replay;
+        }
 
         if (result.Succeeded && statusChangedEvent is not null)
         {
@@ -194,6 +221,40 @@ public sealed class PlaceOrderCommandHandler
         }
 
         return result;
+    }
+
+    private async Task<ApiResult<OrderResult>?> ResolveConcurrentReplayAsync(
+        string scopedIdempotencyKey,
+        PlaceOrderCommand command,
+        PlaceOrderRequest request,
+        string? clientOrderId,
+        CancellationToken cancellationToken)
+    {
+        var existingByIdempotencyKey = await _orderStore.GetOrderByIdempotencyKeyAsync(
+            scopedIdempotencyKey,
+            cancellationToken);
+        if (existingByIdempotencyKey is not null)
+        {
+            return IsEquivalentIdempotentRequest(existingByIdempotencyKey, command, request)
+                ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByIdempotencyKey), "Order already created.")
+                : ApiResult<OrderResult>.BusinessFailure(
+                    OrderErrors.IdempotencyConflict);
+        }
+
+        if (clientOrderId is null)
+            return null;
+
+        var existingByClientOrderId = await _orderStore.GetOrderByClientOrderIdAsync(
+            command.KioskId,
+            clientOrderId,
+            cancellationToken);
+        if (existingByClientOrderId is null)
+            return null;
+
+        return IsEquivalentIdempotentRequest(existingByClientOrderId, command, request)
+            ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByClientOrderId), "Order already created.")
+            : ApiResult<OrderResult>.BusinessFailure(
+                OrderErrors.ClientOrderIdConflict);
     }
 
     private static string? NormalizeOptional(string? value)

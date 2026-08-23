@@ -71,6 +71,7 @@ public sealed class PlaceOrderOperationalAvailabilityTests
 
         Assert.NotNull(failure);
         Assert.Equal(409, failure.StatusCode);
+        Assert.Equal("SALES.MENU_ITEM_PAUSED", failure.BusinessError!.Code);
         Assert.Contains("paused", failure.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

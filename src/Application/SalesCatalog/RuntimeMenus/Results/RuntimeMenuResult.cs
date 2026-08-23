@@ -28,5 +28,6 @@ public sealed class RuntimeMenuAdmissionResult
 public sealed class RuntimeMenuAdmissionBlockerResult
 {
     public string Code { get; set; } = null!;
+    public string Message { get; set; } = null!;
     public string Scope { get; set; } = null!;
 }

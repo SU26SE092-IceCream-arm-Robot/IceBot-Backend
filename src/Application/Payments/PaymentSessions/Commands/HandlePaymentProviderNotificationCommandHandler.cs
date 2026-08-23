@@ -49,7 +49,10 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
 
         if (string.IsNullOrWhiteSpace(request.RawPayload))
         {
-            return ApiResult<PaymentNotificationResult>.Fail("Webhook payload is required.", 400);
+            return ApiResult<PaymentNotificationResult>.ValidationFailure(new()
+            {
+                ["rawPayload"] = ["Webhook payload is required."]
+            });
         }
 
         ProviderPaymentNotification notification;
@@ -60,9 +63,18 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                 request.Signature,
                 cancellationToken);
         }
-        catch (AppException ex)
+        catch (ProviderPaymentNotificationVerificationException exception)
         {
-            return ApiResult<PaymentNotificationResult>.Fail(ex.Message, ex.StatusCode);
+            return exception.Kind switch
+            {
+                ProviderPaymentNotificationVerificationFailureKind.InvalidPayload =>
+                    ApiResult<PaymentNotificationResult>.BusinessFailure(PaymentErrors.WebhookPayloadInvalid),
+                ProviderPaymentNotificationVerificationFailureKind.InvalidSignature =>
+                    ApiResult<PaymentNotificationResult>.BusinessFailure(PaymentErrors.WebhookVerificationFailed),
+                ProviderPaymentNotificationVerificationFailureKind.ConfigurationUnavailable =>
+                    ApiResult<PaymentNotificationResult>.BusinessFailure(PaymentErrors.WebhookConfigurationUnavailable),
+                _ => throw new ArgumentOutOfRangeException(nameof(exception.Kind), exception.Kind, "Unsupported webhook verification failure.")
+            };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -70,7 +82,8 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         }
         catch (Exception ex)
         {
-            return ApiResult<PaymentNotificationResult>.Fail(ex.Message, 400);
+            _logger.LogError(ex, "Unexpected payment webhook verification failure.");
+            return ApiResult<PaymentNotificationResult>.Fail("Payment webhook processing failed.", 500);
         }
 
         OrderStatus originalStatus = OrderStatus.Draft;
@@ -92,6 +105,7 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         bool requiresStaffSupport = false;
         bool requiresMachineExecution = false;
         var verifiedUnmatched = false;
+        PaymentWebhookAcknowledgementIssue? acknowledgementIssue = null;
 
         var result = await _paymentStore.ExecuteInTransactionAsync(async ct =>
         {
@@ -129,14 +143,14 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
                         StringComparison.Ordinal);
                     if (!samePaymentIdentity || !samePayload)
                     {
-                        return ApiResult<PaymentNotificationResult>.Fail(
-                            "Provider event id was already used with a different payment or payload.", 409);
+                        acknowledgementIssue = PaymentWebhookAcknowledgementIssue.EventIdentityConflict;
+                        return AcknowledgeExistingCallback(existingCallback);
                     }
 
                     if (existingCallback.ProcessingStatus != PaymentCallbackProcessingStatus.Processed)
                     {
-                        return ApiResult<PaymentNotificationResult>.Fail(
-                            existingCallback.LastError ?? "The existing payment callback was rejected.", 409);
+                        acknowledgementIssue = PaymentWebhookAcknowledgementIssue.PreviouslyIgnored;
+                        return AcknowledgeExistingCallback(existingCallback);
                     }
 
                     var existingPayment = existingCallback.PaymentTransaction;
@@ -198,10 +212,17 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
             var validationError = PaymentNotificationApplier.ValidateNotification(paymentTransaction, notification);
             if (validationError is not null)
             {
-                callback.MarkIgnored(validationError, DateTimeOffset.UtcNow);
+                callback.MarkIgnored(PaymentNotificationApplier.ToDiagnosticCode(validationError.Value), DateTimeOffset.UtcNow);
                 await _paymentStore.AddPaymentCallbackAsync(callback, ct);
                 await _paymentStore.SaveChangesAsync(ct);
-                return ApiResult<PaymentNotificationResult>.Fail(validationError, 409);
+                acknowledgementIssue = PaymentWebhookAcknowledgementIssue.InvalidSettlement;
+                return ApiResult<PaymentNotificationResult>.Success(new PaymentNotificationResult
+                {
+                    PaymentTransactionId = paymentTransaction.Id,
+                    OrderId = paymentTransaction.OrderId,
+                    Status = paymentTransaction.Status,
+                    AlreadyProcessed = false
+                }, "Payment callback acknowledged.");
             }
 
             await _paymentStore.AddPaymentCallbackAsync(callback, ct);
@@ -294,6 +315,21 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
             return result;
         }
 
+        if (acknowledgementIssue is not null)
+        {
+            if (acknowledgementIssue == PaymentWebhookAcknowledgementIssue.EventIdentityConflict)
+            {
+                PaymentWebhookMetrics.RecordVerifiedEventConflict();
+            }
+
+            _logger.LogWarning(
+                "Verified payment callback acknowledged without applying a settlement. Issue={Issue}, Provider={Provider}, EventId={EventId}",
+                acknowledgementIssue,
+                notification.Provider,
+                notification.ProviderEventId);
+            return result;
+        }
+
         if (result.Succeeded && result.Data is not null)
         {
             if (txStatusChanged)
@@ -354,5 +390,21 @@ public sealed class HandlePaymentProviderNotificationCommandHandler
         }
 
         return result;
+    }
+
+    private static ApiResult<PaymentNotificationResult> AcknowledgeExistingCallback(PaymentCallback callback) =>
+        ApiResult<PaymentNotificationResult>.Success(new PaymentNotificationResult
+        {
+            PaymentTransactionId = callback.PaymentTransactionId,
+            OrderId = callback.PaymentTransaction.OrderId,
+            Status = callback.PaymentTransaction.Status,
+            AlreadyProcessed = true
+        }, "Payment callback acknowledged.");
+
+    private enum PaymentWebhookAcknowledgementIssue
+    {
+        EventIdentityConflict,
+        PreviouslyIgnored,
+        InvalidSettlement
     }
 }

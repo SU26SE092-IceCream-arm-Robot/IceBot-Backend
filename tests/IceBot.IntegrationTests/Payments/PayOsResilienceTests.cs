@@ -103,7 +103,7 @@ public sealed class PayOsResilienceTests
             Payment(gateway),
             new Order { OrderNumber = "ORDER-1" }));
 
-        Assert.True(exception.OutcomeUnknown);
+        Assert.Equal(ProviderPaymentSessionFailureKind.OutcomeUnknown, exception.FailureKind);
         Assert.Contains("transient", failureKinds);
     }
 

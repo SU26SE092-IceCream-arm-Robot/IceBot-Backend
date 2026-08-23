@@ -11,7 +11,7 @@ public class ApiResult<T>
     public Dictionary<string, object>? Details { get; set; }
     public Dictionary<string, List<string>>? ValidationErrors { get; set; }
     public string? BusinessError { get; set; }
-    public string? SystemError { get; set; }
+    public string? SystemError { get; private set; }
 
     public ApiResult()
     {
@@ -41,7 +41,6 @@ public class ApiResult<T>
         string message,
         int statusCode = 400,
         string? businessError = null,
-        string? systemError = null,
         Dictionary<string, List<string>>? validationErrors = null)
     {
         return new ApiResult<T>
@@ -50,9 +49,24 @@ public class ApiResult<T>
             StatusCode = statusCode,
             Message = message,
             BusinessError = businessError,
-            SystemError = systemError,
             ValidationErrors = validationErrors
         };
+    }
+
+    public static ApiResult<T> BusinessFailure(ApiBusinessErrorDefinition error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+
+        return Fail(error.Message, error.StatusCode, businessError: error.Code);
+    }
+
+    public static ApiResult<T> ValidationFailure(
+        Dictionary<string, List<string>> validationErrors,
+        string message = "Validation failed")
+    {
+        ArgumentNullException.ThrowIfNull(validationErrors);
+
+        return Fail(message, 400, validationErrors: validationErrors);
     }
 
     public ApiResult<T> AddDetail(string key, object value)
@@ -75,15 +89,10 @@ public class ApiResult<T>
         return this;
     }
 
-    public ApiResult<T> SetBusinessError(string message)
+    public ApiResult<T> SetBusinessErrorCode(string code)
     {
-        BusinessError = message;
-        return this;
-    }
-
-    public ApiResult<T> SetSystemError(string message)
-    {
-        SystemError = message;
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        BusinessError = code;
         return this;
     }
 

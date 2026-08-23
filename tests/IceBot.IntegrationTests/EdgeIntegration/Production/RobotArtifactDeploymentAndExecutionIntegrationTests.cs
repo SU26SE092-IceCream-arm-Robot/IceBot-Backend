@@ -107,6 +107,42 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
     : EdgeOperationalIntegrationTestBase(fixture)
 {
     [IntegrationFact]
+    public async Task ConcurrentEquivalentCheckoutReplay_PersistsOneOrder()
+    {
+        var runtime = await CreateActiveRuntimeAsync();
+        var idempotencyKey = $"checkout-replay-{Guid.NewGuid():N}";
+        var clientOrderId = $"checkout-client-{Guid.NewGuid():N}";
+        await EnsureSourceClientDeviceAsync(runtime.Graph);
+
+        var results = await Task.WhenAll(
+            PlaceCustomerOrderAsync(runtime.Graph, idempotencyKey, clientOrderId),
+            PlaceCustomerOrderAsync(runtime.Graph, idempotencyKey, clientOrderId));
+
+        Assert.Equal(results[0].Id, results[1].Id);
+        await using var assertionContext = _fixture.CreateDbContext();
+        Assert.Equal(1, await assertionContext.Orders.CountAsync(order =>
+            order.IdempotencyKey != null && order.IdempotencyKey.EndsWith(idempotencyKey)));
+    }
+
+    [IntegrationFact]
+    public async Task ConcurrentEquivalentPaymentSessionReplay_PersistsOneTransaction()
+    {
+        var runtime = await CreateActiveRuntimeAsync();
+        await EnsureCashPaymentMethodAsync();
+        var order = await PlaceCustomerOrderAsync(runtime.Graph);
+        var idempotencyKey = $"payment-replay-{Guid.NewGuid():N}";
+
+        var results = await Task.WhenAll(
+            CreateCashPaymentSessionAsync(order, idempotencyKey),
+            CreateCashPaymentSessionAsync(order, idempotencyKey));
+
+        Assert.Equal(results[0].PaymentTransactionId, results[1].PaymentTransactionId);
+        await using var assertionContext = _fixture.CreateDbContext();
+        Assert.Equal(1, await assertionContext.PaymentTransactions.CountAsync(payment =>
+            payment.OrderId == order.Id && payment.IdempotencyKey != null && payment.IdempotencyKey.EndsWith(idempotencyKey)));
+    }
+
+    [IntegrationFact]
     public async Task CustomerCheckout_CashConfirmation_DispatchesAndCompletesWithSimulatedExecution()
     {
         var runtime = await CreateActiveRuntimeAsync();
@@ -278,7 +314,34 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         await AssertInventoryDispatchBlockedAsync(graph, "inactive");
     }
 
-    private async Task<Application.Orders.PlaceOrder.Results.OrderResult> PlaceCustomerOrderAsync(SmokeGraph graph)
+    private async Task<Guid> EnsureSourceClientDeviceAsync(SmokeGraph graph)
+    {
+        await using var dbContext = _fixture.CreateDbContext();
+        var sourceClientDevice = await dbContext.ClientDevices
+            .SingleOrDefaultAsync(device => device.KioskId == graph.KioskId && device.Status == ClientDeviceStatus.Active);
+        if (sourceClientDevice is not null)
+            return sourceClientDevice.Id;
+
+        var kiosk = await dbContext.Kiosks.SingleAsync(candidate => candidate.Id == graph.KioskId);
+        sourceClientDevice = ClientDevice.Provision(
+            kiosk,
+            ClientDeviceType.SelfOrderTablet,
+            Guid.NewGuid(),
+            "Integration test tablet",
+            null,
+            "Test",
+            DateTimeOffset.UtcNow,
+            Guid.Empty);
+        sourceClientDevice.AddInitialCredential(new byte[32], "test", DateTimeOffset.UtcNow, Guid.Empty);
+        dbContext.ClientDevices.Add(sourceClientDevice);
+        await dbContext.SaveChangesAsync();
+        return sourceClientDevice.Id;
+    }
+
+    private async Task<Application.Orders.PlaceOrder.Results.OrderResult> PlaceCustomerOrderAsync(
+        SmokeGraph graph,
+        string? idempotencyKey = null,
+        string? clientOrderId = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
         var telemetryOptions = Options.Create(new EdgeTelemetryIngestionOptions());
@@ -288,24 +351,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             new InventoryReadinessEvaluator(new InventoryStore(dbContext)),
             telemetryOptions);
         var admissionStore = new OperationalAdmissionReadStore(dbContext);
-        var sourceClientDevice = await dbContext.ClientDevices
-            .SingleOrDefaultAsync(device => device.KioskId == graph.KioskId && device.Status == ClientDeviceStatus.Active);
-        if (sourceClientDevice is null)
-        {
-            var kiosk = await dbContext.Kiosks.SingleAsync(candidate => candidate.Id == graph.KioskId);
-            sourceClientDevice = ClientDevice.Provision(
-                kiosk,
-                ClientDeviceType.SelfOrderTablet,
-                Guid.NewGuid(),
-                "Integration test tablet",
-                null,
-                "Test",
-                DateTimeOffset.UtcNow,
-                Guid.Empty);
-            sourceClientDevice.AddInitialCredential(new byte[32], "test", DateTimeOffset.UtcNow, Guid.Empty);
-            dbContext.ClientDevices.Add(sourceClientDevice);
-            await dbContext.SaveChangesAsync();
-        }
+        var sourceClientDeviceId = await EnsureSourceClientDeviceAsync(graph);
         var handler = new PlaceOrderCommandHandler(
             orders,
             new NoOpRealtimeNotificationPublisher(),
@@ -321,11 +367,11 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var result = await handler.HandleAsync(new PlaceOrderCommand
         {
             KioskId = graph.KioskId,
-            SourceClientDeviceId = sourceClientDevice.Id,
-            IdempotencyKey = $"customer-attended-{Guid.NewGuid():N}",
+            SourceClientDeviceId = sourceClientDeviceId,
+            IdempotencyKey = idempotencyKey ?? $"customer-attended-{Guid.NewGuid():N}",
             Request = new PlaceOrderRequest
             {
-                ClientOrderId = $"customer-{Guid.NewGuid():N}",
+                ClientOrderId = clientOrderId ?? $"customer-{Guid.NewGuid():N}",
                 Items = [new PlaceOrderItemRequest { MenuItemId = graph.MenuItemId, Quantity = 1 }]
             }
         });
@@ -335,7 +381,8 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
     }
 
     private async Task<Application.Payments.PaymentSessions.Results.PaymentSessionResult> CreateCashPaymentSessionAsync(
-        Application.Orders.PlaceOrder.Results.OrderResult order)
+        Application.Orders.PlaceOrder.Results.OrderResult order,
+        string? idempotencyKey = null)
     {
         await using var dbContext = _fixture.CreateDbContext();
         var telemetryOptions = Options.Create(new EdgeTelemetryIngestionOptions());
@@ -359,7 +406,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var result = await handler.HandleAsync(new CreatePaymentSessionCommand
         {
             OrderId = order.Id,
-            IdempotencyKey = $"cash-payment-{Guid.NewGuid():N}",
+            IdempotencyKey = idempotencyKey ?? $"cash-payment-{Guid.NewGuid():N}",
             Request = new CreatePaymentSessionRequest
             {
                 PaymentMethodCode = "cash",

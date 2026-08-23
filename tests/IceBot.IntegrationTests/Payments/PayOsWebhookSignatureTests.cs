@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Infrastructure.Payments.Options;
 using Infrastructure.Payments.Providers.PayOS;
+using Application.Payments.Providers;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -33,12 +34,12 @@ public sealed class PayOsWebhookSignatureTests
     {
         var gateway = CreateGateway("test-checksum-key");
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        var exception = await Assert.ThrowsAsync<ProviderPaymentNotificationVerificationException>(() =>
             gateway.ParseAndVerifyNotificationAsync(
                 "{\"data\":{\"orderCode\":\"9999999999999\",\"amount\":30000,\"status\":\"PAID\"}}",
                 "not-a-valid-signature"));
 
-        Assert.Contains("Invalid PayOS webhook signature", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(ProviderPaymentNotificationVerificationFailureKind.InvalidSignature, exception.Kind);
     }
 
     private static PayOsPaymentGateway CreateGateway(string checksumKey) => new(

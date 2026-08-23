@@ -22,9 +22,10 @@ public sealed class ManuallyReconcilePaymentSessionCommandHandler(
         var reason = command.Reason?.Trim();
         if (string.IsNullOrWhiteSpace(reason) || reason.Length > 500)
         {
-            return ApiResult<ManualPaymentSessionReconciliationResult>.Fail(
-                "Reason is required and must be at most 500 characters.",
-                400);
+            return ApiResult<ManualPaymentSessionReconciliationResult>.ValidationFailure(new()
+            {
+                ["reason"] = ["Reason is required and must be at most 500 characters."]
+            });
         }
 
         var payment = await paymentStore.GetPaymentTransactionByIdAsync(
@@ -50,9 +51,8 @@ public sealed class ManuallyReconcilePaymentSessionCommandHandler(
         var requestedAt = DateTimeOffset.UtcNow;
         if (!PaymentSessionInterventionPolicy.CanReconcile(payment, requestedAt))
         {
-            return ApiResult<ManualPaymentSessionReconciliationResult>.Fail(
-                "Payment session is not eligible for reconciliation.",
-                409);
+            return ApiResult<ManualPaymentSessionReconciliationResult>.BusinessFailure(
+                PaymentErrors.ReconciliationNotEligible);
         }
 
         await WriteAuditAsync(

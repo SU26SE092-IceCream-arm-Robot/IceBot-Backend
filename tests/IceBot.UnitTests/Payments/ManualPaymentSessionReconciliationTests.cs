@@ -15,6 +15,28 @@ namespace IceBot.UnitTests.Payments;
 public sealed class ManualPaymentSessionReconciliationTests
 {
     [Fact]
+    public async Task MissingReason_ReturnsFieldValidationWithoutLookupOrAudit()
+    {
+        var store = Substitute.For<IPaymentStore>();
+        var operationLogs = Substitute.For<IOperationLogStore>();
+        var gateway = Substitute.For<IPaymentGateway>();
+        var handler = new ManuallyReconcilePaymentSessionCommandHandler(
+            store,
+            operationLogs,
+            new ReconcilePendingPaymentSessionCommandHandler(
+                store, gateway, Substitute.For<IPaymentInterventionNotifier>()));
+
+        var result = await handler.HandleAsync(new ManuallyReconcilePaymentSessionCommand(
+            Guid.NewGuid(), Guid.NewGuid(), " ", new CurrentUserContext()));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(400, result.StatusCode);
+        Assert.Contains("reason", result.ValidationErrors!.Keys);
+        await store.DidNotReceive().GetPaymentTransactionByIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>());
+        await operationLogs.DidNotReceive().AddAsync(Arg.Any<OperationLog>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task EligibleSession_RestoresInstructionsAndWritesRequestAndResultAudit()
     {
         var order = new Order

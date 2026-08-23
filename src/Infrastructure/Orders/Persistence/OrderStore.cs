@@ -569,6 +569,7 @@ public sealed partial class OrderStore : IOrderStore
         catch
         {
             await transaction.RollbackAsync(cancellationToken);
+            _dbContext.ChangeTracker.Clear();
             throw;
         }
     }

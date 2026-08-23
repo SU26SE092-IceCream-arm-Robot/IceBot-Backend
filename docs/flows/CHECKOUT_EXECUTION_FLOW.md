@@ -3,6 +3,8 @@
 This document describes tablet checkout, payment, edge dispatch, robot execution, and customer-facing status projection.
 
 Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md).
+The public checkout error code, validation, and retry contract lives in
+[API Error Contract](../api/API_ERROR_CONTRACT.md).
 
 ## Search Keywords
 
@@ -30,7 +32,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 7. Tablet calls Cloud Backend to place order. Cloud acquires the kiosk
    customer-session lock and rejects a second non-expired customer session for
    the same kiosk.
-8. Cloud re-evaluates kiosk lifecycle, `KioskOperationalState.Operational`, connectivity, Store opening hours in `Store.TimeZone`, explicit Store sales pause, kiosk-scoped menu-item operational availability, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store, kiosk operational state, operational item pause, or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found.
+8. Cloud re-evaluates kiosk lifecycle, `KioskOperationalState.Operational`, connectivity, Store opening hours in `Store.TimeZone`, explicit Store sales pause, kiosk-scoped menu-item operational availability, Menu/MenuItem lifecycle and scope, Product/Variant availability, Recipe/Ingredient lifecycle, active production route, and every active OptionGroup against the selected option IDs. Checkout calculates server-authoritative prices and stores immutable recipe/option snapshots. A Store, kiosk operational state, operational item pause, or catalog definition that becomes unavailable after a runtime-menu snapshot was issued rejects the order with `409`; a scoped item that does not belong to the kiosk is returned as not found. Request-shape failures return `400` with `validationErrors`; documented `ORDER.*` and `SALES.*` codes distinguish idempotency, stale cart, and admission behavior without message parsing.
 9. Cloud creates:
    - Order
    - OrderItems
@@ -53,7 +55,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 14. Tablet renders QR for PayOS, or directs the customer to Staff for cash.
 15. Customer pays.
 16. Payment provider calls Cloud webhook, or Staff confirms cash receipt.
-17. Cloud verifies a provider callback and signature before payment/order lookup. A verified callback with no matching local provider transaction is acknowledged without creating callback/payment/order evidence or dispatching fulfillment.
+17. Cloud verifies a provider callback and signature before payment/order lookup. Empty bodies are field validation, malformed payloads and invalid signatures are safe `400` Payment errors, and missing verification configuration returns retryable `503`. A verified callback with no matching local provider transaction is acknowledged without creating callback/payment/order evidence or dispatching fulfillment. Verified replays, duplicate event identities, and settlement validation conflicts are acknowledged only after their existing or ignored evidence is durable; callback diagnostics are never returned to the provider.
 18. For a matching payment transaction, Cloud acquires the same kiosk session
    lock, then updates PaymentTransaction = Paid and Order = ReadyForFulfillment
    in one DB transaction. A verified late payment received after another

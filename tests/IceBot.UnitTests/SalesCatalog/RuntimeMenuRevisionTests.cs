@@ -97,6 +97,8 @@ public sealed class RuntimeMenuRevisionTests
         Assert.Empty(result.Data!.Items);
         Assert.False(result.Data.Admission!.CanPlaceOrder);
         Assert.False(result.Data.Admission.CanOpenPayment);
+        Assert.Contains(result.Data.Admission.Blockers, blocker =>
+            blocker.Code == "SALES.KIOSK_CONNECTIVITY_UNAVAILABLE");
         Assert.Equal(1, cache.ReadCount);
     }
 

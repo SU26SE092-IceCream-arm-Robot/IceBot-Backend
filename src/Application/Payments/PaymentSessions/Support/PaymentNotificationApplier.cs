@@ -5,9 +5,15 @@ using Domain.Payments.Enums;
 
 namespace Application.Payments.PaymentSessions.Support;
 
+internal enum PaymentNotificationValidationFailure
+{
+    PaidAmountMissing,
+    PaidAmountMismatch
+}
+
 internal static class PaymentNotificationApplier
 {
-    public static string? ValidateNotification(
+    public static PaymentNotificationValidationFailure? ValidateNotification(
         PaymentTransaction paymentTransaction,
         ProviderPaymentNotification notification)
     {
@@ -18,13 +24,20 @@ internal static class PaymentNotificationApplier
 
         if (!notification.PaidAmount.HasValue)
         {
-            return "Paid webhook amount is required.";
+            return PaymentNotificationValidationFailure.PaidAmountMissing;
         }
 
         return notification.PaidAmount.Value == paymentTransaction.Amount
             ? null
-            : "Paid webhook amount does not match the payment transaction amount.";
+            : PaymentNotificationValidationFailure.PaidAmountMismatch;
     }
+
+    public static string ToDiagnosticCode(PaymentNotificationValidationFailure failure) => failure switch
+    {
+        PaymentNotificationValidationFailure.PaidAmountMissing => "PAID_AMOUNT_MISSING",
+        PaymentNotificationValidationFailure.PaidAmountMismatch => "PAID_AMOUNT_MISMATCH",
+        _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, "Unsupported payment notification validation failure.")
+    };
 
     public static void ApplyNotification(PaymentTransaction paymentTransaction, ProviderPaymentNotification notification)
     {

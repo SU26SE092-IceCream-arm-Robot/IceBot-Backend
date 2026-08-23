@@ -99,21 +99,21 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             PayOsResilienceMetrics.RecordTimeout();
             throw new ProviderPaymentSessionCreationException(
                 "PayOS payment-session creation timed out.",
-                outcomeUnknown: true);
+                ProviderPaymentSessionFailureKind.OutcomeUnknown);
         }
         catch (BrokenCircuitException)
         {
             PayOsResilienceMetrics.RecordCircuitOpen();
             throw new ProviderPaymentSessionCreationException(
                 "PayOS payment-session creation was blocked by the open circuit.",
-                outcomeUnknown: false);
+                ProviderPaymentSessionFailureKind.Unavailable);
         }
         catch (HttpRequestException ex)
         {
             PayOsResilienceMetrics.RecordTransientFailure();
             throw new ProviderPaymentSessionCreationException(
                 "PayOS payment-session creation failed at transport level.",
-                outcomeUnknown: true,
+                ProviderPaymentSessionFailureKind.OutcomeUnknown,
                 ex);
         }
 
@@ -131,7 +131,9 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
                 _logger.LogError("PayOS create payment link failed. Status={StatusCode}, Body={Body}", response.StatusCode, responseJson);
                 throw new ProviderPaymentSessionCreationException(
                     "PayOS create payment link failed.",
-                    outcomeUnknown: (int)response.StatusCode is 408 or 429 or >= 500);
+                    (int)response.StatusCode is 408 or 429 or >= 500
+                        ? ProviderPaymentSessionFailureKind.OutcomeUnknown
+                        : ProviderPaymentSessionFailureKind.Rejected);
             }
 
             var apiResponse = JsonSerializer.Deserialize<PayOsApiResponse<PaymentLinkData>>(responseJson, JsonOptions);
@@ -139,7 +141,9 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             {
                 var message = apiResponse?.Description ?? "Invalid PayOS response.";
                 _logger.LogError("PayOS create payment link returned error: {Message}. Body={Body}", message, responseJson);
-                throw new ProviderPaymentSessionCreationException(message, outcomeUnknown: false);
+                throw new ProviderPaymentSessionCreationException(
+                    message,
+                    ProviderPaymentSessionFailureKind.Rejected);
             }
 
             if (apiResponse.Data.OrderCode != orderCode ||
@@ -147,9 +151,9 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
                  string.IsNullOrWhiteSpace(apiResponse.Data.QrCode)))
             {
                 _logger.LogError("PayOS create payment link returned incomplete data. Body={Body}", responseJson);
-                throw new ProviderPaymentSessionCreationException(
-                    "PayOS returned an invalid or incomplete payment session.",
-                    outcomeUnknown: true);
+            throw new ProviderPaymentSessionCreationException(
+                "PayOS returned an invalid or incomplete payment session.",
+                ProviderPaymentSessionFailureKind.OutcomeUnknown);
             }
 
             return new ProviderPaymentSession
@@ -246,11 +250,38 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        EnsureConfigured(requireApiCredentials: false);
+        try
+        {
+            EnsureConfigured(requireApiCredentials: false);
+        }
+        catch (AppException exception) when (exception.StatusCode == 503)
+        {
+            throw new ProviderPaymentNotificationVerificationException(
+                ProviderPaymentNotificationVerificationFailureKind.ConfigurationUnavailable,
+                exception);
+        }
 
-        using var document = JsonDocument.Parse(rawPayload);
+        JsonDocument document;
+        try
+        {
+            document = JsonDocument.Parse(rawPayload);
+        }
+        catch (JsonException exception)
+        {
+            throw new ProviderPaymentNotificationVerificationException(
+                ProviderPaymentNotificationVerificationFailureKind.InvalidPayload,
+                exception);
+        }
+
+        using (document)
+        {
         var root = document.RootElement;
         var data = root.TryGetProperty("data", out var dataElement) ? dataElement : root;
+        if (root.ValueKind != JsonValueKind.Object || data.ValueKind != JsonValueKind.Object)
+        {
+            throw new ProviderPaymentNotificationVerificationException(
+                ProviderPaymentNotificationVerificationFailureKind.InvalidPayload);
+        }
         var payloadSignature = signature;
 
         if (string.IsNullOrWhiteSpace(payloadSignature) &&
@@ -261,7 +292,8 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
 
         if (string.IsNullOrWhiteSpace(payloadSignature))
         {
-            throw new InvalidOperationException("Missing PayOS webhook signature.");
+            throw new ProviderPaymentNotificationVerificationException(
+                ProviderPaymentNotificationVerificationFailureKind.InvalidSignature);
         }
 
         var expectedSignature = CreateDataSignature(data);
@@ -269,7 +301,8 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
                 Encoding.UTF8.GetBytes(expectedSignature),
                 Encoding.UTF8.GetBytes(payloadSignature)))
         {
-            throw new InvalidOperationException("Invalid PayOS webhook signature.");
+            throw new ProviderPaymentNotificationVerificationException(
+                ProviderPaymentNotificationVerificationFailureKind.InvalidSignature);
         }
 
         var status = GetString(data, "status") ?? GetString(root, "status") ?? GetString(root, "code") ?? "UNKNOWN";
@@ -302,6 +335,7 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             ProviderPaidAt = paidAt,
             RawPayloadJson = rawPayload
         });
+        }
     }
 
     private string CreatePaymentLinkSignature(CreatePaymentLinkRequest request)

@@ -12,16 +12,12 @@ namespace WebAPI.Middlewares
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<GlobalExceptionMiddleware> _logger;
-        private readonly IConfiguration _config;
-
         public GlobalExceptionMiddleware(
             RequestDelegate next,
-            ILogger<GlobalExceptionMiddleware> logger,
-            IConfiguration config)
+            ILogger<GlobalExceptionMiddleware> logger)
         {
             _next = next;
             _logger = logger;
-            _config = config;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -40,7 +36,7 @@ namespace WebAPI.Middlewares
                 {
                     _logger.LogError(ex, "AppException caught for path {Path} in middleware", path);
 
-                    var response = ApiResult<object>.Fail(ex.Message, ex.StatusCode);
+                    var response = ApiResult<object>.Fail(GetSafeMessage(ex.StatusCode), ex.StatusCode);
 
                     if (ex.Errors != null)
                     {
@@ -49,8 +45,6 @@ namespace WebAPI.Middlewares
                             response.AddValidationError(error.Key, error.Value);
                         }
                     }
-
-                    ApplyExceptionDetails(response, ex);
 
                     var httpStatusCode = Enum.IsDefined(typeof(HttpStatusCode), ex.StatusCode)
                         ? (HttpStatusCode)ex.StatusCode
@@ -62,74 +56,57 @@ namespace WebAPI.Middlewares
                 {
                     _logger.LogError(ex, "Database update exception caught");
 
-                    var response = ApiResult<object>.Fail("A database error occurred.", 500)
-                                                  .SetSystemError(ex.InnerException?.Message ?? ex.Message);
-
-                    ApplyExceptionDetails(response, ex);
+                    var response = ApiResult<object>.Fail("A database error occurred.", 500);
                     await WriteResponseAsync(context, response, HttpStatusCode.InternalServerError);
                 }
                 catch (DbException ex)
                 {
                     _logger.LogError(ex, "Database exception caught");
 
-                    var response = ApiResult<object>.Fail("Database error", 500)
-                                                  .SetSystemError(ex.Message);
-
-                    ApplyExceptionDetails(response, ex);
+                    var response = ApiResult<object>.Fail("A database error occurred.", 500);
                     await WriteResponseAsync(context, response, HttpStatusCode.InternalServerError);
                 }
                 catch (UnauthorizedAccessException ex)
                 {
                     _logger.LogError(ex, "UnauthorizedAccessException caught in middleware");
 
-                    var response = ApiResult<object>.Fail("Unauthorized", (int)HttpStatusCode.Unauthorized)
-                                                      .SetSystemError(ex.Message);
-
-                    ApplyExceptionDetails(response, ex);
+                    var response = ApiResult<object>.Fail("Authentication is required.", (int)HttpStatusCode.Unauthorized);
                     await WriteResponseAsync(context, response, HttpStatusCode.Unauthorized);
                 }
                 catch (System.Collections.Generic.KeyNotFoundException ex)
                 {
                     _logger.LogError(ex, "KeyNotFoundException caught in middleware");
 
-                    var response = ApiResult<object>.Fail("Resource not found", (int)HttpStatusCode.NotFound)
-                                                      .SetSystemError(ex.Message);
-
-                    ApplyExceptionDetails(response, ex);
+                    var response = ApiResult<object>.Fail("Resource not found.", (int)HttpStatusCode.NotFound);
                     await WriteResponseAsync(context, response, HttpStatusCode.NotFound);
                 }
                 catch (OperationCanceledException ex)
                 {
                     _logger.LogWarning(ex, "Operation was canceled");
 
-                    var response = ApiResult<object>.Fail("Request was cancelled or timed out", 408)
-                                                  .SetSystemError(ex.Message);
-
-                    ApplyExceptionDetails(response, ex);
+                    var response = ApiResult<object>.Fail("Request was cancelled or timed out.", 408);
                     await WriteResponseAsync(context, response, HttpStatusCode.RequestTimeout);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Unhandled exception caught in middleware");
 
-                    var exposeStackTrace = _config.GetValue<bool>("ErrorHandling:ExposeStackTrace");
-                    var response = ApiResult<object>.Fail("Internal Server Error", (int)HttpStatusCode.InternalServerError)
-                                                      .SetSystemError(ex.Message);
-
-                    ApplyExceptionDetails(response, ex);
+                    var response = ApiResult<object>.Fail("Internal Server Error.", (int)HttpStatusCode.InternalServerError);
                     await WriteResponseAsync(context, response, HttpStatusCode.InternalServerError);
                 }
             }
         }
 
-        private void ApplyExceptionDetails(ApiResult<object> response, Exception ex)
+        private static string GetSafeMessage(int statusCode) => statusCode switch
         {
-            var exposeStackTrace = _config.GetValue<bool>("ErrorHandling:ExposeStackTrace");
-            if (!exposeStackTrace) return;
-
-            response.AddDetail("exceptionType", ex.GetType().FullName ?? "Exception")
-                    .AddDetail("stackTrace", ex.StackTrace ?? string.Empty);
-        }
+            StatusCodes.Status400BadRequest => "Request could not be completed.",
+            StatusCodes.Status401Unauthorized => "Authentication is required.",
+            StatusCodes.Status403Forbidden => "Access is denied.",
+            StatusCodes.Status404NotFound => "Resource not found.",
+            StatusCodes.Status409Conflict => "The requested operation conflicts with the current state.",
+            StatusCodes.Status423Locked => "The requested resource is temporarily locked.",
+            _ => "Request could not be completed."
+        };
 
         private static async Task WriteResponseAsync(HttpContext context, ApiResult<object> response, HttpStatusCode statusCode)
         {

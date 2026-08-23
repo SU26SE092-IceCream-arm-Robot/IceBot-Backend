@@ -3,23 +3,35 @@ using Domain.Catalog.Enums;
 
 namespace Application.SalesCatalog.Rules;
 
+public enum ProductOptionSelectionFailureCode
+{
+    DuplicateSelection,
+    OptionUnavailable,
+    MinimumSelectionNotMet,
+    MaximumSelectionExceeded
+}
+
+public sealed record ProductOptionSelectionFailure(
+    ProductOptionSelectionFailureCode Code,
+    string Message);
+
 public static class ProductOptionSelectionRules
 {
-    public static string? Validate(
+    public static ProductOptionSelectionFailure? Validate(
         IReadOnlyCollection<MenuItemProductOptionReadModel> options,
         IReadOnlyCollection<Guid> selectedOptionIds)
     {
         return Validate(BuildGroupDefinitions(options), options, selectedOptionIds);
     }
 
-    public static string? Validate(
+    public static ProductOptionSelectionFailure? Validate(
         IReadOnlyCollection<MenuItemOptionGroupReadModel> groups,
         IReadOnlyCollection<MenuItemProductOptionReadModel> options,
         IReadOnlyCollection<Guid> selectedOptionIds)
     {
         if (selectedOptionIds.Count != selectedOptionIds.Distinct().Count())
         {
-            return "Selected product options must be unique.";
+            return new(ProductOptionSelectionFailureCode.DuplicateSelection, "Selected product options must be unique.");
         }
 
         var selected = options
@@ -28,7 +40,9 @@ public static class ProductOptionSelectionRules
 
         if (selected.Length != selectedOptionIds.Count || selected.Any(option => !IsSelectable(option)))
         {
-            return "One or more selected product options are unavailable for this menu item.";
+            return new(
+                ProductOptionSelectionFailureCode.OptionUnavailable,
+                "One or more selected product options are unavailable for this menu item.");
         }
 
         foreach (var definition in groups)
@@ -41,12 +55,16 @@ public static class ProductOptionSelectionRules
 
             if (count < minimum)
             {
-                return $"Option group '{definition.OptionGroupName}' requires at least {minimum} selection(s).";
+                return new(
+                    ProductOptionSelectionFailureCode.MinimumSelectionNotMet,
+                    $"Option group '{definition.OptionGroupName}' requires at least {minimum} selection(s).");
             }
 
             if (maximum > 0 && count > maximum)
             {
-                return $"Option group '{definition.OptionGroupName}' allows at most {maximum} selection(s).";
+                return new(
+                    ProductOptionSelectionFailureCode.MaximumSelectionExceeded,
+                    $"Option group '{definition.OptionGroupName}' allows at most {maximum} selection(s).");
             }
         }
 

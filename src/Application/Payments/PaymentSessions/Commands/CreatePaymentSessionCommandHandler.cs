@@ -1,5 +1,7 @@
 using Application.Payments.Abstractions;
+using Application.Payments.PaymentSessions;
 using Application.Payments.PaymentSessions.Mapping;
+using Application.Payments.PaymentSessions.Requests;
 using Application.Payments.PaymentSessions.Results;
 using Application.Payments.PaymentSessions.Support;
 using Application.Payments.Providers;
@@ -42,11 +44,16 @@ public sealed class CreatePaymentSessionCommandHandler
     {
         var orderId = command.OrderId;
         var request = command.Request;
+        var validationErrors = ValidateRequest(request);
+        if (validationErrors is not null)
+        {
+            return ApiResult<PaymentSessionResult>.ValidationFailure(validationErrors);
+        }
+
         if (!ScopedIdempotencyKey.TryNormalize(command.IdempotencyKey, out var idempotencyKey))
         {
-            return ApiResult<PaymentSessionResult>.Fail(
-                $"Idempotency-Key is required and must be at most {ScopedIdempotencyKey.MaxClientKeyLength} characters.",
-                400);
+            return ApiResult<PaymentSessionResult>.BusinessFailure(
+                PaymentErrors.IdempotencyKeyInvalid);
         }
         var scopedIdempotencyKey = ScopedIdempotencyKey.ForOrder(orderId, idempotencyKey);
         var paymentMethodCode = request.PaymentMethodCode.Trim().ToLowerInvariant();
@@ -54,11 +61,6 @@ public sealed class CreatePaymentSessionCommandHandler
         var isCashPayment = CashPaymentMethodResolver.IsCash(paymentMethodCode);
         var isPayOsPayment = string.Equals(paymentMethodCode, PayOsPaymentMethodResolver.MethodCode, StringComparison.Ordinal);
         var providerCode = isCashPayment ? CashPaymentMethodResolver.ProviderCode : _paymentGateway.ProviderCode;
-
-        if (!isCashPayment && !isPayOsPayment)
-        {
-            return ApiResult<PaymentSessionResult>.Fail("Payment method is not supported.", 400);
-        }
 
         var createdNewTransaction = false;
 
@@ -82,24 +84,21 @@ public sealed class CreatePaymentSessionCommandHandler
             {
                 if (!MatchesRequest(existingByIdempotencyKey, orderId, paymentMethodCode, providerCode, expectedCurrency, request.ExpectedAmount))
                 {
-                    return ApiResult<PaymentSessionResult>.Fail(
-                        "Idempotency key was already used for a different payment request.",
-                        409);
+                    return ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.IdempotencyConflict);
                 }
 
                 if (HasExpiredOrderPaymentWindow(order, DateTimeOffset.UtcNow))
                 {
-                    return ApiResult<PaymentSessionResult>.Fail(
-                        "The order payment window has expired.",
-                        409);
+                    return ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.WindowExpired);
                 }
 
                 if (existingByIdempotencyKey.Status == PaymentTransactionStatus.Failed &&
                     !HasPaymentInstructions(existingByIdempotencyKey))
                 {
-                    return ApiResult<PaymentSessionResult>.Fail(
-                        "The previous payment session creation failed. Retry with a new idempotency key.",
-                        409);
+                    return ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.PreviousSessionFailed);
                 }
 
                 return isCashPayment && IsPendingCashConfirmation(existingByIdempotencyKey)
@@ -108,13 +107,15 @@ public sealed class CreatePaymentSessionCommandHandler
                         "Cash payment is awaiting staff confirmation.")
                     : !HasPaymentInstructions(existingByIdempotencyKey) &&
                     existingByIdempotencyKey.Status is PaymentTransactionStatus.Pending or PaymentTransactionStatus.Authorized
-                    ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry with the same idempotency key.", 409)
+                    ? ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.SessionCreationInProgress)
                     : ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(existingByIdempotencyKey));
             }
 
             if (order.PaymentStatus == PaymentStatus.Paid)
             {
-                return ApiResult<PaymentSessionResult>.Fail("Order is already paid.", 409);
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                    PaymentErrors.OrderAlreadyPaid);
             }
 
             var admission = await _admissionEvaluator.EvaluateAsync(
@@ -123,31 +124,35 @@ public sealed class CreatePaymentSessionCommandHandler
                 ct);
             if (!admission.CanOpenPayment)
             {
-                return ApiResult<PaymentSessionResult>.Fail(admission.ToDisplayMessage()!, 409);
+                var blocker = admission.PrimaryBlocker
+                    ?? throw new InvalidOperationException("Blocked kiosk admission must provide a blocker.");
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                    SalesAdmissionErrors.For(blocker.Code));
             }
 
-            var sellabilityError = await _sellabilityGuard.ValidateAsync(order, DateTimeOffset.UtcNow, ct);
-            if (sellabilityError is not null)
+            var sellabilityFailure = await _sellabilityGuard.ValidateAsync(order, DateTimeOffset.UtcNow, ct);
+            if (sellabilityFailure is not null)
             {
-                return ApiResult<PaymentSessionResult>.Fail(sellabilityError, 409);
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                    SalesAdmissionErrors.For(sellabilityFailure.Blocker.Code));
             }
 
             if (order.Status is OrderStatus.Cancelled or OrderStatus.Completed or OrderStatus.Failed or OrderStatus.ExecutionRejected or OrderStatus.RefundRequired)
             {
-                return ApiResult<PaymentSessionResult>.Fail("Order cannot be paid in its current state.", 409);
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                    PaymentErrors.OrderNotPayable);
             }
 
             if (order.TotalAmount <= 0)
             {
-                return ApiResult<PaymentSessionResult>.Fail("Order amount must be greater than zero.", 400);
+                return ApiResult<PaymentSessionResult>.Fail("Order cannot be paid because its total is invalid.", 500);
             }
 
             var now = DateTimeOffset.UtcNow;
             if (HasExpiredOrderPaymentWindow(order, now))
             {
-                return ApiResult<PaymentSessionResult>.Fail(
-                    "The order payment window has expired.",
-                    409);
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                    PaymentErrors.WindowExpired);
             }
 
             var activeSession = await _paymentStore.GetActivePaymentTransactionByOrderIdAsync(order.Id, ct);
@@ -158,7 +163,8 @@ public sealed class CreatePaymentSessionCommandHandler
                         PaymentSessionResultMapper.ToSessionResult(activeSession),
                         "Existing cash payment is awaiting staff confirmation.")
                     : !HasPaymentInstructions(activeSession)
-                    ? ApiResult<PaymentSessionResult>.Fail("Payment session creation is in progress. Retry shortly.", 409)
+                    ? ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.SessionCreationInProgress)
                     : ApiResult<PaymentSessionResult>.Success(
                         PaymentSessionResultMapper.ToSessionResult(activeSession),
                         "Existing active payment session returned.");
@@ -167,9 +173,8 @@ public sealed class CreatePaymentSessionCommandHandler
             if (request.ExpectedAmount != order.TotalAmount ||
                 !string.Equals(expectedCurrency, order.Currency, StringComparison.OrdinalIgnoreCase))
             {
-                return ApiResult<PaymentSessionResult>.Fail(
-                        "Displayed payment amount no longer matches the order total.",
-                        409)
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.AmountChanged)
                     .AddDetail("expectedAmount", request.ExpectedAmount)
                     .AddDetail("orderAmount", order.TotalAmount)
                     .AddDetail("expectedCurrency", expectedCurrency)
@@ -181,13 +186,13 @@ public sealed class CreatePaymentSessionCommandHandler
                 : await PayOsPaymentMethodResolver.EnsurePayOsPaymentMethodAsync(_paymentStore, _paymentGateway.ProviderCode, ct);
             if (paymentMethod is null)
             {
-                return ApiResult<PaymentSessionResult>.Fail("Cash payment method is not configured.", 409);
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                    PaymentErrors.MethodNotConfigured);
             }
             if (!paymentMethod.IsActive)
             {
-                return ApiResult<PaymentSessionResult>.Fail(
-                    isCashPayment ? "Cash payment method is inactive." : "PayOS payment method is inactive.",
-                    409);
+                return ApiResult<PaymentSessionResult>.BusinessFailure(
+                    PaymentErrors.MethodInactive);
             }
 
             var paymentTransaction = new PaymentTransaction
@@ -246,7 +251,8 @@ public sealed class CreatePaymentSessionCommandHandler
             payment.MarkExpired(providerRequestStartedAt);
             payment.ExpiresAt = payment.Order.PaymentDeadlineAt;
             await _paymentStore.SaveChangesAsync(cancellationToken);
-            return ApiResult<PaymentSessionResult>.Fail("The order payment window has expired.", 409);
+            return ApiResult<PaymentSessionResult>.BusinessFailure(
+                PaymentErrors.WindowExpired);
         }
 
         try
@@ -273,27 +279,48 @@ public sealed class CreatePaymentSessionCommandHandler
         catch (ProviderPaymentSessionCreationException ex)
         {
             var now = DateTimeOffset.UtcNow;
-            if (ex.OutcomeUnknown)
+            switch (ex.FailureKind)
             {
-                payment.MarkAttempted(now);
-                payment.ScheduleRetry(
-                    "PROVIDER_SESSION_CREATE_OUTCOME_UNKNOWN",
-                    ex.Message,
-                    now.AddSeconds(30));
-            }
-            else
-            {
-                payment.MarkFailed("PROVIDER_SESSION_CREATE_REJECTED", ex.Message, now);
-            }
+                case ProviderPaymentSessionFailureKind.OutcomeUnknown:
+                    payment.MarkAttempted(now);
+                    payment.ScheduleRetry(
+                        "PROVIDER_SESSION_CREATE_OUTCOME_UNKNOWN",
+                        ex.Message,
+                        now.AddSeconds(30));
+                    await _paymentStore.SaveChangesAsync(cancellationToken);
+                    return ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.ProviderOutcomeUnknown);
 
-            await _paymentStore.SaveChangesAsync(cancellationToken);
-            return ApiResult<PaymentSessionResult>.Fail("Failed to create provider payment session.", 502);
+                case ProviderPaymentSessionFailureKind.Unavailable:
+                    payment.MarkAttempted(now);
+                    payment.ScheduleRetry(
+                        "PROVIDER_SESSION_CREATE_UNAVAILABLE",
+                        ex.Message,
+                        now.AddSeconds(30));
+                    await _paymentStore.SaveChangesAsync(cancellationToken);
+                    return ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.ProviderUnavailable);
+
+                case ProviderPaymentSessionFailureKind.Rejected:
+                    payment.MarkFailed("PROVIDER_SESSION_CREATE_REJECTED", ex.Message, now);
+                    await _paymentStore.SaveChangesAsync(cancellationToken);
+                    return ApiResult<PaymentSessionResult>.BusinessFailure(
+                        PaymentErrors.ProviderRejected);
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(ex.FailureKind), ex.FailureKind, "Unsupported provider failure kind.");
+            }
         }
         catch (Exception ex)
         {
-            payment.MarkFailed("PROVIDER_SESSION_CREATE_FAILED", ex.Message, DateTimeOffset.UtcNow);
+            var now = DateTimeOffset.UtcNow;
+            payment.MarkAttempted(now);
+            payment.ScheduleRetry(
+                "PROVIDER_SESSION_CREATE_UNEXPECTED_FAILURE",
+                ex.Message,
+                now.AddSeconds(30));
             await _paymentStore.SaveChangesAsync(cancellationToken);
-            return ApiResult<PaymentSessionResult>.Fail("Failed to create provider payment session.", 502);
+            throw;
         }
     }
 
@@ -321,4 +348,44 @@ public sealed class CreatePaymentSessionCommandHandler
 
     private static bool HasExpiredOrderPaymentWindow(Order order, DateTimeOffset observedAt) =>
         order.PaymentDeadlineAt != default && order.PaymentDeadlineAt <= observedAt;
+
+    private static Dictionary<string, List<string>>? ValidateRequest(CreatePaymentSessionRequest request)
+    {
+        var errors = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        if (string.IsNullOrWhiteSpace(request.PaymentMethodCode))
+        {
+            AddValidationError(errors, "paymentMethodCode", "Payment method is required.");
+        }
+        else if (request.PaymentMethodCode.Trim().Length > 50 ||
+                 (!CashPaymentMethodResolver.IsCash(request.PaymentMethodCode.Trim()) &&
+                  !string.Equals(
+                      request.PaymentMethodCode.Trim(),
+                      PayOsPaymentMethodResolver.MethodCode,
+                      StringComparison.OrdinalIgnoreCase)))
+        {
+            AddValidationError(errors, "paymentMethodCode", "Payment method is not supported.");
+        }
+
+        if (request.ExpectedAmount <= 0)
+            AddValidationError(errors, "expectedAmount", "Expected amount must be greater than zero.");
+
+        if (string.IsNullOrWhiteSpace(request.ExpectedCurrency) || request.ExpectedCurrency.Trim().Length != 3)
+            AddValidationError(errors, "expectedCurrency", "Expected currency must be a three-letter code.");
+
+        return errors.Count == 0 ? null : errors;
+    }
+
+    private static void AddValidationError(
+        Dictionary<string, List<string>> errors,
+        string field,
+        string message)
+    {
+        if (!errors.TryGetValue(field, out var fieldErrors))
+        {
+            fieldErrors = [];
+            errors[field] = fieldErrors;
+        }
+
+        fieldErrors.Add(message);
+    }
 }

@@ -6,6 +6,7 @@ using Application.SalesCatalog.RuntimeMenus.Services;
 using Application.SalesCatalog.RuntimeMenus.Support;
 using Application.SalesCatalog.Admission.Services;
 using Application.SalesCatalog.Admission.Abstractions;
+using Application.SalesCatalog.Admission;
 using Domain.Catalog.Enums;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
@@ -47,7 +48,9 @@ public sealed class GetKioskRuntimeMenuQueryHandler
         var admission = await _kioskAdmission.EvaluateAsync(kiosk, new(now), cancellationToken);
         if (!admission.CanExposeCatalog)
         {
-            return ApiResult<RuntimeMenuResult>.Fail(admission.ToDisplayMessage()!, 409);
+            var blocker = admission.PrimaryBlocker
+                ?? throw new InvalidOperationException("Blocked kiosk admission must provide a blocker.");
+            return ApiResult<RuntimeMenuResult>.BusinessFailure(SalesAdmissionErrors.For(blocker.Code));
         }
 
         var projection = await _cache.GetOrCreateAsync(
@@ -92,7 +95,8 @@ public sealed class GetKioskRuntimeMenuQueryHandler
                 EvidenceValidUntil = admission.EvidenceValidUntil,
                 Blockers = admission.Blockers.Select(blocker => new RuntimeMenuAdmissionBlockerResult
                 {
-                    Code = blocker.Code.ToString(),
+                    Code = SalesAdmissionErrors.For(blocker.Code).Code,
+                    Message = SalesAdmissionErrors.For(blocker.Code).Message,
                     Scope = blocker.Scope.ToString()
                 }).ToList()
             }

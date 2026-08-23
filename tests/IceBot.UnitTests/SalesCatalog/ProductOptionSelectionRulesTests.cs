@@ -13,7 +13,9 @@ public sealed class ProductOptionSelectionRulesTests
 
         var error = ProductOptionSelectionRules.Validate([option], []);
 
-        Assert.Equal("Option group 'Toppings' requires at least 1 selection(s).", error);
+        Assert.NotNull(error);
+        Assert.Equal(ProductOptionSelectionFailureCode.MinimumSelectionNotMet, error.Code);
+        Assert.Equal("Option group 'Toppings' requires at least 1 selection(s).", error.Message);
     }
 
     [Fact]
@@ -21,7 +23,9 @@ public sealed class ProductOptionSelectionRulesTests
     {
         var error = ProductOptionSelectionRules.Validate([], [Guid.NewGuid()]);
 
-        Assert.Equal("One or more selected product options are unavailable for this menu item.", error);
+        Assert.NotNull(error);
+        Assert.Equal(ProductOptionSelectionFailureCode.OptionUnavailable, error.Code);
+        Assert.Equal("One or more selected product options are unavailable for this menu item.", error.Message);
     }
 
     [Fact]
@@ -51,9 +55,9 @@ public sealed class ProductOptionSelectionRulesTests
         };
 
         Assert.False(ProductOptionSelectionRules.IsSatisfiable([option]));
-        Assert.Equal(
-            "One or more selected product options are unavailable for this menu item.",
-            ProductOptionSelectionRules.Validate([option], [option.ProductOptionId]));
+        var error = ProductOptionSelectionRules.Validate([option], [option.ProductOptionId]);
+        Assert.NotNull(error);
+        Assert.Equal(ProductOptionSelectionFailureCode.OptionUnavailable, error.Code);
     }
 
     [Fact]
@@ -71,7 +75,9 @@ public sealed class ProductOptionSelectionRulesTests
 
         var error = ProductOptionSelectionRules.Validate([group], [], []);
 
-        Assert.Equal("Option group 'Toppings' requires at least 1 selection(s).", error);
+        Assert.NotNull(error);
+        Assert.Equal(ProductOptionSelectionFailureCode.MinimumSelectionNotMet, error.Code);
+        Assert.Equal("Option group 'Toppings' requires at least 1 selection(s).", error.Message);
     }
 
     private static MenuItemProductOptionReadModel CreateOption(bool isRequired, int minSelections)

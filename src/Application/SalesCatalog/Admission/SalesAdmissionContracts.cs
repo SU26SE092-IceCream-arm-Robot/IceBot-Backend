@@ -52,7 +52,9 @@ public sealed record KioskSalesAdmissionDecision(
     DateTimeOffset EvaluatedAt,
     DateTimeOffset? EvidenceValidUntil)
 {
-    public string? ToDisplayMessage() => Blockers.FirstOrDefault()?.Code switch
+    public SalesAdmissionBlocker? PrimaryBlocker => SalesAdmissionErrors.SelectPrimary(Blockers);
+
+    public string? ToDisplayMessage() => PrimaryBlocker?.Code switch
     {
         SalesAdmissionBlockerCode.OrganizationInactive => "Organization is not active for sales.",
         SalesAdmissionBlockerCode.StoreInactive => "Store is not active for sales.",
@@ -73,7 +75,9 @@ public sealed record MenuItemOperationalDecision(
     IReadOnlyList<SalesAdmissionWarning> Warnings,
     IReadOnlySet<string> SupportedProductionOptionCodes)
 {
-    public string? ToDisplayMessage(string displayName) => Blockers.FirstOrDefault()?.Code switch
+    public SalesAdmissionBlocker? PrimaryBlocker => SalesAdmissionErrors.SelectPrimary(Blockers);
+
+    public string? ToDisplayMessage(string displayName) => PrimaryBlocker?.Code switch
     {
         SalesAdmissionBlockerCode.MenuItemPaused => $"Menu item '{displayName}' is paused for this kiosk.",
         SalesAdmissionBlockerCode.ProductionRouteUnavailable =>

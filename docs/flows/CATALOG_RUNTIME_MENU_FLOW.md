@@ -21,10 +21,15 @@ Catalog
 
 - Catalog owns product definitions and recipes.
 - Sales Catalog owns sellable menu items and prices.
-- Cloud runtime-menu reads expose only active organization/store/kiosk catalog data; temporary admission blockers such as store closure, Edge loss, or an occupied customer session return a bounded unavailable state with no sellable items.
+- Cloud runtime-menu reads expose only active organization/store/kiosk catalog data; temporary admission blockers such as store closure, Edge loss, or an occupied customer session return a bounded unavailable state with no sellable items. Each exposed blocker includes its stable `SALES.*` code, safe message, and scope; consumers do not infer meaning from a free-form message.
 - An empty Store schedule means no opening-hours restriction. Once any day is configured, an omitted day is treated as closed; opening is inclusive and closing is exclusive. `OpensAt > ClosesAt` represents an overnight interval that continues until the following day's close time.
 - Runtime menu is a static catalog projection overlaid with fresh operational admission evidence; it is not a machine-readiness guarantee retained in cache.
 - Kiosk connectivity, lifecycle, store admission, customer-session occupancy, route/readiness/capability, inventory, and menu-item pause are evaluated on every request; the customer receives only safe blocker codes and scopes.
+- Runtime-menu blocker codes use the public `SALES.*` taxonomy in
+  [API Error Contract](../api/API_ERROR_CONTRACT.md). They are stable client
+  behavior signals, not enum names, resource IDs, or technical evidence. When
+  an order or payment is blocked by sales admission, the same highest-priority
+  `SALES.*` code is returned as `businessError`.
 - A kiosk-scoped pause or recovery takes effect without changing shared catalog data. SignalR/cache invalidation improves recovery latency only; authoritative checkout evaluates fresh evidence.
 - The optional Redis cache stores static kiosk catalog candidates (`Revision` and items), never request-scoped `SnapshotId`, generated time, inventory, route, or readiness evidence.
 - Redis caching is bounded-TTL acceleration, not sales authority: cache failure falls back to the database projection, and checkout still revalidates sellability transactionally. Cache expiry may delay static catalog visibility by at most the configured distributed TTL plus a short process-local TTL.
