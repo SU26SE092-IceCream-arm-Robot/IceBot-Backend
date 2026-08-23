@@ -18,6 +18,11 @@ environment variables
 
 Use environment variables or a deployment secret store for credentials and environment-specific addresses. Values marked **Use appsettings default** below do not need to be repeated unless the deployment intentionally changes them.
 
+Startup gates, migration-job ownership, development seed, and explicit repair
+rules are defined in [Startup And Bootstrap Rules](STARTUP_AND_BOOTSTRAP_RULES.md).
+Deployment must not replace that sequence with API-host startup repair or remote
+provider reachability probes.
+
 ## Docker Compose Boundary
 
 Backend docker compose, when added, should contain only backend app runtime dependencies such as PostgreSQL, Redis, and backend-owned infrastructure. Do not require `IceBot-Tools` to run the backend.
@@ -125,6 +130,18 @@ The runtime-menu cache is optional. It accelerates the authenticated client-devi
 
 Redis loss must not make kiosk ordering unavailable: the backend logs the cache failure, records a metric, and resolves the projection from PostgreSQL. Do not set a long TTL to compensate for slow catalog queries; profile and fix the query path instead.
 
+## Catalog Image Storage
+
+| Area | Configuration key | Priority | Deploy action |
+| --- | --- | --- | --- |
+| Cloudinary account | `Media__Cloudinary__CloudName`, `Media__Cloudinary__ApiKey`, `Media__Cloudinary__ApiSecret` | **P1 Feature** | Supply from the secret store when catalog-image authoring is enabled. |
+| Cloudinary object namespace | `Media__Cloudinary__RootFolder` | **P1 Feature** | Set one environment namespace, for example `icebot/production`; generated image IDs are relative to this folder. |
+| Catalog image upload limit | `Media__Cloudinary__MaxUploadBytes` | **P2** | Default is 5 MiB; allowed range is 1 byte to 20 MiB. |
+| Catalog image dimensions | `Media__Cloudinary__MinDimensionPixels`, `Media__Cloudinary__MaxDimensionPixels` | **P2** | Keep the default `400` and `4096` unless the product presentation contract changes. |
+| Catalog image cleanup | `Media__Cloudinary__Cleanup__Enabled`, `__IntervalMinutes`, `__BatchSize` | **P1 Feature** | Keep enabled in production. Cleanup retries provider deletes under a distributed lock; it must not be replaced by a manual scheduled delete. |
+
+Cloudinary configuration and reachability do not block Backend startup or `/health/ready`. A configuration or provider outage returns `503` only from catalog-image upload and delete operations. Use the protected diagnostics endpoint with external ping enabled to verify live Cloudinary credentials and reachability.
+
 ## Robot Artifact Storage
 
 | Area | Configuration key | Priority | Deploy action |
@@ -145,7 +162,7 @@ Redis loss must not make kiosk ordering unavailable: the backend logs the cache 
 | Cleanup delete limit | `RobotArtifacts__ObjectStorage__OrphanCleanupMaxDeletesPerRun` | **P2** | Use appsettings default `100`. |
 | Authoring import staging retention | `RobotArtifacts__ObjectStorage__AuthoringImportRetentionHours` | **P2** | Use appsettings default `168` hours. The window applies to Applied import staging; Uploaded, Validated, and Failed imports retain staging while retry actions remain available. Discarded imports are eligible for cleanup after the orphan grace period. Import metadata/provenance remains in PostgreSQL after staging ZIP removal. |
 
-Object storage is validated before background jobs start. Connection failure, invalid credentials, or a missing bucket while `AutoCreateBucket=false` stops application startup. This prevents the API from reporting healthy while artifact upload and deployment are unavailable.
+Object-storage configuration is validated at startup, but the Backend does not make a remote storage call while starting. A temporary object-storage outage must not take unrelated API, order, or authentication workflows down. Artifact import, upload, download, and deployment operations fail only at their own boundary; use the protected diagnostics endpoint with external ping enabled to verify live credentials, bucket access, and reachability.
 
 ## Runtime Safety And Capacity
 
@@ -257,16 +274,16 @@ GET /management/diagnostics/health
 X-Diagnostics-Key: <Diagnostics__ApiKey>
 ```
 
-This endpoint returns safe checks for database connectivity, migration status, and required config presence. It does not return secret values.
+This endpoint returns safe checks for database connectivity, migration status, and required config presence. It includes account JWT, SMTP, Firebase, PayOS, Cloudinary catalog-image storage, robot artifact object storage, the client order-token key ring, and client-device security. It does not return secret values.
 
-Realtime SMTP, Firebase, and PayOS checks are disabled by default. Enable them only for CI/CD or controlled diagnostics:
+Realtime SMTP, Firebase, PayOS, Cloudinary, and robot artifact object-storage checks are disabled by default. Enable them only for CI/CD or controlled diagnostics:
 
 ```text
 Diagnostics__EnableExternalPing=true
 Diagnostics__ExternalPingTimeoutSeconds=5
 ```
 
-When enabled, diagnostics performs provider reachability checks without sending email or creating payment sessions. `/health/ready` still checks database readiness only.
+When enabled, diagnostics performs provider reachability checks without sending email, creating payment sessions, uploading catalog images, or modifying artifact storage. `/health/ready` still checks database readiness only.
 
 ## Notes
 
@@ -278,7 +295,7 @@ When enabled, diagnostics performs provider reachability checks without sending 
 - Set `ErrorHandling__ExposeStackTrace=false` and `Observability__DebugBodyLogging__Enabled=false` in deployed environments.
 - For production observability, enable metric and trace exporters independently, point them to the private Collector receiver, and optionally enable the Serilog OTLP sink. See [Prometheus And Grafana Handoff](PROMETHEUS_GRAFANA_HANDOFF.md); the Collector, Prometheus, Grafana, retention, and alerts remain DevOps-owned.
 - Set `Diagnostics__ApiKey` outside Development before using `/management/diagnostics/health`.
-- Keep `Diagnostics__EnableExternalPing=false` unless the deployment check intentionally needs live SMTP/Firebase/PayOS reachability.
+- Keep `Diagnostics__EnableExternalPing=false` unless the deployment check intentionally needs live SMTP/Firebase/PayOS/Cloudinary/object-storage reachability.
 - IoT runtime endpoints require HTTPS. Full Edge client certificates are accepted at the TLS handshake and authenticated by the provisioned SHA-256 fingerprint in WebAPI; do not terminate mTLS at an untrusted proxy.
 - After applying the execution transport-security migration, rotate any pre-existing low-cost credential binding that has no ECDSA public key and any Full Edge binding whose reference is not the normalized certificate SHA-256 fingerprint.
 

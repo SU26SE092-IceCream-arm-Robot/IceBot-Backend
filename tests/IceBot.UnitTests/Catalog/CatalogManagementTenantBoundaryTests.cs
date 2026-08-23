@@ -249,7 +249,8 @@ public sealed class CatalogManagementTenantBoundaryTests
         var store = Substitute.For<IProductStore>();
         store.GetProductByIdAsync(template.Id, false, Arg.Any<CancellationToken>()).Returns(template);
 
-        var result = await new SetProductAvailabilityCommandHandler(store).HandleAsync(
+        var result = await new SetProductAvailabilityCommandHandler(
+            store, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(
             new SetProductAvailabilityCommand
             {
                 Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),
@@ -316,7 +317,8 @@ public sealed class CatalogManagementTenantBoundaryTests
             UserContext = manager,
             IsGlobalTemplate = true
         });
-        var mutation = await new SetProductAvailabilityCommandHandler(store).HandleAsync(
+        var mutation = await new SetProductAvailabilityCommandHandler(
+            store, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(
             new SetProductAvailabilityCommand
             {
                 Scope = new ProductManagementCommandScope(manager, null, IsGlobalTemplate: true),
@@ -343,7 +345,8 @@ public sealed class CatalogManagementTenantBoundaryTests
             UserContext = orgAdmin,
             IsGlobalTemplate = true
         });
-        var mutation = await new SetProductAvailabilityCommandHandler(store).HandleAsync(
+        var mutation = await new SetProductAvailabilityCommandHandler(
+            store, InlineTechnicalResourceMutationCoordinator.Instance).HandleAsync(
             new SetProductAvailabilityCommand
             {
                 Scope = new ProductManagementCommandScope(orgAdmin, null, IsGlobalTemplate: true),

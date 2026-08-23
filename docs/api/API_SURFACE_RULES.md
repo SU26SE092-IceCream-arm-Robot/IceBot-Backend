@@ -374,7 +374,12 @@ Rules:
 - `InternalResult<T>` is not an API response contract and must not be returned directly by controllers.
 - `AppException` subclasses must preserve their intended HTTP status through `GlobalExceptionMiddleware`.
 - Middleware must not collapse `NotFoundException`, `ForbiddenException`, or `ConflictException` into `400 Bad Request`.
-- Provider/system failures may include `SystemError` for diagnostics, but public responses must not expose secrets or sensitive config.
+- Public responses must not expose provider exceptions, credentials, raw provider payloads, or sensitive configuration.
+- Use `500` only for an unexpected server defect. A feature blocked by an unavailable or failed external dependency returns a safe `503` outcome at that feature boundary.
+- `SystemError` is diagnostic metadata, not a stable consumer contract. Clients must not parse it or branch on a human-readable message.
+
+The canonical envelope, consumer rules, retry guidance, and status semantics are
+defined in [API Error Contract](API_ERROR_CONTRACT.md).
 
 Recommended status use:
 
@@ -387,7 +392,10 @@ Recommended status use:
 | Forbidden/scoped denied | `403 Forbidden` |
 | Resource not found | `404 Not Found` |
 | Business conflict/duplicate | `409 Conflict` |
-| Provider/system failure | `500 Internal Server Error` unless a more specific application status is intentionally returned |
+| Temporary account lock | `423 Locked` |
+| Rate limited | `429 Too Many Requests` |
+| Enabled feature dependency unavailable | `503 Service Unavailable` |
+| Unexpected server defect | `500 Internal Server Error` |
 
 ## Validation Strategy
 

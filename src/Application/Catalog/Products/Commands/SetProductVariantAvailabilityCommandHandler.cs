@@ -1,6 +1,7 @@
 using Application.Catalog.Abstractions;
 using Application.Catalog.Products.Mapping;
 using Application.Catalog.Products.Results;
+using Application.Shared.Concurrency;
 using Application.Shared.Wrappers;
 
 namespace Application.Catalog.Products.Commands;
@@ -8,15 +9,27 @@ namespace Application.Catalog.Products.Commands;
 public sealed class SetProductVariantAvailabilityCommandHandler
 {
     private readonly IProductStore _products;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
-    public SetProductVariantAvailabilityCommandHandler(IProductStore products)
+    public SetProductVariantAvailabilityCommandHandler(
+        IProductStore products,
+        ITechnicalResourceMutationCoordinator mutations)
     {
         _products = products;
+        _mutations = mutations;
     }
 
     public async Task<ApiResult<ProductVariantResult>> HandleAsync(
         SetProductVariantAvailabilityCommand command,
         CancellationToken cancellationToken = default)
+        => await _mutations.ExecuteAsync(
+            [TechnicalResourceMutationIdentity.Product(command.ProductId)],
+            ct => HandleLockedAsync(command, ct),
+            cancellationToken);
+
+    private async Task<ApiResult<ProductVariantResult>> HandleLockedAsync(
+        SetProductVariantAvailabilityCommand command,
+        CancellationToken cancellationToken)
     {
         var product = await _products.GetProductByIdAsync(command.ProductId, cancellationToken: cancellationToken);
         if (product is null)

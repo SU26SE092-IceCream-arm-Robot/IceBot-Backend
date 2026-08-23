@@ -36,6 +36,10 @@ Catalog
 - Product/ProductVariant deletion and Product currency changes are rejected while a non-deleted MenuItem references them. Menu currency changes are rejected once the Menu contains items. These rules prevent active menu references from retaining deleted catalog definitions or a currency mismatch.
 - Activating a MenuItem performs static authoring preflight for Product/Variant/Recipe ownership, recipe lifecycle and ingredients, currency, and option satisfiability. Dynamic route, connectivity, and inventory readiness remain runtime or deployment concerns.
 - Cloud inventory balances, with optional sensor/topology evidence, decide machine-produced runtime sellability once a kiosk opts into balance tracking.
+- Public product imagery is Catalog-owned: runtime item images use the active
+  Variant asset when present, otherwise the active Product asset. The endpoint
+  returns versioned card/detail delivery URLs only; it does not call Cloudinary
+  during runtime reads and exposes no provider identity or credentials.
 
 ## Related Docs
 

@@ -8,6 +8,7 @@ using Domain.ProductionConfiguration.Enums;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
 using Infrastructure.Data;
+using Infrastructure.Data.Queries;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Application.SalesCatalog.ReadModels;
@@ -350,22 +351,8 @@ public sealed partial class MenuStore : IMenuStore
         Guid? storeId,
         Guid? kioskId,
         CancellationToken cancellationToken = default)
-    {
-        if (!await _dbContext.Organizations.WhereNotDeleted().AnyAsync(x => x.Id == organizationId, cancellationToken))
-        {
-            return false;
-        }
-
-        if (storeId.HasValue && !await _dbContext.Stores.WhereNotDeleted().AnyAsync(
-                x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
-        {
-            return false;
-        }
-
-        return !kioskId.HasValue || await _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
-            x => x.Id == kioskId && x.OrganizationId == organizationId &&
-                 (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
-    }
+        => await TenantScopeExistenceQuery.ExistsAsync(
+            _dbContext, organizationId, storeId, kioskId, cancellationToken);
 
     public Task AddMenuAsync(Menu menu, CancellationToken cancellationToken = default)
     {

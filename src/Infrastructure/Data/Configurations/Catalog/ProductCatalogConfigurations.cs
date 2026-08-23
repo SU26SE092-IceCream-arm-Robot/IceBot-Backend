@@ -43,6 +43,7 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         entity.HasOne(x => x.TemplateProduct).WithMany().HasForeignKey(x => x.TemplateProductId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.ImageAsset).WithMany().HasForeignKey(x => x.ImageAssetId).OnDelete(DeleteBehavior.Restrict);
+        entity.Property(x => x.ImageAltText).HasMaxLength(500);
         entity.Property(x => x.Revision).IsConcurrencyToken();
         entity.HasMany(x => x.OptionGroups).WithOne(x => x.Product).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
 
@@ -58,6 +59,7 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         entity.HasIndex(x => new { x.ProductId, x.DisplayOrder });
         entity.HasOne(x => x.Product).WithMany(x => x.ProductVariants).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.ImageAsset).WithMany().HasForeignKey(x => x.ImageAssetId).OnDelete(DeleteBehavior.Restrict);
+        entity.Property(x => x.ImageAltText).HasMaxLength(500);
         entity.Property(x => x.Revision).IsConcurrencyToken();
 
     }
@@ -71,6 +73,33 @@ internal sealed class CatalogImageAssetConfiguration : IEntityTypeConfiguration<
         entity.Property(x => x.Status).HasConversion<int>();
         entity.HasIndex(x => new { x.Provider, x.ProviderAssetId }).IsUnique();
         entity.HasIndex(x => new { x.Provider, x.PublicId }).IsUnique();
+    }
+}
+
+internal sealed class CatalogImageCleanupConfiguration : IEntityTypeConfiguration<CatalogImageCleanup>
+{
+    public void Configure(EntityTypeBuilder<CatalogImageCleanup> entity)
+    {
+        entity.ToTable("CatalogImageCleanups");
+        entity.Property(x => x.PublicIdSnapshot).HasMaxLength(500);
+        entity.Property(x => x.LastErrorCode).HasMaxLength(100);
+        entity.HasIndex(x => new { x.CompletedAt, x.NextAttemptAt });
+        entity.HasOne(x => x.CatalogImageAsset).WithMany().HasForeignKey(x => x.CatalogImageAssetId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+internal sealed class CatalogImageOperationReplayConfiguration : IEntityTypeConfiguration<CatalogImageOperationReplay>
+{
+    public void Configure(EntityTypeBuilder<CatalogImageOperationReplay> entity)
+    {
+        entity.ToTable("CatalogImageOperationReplays");
+        entity.Property(x => x.ScopeKey).HasMaxLength(80);
+        entity.Property(x => x.OwnerType).HasMaxLength(40);
+        entity.Property(x => x.IdempotencyKey).HasMaxLength(200);
+        entity.Property(x => x.RequestFingerprint).HasMaxLength(64);
+        entity.Property(x => x.Operation).HasConversion<int>();
+        entity.HasIndex(x => new { x.ScopeKey, x.OwnerType, x.OwnerId, x.Operation, x.IdempotencyKey }).IsUnique();
     }
 }
 

@@ -165,6 +165,8 @@ public class IceBotDbContext : DbContext
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
     public DbSet<CatalogImageAsset> CatalogImageAssets => Set<CatalogImageAsset>();
+    public DbSet<CatalogImageCleanup> CatalogImageCleanups => Set<CatalogImageCleanup>();
+    public DbSet<CatalogImageOperationReplay> CatalogImageOperationReplays => Set<CatalogImageOperationReplay>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<OptionGroup> OptionGroups => Set<OptionGroup>();

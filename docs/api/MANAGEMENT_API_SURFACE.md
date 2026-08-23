@@ -14,9 +14,11 @@ Management APIs are for internal operations, not only the `Manager` role.
 
 ```text
 GET /api/v1/management/product-templates
+PUT/DELETE /api/v1/management/product-templates/{productId}[ /variants/{variantId}]/image
 POST/PUT/PATCH/DELETE /api/v1/management/product-templates/{productId}/option-groups/*
 GET /api/v1/management/organizations/{organizationId}/products
 POST /api/v1/management/organizations/{organizationId}/products/from-template
+PUT/DELETE /api/v1/management/organizations/{organizationId}/products/{productId}[ /variants/{variantId}]/image
 POST /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups
 PUT /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}
 PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/option-groups/{optionGroupId}/status
@@ -62,6 +64,8 @@ PATCH /api/v1/management/kiosks/{kioskId}/status
 GET /api/v1/management/kiosks/{kioskId}/menu-item-availability
 PUT /api/v1/management/kiosks/{kioskId}/menu-items/{menuItemId}/availability
 ```
+
+Catalog-image mutation and response rules are owned by [Catalog Image API](CATALOG_IMAGE_API.md).
 
 `GET /api/v1/management/organizations/sales-summaries` is a SystemAdmin-only,
 paged aggregate reporting surface. It requires UTC `from` and `to` query
@@ -135,26 +139,12 @@ Staff workforce mutation semantics are owned by
 ### Ingredient And Recipe Routes
 
 ```text
-GET /api/v1/management/ingredients
-GET /api/v1/management/ingredients/{ingredientId}
-POST /api/v1/management/ingredients
-PUT /api/v1/management/ingredients/{ingredientId}
-PATCH /api/v1/management/ingredients/{ingredientId}/status
-DELETE /api/v1/management/ingredients/{ingredientId}
-GET /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes
-GET /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}
-POST /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes
-PUT /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}
-PUT /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}/items
-PATCH /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}/status
-POST /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}/versions
-GET /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes
-GET /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}
-POST /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes
-PUT /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}
-PUT /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}/items
-PATCH /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}/status
-POST /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}/versions
+GET/POST /api/v1/management/ingredients
+GET/PUT/PATCH/DELETE /api/v1/management/ingredients/{ingredientId}[ /status]
+GET/POST /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes[/{recipeId}]
+PUT/PATCH/POST /api/v1/management/organizations/{organizationId}/products/{productId}/variants/{variantId}/recipes/{recipeId}[ /items|/status|/versions]
+GET/POST /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes[/{recipeId}]
+PUT/PATCH/POST /api/v1/management/product-templates/{productId}/variants/{variantId}/recipes/{recipeId}[ /items|/status|/versions]
 ```
 
 ### Robot And Production Configuration Routes

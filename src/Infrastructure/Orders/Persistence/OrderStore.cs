@@ -17,6 +17,7 @@ using Application.Orders.PlaceOrder.ReadModels;
 using Application.ProductionConfiguration.Routes.Support;
 using Application.Orders.Admission;
 using Application.Tenants.Kiosks.Rules;
+using Infrastructure.SalesCatalog.Persistence;
 
 namespace Infrastructure.Orders.Persistence;
 
@@ -68,23 +69,8 @@ public sealed partial class OrderStore : IOrderStore
         Guid kioskId,
         CancellationToken cancellationToken = default)
     {
-        return _dbContext.MenuItems
-            .Include(menuItem => menuItem.Menu)
-            .Include(menuItem => menuItem.Product)
-            .Include(menuItem => menuItem.ProductVariant)
-            .Include(menuItem => menuItem.Recipe)
-                .ThenInclude(recipe => recipe!.RecipeItems)
-                    .ThenInclude(item => item.Ingredient)
-            .FirstOrDefaultAsync(menuItem =>
-                menuItem.Id == menuItemId &&
-                menuItem.Product.DeletedAt == null &&
-                menuItem.Menu.OrganizationId == organizationId &&
-                (!menuItem.Menu.StoreId.HasValue || menuItem.Menu.StoreId == storeId) &&
-                (!menuItem.Menu.KioskId.HasValue || menuItem.Menu.KioskId == kioskId) &&
-                menuItem.Product.OrganizationId == organizationId &&
-                (!menuItem.Product.StoreId.HasValue || menuItem.Product.StoreId == storeId) &&
-                (!menuItem.Product.KioskId.HasValue || menuItem.Product.KioskId == kioskId),
-                cancellationToken);
+        return KioskMenuItemQuery.Build(_dbContext, menuItemId, organizationId, storeId, kioskId)
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public Task<List<MenuItemProductOptionReadModel>> ListMenuItemProductOptionsAsync(

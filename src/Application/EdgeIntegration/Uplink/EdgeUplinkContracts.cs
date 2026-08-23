@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Application.Devices.Telemetry.Commands;
 using System.Text.Json.Serialization;
 using Application.Devices.Connectivity.Contracts;
 using Domain.Common.Enums;
@@ -74,7 +75,7 @@ public sealed class EdgeUplinkResult
     public object? Data { get; init; }
 }
 
-public sealed class EdgeHeartbeatUplink
+public sealed class EdgeHeartbeatUplink : IBatchHeartbeatPayload
 {
     public Guid OriginNodeId { get; init; }
     public long HeartbeatSequence { get; init; }
@@ -96,13 +97,25 @@ public sealed class EdgeTelemetryBatchUplink
     public IReadOnlyList<EdgeTelemetryEventUplink> Events { get; init; } = [];
 }
 
-public sealed class EdgeTelemetryEventUplink
+public sealed class EdgeTelemetryEventUplink : IBatchSyncEventPayload
 {
     public Guid EventId { get; init; }
     public EdgeTelemetryEventType EventType { get; init; }
     public EdgeHeartbeatUplink? Heartbeat { get; init; }
     public EdgeDeviceEventUplink? DeviceEvent { get; init; }
     public EdgeLocalLogUplink? LocalLog { get; init; }
+
+    BatchSyncEventType IBatchSyncEventPayload.EventType => EventType switch
+    {
+        EdgeTelemetryEventType.Heartbeat => BatchSyncEventType.Heartbeat,
+        EdgeTelemetryEventType.DeviceEvent => BatchSyncEventType.DeviceEvent,
+        EdgeTelemetryEventType.LocalLog => BatchSyncEventType.LocalLog,
+        _ => throw new JsonException("Unsupported telemetry event type.")
+    };
+
+    IBatchHeartbeatPayload? IBatchSyncEventPayload.Heartbeat => Heartbeat;
+    IBatchDeviceEventPayload? IBatchSyncEventPayload.DeviceEvent => DeviceEvent;
+    IBatchLocalLogPayload? IBatchSyncEventPayload.LocalLog => LocalLog;
 }
 
 public enum EdgeTelemetryEventType
@@ -112,7 +125,7 @@ public enum EdgeTelemetryEventType
     LocalLog = 3
 }
 
-public sealed class EdgeDeviceEventUplink
+public sealed class EdgeDeviceEventUplink : IBatchDeviceEventPayload
 {
     public Guid DeviceId { get; init; }
     public Guid? CorrelationId { get; init; }
@@ -124,7 +137,7 @@ public sealed class EdgeDeviceEventUplink
     public JsonElement? Payload { get; init; }
 }
 
-public sealed class EdgeLocalLogUplink
+public sealed class EdgeLocalLogUplink : IBatchLocalLogPayload
 {
     public Guid? DeviceId { get; init; }
     public Guid? OrderId { get; init; }

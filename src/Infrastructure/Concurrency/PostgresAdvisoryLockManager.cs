@@ -31,6 +31,25 @@ public sealed class PostgresAdvisoryLockManager
         return new AdvisoryLockHandle(connection, lockKey);
     }
 
+    public async Task<IAsyncDisposable> AcquireAsync(string lockKey, CancellationToken cancellationToken = default)
+    {
+        var connection = new NpgsqlConnection(_connectionString);
+        try
+        {
+            await connection.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(
+                "SELECT pg_advisory_lock(hashtextextended(@lock_key, 0));", connection);
+            command.Parameters.AddWithValue("lock_key", lockKey);
+            await command.ExecuteScalarAsync(cancellationToken);
+            return new StringAdvisoryLockHandle(connection, lockKey);
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
     private sealed class AdvisoryLockHandle : IAsyncDisposable
     {
         private readonly NpgsqlConnection _connection;
@@ -52,6 +71,38 @@ public sealed class PostgresAdvisoryLockManager
             try
             {
                 await using var command = new NpgsqlCommand("SELECT pg_advisory_unlock(@lock_key);", _connection);
+                command.Parameters.AddWithValue("lock_key", _lockKey);
+                await command.ExecuteScalarAsync();
+            }
+            finally
+            {
+                await _connection.DisposeAsync();
+            }
+        }
+    }
+
+    private sealed class StringAdvisoryLockHandle : IAsyncDisposable
+    {
+        private readonly NpgsqlConnection _connection;
+        private readonly string _lockKey;
+        private bool _disposed;
+
+        public StringAdvisoryLockHandle(NpgsqlConnection connection, string lockKey)
+        {
+            _connection = connection;
+            _lockKey = lockKey;
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+            try
+            {
+                await using var command = new NpgsqlCommand(
+                    "SELECT pg_advisory_unlock(hashtextextended(@lock_key, 0));", _connection);
                 command.Parameters.AddWithValue("lock_key", _lockKey);
                 await command.ExecuteScalarAsync();
             }

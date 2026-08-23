@@ -38,23 +38,9 @@ public sealed class OperationalAdmissionReadStore(IceBotDbContext dbContext) : I
         Guid storeId,
         Guid kioskId,
         CancellationToken cancellationToken = default) =>
-        dbContext.MenuItems.AsNoTracking()
-            .Include(menuItem => menuItem.Menu)
-            .Include(menuItem => menuItem.Product)
-            .Include(menuItem => menuItem.ProductVariant)
-            .Include(menuItem => menuItem.Recipe)
-                .ThenInclude(recipe => recipe!.RecipeItems)
-                    .ThenInclude(item => item.Ingredient)
-            .FirstOrDefaultAsync(menuItem =>
-                menuItem.Id == menuItemId &&
-                menuItem.Product.DeletedAt == null &&
-                menuItem.Menu.OrganizationId == organizationId &&
-                (!menuItem.Menu.StoreId.HasValue || menuItem.Menu.StoreId == storeId) &&
-                (!menuItem.Menu.KioskId.HasValue || menuItem.Menu.KioskId == kioskId) &&
-                menuItem.Product.OrganizationId == organizationId &&
-                (!menuItem.Product.StoreId.HasValue || menuItem.Product.StoreId == storeId) &&
-                (!menuItem.Product.KioskId.HasValue || menuItem.Product.KioskId == kioskId),
-                cancellationToken);
+        KioskMenuItemQuery.Build(dbContext, menuItemId, organizationId, storeId, kioskId)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(cancellationToken);
 
     public Task<bool> IsMenuItemPausedAsync(Guid kioskId, Guid menuItemId, CancellationToken cancellationToken = default) =>
         dbContext.KioskMenuItemAvailabilities.AsNoTracking().AnyAsync(

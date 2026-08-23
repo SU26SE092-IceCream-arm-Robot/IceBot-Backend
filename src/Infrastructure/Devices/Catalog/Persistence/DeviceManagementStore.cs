@@ -33,39 +33,10 @@ public sealed class DeviceManagementStore : IDeviceManagementStore
             .Include(d => d.Kiosk)
             .AsQueryable();
 
-        if (organizationId.HasValue)
-        {
-            query = query.Where(d => d.Kiosk != null && d.Kiosk.OrganizationId == organizationId.Value);
-        }
-
-        if (storeId.HasValue)
-        {
-            query = query.Where(d => d.Kiosk != null && d.Kiosk.StoreId == storeId.Value);
-        }
-
-        if (kioskId.HasValue)
-        {
-            query = query.Where(d => d.KioskId == kioskId.Value);
-        }
-
-        if (!string.IsNullOrWhiteSpace(status))
-        {
-            if (Enum.TryParse<Domain.Devices.Catalog.DeviceStatus>(status.Trim(), true, out var deviceStatus))
-            {
-                query = query.Where(d => d.Status == deviceStatus);
-            }
-        }
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            var normalized = search.Trim().ToLowerInvariant();
-            query = query.Where(d =>
-                d.Code.ToLower().Contains(normalized) ||
-                d.Name.ToLower().Contains(normalized) ||
-                (d.SerialNumber != null && d.SerialNumber.ToLower().Contains(normalized)));
-        }
-
-        return await query.AsNoTracking().OrderBy(d => d.Code).ToListAsync(cancellationToken);
+        return await ApplyListFilters(query, organizationId, storeId, kioskId, status, search)
+            .AsNoTracking()
+            .OrderBy(device => device.Code)
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IReadOnlyList<Device>> ListAccessibleAsync(
@@ -93,39 +64,51 @@ public sealed class DeviceManagementStore : IDeviceManagementStore
                 kiosks.Contains(d.KioskId!.Value)
             ));
 
+        return await ApplyListFilters(query, organizationId, storeId, kioskId, status, search)
+            .AsNoTracking()
+            .OrderBy(device => device.Code)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static IQueryable<Device> ApplyListFilters(
+        IQueryable<Device> query,
+        Guid? organizationId,
+        Guid? storeId,
+        Guid? kioskId,
+        string? status,
+        string? search)
+    {
         if (organizationId.HasValue)
         {
-            query = query.Where(d => d.Kiosk != null && d.Kiosk.OrganizationId == organizationId.Value);
+            query = query.Where(device => device.Kiosk != null && device.Kiosk.OrganizationId == organizationId.Value);
         }
 
         if (storeId.HasValue)
         {
-            query = query.Where(d => d.Kiosk != null && d.Kiosk.StoreId == storeId.Value);
+            query = query.Where(device => device.Kiosk != null && device.Kiosk.StoreId == storeId.Value);
         }
 
         if (kioskId.HasValue)
         {
-            query = query.Where(d => d.KioskId == kioskId.Value);
+            query = query.Where(device => device.KioskId == kioskId.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(status))
+        if (!string.IsNullOrWhiteSpace(status) &&
+            Enum.TryParse<Domain.Devices.Catalog.DeviceStatus>(status.Trim(), true, out var deviceStatus))
         {
-            if (Enum.TryParse<Domain.Devices.Catalog.DeviceStatus>(status.Trim(), true, out var deviceStatus))
-            {
-                query = query.Where(d => d.Status == deviceStatus);
-            }
+            query = query.Where(device => device.Status == deviceStatus);
         }
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var normalized = search.Trim().ToLowerInvariant();
-            query = query.Where(d =>
-                d.Code.ToLower().Contains(normalized) ||
-                d.Name.ToLower().Contains(normalized) ||
-                (d.SerialNumber != null && d.SerialNumber.ToLower().Contains(normalized)));
+            query = query.Where(device =>
+                device.Code.ToLower().Contains(normalized) ||
+                device.Name.ToLower().Contains(normalized) ||
+                (device.SerialNumber != null && device.SerialNumber.ToLower().Contains(normalized)));
         }
 
-        return await query.AsNoTracking().OrderBy(d => d.Code).ToListAsync(cancellationToken);
+        return query;
     }
 
     public Task<Device?> GetByIdAsync(Guid deviceId, CancellationToken cancellationToken = default)

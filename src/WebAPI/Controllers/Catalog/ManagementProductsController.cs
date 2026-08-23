@@ -27,6 +27,7 @@ public sealed class ManagementProductsController : ControllerBase
     private readonly SetProductVariantAvailabilityCommandHandler _setVariantAvailabilityHandler;
     private readonly DeleteProductVariantCommandHandler _deleteVariantHandler;
     private readonly ReplaceCatalogImageCommandHandler _replaceImageHandler;
+    private readonly RemoveCatalogImageCommandHandler _removeImageHandler;
 
     public ManagementProductsController(
         ListProductsQueryHandler listProductsHandler,
@@ -40,7 +41,8 @@ public sealed class ManagementProductsController : ControllerBase
         UpdateProductVariantCommandHandler updateVariantHandler,
         SetProductVariantAvailabilityCommandHandler setVariantAvailabilityHandler,
         DeleteProductVariantCommandHandler deleteVariantHandler,
-        ReplaceCatalogImageCommandHandler replaceImageHandler)
+        ReplaceCatalogImageCommandHandler replaceImageHandler,
+        RemoveCatalogImageCommandHandler removeImageHandler)
     {
         _listProductsHandler = listProductsHandler;
         _getProductHandler = getProductHandler;
@@ -54,6 +56,7 @@ public sealed class ManagementProductsController : ControllerBase
         _setVariantAvailabilityHandler = setVariantAvailabilityHandler;
         _deleteVariantHandler = deleteVariantHandler;
         _replaceImageHandler = replaceImageHandler;
+        _removeImageHandler = removeImageHandler;
     }
 
     [HttpGet]
@@ -179,7 +182,8 @@ public sealed class ManagementProductsController : ControllerBase
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(5_500_000)]
     public async Task<IActionResult> ReplaceProductImage(
-        Guid organizationId, Guid productId, [FromForm] CatalogImageUploadForm form, CancellationToken cancellationToken)
+        Guid organizationId, Guid productId, [FromForm] CatalogImageUploadForm form,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey, CancellationToken cancellationToken)
     {
         if (form.File is null)
         {
@@ -189,7 +193,17 @@ public sealed class ManagementProductsController : ControllerBase
         await using var stream = new MemoryStream();
         await form.File.CopyToAsync(stream, cancellationToken);
         var result = await _replaceImageHandler.ReplaceProductAsync(Scope(organizationId), productId, form.ExpectedRevision,
-            form.AltText, stream.ToArray(), form.File.FileName, form.File.ContentType, GetCurrentAccountId(), cancellationToken);
+            form.AltText, stream.ToArray(), form.File.FileName, form.File.ContentType, idempotencyKey, GetCurrentAccountId(), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("{productId:guid}/image")]
+    public async Task<IActionResult> RemoveProductImage(
+        Guid organizationId, Guid productId, [FromHeader(Name = "If-Match")] int expectedRevision,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey, CancellationToken cancellationToken)
+    {
+        var result = await _removeImageHandler.RemoveProductAsync(
+            Scope(organizationId), productId, expectedRevision, idempotencyKey, GetCurrentAccountId(), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 
@@ -258,7 +272,8 @@ public sealed class ManagementProductsController : ControllerBase
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(5_500_000)]
     public async Task<IActionResult> ReplaceVariantImage(
-        Guid organizationId, Guid productId, Guid variantId, [FromForm] CatalogImageUploadForm form, CancellationToken cancellationToken)
+        Guid organizationId, Guid productId, Guid variantId, [FromForm] CatalogImageUploadForm form,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey, CancellationToken cancellationToken)
     {
         if (form.File is null)
         {
@@ -269,7 +284,17 @@ public sealed class ManagementProductsController : ControllerBase
         await form.File.CopyToAsync(stream, cancellationToken);
         var result = await _replaceImageHandler.ReplaceVariantAsync(Scope(organizationId), productId, variantId,
             form.ExpectedRevision, form.AltText, stream.ToArray(), form.File.FileName, form.File.ContentType,
-            GetCurrentAccountId(), cancellationToken);
+            idempotencyKey, GetCurrentAccountId(), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpDelete("{productId:guid}/variants/{variantId:guid}/image")]
+    public async Task<IActionResult> RemoveVariantImage(
+        Guid organizationId, Guid productId, Guid variantId, [FromHeader(Name = "If-Match")] int expectedRevision,
+        [FromHeader(Name = "Idempotency-Key")] string idempotencyKey, CancellationToken cancellationToken)
+    {
+        var result = await _removeImageHandler.RemoveVariantAsync(
+            Scope(organizationId), productId, variantId, expectedRevision, idempotencyKey, GetCurrentAccountId(), cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

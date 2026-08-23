@@ -5,6 +5,7 @@ using Application.Catalog.Products.Rules;
 using Application.Catalog.Products.Support;
 using Application.Shared.Wrappers;
 using Application.Shared.Ownership;
+using Application.Shared.Concurrency;
 
 namespace Application.Catalog.Products.Commands;
 
@@ -12,18 +13,29 @@ public sealed class UpdateProductVariantCommandHandler
 {
     private readonly IProductStore _products;
     private readonly ITechnicalResourceMutationPolicy _technicalOwnership;
+    private readonly ITechnicalResourceMutationCoordinator _mutations;
 
     public UpdateProductVariantCommandHandler(
         IProductStore products,
-        ITechnicalResourceMutationPolicy technicalOwnership)
+        ITechnicalResourceMutationPolicy technicalOwnership,
+        ITechnicalResourceMutationCoordinator mutations)
     {
         _products = products;
         _technicalOwnership = technicalOwnership;
+        _mutations = mutations;
     }
 
     public async Task<ApiResult<ProductVariantResult>> HandleAsync(
         UpdateProductVariantCommand command,
         CancellationToken cancellationToken = default)
+        => await _mutations.ExecuteAsync(
+            [TechnicalResourceMutationIdentity.Product(command.ProductId)],
+            ct => HandleLockedAsync(command, ct),
+            cancellationToken);
+
+    private async Task<ApiResult<ProductVariantResult>> HandleLockedAsync(
+        UpdateProductVariantCommand command,
+        CancellationToken cancellationToken)
     {
         var productId = command.ProductId;
         var variantId = command.VariantId;

@@ -1,3 +1,4 @@
+using Application.Catalog.Images;
 using Application.SalesCatalog.RuntimeMenus.Results;
 using Domain.SalesCatalog.Entities;
 using Application.SalesCatalog.ReadModels;
@@ -11,8 +12,10 @@ internal static class RuntimeMenuResultMapper
         MenuItem item,
         IReadOnlyCollection<MenuItemProductOptionReadModel> availableOptions)
     {
-        var imageAsset = item.ProductVariant.ImageAsset ?? item.Product.ImageAsset;
         var imageAltText = item.ProductVariant.ImageAltText ?? item.Product.ImageAltText;
+        var catalogImage = CatalogImageDeliveryUrlFactory.Create(
+            item.ProductVariant.ImageAsset ?? item.Product.ImageAsset,
+            imageAltText);
 
         var preparationTimeSeconds = item.PreparationTimeSeconds
             ?? item.ProductVariant.PreparationTimeSeconds
@@ -37,11 +40,11 @@ internal static class RuntimeMenuResultMapper
             FinalPrice = item.Price - item.DiscountAmount,
             Currency = item.Currency,
             PreparationTimeSeconds = preparationTimeSeconds,
-            Image = imageAsset is null ? null : new RuntimeMenuImageResult
+            Image = catalogImage is null ? null : new RuntimeMenuImageResult
             {
-                CardUrl = imageAsset.DeliveryUrl,
-                DetailUrl = imageAsset.DeliveryUrl,
-                AltText = imageAltText
+                CardUrl = catalogImage.CardUrl,
+                DetailUrl = catalogImage.DetailUrl,
+                AltText = catalogImage.AltText
             },
             RecipeVersion = item.Recipe?.Version,
             OptionGroups = availableOptions

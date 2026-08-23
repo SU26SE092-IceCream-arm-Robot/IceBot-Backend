@@ -112,7 +112,7 @@ public sealed class RecordManualOrderItemFulfillmentEventCommandHandler(
             order.UpdatedByAccountId = command.UserContext.AccountId;
             await orders.SaveChangesAsync(ct);
             changedOrder = order;
-            itemChangedEvent = BuildItemChangedEvent(order, item, fromItemStatus, changedAt);
+            itemChangedEvent = OrderItemFulfillmentEventFactory.Create(order, item, fromItemStatus, changedAt);
             return ApiResult<ManagementOrderDetailResult>.Success(
                 ManagementOrderResultMapper.ToDetail(order), "Order item fulfillment event recorded.");
         }, cancellationToken);
@@ -123,26 +123,6 @@ public sealed class RecordManualOrderItemFulfillmentEventCommandHandler(
             await publisher.PublishOrderItemFulfillmentChangedAsync(itemChangedEvent, cancellationToken);
         return result;
     }
-
-    private static OrderItemFulfillmentChangedEvent BuildItemChangedEvent(
-        Order order,
-        OrderItem item,
-        OrderItemStatus oldStatus,
-        DateTimeOffset changedAt) => new()
-        {
-            OrderId = order.Id,
-            OrderItemId = item.Id,
-            OrderNumber = order.OrderNumber,
-            KioskId = order.KioskId,
-            OrganizationId = order.OrganizationId,
-            StoreId = order.StoreId,
-            FulfillmentType = item.FulfillmentType.ToString(),
-            OldStatus = oldStatus.ToString(),
-            NewStatus = item.Status.ToString(),
-            Quantity = item.Quantity,
-            UpdatedAt = changedAt,
-            Version = 1
-        };
 
     private static void ApplyItemEvent(OrderItem item, ManualOrderItemFulfillmentEventType eventType)
     {

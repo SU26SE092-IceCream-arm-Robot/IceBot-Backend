@@ -2,6 +2,7 @@ using Application.Catalog.Abstractions;
 using Application.Shared.Wrappers;
 using Application.Shared.Ownership;
 using Application.Shared.Concurrency;
+using Domain.Catalog.Entities;
 
 namespace Application.Catalog.Products.Commands;
 
@@ -59,8 +60,19 @@ public sealed class DeleteProductVariantCommandHandler
                 "Product variant is used by one or more menu items. Archive or replace those menu items before deleting it.",
                 409);
 
+        var previousImage = variant.ImageAsset;
         variant.DeletedAt = DateTimeOffset.UtcNow;
         variant.DeletedByAccountId = command.DeletedByAccountId;
+        variant.ImageAssetId = null;
+        variant.ImageAsset = null;
+        if (previousImage is not null)
+        {
+            await _products.AddCatalogImageCleanupAsync(new CatalogImageCleanup
+            {
+                CatalogImageAssetId = previousImage.Id,
+                PublicIdSnapshot = previousImage.PublicId
+            }, cancellationToken);
+        }
         await _products.SaveChangesAsync(cancellationToken);
 
         return ApiResult<bool>.Success(true, "Product variant deleted.");

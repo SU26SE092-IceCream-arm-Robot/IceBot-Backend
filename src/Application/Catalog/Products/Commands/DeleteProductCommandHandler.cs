@@ -2,6 +2,7 @@ using Application.Catalog.Abstractions;
 using Application.Shared.Wrappers;
 using Application.Shared.Ownership;
 using Application.Shared.Concurrency;
+using Domain.Catalog.Entities;
 
 namespace Application.Catalog.Products.Commands;
 
@@ -54,13 +55,33 @@ public sealed class DeleteProductCommandHandler
                 409);
 
         var now = DateTimeOffset.UtcNow;
+        var imageAssetsToClean = product.ProductVariants
+            .Select(variant => variant.ImageAsset)
+            .Append(product.ImageAsset)
+            .OfType<CatalogImageAsset>()
+            .DistinctBy(image => image.Id)
+            .ToArray();
+
         product.DeletedAt = now;
         product.DeletedByAccountId = command.DeletedByAccountId;
+        product.ImageAssetId = null;
+        product.ImageAsset = null;
 
         foreach (var variant in product.ProductVariants)
         {
             variant.DeletedAt = now;
             variant.DeletedByAccountId = command.DeletedByAccountId;
+            variant.ImageAssetId = null;
+            variant.ImageAsset = null;
+        }
+
+        foreach (var image in imageAssetsToClean)
+        {
+            await _products.AddCatalogImageCleanupAsync(new CatalogImageCleanup
+            {
+                CatalogImageAssetId = image.Id,
+                PublicIdSnapshot = image.PublicId
+            }, cancellationToken);
         }
 
         await _products.SaveChangesAsync(cancellationToken);

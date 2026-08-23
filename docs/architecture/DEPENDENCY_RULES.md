@@ -4,7 +4,7 @@ This document defines dependency boundaries for the current modular monolith. Th
 
 ## Search Keywords
 
-`dependency rules`, `clean architecture`, `modular monolith`, `WebAPI`, `Infrastructure`, `Application`, `Domain`, `DbContext`, `unit of work`, `repository`, `thin repository`, `handler`, `controller`, `bounded context`, `layer boundary`, `EF Core`, `external adapter`, `provider adapter`, `microservice-ready`
+`dependency rules`, `clean architecture`, `modular monolith`, `WebAPI`, `Infrastructure`, `Application`, `Domain`, `DbContext`, `unit of work`, `repository`, `thin repository`, `handler`, `controller`, `bounded context`, `layer boundary`, `EF Core`, `external adapter`, `provider adapter`, `microservice-ready`, `provider outage`, `external dependency failure isolation`, `readiness`, `503`, `timeout`, `circuit breaker`
 
 ## Project Dependencies
 
@@ -115,6 +115,38 @@ Infrastructure owns:
 - Technical persistence concerns.
 
 Infrastructure should not add business rules that belong in Domain. It should translate external/provider details into application/domain concepts.
+
+## External Dependency Failure Isolation
+
+External providers are feature dependencies, not implicit dependencies of every
+Backend request. A failure must remain inside the owning feature boundary unless
+the dependency is explicitly classified as core runtime infrastructure.
+
+- PostgreSQL is core runtime infrastructure. Its failure may make readiness
+  unhealthy because authoritative application state is unavailable.
+- Cloudinary catalog images, payment providers, Firebase delivery, SMTP,
+  object storage, MQTT, and Edge connectivity must not make unrelated API,
+  order, authentication, or management workflows unavailable.
+- Validate required configuration at startup only when the process cannot safely
+  operate without that configuration. Do not make a remote provider call during
+  startup merely to test reachability.
+- An adapter must apply a bounded timeout and honour cancellation. It must
+  translate provider/transport failures into a typed feature-level outcome or a
+  safe `503`; it must not expose provider exception messages, credentials, or
+  raw SDK payloads through public responses.
+- Application handlers must not hold a database transaction open across a
+  provider call. Persist an explicit pending/failed/retryable state when the
+  workflow requires recovery.
+- Background jobs must catch failures per item and per cycle, record a safe
+  diagnostic or durable retry outcome, and continue future cycles. A provider
+  outage must not terminate the host.
+- Liveness and Kubernetes readiness stay limited to core runtime dependencies.
+  Provider reachability belongs in protected diagnostics with independent
+  timeouts; diagnostics failure must not change readiness.
+
+Feature-specific deployment keys and operational probes belong in
+[Deployment Configuration](../operations/DEPLOYMENT_CONFIG.md). Retry and
+idempotency semantics belong in [Idempotency and Retry Rules](../data/IDEMPOTENCY_RETRY_RULES.md).
 
 ## WebAPI Rules
 

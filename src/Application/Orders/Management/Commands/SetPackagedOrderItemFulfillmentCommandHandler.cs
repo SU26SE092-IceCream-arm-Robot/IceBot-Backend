@@ -126,7 +126,7 @@ public sealed class SetPackagedOrderItemFulfillmentCommandHandler(
             order.UpdatedByAccountId = command.UserContext.AccountId;
             await orders.SaveChangesAsync(ct);
             changedOrder = order;
-            itemChangedEvent = BuildItemChangedEvent(order, item, previousItemStatus, changedAt);
+            itemChangedEvent = OrderItemFulfillmentEventFactory.Create(order, item, previousItemStatus, changedAt);
             return ApiResult<ManagementOrderDetailResult>.Success(
                 ManagementOrderResultMapper.ToDetail(order),
                 command.Action == PackagedOrderItemFulfillmentAction.Fulfill
@@ -140,26 +140,6 @@ public sealed class SetPackagedOrderItemFulfillmentCommandHandler(
             await publisher.PublishOrderItemFulfillmentChangedAsync(itemChangedEvent, cancellationToken);
         return result;
     }
-
-    private static OrderItemFulfillmentChangedEvent BuildItemChangedEvent(
-        Order order,
-        OrderItem item,
-        OrderItemStatus oldStatus,
-        DateTimeOffset changedAt) => new()
-        {
-            OrderId = order.Id,
-            OrderItemId = item.Id,
-            OrderNumber = order.OrderNumber,
-            KioskId = order.KioskId,
-            OrganizationId = order.OrganizationId,
-            StoreId = order.StoreId,
-            FulfillmentType = item.FulfillmentType.ToString(),
-            OldStatus = oldStatus.ToString(),
-            NewStatus = item.Status.ToString(),
-            Quantity = item.Quantity,
-            UpdatedAt = changedAt,
-            Version = 1
-        };
 
     private Task PublishStatusChangedAsync(Order order, OrderStatus oldStatus, CancellationToken cancellationToken)
     {

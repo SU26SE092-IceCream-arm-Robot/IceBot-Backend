@@ -1,10 +1,6 @@
 using Application;
 using Infrastructure;
-using Infrastructure.Catalog.Bootstrap;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.HttpOverrides;
-using System.Net;
-using System.Threading.RateLimiting;
 using Serilog;
 using WebAPI.Authorization;
 using WebAPI.Configuration.Diagnostics;
@@ -15,9 +11,6 @@ using WebAPI.Configuration.Security;
 using WebAPI.GraphQL;
 using WebAPI.Middlewares;
 using WebAPI.SignalR;
-using Application.Tenants.Kiosks.Rules;
-using Application.ClientDevices;
-using Application.ClientDevices.Contracts;
 
 
 Log.Logger = new LoggerConfiguration()
@@ -33,154 +26,17 @@ try
 
     builder.WebHost.UseIceBotExecutionEndpointMutualTls();
 
-    builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                                    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
-                                    .AddEnvironmentVariables();
-
     ExecutionEndpointMutualTlsListenerConfigurationValidator.Validate(
         builder.Configuration,
         builder.Environment);
 
-    if (builder.Environment.IsDevelopment())
-    {
-        builder.Configuration.AddUserSecrets<Program>(optional: true);
-    }
-
     builder.AddIceBotObservability();
-
-    if (builder.Environment.IsProduction())
-    {
-        var trustedProxyNetworks = builder.Configuration
-            .GetSection("ReverseProxy:TrustedNetworks")
-            .Get<string[]>()?
-            .Where(value => !string.IsNullOrWhiteSpace(value))
-            .ToArray() ?? [];
-        if (trustedProxyNetworks.Length == 0)
-        {
-            throw new InvalidOperationException(
-                "ReverseProxy:TrustedNetworks is required in Production when HTTPS terminates at a reverse proxy.");
-        }
-
-        builder.Services.Configure<ForwardedHeadersOptions>(options =>
-        {
-            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-            options.KnownIPNetworks.Clear();
-            options.KnownProxies.Clear();
-
-            foreach (var cidr in trustedProxyNetworks)
-            {
-                var parts = cidr.Split('/', 2, StringSplitOptions.TrimEntries);
-                if (parts.Length != 2 ||
-                    !IPAddress.TryParse(parts[0], out var address) ||
-                    !int.TryParse(parts[1], out var prefixLength))
-                {
-                    throw new InvalidOperationException(
-                        $"ReverseProxy:TrustedNetworks contains an invalid CIDR: '{cidr}'.");
-                }
-
-                options.KnownIPNetworks.Add(new System.Net.IPNetwork(address, prefixLength));
-            }
-        });
-    }
-
+    builder.Services.AddIceBotForwardedHeaders(builder.Configuration, builder.Environment);
     builder.Services.AddIceBotCors(builder.Configuration, builder.Environment);
-    builder.Services.AddOptions<KioskSalesAdmissionOptions>()
-        .Bind(builder.Configuration.GetSection(KioskSalesAdmissionOptions.SectionName));
-    builder.Services.AddOptions<ClientDeviceRuntimeOptions>()
-        .Bind(builder.Configuration.GetSection(ClientDeviceRuntimeOptions.SectionName))
-        .Validate(options => options.MaxOrderLines is >= 1 and <= 100 &&
-                             options.MaxQuantityPerLine is >= 1 and <= 100 &&
-                             options.MaxTotalUnits >= options.MaxQuantityPerLine &&
-                             options.MaxSelectedOptionsPerLine is >= 0 and <= 100 &&
-                             options.MaxClientOrderIdLength is >= 1 and <= 200 &&
-                             options.MaxCustomerNameLength is >= 1 and <= 200 &&
-                             options.MaxCustomerPhoneNumberLength is >= 1 and <= 100 &&
-                             options.MaxNotesLength is >= 1 and <= 4_000 &&
-                             options.MaxClientLineIdLength is >= 1 and <= 200,
-            "Client-device runtime order limits are invalid.")
-        .ValidateOnStart();
+    builder.Services.AddIceBotClientDeviceRuntime(builder.Configuration);
     builder.Services.AddIceBotAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddAuthorization(options => options.AddIceBotAuthorizationPolicies());
-    builder.Services.AddRateLimiter(options =>
-    {
-        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-        {
-            if (!context.Request.Path.StartsWithSegments("/api/v1/client-device-sessions"))
-                return RateLimitPartition.GetNoLimiter("non-client-device-session");
-
-            var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            return RateLimitPartition.GetFixedWindowLimiter(address, _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-        });
-        options.AddPolicy("service-registration-submission", context =>
-        {
-            var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-            return RateLimitPartition.GetFixedWindowLimiter(address, _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 5,
-                Window = TimeSpan.FromMinutes(10),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-        });
-        options.AddPolicy("client-device-session", context =>
-        {
-            var clientDeviceId = context.Request.Headers[ClientDeviceSessionHeaderNames.ClientDeviceId].ToString();
-            return RateLimitPartition.GetFixedWindowLimiter(clientDeviceId, _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 10,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-        });
-        options.AddPolicy("client-device-menu", context =>
-        {
-            var partition = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.ClientDeviceIdClaim)?.Value
-                ?? context.Connection.RemoteIpAddress?.ToString()
-                ?? "unknown";
-            return RateLimitPartition.GetFixedWindowLimiter(partition, _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 120,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-        });
-        options.AddPolicy("client-device-order", context =>
-        {
-            var deviceId = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.ClientDeviceIdClaim)?.Value
-                ?? "unknown";
-            var kioskId = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.KioskIdClaim)?.Value
-                ?? "unknown";
-            return RateLimitPartition.GetFixedWindowLimiter($"{deviceId}:{kioskId}", _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 12,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-        });
-        options.AddPolicy("client-device-payment", context =>
-        {
-            var deviceId = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.ClientDeviceIdClaim)?.Value
-                ?? "unknown";
-            var orderId = context.Request.RouteValues["orderId"]?.ToString() ?? "unknown";
-            return RateLimitPartition.GetFixedWindowLimiter($"{deviceId}:{orderId}", _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = 8,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0,
-                AutoReplenishment = true
-            });
-        });
-    });
+    builder.Services.AddIceBotRateLimiting();
 
     builder.Services.AddSingleton<IAuthorizationHandler, ScopedRoleAuthorizationHandler>();
 
@@ -195,50 +51,7 @@ try
 
     var app = builder.Build();
 
-    if (args.Contains("--delete-legacy-automation-fixture", StringComparer.OrdinalIgnoreCase))
-    {
-        if (!app.Environment.IsDevelopment())
-            throw new InvalidOperationException("Legacy automation fixture deletion is available only in Development.");
-
-        await using var scope = app.Services.CreateAsyncScope();
-        var reset = scope.ServiceProvider.GetRequiredService<DevelopmentIceBotDemoReset>();
-        var deleted = await reset.DeleteLegacyAutomationFixtureAsync(CancellationToken.None);
-        Log.Information("Deleted legacy ICEBOT-AUTOMATION-TEST fixture organization: {Deleted}.", deleted);
-        return;
-    }
-
-    if (args.Contains("--reset-icebot-demo", StringComparer.OrdinalIgnoreCase))
-    {
-        if (!app.Environment.IsDevelopment())
-            throw new InvalidOperationException("ICEBOT-DEMO reset is available only in Development.");
-
-        await using var scope = app.Services.CreateAsyncScope();
-        var reset = scope.ServiceProvider.GetRequiredService<DevelopmentIceBotDemoReset>();
-        var result = await reset.ResetAsync(CancellationToken.None);
-        Log.Information(
-            "Reset {OrganizationCode} ({OrganizationId}): {Imports} imports, {Artifacts} artifacts, {Programs} programs, {Contracts} contracts, {Bindings} bindings, {Releases} releases, {MenuItems} menu items, {Objects} objects deleted, {RetainedObjects} objects retained. Deleted legacy automation fixture: {DeletedAutomationFixture}.",
-            DevelopmentIceBotDemoReset.OrganizationCode, result.OrganizationId,
-            result.DeletedImportCount, result.DeletedArtifactCount, result.DeletedProgramCount,
-            result.DeletedContractCount, result.DeletedBindingCount, result.DeletedReleaseCount,
-            result.DeletedMenuItemCount, result.DeletedObjectCount, result.RetainedObjectCount,
-            result.DeletedAutomationFixture);
-        return;
-    }
-
-    if (args.Contains("--repair-icebot-demo-runtime", StringComparer.OrdinalIgnoreCase))
-    {
-        await using var scope = app.Services.CreateAsyncScope();
-        var repair = scope.ServiceProvider.GetRequiredService<IceBotDemoRuntimeRepair>();
-        await repair.RepairAsync(CancellationToken.None);
-        Log.Information("Repaired ICEBOT-DEMO runtime catalog and inventory fixture.");
-        return;
-    }
-
-    // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
-    {
-
-    }
+    if (await app.TryRunIceBotMaintenanceCommandAsync(args)) return;
 
     app.UseIceBotSwagger();
 

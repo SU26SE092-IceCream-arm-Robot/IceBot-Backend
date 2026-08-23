@@ -1,4 +1,6 @@
 using FirebaseAdmin.Auth;
+using Application.Catalog.Images;
+using Application.RobotConfiguration.Storage.Abstractions;
 using Infrastructure.Data;
 using Infrastructure.Firebase;
 using MailKit.Net.Smtp;
@@ -68,6 +70,8 @@ public static class HealthEndpointExtensions
             IceBotDbContext dbContext,
             IConfiguration configuration,
             IFirebaseClient firebaseClient,
+            ICatalogImageStorageHealthProbe catalogImageStorageHealthProbe,
+            IArtifactObjectStorage artifactObjectStorage,
             IHttpClientFactory httpClientFactory,
             IWebHostEnvironment environment,
             CancellationToken cancellationToken) =>
@@ -144,6 +148,10 @@ public static class HealthEndpointExtensions
             checks.Add(CheckSmtpConfig(configuration));
             checks.Add(CheckFirebaseConfig(configuration, environment));
             checks.Add(CheckPayOsConfig(configuration));
+            checks.Add(CheckCloudinaryConfig(configuration));
+            checks.Add(CheckArtifactObjectStorageConfig(configuration));
+            checks.Add(CheckClientRuntimeKeyRing(configuration));
+            checks.Add(CheckClientDeviceSecurityConfig(configuration));
 
             if (configuration.GetValue<bool>("Diagnostics:EnableExternalPing"))
             {
@@ -155,10 +163,13 @@ public static class HealthEndpointExtensions
                 checks.Add(await CheckSmtpRealtimeAsync(configuration, timeoutSeconds, cancellationToken));
                 checks.Add(await CheckFirebaseRealtimeAsync(configuration, firebaseClient, timeoutSeconds, cancellationToken));
                 checks.Add(await CheckPayOsRealtimeAsync(configuration, httpClientFactory, timeoutSeconds, cancellationToken));
+                checks.Add(await CheckCloudinaryRealtimeAsync(catalogImageStorageHealthProbe, timeoutSeconds, cancellationToken));
+                checks.Add(await CheckArtifactObjectStorageRealtimeAsync(artifactObjectStorage, timeoutSeconds, cancellationToken));
             }
             else
             {
-                checks.Add(new HealthCheckResult("external_ping", "Skipped", 0, "Realtime SMTP/Firebase/PayOS ping is disabled."));
+                checks.Add(new HealthCheckResult("external_ping", "Skipped", 0,
+                    "Realtime SMTP/Firebase/PayOS/Cloudinary/object-storage ping is disabled."));
             }
 
             overallStopwatch.Stop();
@@ -256,27 +267,23 @@ public static class HealthEndpointExtensions
             return new HealthCheckResult("smtp_realtime", "Skipped", stopwatch.ElapsedMilliseconds, "SMTP config is incomplete.");
         }
 
-        try
-        {
-            using var timeoutCts = CreateTimeoutCancellationToken(timeoutSeconds, cancellationToken);
+        return await CheckExternalProbeAsync(
+            "smtp_realtime",
+            "SMTP realtime ping failed.",
+            timeoutSeconds,
+            cancellationToken,
+            async timeoutToken =>
+            {
             using var client = new SmtpClient();
             var secureSocketOptions = ResolveSmtpSecureSocketOptions(configuration, port);
             var smtpHost = host!;
             var smtpUserName = userName!;
             var smtpPassword = password!;
 
-            await client.ConnectAsync(smtpHost, port, secureSocketOptions, timeoutCts.Token);
-            await client.AuthenticateAsync(smtpUserName, smtpPassword, timeoutCts.Token);
-            await client.DisconnectAsync(true, timeoutCts.Token);
-
-            stopwatch.Stop();
-            return new HealthCheckResult("smtp_realtime", "Healthy", stopwatch.ElapsedMilliseconds);
-        }
-        catch (Exception)
-        {
-            stopwatch.Stop();
-            return new HealthCheckResult("smtp_realtime", "Unhealthy", stopwatch.ElapsedMilliseconds, "SMTP realtime ping failed.");
-        }
+            await client.ConnectAsync(smtpHost, port, secureSocketOptions, timeoutToken);
+            await client.AuthenticateAsync(smtpUserName, smtpPassword, timeoutToken);
+            await client.DisconnectAsync(true, timeoutToken);
+            });
     }
 
     private static HealthCheckResult CheckFirebaseConfig(
@@ -323,27 +330,22 @@ public static class HealthEndpointExtensions
             return new HealthCheckResult("firebase_realtime", "Skipped", stopwatch.ElapsedMilliseconds, "Firebase integration is disabled.");
         }
 
-        try
-        {
-            using var timeoutCts = CreateTimeoutCancellationToken(timeoutSeconds, cancellationToken);
-            try
+        return await CheckExternalProbeAsync(
+            "firebase_realtime",
+            "Firebase realtime ping failed.",
+            timeoutSeconds,
+            cancellationToken,
+            async timeoutToken =>
             {
-                await firebaseClient.GetUserAsync("__icebot_diagnostics_probe__", timeoutCts.Token);
-            }
-            catch (FirebaseAuthException ex) when (IsExpectedFirebaseProbeMiss(ex))
-            {
-                stopwatch.Stop();
-                return new HealthCheckResult("firebase_realtime", "Healthy", stopwatch.ElapsedMilliseconds);
-            }
-
-            stopwatch.Stop();
-            return new HealthCheckResult("firebase_realtime", "Healthy", stopwatch.ElapsedMilliseconds);
-        }
-        catch (Exception)
-        {
-            stopwatch.Stop();
-            return new HealthCheckResult("firebase_realtime", "Unhealthy", stopwatch.ElapsedMilliseconds, "Firebase realtime ping failed.");
-        }
+                try
+                {
+                    await firebaseClient.GetUserAsync("__icebot_diagnostics_probe__", timeoutToken);
+                }
+                catch (FirebaseAuthException ex) when (IsExpectedFirebaseProbeMiss(ex))
+                {
+                    // A missing synthetic user proves authenticated reachability.
+                }
+            });
     }
 
     private static HealthCheckResult CheckPayOsConfig(IConfiguration configuration)
@@ -368,35 +370,157 @@ public static class HealthEndpointExtensions
         return new HealthCheckResult("payos_config", "Healthy", 0);
     }
 
+    private static HealthCheckResult CheckCloudinaryConfig(IConfiguration configuration)
+    {
+        var cloudName = configuration["Media:Cloudinary:CloudName"];
+        var apiKey = configuration["Media:Cloudinary:ApiKey"];
+        var apiSecret = configuration["Media:Cloudinary:ApiSecret"];
+        var rootFolder = configuration["Media:Cloudinary:RootFolder"];
+
+        return IsMissingOrPlaceholder(cloudName) ||
+               IsMissingOrPlaceholder(apiKey) ||
+               IsMissingOrPlaceholder(apiSecret) ||
+               string.IsNullOrWhiteSpace(rootFolder)
+            ? new HealthCheckResult("cloudinary_config", "Missing", 0, "Cloudinary config is missing or placeholder.")
+            : new HealthCheckResult("cloudinary_config", "Healthy", 0);
+    }
+
+    private static HealthCheckResult CheckArtifactObjectStorageConfig(IConfiguration configuration)
+    {
+        var endpoint = configuration["RobotArtifacts:ObjectStorage:Endpoint"];
+        var accessKey = configuration["RobotArtifacts:ObjectStorage:AccessKey"];
+        var secretKey = configuration["RobotArtifacts:ObjectStorage:SecretKey"];
+        var bucketName = configuration["RobotArtifacts:ObjectStorage:BucketName"];
+
+        return IsMissingOrPlaceholder(endpoint) ||
+               IsMissingOrPlaceholder(accessKey) ||
+               IsMissingOrPlaceholder(secretKey) ||
+               string.IsNullOrWhiteSpace(bucketName)
+            ? new HealthCheckResult("artifact_object_storage_config", "Missing", 0,
+                "Artifact object-storage config is missing or placeholder.")
+            : new HealthCheckResult("artifact_object_storage_config", "Healthy", 0);
+    }
+
+    private static HealthCheckResult CheckClientRuntimeKeyRing(IConfiguration configuration)
+    {
+        var keyRingDirectory = configuration["ClientRuntime:OrderAccessKeyRingDirectory"];
+        if (string.IsNullOrWhiteSpace(keyRingDirectory))
+        {
+            return new HealthCheckResult("client_order_key_ring", "Missing", 0,
+                "Client order-token key-ring directory is not configured.");
+        }
+
+        try
+        {
+            if (!Directory.Exists(keyRingDirectory))
+            {
+                return new HealthCheckResult("client_order_key_ring", "Unhealthy", 0,
+                    "Client order-token key-ring directory is unavailable.");
+            }
+
+            _ = Directory.EnumerateFileSystemEntries(keyRingDirectory).Take(1).ToArray();
+            return new HealthCheckResult("client_order_key_ring", "Healthy", 0);
+        }
+        catch (Exception)
+        {
+            return new HealthCheckResult("client_order_key_ring", "Unhealthy", 0,
+                "Client order-token key-ring directory cannot be read.");
+        }
+    }
+
+    private static HealthCheckResult CheckClientDeviceSecurityConfig(IConfiguration configuration)
+    {
+        var currentHashKeyVersion = configuration["ClientDevices:Security:CurrentHashKeyVersion"];
+        var currentHashKey = string.IsNullOrWhiteSpace(currentHashKeyVersion)
+            ? null
+            : configuration[$"ClientDevices:Security:HashKeys:{currentHashKeyVersion}"];
+        var jwtSecret = configuration["ClientDevices:Security:JwtSecret"];
+        var issuer = configuration["ClientDevices:Security:Issuer"];
+        var audience = configuration["ClientDevices:Security:Audience"];
+
+        return string.IsNullOrWhiteSpace(currentHashKeyVersion) ||
+               IsMissingOrPlaceholder(currentHashKey) ||
+               IsMissingOrPlaceholder(jwtSecret) ||
+               jwtSecret!.Length < 32 ||
+               string.IsNullOrWhiteSpace(issuer) ||
+               string.IsNullOrWhiteSpace(audience)
+            ? new HealthCheckResult("client_device_security", "Missing", 0,
+                "Client-device credential or JWT config is incomplete.")
+            : new HealthCheckResult("client_device_security", "Healthy", 0);
+    }
+
     private static async Task<HealthCheckResult> CheckPayOsRealtimeAsync(
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
         int timeoutSeconds,
         CancellationToken cancellationToken)
     {
-        var stopwatch = Stopwatch.StartNew();
         var baseUrl = configuration["PayOS:BaseUrl"];
 
         if (IsMissingOrPlaceholder(baseUrl) || !Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri))
         {
-            return new HealthCheckResult("payos_realtime", "Skipped", stopwatch.ElapsedMilliseconds, "PayOS base URL is not configured.");
+            return new HealthCheckResult("payos_realtime", "Skipped", 0, "PayOS base URL is not configured.");
         }
 
+        return await CheckExternalProbeAsync(
+            "payos_realtime",
+            "PayOS realtime ping failed.",
+            timeoutSeconds,
+            cancellationToken,
+            async timeoutToken =>
+            {
+            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
+            var client = httpClientFactory.CreateClient();
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeoutToken);
+            response.Dispose();
+            });
+    }
+
+    private static async Task<HealthCheckResult> CheckCloudinaryRealtimeAsync(
+        ICatalogImageStorageHealthProbe catalogImageStorageHealthProbe,
+        int timeoutSeconds,
+        CancellationToken cancellationToken)
+    {
+        return await CheckExternalProbeAsync(
+            "cloudinary_realtime",
+            "Cloudinary API ping failed.",
+            timeoutSeconds,
+            cancellationToken,
+            catalogImageStorageHealthProbe.EnsureReadyAsync);
+    }
+
+    private static async Task<HealthCheckResult> CheckArtifactObjectStorageRealtimeAsync(
+        IArtifactObjectStorage artifactObjectStorage,
+        int timeoutSeconds,
+        CancellationToken cancellationToken)
+    {
+        return await CheckExternalProbeAsync(
+            "artifact_object_storage_realtime",
+            "Artifact object storage ping failed.",
+            timeoutSeconds,
+            cancellationToken,
+            artifactObjectStorage.EnsureReadyAsync);
+    }
+
+    private static async Task<HealthCheckResult> CheckExternalProbeAsync(
+        string checkName,
+        string failureReason,
+        int timeoutSeconds,
+        CancellationToken cancellationToken,
+        Func<CancellationToken, Task> probe)
+    {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             using var timeoutCts = CreateTimeoutCancellationToken(timeoutSeconds, cancellationToken);
-            using var request = new HttpRequestMessage(HttpMethod.Get, uri);
-            var client = httpClientFactory.CreateClient();
-            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeoutCts.Token);
-            response.Dispose();
-
+            await probe(timeoutCts.Token);
             stopwatch.Stop();
-            return new HealthCheckResult("payos_realtime", "Healthy", stopwatch.ElapsedMilliseconds);
+            return new HealthCheckResult(checkName, "Healthy", stopwatch.ElapsedMilliseconds);
         }
         catch (Exception)
         {
             stopwatch.Stop();
-            return new HealthCheckResult("payos_realtime", "Unhealthy", stopwatch.ElapsedMilliseconds, "PayOS realtime ping failed.");
+            return new HealthCheckResult(checkName, "Unhealthy", stopwatch.ElapsedMilliseconds, failureReason);
         }
     }
 

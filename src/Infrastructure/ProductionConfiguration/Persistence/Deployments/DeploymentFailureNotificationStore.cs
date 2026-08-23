@@ -1,4 +1,6 @@
 using Application.ProductionConfiguration.Deployments.Notifications;
+using Domain.Identity.Entities;
+using Domain.Identity.Enums;
 using Domain.ProductionConfiguration.Enums;
 using Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
@@ -38,53 +40,56 @@ public sealed class DeploymentFailureNotificationStore(IceBotDbContext db) : IDe
             .SingleOrDefaultAsync(cancellationToken);
     }
 
-    private IQueryable<Domain.ProductionConfiguration.Entities.KioskConfigurationDeployment> FullEdgeCandidates() =>
-        db.KioskConfigurationDeployments.AsNoTracking().Where(x =>
+    private IQueryable<Domain.ProductionConfiguration.Entities.KioskConfigurationDeployment> FullEdgeCandidates()
+    {
+        var businessRecipients = EligibleBusinessRecipients();
+        var technicianRecipients = EligibleTechnicianRecipients();
+        return db.KioskConfigurationDeployments.AsNoTracking().Where(x =>
             x.Status == KioskConfigurationDeploymentStatus.Failed && x.FailureCode != null &&
             !db.NotificationDeliveries.Any(delivery =>
                 delivery.NotificationType == "deployment_failed" && delivery.SubjectId == x.Id) &&
-            (db.AccountRoles.Any(accountRole =>
-                accountRole.IsActive &&
-                accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
-                accountRole.Account.DeletedAt == null &&
-                accountRole.Account.NotificationDevices.Any(device =>
-                    device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+            (businessRecipients.Any(accountRole =>
                 ((accountRole.Role.Code == "Manager" &&
                   (accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId ||
                    accountRole.OrganizationId == x.OrganizationId)) ||
                  (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))) ||
-             db.TechnicianSupportGrants.Any(grant =>
-                 grant.IsActive && grant.DeletedAt == null &&
-                 grant.Account.PlatformTechnicianProfile != null &&
-                 grant.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
-                 grant.Account.DeletedAt == null &&
-                 grant.Account.NotificationDevices.Any(device =>
-                     device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+              technicianRecipients.Any(grant =>
                  (grant.KioskId == x.KioskId ||
                   grant.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId))));
+    }
 
-    private IQueryable<Domain.ProductionConfiguration.Entities.ControllerArtifactSetDeployment> ControllerCandidates() =>
-        db.ControllerArtifactSetDeployments.AsNoTracking().Where(x =>
+    private IQueryable<Domain.ProductionConfiguration.Entities.ControllerArtifactSetDeployment> ControllerCandidates()
+    {
+        var businessRecipients = EligibleBusinessRecipients();
+        var technicianRecipients = EligibleTechnicianRecipients();
+        return db.ControllerArtifactSetDeployments.AsNoTracking().Where(x =>
             x.Status == ControllerArtifactSetDeploymentStatus.Failed && x.FailureCode != null &&
             !db.NotificationDeliveries.Any(delivery =>
                 delivery.NotificationType == "deployment_failed" && delivery.SubjectId == x.Id) &&
-            (db.AccountRoles.Any(accountRole =>
-                accountRole.IsActive &&
-                accountRole.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
-                accountRole.Account.DeletedAt == null &&
-                accountRole.Account.NotificationDevices.Any(device =>
-                    device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+            (businessRecipients.Any(accountRole =>
                 ((accountRole.Role.Code == "Manager" &&
                   (accountRole.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId ||
                    accountRole.OrganizationId == x.OrganizationId)) ||
                  (accountRole.Role.Code == "OrgAdmin" && accountRole.OrganizationId == x.OrganizationId))) ||
-             db.TechnicianSupportGrants.Any(grant =>
-                 grant.IsActive && grant.DeletedAt == null &&
-                 grant.Account.PlatformTechnicianProfile != null &&
-                 grant.Account.Status == Domain.Identity.Enums.AccountStatus.Active &&
-                 grant.Account.DeletedAt == null &&
-                 grant.Account.NotificationDevices.Any(device =>
-                     device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null) &&
+              technicianRecipients.Any(grant =>
                  (grant.KioskId == x.KioskId ||
                   grant.StoreId == x.KioskExecutionEndpoint.Kiosk.StoreId))));
+    }
+
+    private IQueryable<AccountRole> EligibleBusinessRecipients() =>
+        db.AccountRoles.AsNoTracking().Where(accountRole =>
+            accountRole.IsActive &&
+            accountRole.Account.Status == AccountStatus.Active &&
+            accountRole.Account.DeletedAt == null &&
+            accountRole.Account.NotificationDevices.Any(device =>
+                device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null));
+
+    private IQueryable<TechnicianSupportGrant> EligibleTechnicianRecipients() =>
+        db.TechnicianSupportGrants.AsNoTracking().Where(grant =>
+            grant.IsActive && grant.DeletedAt == null &&
+            grant.Account.PlatformTechnicianProfile != null &&
+            grant.Account.Status == AccountStatus.Active &&
+            grant.Account.DeletedAt == null &&
+            grant.Account.NotificationDevices.Any(device =>
+                device.DeletedAt == null && device.InvalidatedAt == null && device.PushToken != null));
 }

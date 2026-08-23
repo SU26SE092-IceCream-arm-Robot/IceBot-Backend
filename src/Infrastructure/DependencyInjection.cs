@@ -232,7 +232,6 @@ namespace Infrastructure
             services.AddScoped<IArtifactObjectStorage, MinioArtifactObjectStorage>();
             services.AddScoped<IArtifactObjectReferenceSource, RobotConfigurationObjectReferenceSource>();
             services.AddScoped<IArtifactObjectReferenceSource, ConfigurationReleaseBundleReferenceSource>();
-            services.AddHostedService<RobotArtifactObjectStorageStartupValidator>();
             services.AddHostedService<RobotArtifactOrphanCleanupJob>();
             services.AddScoped<IRobotArtifactStore, RobotArtifactStore>();
             services.AddScoped<IRobotArtifactUsageReader, RobotArtifactUsageReader>();

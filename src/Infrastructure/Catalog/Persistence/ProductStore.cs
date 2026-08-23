@@ -1,6 +1,7 @@
 using Application.Catalog.Abstractions;
 using Domain.Catalog.Entities;
 using Infrastructure.Data;
+using Infrastructure.Data.Queries;
 using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Catalog.Persistence;
@@ -252,22 +253,8 @@ public sealed class ProductStore : IProductStore
         Guid? storeId,
         Guid? kioskId,
         CancellationToken cancellationToken = default)
-    {
-        if (!await _dbContext.Organizations.WhereNotDeleted().AnyAsync(x => x.Id == organizationId, cancellationToken))
-        {
-            return false;
-        }
-
-        if (storeId.HasValue && !await _dbContext.Stores.WhereNotDeleted().AnyAsync(
-                x => x.Id == storeId && x.OrganizationId == organizationId, cancellationToken))
-        {
-            return false;
-        }
-
-        return !kioskId.HasValue || await _dbContext.Kiosks.WhereNotDeleted().AnyAsync(
-            x => x.Id == kioskId && x.OrganizationId == organizationId &&
-                 (!storeId.HasValue || x.StoreId == storeId), cancellationToken);
-    }
+        => await TenantScopeExistenceQuery.ExistsAsync(
+            _dbContext, organizationId, storeId, kioskId, cancellationToken);
 
     public async Task AddProductAsync(Product product, CancellationToken cancellationToken = default)
     {
@@ -282,10 +269,55 @@ public sealed class ProductStore : IProductStore
     public Task AddCatalogImageAssetAsync(CatalogImageAsset imageAsset, CancellationToken cancellationToken = default) =>
         _dbContext.CatalogImageAssets.AddAsync(imageAsset, cancellationToken).AsTask();
 
+    public Task AddCatalogImageCleanupAsync(CatalogImageCleanup cleanup, CancellationToken cancellationToken = default) =>
+        _dbContext.CatalogImageCleanups.AddAsync(cleanup, cancellationToken).AsTask();
+
+    public Task AddCatalogImageOperationReplayAsync(CatalogImageOperationReplay replay, CancellationToken cancellationToken = default) =>
+        _dbContext.CatalogImageOperationReplays.AddAsync(replay, cancellationToken).AsTask();
+
+    public Task<CatalogImageOperationReplay?> GetCatalogImageOperationReplayAsync(
+        string scopeKey,
+        string ownerType,
+        Guid ownerId,
+        Domain.Catalog.Enums.CatalogImageOperation operation,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.CatalogImageOperationReplays.AsNoTracking().FirstOrDefaultAsync(replay =>
+            replay.ScopeKey == scopeKey &&
+            replay.OwnerType == ownerType &&
+            replay.OwnerId == ownerId &&
+            replay.Operation == operation &&
+            replay.IdempotencyKey == idempotencyKey,
+            cancellationToken);
+
+    public Task<List<CatalogImageCleanup>> ListPendingCatalogImageCleanupsAsync(
+        int take,
+        DateTimeOffset now,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.CatalogImageCleanups
+            .Include(cleanup => cleanup.CatalogImageAsset)
+            .Where(cleanup => cleanup.CompletedAt == null &&
+                (!cleanup.NextAttemptAt.HasValue || cleanup.NextAttemptAt <= now))
+            .OrderBy(cleanup => cleanup.CreatedAt)
+            .Take(take)
+            .ToListAsync(cancellationToken);
+
     public async Task<bool> IsCatalogImageAssetReferencedAsync(Guid imageAssetId, CancellationToken cancellationToken = default)
     {
-        return await _dbContext.Products.AnyAsync(product => product.ImageAssetId == imageAssetId, cancellationToken) ||
-               await _dbContext.ProductVariants.AnyAsync(variant => variant.ImageAssetId == imageAssetId, cancellationToken);
+        if (await _dbContext.Products.AnyAsync(product => product.ImageAssetId == imageAssetId, cancellationToken) ||
+            await _dbContext.ProductVariants.AnyAsync(variant => variant.ImageAssetId == imageAssetId, cancellationToken))
+        {
+            return true;
+        }
+
+        var imageAssetIdText = imageAssetId.ToString("D");
+        var packageSnapshots = await _dbContext.ProductionPackageProductDefinitions
+            .AsNoTracking()
+            .Select(definition => definition.ProductSnapshotJson)
+            .ToListAsync(cancellationToken);
+
+        return packageSnapshots.Any(snapshot =>
+            snapshot.Contains(imageAssetIdText, StringComparison.OrdinalIgnoreCase));
     }
 
     public Task AddOptionGroupAsync(OptionGroup optionGroup, CancellationToken cancellationToken = default) =>

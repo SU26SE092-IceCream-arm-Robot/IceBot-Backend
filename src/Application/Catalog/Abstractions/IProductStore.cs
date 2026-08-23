@@ -109,6 +109,20 @@ public interface IProductStore
 
     Task AddCatalogImageAssetAsync(CatalogImageAsset imageAsset, CancellationToken cancellationToken = default);
 
+    Task AddCatalogImageCleanupAsync(CatalogImageCleanup cleanup, CancellationToken cancellationToken = default);
+
+    Task AddCatalogImageOperationReplayAsync(CatalogImageOperationReplay replay, CancellationToken cancellationToken = default);
+
+    Task<CatalogImageOperationReplay?> GetCatalogImageOperationReplayAsync(
+        string scopeKey,
+        string ownerType,
+        Guid ownerId,
+        Domain.Catalog.Enums.CatalogImageOperation operation,
+        string idempotencyKey,
+        CancellationToken cancellationToken = default);
+
+    Task<List<CatalogImageCleanup>> ListPendingCatalogImageCleanupsAsync(int take, DateTimeOffset now, CancellationToken cancellationToken = default);
+
     Task<bool> IsCatalogImageAssetReferencedAsync(Guid imageAssetId, CancellationToken cancellationToken = default);
 
     Task AddOptionGroupAsync(OptionGroup optionGroup, CancellationToken cancellationToken = default);

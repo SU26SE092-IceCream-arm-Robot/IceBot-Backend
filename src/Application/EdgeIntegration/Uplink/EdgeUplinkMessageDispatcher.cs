@@ -174,55 +174,7 @@ public sealed class EdgeUplinkMessageDispatcher(
             KioskId = kioskId,
             EndpointId = endpointId,
             OriginNodeId = payload.OriginNodeId,
-            Events = payload.Events.Select(item => new BatchSyncEventItem
-            {
-                EventId = item.EventId,
-                EventType = item.EventType switch
-                {
-                    EdgeTelemetryEventType.Heartbeat => BatchSyncEventType.Heartbeat,
-                    EdgeTelemetryEventType.DeviceEvent => BatchSyncEventType.DeviceEvent,
-                    EdgeTelemetryEventType.LocalLog => BatchSyncEventType.LocalLog,
-                    _ => throw new JsonException("Unsupported telemetry event type.")
-                },
-                Heartbeat = item.Heartbeat is null ? null : new BatchHeartbeatData
-                {
-                    HeartbeatSequence = item.Heartbeat.HeartbeatSequence,
-                    ReportedAt = item.Heartbeat.ReportedAt,
-                    Status = item.Heartbeat.Status,
-                    RobotStatus = item.Heartbeat.RobotStatus,
-                    NetworkStatus = item.Heartbeat.NetworkStatus,
-                    AppVersion = item.Heartbeat.AppVersion,
-                    FirmwareVersion = item.Heartbeat.FirmwareVersion,
-                    CpuUsagePercent = item.Heartbeat.CpuUsagePercent,
-                    MemoryUsagePercent = item.Heartbeat.MemoryUsagePercent,
-                    DiskUsagePercent = item.Heartbeat.DiskUsagePercent,
-                    PendingSyncEventCount = item.Heartbeat.PendingSyncEventCount
-                },
-                DeviceEvent = item.DeviceEvent is null ? null : new BatchDeviceEventData
-                {
-                    DeviceId = item.DeviceEvent.DeviceId,
-                    CorrelationId = item.DeviceEvent.CorrelationId,
-                    CausationId = item.DeviceEvent.CausationId,
-                    EventType = item.DeviceEvent.EventType,
-                    Severity = item.DeviceEvent.Severity,
-                    Message = item.DeviceEvent.Message,
-                    OccurredAt = item.DeviceEvent.OccurredAt,
-                    PayloadJson = item.DeviceEvent.Payload?.GetRawText()
-                },
-                LocalLog = item.LocalLog is null ? null : new BatchLocalLogData
-                {
-                    DeviceId = item.LocalLog.DeviceId,
-                    OrderId = item.LocalLog.OrderId,
-                    CorrelationId = item.LocalLog.CorrelationId,
-                    CausationId = item.LocalLog.CausationId,
-                    Action = item.LocalLog.Action,
-                    Category = item.LocalLog.Category,
-                    Severity = item.LocalLog.Severity,
-                    Message = item.LocalLog.Message,
-                    OccurredAt = item.LocalLog.OccurredAt,
-                    PayloadJson = item.LocalLog.Payload?.GetRawText()
-                }
-            }).ToArray()
+            Events = payload.Events.Select(BatchSyncEventCommandMapper.Map).ToArray()
         };
 
     private static IngestExecutionReadinessCommand MapReadiness(

@@ -1,3 +1,4 @@
+using Application.Catalog.Images;
 using Application.Catalog.Products.Results;
 using Domain.Catalog.Entities;
 
@@ -119,20 +120,6 @@ internal static class ProductResultMapper
         };
     }
 
-    private static CatalogImageResult? ToImageResult(CatalogImageAsset? asset, string? altText)
-    {
-        if (asset is null || asset.Status != Domain.Catalog.Enums.CatalogImageAssetStatus.Active)
-        {
-            return null;
-        }
-
-        return new CatalogImageResult
-        {
-            AssetId = asset.Id,
-            CardUrl = asset.DeliveryUrl,
-            DetailUrl = asset.DeliveryUrl,
-            AltText = altText,
-            Version = asset.Version
-        };
-    }
+    private static CatalogImageResult? ToImageResult(CatalogImageAsset? asset, string? altText) =>
+        CatalogImageDeliveryUrlFactory.Create(asset, altText);
 }

@@ -22,13 +22,16 @@ Use [Documentation Routing Map](DOCUMENTATION_ROUTING_MAP.md) only when the righ
 | --- | --- |
 | Module documentation ownership and verification entry points | [Documentation Coverage Matrix](DOCUMENTATION_COVERAGE.md) |
 | Route/API ownership | [API Surface Rules](api/API_SURFACE_RULES.md) |
+| API error envelope, status semantics, retry expectations | [API Error Contract](api/API_ERROR_CONTRACT.md) |
 | Internal management route catalog | [Management API Surface](api/MANAGEMENT_API_SURFACE.md) |
+| Catalog image upload, delivery, and cleanup contract | [Catalog Image API](api/CATALOG_IMAGE_API.md) |
 | Role policy and scoped RBAC | [Authorization Rules](api/AUTHORIZATION_RULES.md) |
 | Internal account onboarding | [Identity Onboarding Rules](api/IDENTITY_ONBOARDING_RULES.md) |
 | Domain ownership | [Boundary Contexts](architecture/BOUNDARY_CONTEXTS.md) |
 | Layer dependencies | [Dependency Rules](architecture/DEPENDENCY_RULES.md) |
 | Tenant scope | [Multi-Tenancy Rules](architecture/MULTI_TENANCY_RULES.md) |
 | EF/data modeling rules | [Data Modeling Rules](data/DATA_MODELING_RULES.md) |
+| EF migration and PostgreSQL upgrade workflow | [EF Core Migration Workflow](data/EF_CORE_MIGRATION_WORKFLOW.md) |
 | System flow index | [System Flows](flows/SYSTEM_FLOWS.md) |
 | Checkout/payment/edge execution flow | [Checkout Execution Flow](flows/CHECKOUT_EXECUTION_FLOW.md) |
 | Fairino Lua artifact/program deployment | [Robot Lua Artifact Flow](flows/ROBOT_LUA_ARTIFACT_FLOW.md) |
@@ -37,6 +40,7 @@ Use [Documentation Routing Map](DOCUMENTATION_ROUTING_MAP.md) only when the righ
 | Tablet/edge/cloud contract | [IoT Contract](iot/IOT_CONTRACT.md) |
 | Naming conventions | [Naming Rules](process/NAMING_RULES.md) |
 | Deployment/runtime configuration | [Deployment Configuration](operations/DEPLOYMENT_CONFIG.md) |
+| Startup gates, bootstrap, seed, and repair ownership | [Startup And Bootstrap Rules](operations/STARTUP_AND_BOOTSTRAP_RULES.md) |
 | Local demo accounts and repeat-safe development seeding | [Local Development Bootstrap](operations/LOCAL_DEVELOPMENT_BOOTSTRAP.md) |
 | Robot artifact operational smoke | [Robot Artifact Operational Smoke Test](operations/ROBOT_ARTIFACT_OPERATIONAL_SMOKE.md) |
 | Observability/logging/traces/metrics | [Observability](operations/OBSERVABILITY.md) |

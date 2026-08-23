@@ -26,8 +26,9 @@ If one of these test suites is disabled or failing, report that missing evidence
 Verify against the target environment:
 
 - migrations apply to an empty database and the intended upgrade baseline;
-- required object-storage buckets exist or startup fails according to configured bucket ownership;
-- PostgreSQL, MinIO, MQTT, SMTP, PayOS, and Firebase settings satisfy startup validation;
+- core database and security configuration satisfy startup validation;
+- required object-storage configuration is valid, and bucket ownership/reachability is verified through a controlled smoke or protected diagnostic rather than an unrelated host-startup failure;
+- provider settings for MinIO, MQTT, SMTP, PayOS, Firebase, and Cloudinary are present for the enabled features, without requiring a remote reachability call during generic API startup;
 - health endpoints distinguish startup readiness from optional dependency degradation;
 - secrets are supplied through the deployment secret mechanism and do not appear in responses or logs.
 
@@ -55,7 +56,7 @@ Verify only when the real Edge/controller runtime is available:
 ## Recovery Smoke
 
 - restart MQTT and confirm pending commands remain pullable;
-- temporarily interrupt MinIO reads and confirm immutable artifact recovery behavior;
+- temporarily interrupt MinIO, Cloudinary, or another enabled provider and confirm the owning feature fails safely without making unrelated APIs unready;
 - restart Cloud/API during a pending workflow and confirm reconciliation resumes without duplicate effects;
 - confirm stuck-workflow timeout and retry-failure metrics are emitted and alertable.
 
