@@ -26,6 +26,7 @@ public sealed class ManagementProductsController : ControllerBase
     private readonly UpdateProductVariantCommandHandler _updateVariantHandler;
     private readonly SetProductVariantAvailabilityCommandHandler _setVariantAvailabilityHandler;
     private readonly DeleteProductVariantCommandHandler _deleteVariantHandler;
+    private readonly ReplaceCatalogImageCommandHandler _replaceImageHandler;
 
     public ManagementProductsController(
         ListProductsQueryHandler listProductsHandler,
@@ -38,7 +39,8 @@ public sealed class ManagementProductsController : ControllerBase
         AddProductVariantCommandHandler addVariantHandler,
         UpdateProductVariantCommandHandler updateVariantHandler,
         SetProductVariantAvailabilityCommandHandler setVariantAvailabilityHandler,
-        DeleteProductVariantCommandHandler deleteVariantHandler)
+        DeleteProductVariantCommandHandler deleteVariantHandler,
+        ReplaceCatalogImageCommandHandler replaceImageHandler)
     {
         _listProductsHandler = listProductsHandler;
         _getProductHandler = getProductHandler;
@@ -51,6 +53,7 @@ public sealed class ManagementProductsController : ControllerBase
         _updateVariantHandler = updateVariantHandler;
         _setVariantAvailabilityHandler = setVariantAvailabilityHandler;
         _deleteVariantHandler = deleteVariantHandler;
+        _replaceImageHandler = replaceImageHandler;
     }
 
     [HttpGet]
@@ -172,6 +175,24 @@ public sealed class ManagementProductsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPut("{productId:guid}/image")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(5_500_000)]
+    public async Task<IActionResult> ReplaceProductImage(
+        Guid organizationId, Guid productId, [FromForm] CatalogImageUploadForm form, CancellationToken cancellationToken)
+    {
+        if (form.File is null)
+        {
+            return BadRequest("An image file is required.");
+        }
+
+        await using var stream = new MemoryStream();
+        await form.File.CopyToAsync(stream, cancellationToken);
+        var result = await _replaceImageHandler.ReplaceProductAsync(Scope(organizationId), productId, form.ExpectedRevision,
+            form.AltText, stream.ToArray(), form.File.FileName, form.File.ContentType, GetCurrentAccountId(), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("{productId:guid}/variants")]
     public async Task<IActionResult> AddVariant(
         Guid organizationId,
@@ -233,6 +254,25 @@ public sealed class ManagementProductsController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPut("{productId:guid}/variants/{variantId:guid}/image")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(5_500_000)]
+    public async Task<IActionResult> ReplaceVariantImage(
+        Guid organizationId, Guid productId, Guid variantId, [FromForm] CatalogImageUploadForm form, CancellationToken cancellationToken)
+    {
+        if (form.File is null)
+        {
+            return BadRequest("An image file is required.");
+        }
+
+        await using var stream = new MemoryStream();
+        await form.File.CopyToAsync(stream, cancellationToken);
+        var result = await _replaceImageHandler.ReplaceVariantAsync(Scope(organizationId), productId, variantId,
+            form.ExpectedRevision, form.AltText, stream.ToArray(), form.File.FileName, form.File.ContentType,
+            GetCurrentAccountId(), cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpDelete("{productId:guid}/variants/{variantId:guid}")]
     public async Task<IActionResult> DeleteVariant(
         Guid organizationId,
@@ -260,4 +300,11 @@ public sealed class ManagementProductsController : ControllerBase
 
     private ProductManagementCommandScope Scope(Guid organizationId) =>
         new(User.GetUserContext(), organizationId);
+}
+
+public sealed class CatalogImageUploadForm
+{
+    public IFormFile? File { get; set; }
+    public string? AltText { get; set; }
+    public int ExpectedRevision { get; set; }
 }

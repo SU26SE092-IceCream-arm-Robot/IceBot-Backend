@@ -4,6 +4,7 @@ using Domain.Common.Enums;
 using Domain.Identity.Entities;
 using Domain.Identity.Enums;
 using Domain.Orders.Entities;
+using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
@@ -83,6 +84,7 @@ public sealed class PaymentInterventionNotificationIntegrationTests(IntegrationT
             OrganizationId = organization.Id,
             StoreId = store.Id,
             KioskId = kiosk.Id,
+            Channel = OrderChannel.Admin,
             OrderNumber = $"ORDER-{Guid.NewGuid():N}"
         };
         var payment = new PaymentTransaction

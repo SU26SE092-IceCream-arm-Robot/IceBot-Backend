@@ -31,11 +31,17 @@ public partial class ProductVariant : BusinessEntity
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
+    public Guid? ImageAssetId { get; set; }
+
+    public string? ImageAltText { get; set; }
+
+    public int Revision { get; set; } = 1;
 
     public string? MetadataJson { get; set; }
 
     public virtual Product Product { get; set; } = null!;
+
+    public virtual CatalogImageAsset? ImageAsset { get; set; }
 
     public virtual ICollection<Recipe> Recipes { get; set; } = new List<Recipe>();
 }

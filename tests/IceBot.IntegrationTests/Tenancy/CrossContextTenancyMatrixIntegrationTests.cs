@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Domain.Orders.Entities;
+using Domain.Orders.Enums;
 using Domain.ProductionPackages;
 using IceBot.IntegrationTests.Infrastructure;
 using IceBot.IntegrationTests.ProductionPackages;
@@ -158,6 +159,7 @@ public sealed class CrossContextTenancyMatrixIntegrationTests(IntegrationTestFix
             OrganizationId = scenario.OrganizationId,
             StoreId = scenario.StoreId,
             KioskId = scenario.KioskId,
+            Channel = OrderChannel.Admin,
             OrderNumber = $"TENANCY-{Guid.NewGuid():N}"
         };
         order.SetCurrency("VND");

@@ -13,6 +13,9 @@ public static class ScopedIdempotencyKey
     public static string ForKiosk(Guid kioskId, string clientKey) =>
         $"kiosk:{kioskId:N}:{clientKey}";
 
+    public static string ForClientDevice(Guid clientDeviceId, string clientKey) =>
+        $"client-device:{clientDeviceId:N}:{clientKey}";
+
     public static string ForOrder(Guid orderId, string clientKey) =>
         $"order:{orderId:N}:{clientKey}";
 

@@ -34,7 +34,7 @@ public sealed class RuntimeMenuItemResult
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
+    public RuntimeMenuImageResult? Image { get; set; }
 
     public int? RecipeVersion { get; set; }
 
@@ -63,4 +63,11 @@ public sealed class RuntimeMenuProductOptionResult
     public string Currency { get; set; } = null!;
     public bool IsDefault { get; set; }
     public string ExecutionImpact { get; set; } = null!;
+}
+
+public sealed class RuntimeMenuImageResult
+{
+    public string CardUrl { get; set; } = null!;
+    public string DetailUrl { get; set; } = null!;
+    public string? AltText { get; set; }
 }

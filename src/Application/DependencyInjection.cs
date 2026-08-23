@@ -1,4 +1,5 @@
 using Application.Catalog;
+using Application.ClientDevices;
 using Application.ContentManagement;
 using Application.Dashboard.Queries;
 using Application.Devices;
@@ -26,6 +27,7 @@ namespace Application
         public static IServiceCollection AddApplication(this IServiceCollection services)
         {
             services.AddCatalogModule();
+            services.AddClientDevicesModule();
             services.AddContentManagementApplication();
             services.AddDevicesModule();
             services.AddSyncModule();

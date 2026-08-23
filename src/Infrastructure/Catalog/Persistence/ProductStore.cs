@@ -57,6 +57,9 @@ public sealed class ProductStore : IProductStore
         return ApplyProductFilters(
                 _dbContext.Products.WhereNotDeleted()
                     .AsNoTracking()
+                    .Include(product => product.ImageAsset)
+                    .Include(product => product.ProductVariants)
+                        .ThenInclude(variant => variant.ImageAsset)
                     .Include(product => product.ProductVariants)
                         .ThenInclude(variant => variant.Recipes)
                     .Include(product => product.OptionGroups)
@@ -85,6 +88,9 @@ public sealed class ProductStore : IProductStore
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.Products.WhereNotDeleted()
+            .Include(product => product.ImageAsset)
+            .Include(product => product.ProductVariants)
+                .ThenInclude(variant => variant.ImageAsset)
             .Include(product => product.ProductVariants)
                 .ThenInclude(variant => variant.Recipes)
             .Include(product => product.OptionGroups)
@@ -108,6 +114,7 @@ public sealed class ProductStore : IProductStore
         CancellationToken cancellationToken = default)
     {
         var query = _dbContext.ProductVariants
+            .Include(variant => variant.ImageAsset)
             .Where(variant => variant.ProductId == productId && variant.Id == variantId);
 
         if (asNoTracking)
@@ -270,6 +277,15 @@ public sealed class ProductStore : IProductStore
     public async Task AddProductVariantAsync(ProductVariant variant, CancellationToken cancellationToken = default)
     {
         await _dbContext.ProductVariants.AddAsync(variant, cancellationToken);
+    }
+
+    public Task AddCatalogImageAssetAsync(CatalogImageAsset imageAsset, CancellationToken cancellationToken = default) =>
+        _dbContext.CatalogImageAssets.AddAsync(imageAsset, cancellationToken).AsTask();
+
+    public async Task<bool> IsCatalogImageAssetReferencedAsync(Guid imageAssetId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.Products.AnyAsync(product => product.ImageAssetId == imageAssetId, cancellationToken) ||
+               await _dbContext.ProductVariants.AnyAsync(variant => variant.ImageAssetId == imageAssetId, cancellationToken);
     }
 
     public Task AddOptionGroupAsync(OptionGroup optionGroup, CancellationToken cancellationToken = default) =>

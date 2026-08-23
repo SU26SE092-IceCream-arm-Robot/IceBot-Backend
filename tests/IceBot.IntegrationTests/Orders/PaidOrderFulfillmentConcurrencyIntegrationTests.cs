@@ -247,6 +247,7 @@ public sealed class PaidOrderFulfillmentConcurrencyIntegrationTests(IntegrationT
             OrganizationId = organization.Id,
             StoreId = store.Id,
             KioskId = kiosk.Id,
+            Channel = OrderChannel.Admin,
             OrderNumber = $"ORDER-{Guid.NewGuid():N}"
         };
         order.SetCurrency("VND");

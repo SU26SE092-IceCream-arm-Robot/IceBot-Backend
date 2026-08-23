@@ -1,7 +1,5 @@
 using Application.Payments.Abstractions;
 using Application.Devices.Telemetry;
-using Application.Inventory.Abstractions;
-using Application.Orders.Abstractions;
 using Application.Orders.Admission;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
@@ -16,7 +14,7 @@ using Domain.Common.Enums;
 using Domain.Devices.Connectivity;
 using Domain.Tenants.Entities;
 using Domain.Tenants.Enums;
-using Application.SalesCatalog.Availability;
+using Application.SalesCatalog.Admission;
 using Application.SalesCatalog.Admission.Abstractions;
 using Application.SalesCatalog.Admission.Services;
 using Application.Tenants.Kiosks.Rules;
@@ -421,14 +419,21 @@ public sealed class CreatePaymentSessionCommandHandlerTests
         IPaymentStore paymentStore,
         IPaymentGateway paymentGateway)
     {
-        var inventoryGate = new MachineProductionInventoryGate(
-            Substitute.For<IInventoryReadinessEvaluator>(),
-            Options.Create(new EdgeTelemetryIngestionOptions()));
-        var sellabilityGuard = new OrderPaymentSellabilityGuard(
-            Substitute.For<IOrderStore>(),
-            Substitute.For<IMenuItemOperationalAvailabilityReader>(),
-            inventoryGate,
-            Options.Create(new EdgeTelemetryIngestionOptions()));
+        var itemAdmission = Substitute.For<IMenuItemOperationalAdmissionEvaluator>();
+        itemAdmission.EvaluateAsync(
+                Arg.Any<Kiosk>(),
+                Arg.Any<Guid>(),
+                Arg.Any<int>(),
+                Arg.Any<IReadOnlyCollection<Application.Inventory.Abstractions.InventoryIngredientRequirementInput>?>(),
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call => new MenuItemOperationalDecision(
+                call.ArgAt<Guid>(1),
+                true,
+                [],
+                [],
+                new HashSet<string>()));
+        var sellabilityGuard = new OrderPaymentSellabilityGuard(itemAdmission);
         return new CreatePaymentSessionCommandHandler(
             paymentStore,
             paymentGateway,

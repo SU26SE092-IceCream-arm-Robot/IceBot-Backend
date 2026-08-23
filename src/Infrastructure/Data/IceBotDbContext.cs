@@ -42,6 +42,7 @@ using Microsoft.EntityFrameworkCore.Metadata;
 using System.Linq.Expressions;
 using Domain.Devices.ExecutionEndpoints.Projections;
 using Domain.Devices.Connectivity;
+using Domain.Devices.ClientDevices;
 
 namespace Infrastructure.Data;
 
@@ -91,6 +92,16 @@ public class IceBotDbContext : DbContext
 
         foreach (var entry in entries)
         {
+            if (entry.State == EntityState.Modified && entry.Entity is Product product)
+            {
+                product.Revision++;
+            }
+
+            if (entry.State == EntityState.Modified && entry.Entity is ProductVariant variant)
+            {
+                variant.Revision++;
+            }
+
             if (entry.Entity is IAuditable auditable)
             {
                 switch (entry.State)
@@ -148,8 +159,12 @@ public class IceBotDbContext : DbContext
     public DbSet<ExecutionEndpointCapabilityProjection> ExecutionEndpointCapabilityProjections => Set<ExecutionEndpointCapabilityProjection>();
     public DbSet<ExecutionEndpointRequestNonce> ExecutionEndpointRequestNonces => Set<ExecutionEndpointRequestNonce>();
     public DbSet<ExecutionEndpointReportedDevice> ExecutionEndpointReportedDevices => Set<ExecutionEndpointReportedDevice>();
+    public DbSet<ClientDevice> ClientDevices => Set<ClientDevice>();
+    public DbSet<ClientDeviceCredential> ClientDeviceCredentials => Set<ClientDeviceCredential>();
+    public DbSet<ClientDeviceOperationReplay> ClientDeviceOperationReplays => Set<ClientDeviceOperationReplay>();
 
     public DbSet<ProductCategory> ProductCategories => Set<ProductCategory>();
+    public DbSet<CatalogImageAsset> CatalogImageAssets => Set<CatalogImageAsset>();
     public DbSet<Product> Products => Set<Product>();
     public DbSet<ProductVariant> ProductVariants => Set<ProductVariant>();
     public DbSet<OptionGroup> OptionGroups => Set<OptionGroup>();

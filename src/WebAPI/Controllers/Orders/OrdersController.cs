@@ -4,39 +4,45 @@ using Application.Orders.PlaceOrder.Requests;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Queries;
 using Application.Payments.PaymentSessions.Requests;
+using Application.ClientDevices.Security;
 using Asp.Versioning;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using WebAPI.Configuration.Security;
 
 namespace WebAPI.Controllers.Orders;
 
 [ApiController]
 [ApiVersion("1.0")]
-[Route("api/v{version:apiVersion}/orders")]
-public sealed class OrdersController : ControllerBase
+[Route("api/v{version:apiVersion}/runtime/orders")]
+[Authorize(AuthenticationSchemes = ClientDeviceAuthenticationDefaults.Scheme)]
+public sealed class RuntimeOrdersController : ControllerBase
 {
     private readonly PlaceOrderCommandHandler _placeOrderHandler;
     private readonly GetOrderStatusQueryHandler _getOrderStatusHandler;
     private readonly CancelPendingOrderCommandHandler _cancelOrderHandler;
     private readonly CreatePaymentSessionCommandHandler _createPaymentSessionHandler;
     private readonly GetOrderPaymentStatusQueryHandler _getOrderPaymentStatusHandler;
-    private readonly IPublicOrderAccessTokenService _publicOrderAccess;
+    private readonly IOrderAccessTokenService _orderAccess;
+    private readonly ICurrentClientDeviceContext _clientDevice;
 
-    public OrdersController(
+    public RuntimeOrdersController(
         PlaceOrderCommandHandler placeOrderHandler,
         GetOrderStatusQueryHandler getOrderStatusHandler,
         CancelPendingOrderCommandHandler cancelOrderHandler,
         CreatePaymentSessionCommandHandler createPaymentSessionHandler,
         GetOrderPaymentStatusQueryHandler getOrderPaymentStatusHandler,
-        IPublicOrderAccessTokenService publicOrderAccess)
+        IOrderAccessTokenService orderAccess,
+        ICurrentClientDeviceContext clientDevice)
     {
         _placeOrderHandler = placeOrderHandler;
         _getOrderStatusHandler = getOrderStatusHandler;
         _cancelOrderHandler = cancelOrderHandler;
         _createPaymentSessionHandler = createPaymentSessionHandler;
         _getOrderPaymentStatusHandler = getOrderPaymentStatusHandler;
-        _publicOrderAccess = publicOrderAccess;
+        _orderAccess = orderAccess;
+        _clientDevice = clientDevice;
     }
 
     /// <summary>
@@ -47,7 +53,8 @@ public sealed class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The created order status.</returns>
     [HttpPost]
-    [AllowAnonymous]
+    [EnableRateLimiting("client-device-order")]
+    [RequestSizeLimit(65_536)]
     public async Task<IActionResult> PlaceOrder(
         [FromBody] PlaceOrderRequest request,
         [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
@@ -55,14 +62,20 @@ public sealed class OrdersController : ControllerBase
     {
         request ??= new PlaceOrderRequest();
 
-        var command = new PlaceOrderCommand { Request = request, IdempotencyKey = idempotencyKey };
+        var command = new PlaceOrderCommand
+        {
+            KioskId = _clientDevice.KioskId,
+            SourceClientDeviceId = _clientDevice.ClientDeviceId,
+            Request = request,
+            IdempotencyKey = idempotencyKey
+        };
         var result = await _placeOrderHandler.HandleAsync(command, cancellationToken);
         IssueOrderAccessToken(result);
         return StatusCode(result.StatusCode, result);
     }
 
     [HttpGet("{orderId:guid}")]
-    [AllowAnonymous]
+    [EnableRateLimiting("client-device-payment")]
     public async Task<IActionResult> GetOrderStatus(
         Guid orderId,
         [FromHeader(Name = "Order-Access-Token")] string? orderAccessToken,
@@ -84,7 +97,8 @@ public sealed class OrdersController : ControllerBase
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The created payment session details.</returns>
     [HttpPost("{orderId:guid}/payment-sessions")]
-    [AllowAnonymous]
+    [EnableRateLimiting("client-device-payment")]
+    [RequestSizeLimit(16_384)]
     public async Task<IActionResult> CreatePaymentSession(
         Guid orderId,
         [FromBody] CreatePaymentSessionRequest request,
@@ -104,7 +118,7 @@ public sealed class OrdersController : ControllerBase
     }
 
     [HttpGet("{orderId:guid}/payment-status")]
-    [AllowAnonymous]
+    [EnableRateLimiting("client-device-payment")]
     public async Task<IActionResult> GetOrderPaymentStatus(
         Guid orderId,
         [FromHeader(Name = "Order-Access-Token")] string? orderAccessToken,
@@ -117,7 +131,8 @@ public sealed class OrdersController : ControllerBase
     }
 
     [HttpPost("{orderId:guid}/cancel")]
-    [AllowAnonymous]
+    [EnableRateLimiting("client-device-payment")]
+    [RequestSizeLimit(16_384)]
     public async Task<IActionResult> CancelPendingOrder(
         Guid orderId,
         [FromBody] CancelPendingOrderRequest request,
@@ -132,13 +147,14 @@ public sealed class OrdersController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
-    private bool CanAccessOrder(string? token, Guid orderId) => _publicOrderAccess.CanAccess(token, orderId);
+    private bool CanAccessOrder(string? token, Guid orderId) =>
+        _orderAccess.CanAccess(token, orderId, _clientDevice.ClientDeviceId);
 
     private void IssueOrderAccessToken(Application.Shared.Wrappers.ApiResult<Application.Orders.PlaceOrder.Results.OrderResult> result)
     {
         if (result.Succeeded && result.Data is not null)
         {
-            result.Data.OrderAccessToken = _publicOrderAccess.Issue(result.Data.Id, result.Data.KioskId);
+            result.Data.OrderAccessToken = _orderAccess.Issue(result.Data.Id, _clientDevice.ClientDeviceId);
         }
     }
 }

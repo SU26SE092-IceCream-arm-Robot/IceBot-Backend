@@ -184,6 +184,11 @@ public static class ScopeRoleSets
     public static readonly IReadOnlyList<string> NotificationsView = Roles("notifications.view");
     public static readonly IReadOnlyList<string> NotificationsManage = Roles("notifications.manage");
     public static readonly IReadOnlyList<string> DashboardView = Roles("dashboard.view");
+    public static readonly IReadOnlyList<string> ClientDevicesView = Roles("client-devices.view");
+    public static readonly IReadOnlyList<string> ClientDevicesProvision = Roles("client-devices.provision");
+    public static readonly IReadOnlyList<string> ClientDevicesOperationsManage = Roles("client-devices.operations.manage");
+    public static readonly IReadOnlyList<string> ClientDevicesCredentialsManage = Roles("client-devices.credentials.manage");
+    public static readonly IReadOnlyList<string> ClientDevicesRebind = Roles("client-devices.rebind");
 
     private static IReadOnlyList<string> Roles(string policy) => PermissionCatalog.GetRoles(policy);
 }

@@ -1,5 +1,6 @@
 using Domain.Common;
 using Domain.Catalog.Enums;
+using Domain.Devices.ClientDevices;
 using Domain.Orders.Enums;
 using Domain.Tenants.Entities;
 
@@ -10,6 +11,9 @@ public partial class Order : BusinessEntity, IStoreScoped
     public Guid? OrganizationId { get; set; }
 
     public Guid KioskId { get; set; }
+
+    // Customer runtime orders are bound to the authenticated tablet that created them.
+    public Guid? SourceClientDeviceId { get; set; }
 
     public Guid? StoreId { get; set; }
 
@@ -64,6 +68,8 @@ public partial class Order : BusinessEntity, IStoreScoped
     public string? Notes { get; set; }
 
     public virtual Kiosk Kiosk { get; set; } = null!;
+
+    public virtual ClientDevice? SourceClientDevice { get; set; }
 
     public virtual Organization? Organization { get; set; }
 

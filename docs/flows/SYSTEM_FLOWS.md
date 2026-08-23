@@ -6,7 +6,7 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 
 ## Search Keywords
 
-`system flow`, `system overview`, `flow index`, `which flow doc`, `setup to sale`, `back-office setup flow`, `management read flow`, `catalog runtime menu`, `robot Lua artifact`, `RobotProgram`, `configuration deployment`, `checkout to execution`, `post-payment fan-out`, `tablet status`, `edge command flow`, `runtime readiness check`, `execution event sync`, `production incident`, `defective output`, `remake`, `paid but edge cannot execute`, `edge offline`, `duplicate notification`, `operations support`, `management dashboard`, `maintenance ticket`
+`system flow`, `system overview`, `flow index`, `which flow doc`, `setup to sale`, `back-office setup flow`, `management read flow`, `catalog runtime menu`, `robot Lua artifact`, `RobotProgram`, `configuration deployment`, `checkout to execution`, `post-payment fan-out`, `tablet status`, `client device`, `tablet provisioning`, `edge command flow`, `runtime readiness check`, `execution event sync`, `production incident`, `defective output`, `remake`, `paid but edge cannot execute`, `edge offline`, `duplicate notification`, `operations support`, `inventory refill`, `payment reconciliation`, `management dashboard`, `maintenance ticket`
 
 ## Flow Lookup
 
@@ -19,9 +19,12 @@ Detailed API and message contracts live in [IoT Contract](../iot/IOT_CONTRACT.md
 | Fairino `.lua` export, artifact/program management, release, and Edge deployment | [Robot Lua Artifact Flow](ROBOT_LUA_ARTIFACT_FLOW.md) |
 | Franchise-oriented Production Package publication and installation | [Production Package Installation Flow](PRODUCTION_PACKAGE_INSTALLATION_FLOW.md) |
 | Production Package preview, materialization, cutover, rollback, and abandonment | [Production Package Upgrade Flow](PRODUCTION_PACKAGE_UPGRADE_FLOW.md) |
+| Self-order tablet provisioning, device session, replacement, or rebind | [Client Device API](../api/CLIENT_DEVICE_API.md) |
 | Tablet checkout, payment, edge command, robot execution, status projection | [Checkout Execution Flow](CHECKOUT_EXECUTION_FLOW.md) |
+| Daily payment evidence totals and provider discrepancies | [Daily Payment Reconciliation Flow](DAILY_PAYMENT_RECONCILIATION_FLOW.md) |
 | Outcome unknown, partial/defective output inspection, discard, exact-unit remake, or compensation | [Production Incident Resolution Flow](PRODUCTION_INCIDENT_RESOLUTION_FLOW.md) |
 | Telemetry, heartbeat, events, inventory reporting, manual support | [Operations Support Flow](OPERATIONS_SUPPORT_FLOW.md) |
+| Audited physical stock refill and optional sensor rebaseline | [Inventory Refill Flow](INVENTORY_REFILL_FLOW.md) |
 | Manual kiosk/device/order support ticket lifecycle | [Maintenance Ticket Flow](MAINTENANCE_TICKET_FLOW.md) |
 | Route a failure to its owning workflow | [Failure Flow Index](FAILURE_FLOW_INDEX.md) |
 

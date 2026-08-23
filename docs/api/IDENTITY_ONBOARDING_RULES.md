@@ -10,6 +10,20 @@ This document is the backend source of truth for internal account onboarding, in
 
 Internal tenant accounts are created by authorized organization-management users. `Technician` is not a tenant workforce role: only `SystemAdmin` manages platform Technicians through `/management/platform/technicians`, and each tenant access grant must be Store- or Kiosk-scoped. Neither organization route can assign `Technician` or the global `SystemAdmin` role. Initial/recovery `SystemAdmin` provisioning remains bootstrap-only.
 
+## Staff Workforce Mutations
+
+Staff create requires the `Idempotency-Key` request header. The key is unique
+inside the route Organization; an exact retry returns the originally created
+Staff account and does not create another invitation. Profile and scope
+replacement require `expectedRevision`.
+
+Deactivate and reactivate require `reason`, `expectedRevision`, and a body
+`idempotencyKey`; an exact lifecycle retry returns the original transition.
+Deactivation commits the `Disabled` account state and transition audit before
+refresh-session revocation. A `202` response means access is disabled but
+revocation is pending; the Identity reconciliation job retries while a disabled
+Staff account still has active refresh sessions.
+
 ## Temporary Demo Override
 
 Current implementation temporarily creates every tenant workforce role

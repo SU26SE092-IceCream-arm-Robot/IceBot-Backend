@@ -31,10 +31,11 @@ After repair, restart or reconnect Edge so it reports `Ready / Idle / Safe`,
 then verify:
 
 ```text
-GET /api/v1/kiosks/{kioskId}/runtime-menu
+GET /api/v1/runtime/menu
 ```
 
-The response should contain the demo vanilla product in `items`.
+The response should contain the demo vanilla product in `items` when sent with
+an active ClientDevice bearer token bound to the demo kiosk.
 
 Production startup does not seed or repair the demo tenant. Run this command as
 an explicit deployment/bootstrap operation when the isolated fixture is needed.

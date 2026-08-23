@@ -20,6 +20,4 @@ public sealed class UpdateProductRequest
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
-
 }

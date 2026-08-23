@@ -5,6 +5,7 @@ using Application.Shared.Wrappers;
 using Application.SalesCatalog.RuntimeMenus.Services;
 using Application.SalesCatalog.RuntimeMenus.Support;
 using Application.SalesCatalog.Admission.Services;
+using Application.SalesCatalog.Admission.Abstractions;
 using Domain.Catalog.Enums;
 
 namespace Application.SalesCatalog.RuntimeMenus.Queries;
@@ -15,14 +16,14 @@ public sealed class GetKioskRuntimeMenuQueryHandler
     private readonly RuntimeMenuProjectionBuilder _projectionBuilder;
     private readonly IRuntimeMenuProjectionCache _cache;
     private readonly KioskSalesAdmissionEvaluator _kioskAdmission;
-    private readonly MenuItemOperationalAdmissionEvaluator _itemAdmission;
+    private readonly IMenuItemOperationalAdmissionEvaluator _itemAdmission;
 
     public GetKioskRuntimeMenuQueryHandler(
         IMenuStore menus,
         RuntimeMenuProjectionBuilder projectionBuilder,
         IRuntimeMenuProjectionCache cache,
         KioskSalesAdmissionEvaluator kioskAdmission,
-        MenuItemOperationalAdmissionEvaluator itemAdmission)
+        IMenuItemOperationalAdmissionEvaluator itemAdmission)
     {
         _menus = menus;
         _projectionBuilder = projectionBuilder;
@@ -122,7 +123,7 @@ public sealed class GetKioskRuntimeMenuQueryHandler
             FinalPrice = item.FinalPrice,
             Currency = item.Currency,
             PreparationTimeSeconds = item.PreparationTimeSeconds,
-            ImageUrl = item.ImageUrl,
+            Image = item.Image,
             RecipeVersion = item.RecipeVersion,
             OptionGroups = item.OptionGroups.Select(group => new RuntimeMenuOptionGroupResult
             {

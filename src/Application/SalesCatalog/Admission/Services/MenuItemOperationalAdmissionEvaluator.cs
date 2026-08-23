@@ -14,7 +14,7 @@ namespace Application.SalesCatalog.Admission.Services;
 public sealed class MenuItemOperationalAdmissionEvaluator(
     IOperationalAdmissionReadStore readStore,
     MachineProductionInventoryGate inventoryGate,
-    IOptions<EdgeTelemetryIngestionOptions> telemetryOptions)
+    IOptions<EdgeTelemetryIngestionOptions> telemetryOptions) : IMenuItemOperationalAdmissionEvaluator
 {
     private static readonly IReadOnlySet<string> EmptySupportedOptions = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private readonly EdgeTelemetryIngestionOptions _telemetry = telemetryOptions.Value;

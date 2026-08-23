@@ -118,7 +118,9 @@ public abstract class EdgeOperationalIntegrationTestBase
             new DispatchOrderExecutionCommandHandler(
                 new OrderExecutionDispatchStore(dbContext),
                 options,
-                new NoOpEdgeCommandWakeUpPublisher()),
+                new NoOpEdgeCommandWakeUpPublisher(),
+                Options.Create(new EdgeTelemetryIngestionOptions()),
+                new AlwaysActiveOrganizationAccessStateReader()),
             new NoOpRealtimeNotificationPublisher());
         return await handler.HandleAsync(new RedispatchOrderExecutionCommand
         {
@@ -187,7 +189,8 @@ public abstract class EdgeOperationalIntegrationTestBase
         await using var dbContext = _fixture.CreateDbContext();
         var acknowledged = await new AcknowledgeEdgeCommandCommandHandler(
             new EdgeCommandStore(dbContext),
-            new NoOpRealtimeNotificationPublisher())
+            new NoOpRealtimeNotificationPublisher(),
+            Options.Create(new ExecutionReportIngestionOptions()))
             .HandleAsync(new AcknowledgeEdgeCommandCommand
             {
                 KioskId = graph.KioskId,
@@ -211,6 +214,7 @@ public abstract class EdgeOperationalIntegrationTestBase
             OrganizationId = graph.OrganizationId,
             StoreId = graph.StoreId,
             KioskId = graph.KioskId,
+            Channel = OrderChannel.Admin,
             OrderNumber = $"SMOKE-{Guid.NewGuid():N}"
         };
         order.SetCurrency("VND");
@@ -281,7 +285,9 @@ public abstract class EdgeOperationalIntegrationTestBase
             var result = await new DispatchOrderExecutionCommandHandler(
                 new OrderExecutionDispatchStore(dispatchContext),
                 Options.Create(new OrderExecutionDispatchOptions()),
-                new NoOpEdgeCommandWakeUpPublisher()).HandleAsync(new DispatchOrderExecutionCommand
+                new NoOpEdgeCommandWakeUpPublisher(),
+                Options.Create(new EdgeTelemetryIngestionOptions()),
+                new AlwaysActiveOrganizationAccessStateReader()).HandleAsync(new DispatchOrderExecutionCommand
                 {
                     OrderId = orderId,
                     DispatchAttemptNo = 1
@@ -462,7 +468,8 @@ public abstract class EdgeOperationalIntegrationTestBase
         {
             var accepted = await new AcknowledgeEdgeCommandCommandHandler(
                 new EdgeCommandStore(dbContext),
-                new NoOpRealtimeNotificationPublisher())
+                new NoOpRealtimeNotificationPublisher(),
+                Options.Create(new ExecutionReportIngestionOptions()))
                 .HandleAsync(new AcknowledgeEdgeCommandCommand
                 {
                     KioskId = graph.KioskId,

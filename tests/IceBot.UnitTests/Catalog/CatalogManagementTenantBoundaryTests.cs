@@ -276,13 +276,18 @@ public sealed class CatalogManagementTenantBoundaryTests
             Currency = "VND"
         });
         var store = Substitute.For<IProductStore>();
+        var catalogAuthoring = Substitute.For<ICatalogAuthoringStore>();
         store.GetProductByIdAsync(template.Id, true, Arg.Any<CancellationToken>()).Returns(template);
         store.TenantScopeExistsAsync(organizationId, null, null, Arg.Any<CancellationToken>()).Returns(true);
+        catalogAuthoring.ListPublishedRecipesForProductCloneAsync(
+                template.Id,
+                Arg.Any<CancellationToken>())
+            .Returns([]);
         Product? saved = null;
         store.When(x => x.AddProductAsync(Arg.Any<Product>(), Arg.Any<CancellationToken>()))
             .Do(call => saved = call.Arg<Product>());
 
-        var result = await new CloneProductTemplateCommandHandler(store).HandleAsync(
+        var result = await new CloneProductTemplateCommandHandler(store, catalogAuthoring).HandleAsync(
             new CloneProductTemplateCommand
             {
                 Scope = new ProductManagementCommandScope(Manager(organizationId), organizationId),

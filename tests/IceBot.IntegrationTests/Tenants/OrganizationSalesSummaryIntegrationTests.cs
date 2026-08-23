@@ -3,6 +3,7 @@ using System.Net;
 using System.Text.Json;
 using Domain.Common.Enums;
 using Domain.Orders.Entities;
+using Domain.Orders.Enums;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
 using Domain.Tenants.Entities;
@@ -145,6 +146,7 @@ public sealed class OrganizationSalesSummaryIntegrationTests(IntegrationTestFixt
         OrganizationId = organizationId,
         StoreId = storeId,
         KioskId = kioskId,
+        Channel = OrderChannel.Admin,
         OrderNumber = $"SALES-ORDER-{Guid.NewGuid():N}"
     };
 

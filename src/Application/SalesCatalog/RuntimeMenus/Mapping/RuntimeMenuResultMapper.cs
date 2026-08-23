@@ -11,9 +11,8 @@ internal static class RuntimeMenuResultMapper
         MenuItem item,
         IReadOnlyCollection<MenuItemProductOptionReadModel> availableOptions)
     {
-        var imageUrl = string.IsNullOrWhiteSpace(item.ImageUrl)
-            ? item.ProductVariant.ImageUrl ?? item.Product.ImageUrl
-            : item.ImageUrl;
+        var imageAsset = item.ProductVariant.ImageAsset ?? item.Product.ImageAsset;
+        var imageAltText = item.ProductVariant.ImageAltText ?? item.Product.ImageAltText;
 
         var preparationTimeSeconds = item.PreparationTimeSeconds
             ?? item.ProductVariant.PreparationTimeSeconds
@@ -38,7 +37,12 @@ internal static class RuntimeMenuResultMapper
             FinalPrice = item.Price - item.DiscountAmount,
             Currency = item.Currency,
             PreparationTimeSeconds = preparationTimeSeconds,
-            ImageUrl = imageUrl,
+            Image = imageAsset is null ? null : new RuntimeMenuImageResult
+            {
+                CardUrl = imageAsset.DeliveryUrl,
+                DetailUrl = imageAsset.DeliveryUrl,
+                AltText = imageAltText
+            },
             RecipeVersion = item.Recipe?.Version,
             OptionGroups = availableOptions
                 .Where(ProductOptionSelectionRules.IsSelectable)

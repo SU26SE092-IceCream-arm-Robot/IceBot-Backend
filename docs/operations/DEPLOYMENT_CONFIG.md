@@ -43,7 +43,10 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | JWT signing secret | `Authentication__Jwt__Secret` | **P0 Core** | **Secret/env required.** Use a strong environment-specific secret. |
 | JWT issuer | `Authentication__Jwt__Issuer` | **P1** | Use appsettings default only if `IceBotApp` is the intended issuer. |
 | JWT audience | `Authentication__Jwt__Audience` | **P1** | Use appsettings default only if `IceBotUsers` is the intended audience. |
-| Public order token key ring | `PublicOrderAccess__KeyRingDirectory` | **P0 Core** | **Required in Production.** Persistent shared filesystem path for Data Protection keys; mount the same protected directory into every API instance. Tokens survive restarts but remain invalid after the 24-hour lifetime. |
+| Client order token key ring | `ClientRuntime__OrderAccessKeyRingDirectory` | **P0 Core** | **Required in Production.** Persistent shared filesystem path for Data Protection keys; mount the same protected directory into every API instance. Tokens survive restarts but remain invalid after the 24-hour lifetime. |
+| Client-device credential hash key | `ClientDevices__Security__CurrentHashKeyVersion`, `ClientDevices__Security__HashKeys__{version}` | **P0 Feature** | **Secret/env required** when self-order tablets are enabled. The current key version and every version referenced by an active credential must be present. Do not remove an old key until no active credential uses it. |
+| Client-device JWT secret | `ClientDevices__Security__JwtSecret` | **P0 Feature** | **Secret/env required.** Must be distinct from `Authentication__Jwt__Secret` and at least 32 characters. |
+| Client-device JWT issuer/audience | `ClientDevices__Security__Issuer`, `ClientDevices__Security__Audience` | **P0 Feature** | **Env required.** Both must be distinct from the account JWT issuer/audience. Production startup rejects blank or overlapping values. |
 | Browser frontend origins | `Cors__AllowedOrigins__0`, `Cors__AllowedOrigins__1`, ... | **P0 Core** | **Env required for browser deployments.** Production does not use the Development allow-any fallback. |
 | Require kiosk connectivity before sales | `KioskSalesAdmission__RequireConnectivity` | **P0 Safety** | Default `true`. The current production demo sets `false` temporarily so a kiosk can show the runtime menu and begin checkout before Edge heartbeat integration is verified. Restore `true` before unattended operation; this flag does not bypass dispatch/readiness checks. |
 | Trusted reverse-proxy networks | `ReverseProxy__TrustedNetworks__0`, `ReverseProxy__TrustedNetworks__1`, ... | **P0 Core behind TLS-terminating proxy** | **Required in Production.** CIDRs whose `X-Forwarded-For` and `X-Forwarded-Proto` headers WebAPI may trust. The current K3s default is `10.42.0.0/16`; override it when the observed Traefik-to-WebAPI source network differs. Do not clear trust lists to accept arbitrary client headers. |
@@ -109,7 +112,7 @@ The hosted bootstrap exits without reading these values when an active `SystemAd
 
 ## Runtime Menu Redis Cache
 
-The runtime-menu cache is optional. It accelerates the anonymous kiosk menu projection but does not replace live kiosk/store admission or transactional checkout validation. Keep it disabled until the environment has an isolated Redis service.
+The runtime-menu cache is optional. It accelerates the authenticated client-device menu projection but does not replace live kiosk/store admission or transactional checkout validation. Keep it disabled until the environment has an isolated Redis service.
 
 | Area | Configuration key | Priority | Deploy action |
 | --- | --- | --- | --- |

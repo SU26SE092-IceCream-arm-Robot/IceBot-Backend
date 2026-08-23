@@ -107,6 +107,10 @@ public interface IProductStore
 
     Task AddProductVariantAsync(ProductVariant variant, CancellationToken cancellationToken = default);
 
+    Task AddCatalogImageAssetAsync(CatalogImageAsset imageAsset, CancellationToken cancellationToken = default);
+
+    Task<bool> IsCatalogImageAssetReferencedAsync(Guid imageAssetId, CancellationToken cancellationToken = default);
+
     Task AddOptionGroupAsync(OptionGroup optionGroup, CancellationToken cancellationToken = default);
 
     Task AddProductOptionAsync(ProductOption productOption, CancellationToken cancellationToken = default);

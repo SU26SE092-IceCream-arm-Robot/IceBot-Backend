@@ -119,7 +119,6 @@ public sealed class AddMenuItemCommandHandler
             Currency = menu.Currency,
             DisplayOrder = request.DisplayOrder,
             PreparationTimeSeconds = request.PreparationTimeSeconds,
-            ImageUrl = MenuNormalizer.TrimToNull(request.ImageUrl),
             EffectiveFrom = request.EffectiveFrom,
             EffectiveTo = request.EffectiveTo,
             MetadataSchemaVersion = 1,

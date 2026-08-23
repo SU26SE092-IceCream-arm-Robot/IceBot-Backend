@@ -6,75 +6,15 @@ This document owns the API and state contracts between the tablet, Cloud checkou
 
 `tablet`, `runtime menu`, `sales catalog`, `place order`, `payment session`, `payment callback`, `customer status`, `QR payment`, `order status`
 
-## Tablet To Local Edge
-
-### Get Runtime Menu Projection
-
-```http
-GET /api/v1/local/runtime-products?kioskId={kioskId}
-```
-
-Purpose: return the menu that can currently be sold from this kiosk.
-
-Response:
-
-```json
-{
-  "snapshotId": "uuid",
-  "kioskId": "uuid",
-  "generatedAt": "2026-05-21T10:00:00Z",
-  "expiresAt": "2026-05-21T10:00:15Z",
-  "runtimeStateTimestamp": "2026-05-21T09:59:59Z",
-  "machineAvailable": true,
-  "products": [
-    {
-      "productId": "uuid",
-      "productVariantId": "uuid",
-      "menuItemId": "uuid",
-      "productCode": "VANILLA_CUP",
-      "productVariantCode": "M",
-      "displayName": "Vanilla Cup",
-      "sizeCode": "M",
-      "price": 25000,
-      "currency": "VND",
-      "available": true,
-      "unavailableReason": null,
-      "recipeId": "uuid",
-      "recipeVersion": 3,
-      "estimatedIngredientLevels": [
-        {
-          "ingredientId": "uuid",
-          "ingredientCode": "VANILLA_MIX",
-          "levelStatus": "Medium"
-        }
-      ]
-    }
-  ]
-}
-```
-
-Projection inputs:
-
-- Menu item snapshot.
-- Product variant snapshot.
-- Product snapshot.
-- Recipe snapshot.
-- `IngredientDispenserState`.
-- Device state.
-- Robot availability.
-- Availability policy.
-
-This response is a quote for UX, not a reservation.
-
 ## Tablet To Cloud
 
 ### Get Kiosk Sales Catalog Snapshot
 
 ```http
-GET /api/v1/kiosks/{kioskId}/runtime-menu
+GET /api/v1/runtime/menu
 ```
 
-Purpose: return the Cloud Sales Catalog snapshot that is currently sellable for a kiosk.
+Purpose: return the Cloud Sales Catalog snapshot that is currently sellable for the Kiosk bound to the authenticated ClientDevice.
 
 This endpoint is useful when the tablet needs a Cloud-backed menu snapshot, but it is not a replacement for the Local Edge runtime projection. It does not include live machine availability, ingredient sufficiency, robot status, or local queue state. Read-model boundaries and data exclusions for this endpoint are documented in [API Surface Rules](../api/API_SURFACE_RULES.md#read-model-api-boundaries).
 
@@ -114,6 +54,8 @@ Response:
 
 Rules:
 
+- Every tablet runtime request carries a short-lived `Authorization: Bearer <client-device-jwt>` issued only by `POST /api/v1/client-device-sessions`. The request never carries a kiosk, store, organization, or channel authority.
+- The runtime authentication scheme reloads the ClientDevice binding, lifecycle, credential version, and session version from PostgreSQL. Disable, rebind, rotation, replacement, and retirement invalidate existing device JWTs immediately.
 - Use this endpoint only for Cloud Sales Catalog truth.
 - Cloud online sales require `KioskStatus.Active`, `KioskOperationalState.Operational`, active parent tenant scope, and connectivity `Online` or `Degraded`.
 - Lifecycle, operational admission, and connectivity are separate contracts. `Online` does not imply `AcceptingOrders`; `Unreachable` is not a lifecycle or operational-state value.
@@ -124,7 +66,7 @@ Rules:
 ### Create Order
 
 ```http
-POST /api/v1/orders
+POST /api/v1/runtime/orders
 ```
 
 Headers:
@@ -138,7 +80,6 @@ Request:
 
 ```json
 {
-  "kioskId": "uuid",
   "clientOrderId": "tablet-order-uuid",
   "items": [
     {
@@ -184,7 +125,7 @@ Cloud must calculate price from backend Sales Catalog `MenuItem.Price`. Tablet t
 ### Create Payment Session
 
 ```http
-POST /api/v1/orders/{orderId}/payment-sessions
+POST /api/v1/runtime/orders/{orderId}/payment-sessions
 ```
 
 Headers:
@@ -260,7 +201,7 @@ The command identity is `(OrderId, DispatchAttemptNo)`. Repeating the same attem
 
 ## Cloud To Tablet Status
 
-Tablet needs fast feedback after the customer pays. Cloud supports this through polling `GET /api/v1/orders/{orderId}` or `GET /api/v1/orders/{orderId}/payment-status` every 2-3 seconds. Both requests send `Order-Access-Token` received from order creation; payment-session creation and customer cancellation use the same header.
+Tablet needs fast feedback after the customer pays. Cloud supports this through polling `GET /api/v1/runtime/orders/{orderId}` or `GET /api/v1/runtime/orders/{orderId}/payment-status` every 2-3 seconds. Every runtime call carries the ClientDevice JWT. Order-specific calls also send the `Order-Access-Token` received from order creation; payment-session creation and customer cancellation use the same header.
 
 Raw order/payment state-machine enums are not serialized by the customer polling contracts. The tablet client consumes the following projected fields on `OrderResult` and `PaymentStatusResult`:
 

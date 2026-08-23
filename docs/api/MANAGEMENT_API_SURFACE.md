@@ -124,18 +124,13 @@ POST /api/v1/management/organizations/{organizationId}/workforce/staff/{accountI
 GET /api/v1/management/role-scope-options
 GET /api/v1/management/permission-matrix
 ```
-Staff workforce mutation rules:
+### Client Device Routes
 
-- Create requires the `Idempotency-Key` request header. The key is unique inside
-  the route Organization; an exact retry returns the originally created Staff
-  account and does not create another invitation.
-- Profile and scope replacement require `expectedRevision`.
-- Deactivate and reactivate require `reason`, `expectedRevision`, and a body
-  `idempotencyKey`. An exact lifecycle retry returns the original transition.
-- Deactivation commits the `Disabled` account state and transition audit before
-  refresh-session revocation. A `202` response means access is disabled but
-  revocation is pending; the Identity reconciliation job retries while a
-  disabled Staff account still has active refresh sessions.
+Managed self-order tablet lifecycle, credential exchange, and runtime contract:
+[Client Device API](CLIENT_DEVICE_API.md).
+
+Staff workforce mutation semantics are owned by
+[Identity Onboarding Rules](IDENTITY_ONBOARDING_RULES.md#staff-workforce-mutations).
 
 ### Ingredient And Recipe Routes
 
@@ -241,6 +236,8 @@ POST /api/v1/management/orders/{orderId}/refunds
 PATCH /api/v1/management/refunds/{refundId}/mark-processed
 PATCH /api/v1/management/refunds/{refundId}/reject
 PATCH /api/v1/management/refunds/{refundId}/cancel
+GET /api/v1/management/payment-reconciliation/daily?date=&organizationId=&storeId=&kioskId=&provider=
+GET /api/v1/management/payment-reconciliation/discrepancies?date=&organizationId=&storeId=&kioskId=&provider=&pageNumber=&pageSize=
 GET /api/v1/management/inventory/dispenser-states
 GET /api/v1/management/inventory/stock-movements
 GET /api/v1/management/kiosks/{kioskId}/inventory/workspace
@@ -282,9 +279,12 @@ PATCH /api/v1/management/maintenance-tickets/{ticketId}/cancel
 These summaries describe client-visible scope, authorization, and request/response behavior. Detailed lifecycle and domain invariants remain owned by the linked flow and architecture documents.
 
 ### Maintenance Assignment
-Maintenance assignment accepts only an active `Technician`, `Manager`, or
-`OrgAdmin` whose single role-scope assignment matches the ticket kiosk, store,
-or organization. Cross-tenant role and scope composition is rejected. Push-token
+Maintenance assignment exposes only active `Manager` and platform `Technician`
+accounts. A Manager must have one active tenant `AccountRole` matching the
+ticket kiosk, store, or organization. A Technician must have one active
+`TechnicianSupportGrant` matching the ticket kiosk or store. `OrgAdmin` may
+coordinate and assign a ticket within tenant scope but is not an assignee option
+by default. Cross-tenant role or grant composition is rejected. Push-token
 registration is not an assignment prerequisite.
 
 ### Device Catalog And Lifecycle
@@ -355,6 +355,14 @@ registration is not an assignment prerequisite.
 - `GET /api/v1/management/payment-session-interventions` is a tenant-filtered `payments.manage` work queue. It returns bounded payment/order identity, issue code, retry state, and eligibility; it excludes raw provider payloads. `DUPLICATE_PAYMENT_REFUND_REQUIRED` entries are manual refund/compensation work and are not provider-reconciliation candidates.
 - `POST /api/v1/management/orders/{orderId}/payment-transactions/{paymentTransactionId}/reconcile` performs one provider lookup for an eligible incomplete session. Eligibility is shared with the intervention queue: a pending provider session has missing checkout instructions or has reached its local expiry, even when an old URL/QR payload remains stored. The command requires `payments.manage`, a reason, exact Order ownership, and writes request/result operation-log audit records. It never repeats the provider create `POST` and never treats lookup-only `PAID` as fulfillment authority.
 - Entering payment-session manual intervention enqueues a durable `payment_intervention` push for scoped Staff/Manager recipients, with organization OrgAdmin fallback. Ordinary scheduled retries, restored sessions, explicit cancellation/expiry, and known missing provider sessions do not notify. Repeating the same payment transaction and intervention code is idempotent per recipient.
+- `GET /api/v1/management/payment-reconciliation/daily` and `.../discrepancies` are read-only `payments.reconciliation.view` reports. They compare locally applied payment facts with later provider lookup evidence for one configured local day; they neither apply payment state nor prove provider payout or bank settlement. OrgAdmin and scoped Manager access is tenant-filtered; SystemAdmin does not receive tenant transaction detail through this surface.
+
+### Inventory Refill
+
+- Refill tasks use `Requested -> InProgress -> Completed` or `Cancelled`. A requested task may complete directly when the physical work is already finished.
+- `KioskIngredientInventory` is the authoritative stock balance. `IngredientDispenserState` is optional topology/sensor evidence and cannot be required for a manual refill.
+- Request, start, complete, and cancel require `inventory.refill.manage` and an `Idempotency-Key`. A replay with the same normalized request returns the existing result; key reuse with different content returns `409`.
+- Completion writes an estimated `ManualRefill` stock movement and resets sensor-assisted evidence when applicable. It may resolve the source low/empty alert only after the resulting balance exceeds its recovery threshold.
 
 ### Catalog And Sales Catalog
 

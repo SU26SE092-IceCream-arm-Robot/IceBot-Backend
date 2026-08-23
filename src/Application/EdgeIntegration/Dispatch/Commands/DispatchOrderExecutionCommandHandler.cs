@@ -28,18 +28,18 @@ public sealed class DispatchOrderExecutionCommandHandler
     private readonly OrderExecutionDispatchOptions _options;
     private readonly EdgeTelemetryIngestionOptions _telemetryOptions;
     private readonly IEdgeCommandWakeUpPublisher _wakeUpPublisher;
-    private readonly IOrganizationAccessStateReader? _organizationAccess;
+    private readonly IOrganizationAccessStateReader _organizationAccess;
 
     public DispatchOrderExecutionCommandHandler(
         IOrderExecutionDispatchStore store,
         IOptions<OrderExecutionDispatchOptions> options,
         IEdgeCommandWakeUpPublisher wakeUpPublisher,
-        IOptions<EdgeTelemetryIngestionOptions>? telemetryOptions = null,
-        IOrganizationAccessStateReader? organizationAccess = null)
+        IOptions<EdgeTelemetryIngestionOptions> telemetryOptions,
+        IOrganizationAccessStateReader organizationAccess)
     {
         _store = store;
         _options = options.Value;
-        _telemetryOptions = telemetryOptions?.Value ?? new EdgeTelemetryIngestionOptions();
+        _telemetryOptions = telemetryOptions.Value;
         _wakeUpPublisher = wakeUpPublisher;
         _organizationAccess = organizationAccess;
     }
@@ -490,7 +490,7 @@ public sealed class DispatchOrderExecutionCommandHandler
 
     private Task<bool> AllowsNewProductionEffectAsync(Guid? organizationId, CancellationToken cancellationToken) =>
         organizationId.HasValue
-            ? _organizationAccess?.IsActiveAsync(organizationId.Value, cancellationToken) ?? Task.FromResult(true)
+            ? _organizationAccess.IsActiveAsync(organizationId.Value, cancellationToken)
             : Task.FromResult(false);
 
     private static ApiResult<OrderExecutionDispatchResult> OrganizationUnavailable() =>

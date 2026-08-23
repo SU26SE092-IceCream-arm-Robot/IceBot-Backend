@@ -3,6 +3,8 @@ using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Dispatch;
 using Application.EdgeIntegration.Dispatch.Commands;
 using Application.Identity.Tokens.Claims;
+using Application.Tenants.Abstractions;
+using Application.Devices.Telemetry;
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
@@ -115,7 +117,9 @@ public sealed class ConfirmCashPaymentCommandHandlerTests
         var dispatch = new DispatchOrderExecutionCommandHandler(
             Substitute.For<IOrderExecutionDispatchStore>(),
             Options.Create(new OrderExecutionDispatchOptions { Enabled = false }),
-            Substitute.For<IEdgeCommandWakeUpPublisher>());
+            Substitute.For<IEdgeCommandWakeUpPublisher>(),
+            Options.Create(new EdgeTelemetryIngestionOptions()),
+            Substitute.For<IOrganizationAccessStateReader>());
         return new ConfirmCashPaymentCommandHandler(
             paymentStore,
             Substitute.For<IRealtimeNotificationPublisher>(),

@@ -25,6 +25,7 @@ public static class CatalogModule
         services.AddScoped<UpdateProductVariantCommandHandler>();
         services.AddScoped<SetProductVariantAvailabilityCommandHandler>();
         services.AddScoped<DeleteProductVariantCommandHandler>();
+        services.AddScoped<ReplaceCatalogImageCommandHandler>();
         services.AddScoped<ListProductCategoriesQueryHandler>();
         services.AddScoped<CreateProductCategoryCommandHandler>();
         services.AddScoped<UpdateProductCategoryCommandHandler>();

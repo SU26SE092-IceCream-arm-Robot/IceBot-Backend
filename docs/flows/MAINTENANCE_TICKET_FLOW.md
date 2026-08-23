@@ -86,11 +86,17 @@ Forbidden V1 transitions:
 
 Staff can create and view tickets in assigned scope, but cannot assign, resolve, close, or cancel by default.
 
-An assignee must be an active account with an active `Technician`, `Manager`, or
-`OrgAdmin` role assignment that matches the ticket kiosk, store, or organization
-on that same role-scope record. An account's role in another tenant does not make
-it assignable. A push-notification device is optional and does not determine
-assignment eligibility.
+An assignee must be an active account with scope matching the ticket:
+
+- a `Manager` requires an active tenant `AccountRole` matching the ticket kiosk,
+  store, or organization;
+- a platform `Technician` requires an active `TechnicianSupportGrant` matching
+  the ticket kiosk or store.
+
+`OrgAdmin` may coordinate and assign tickets within its tenant scope, but is not
+an assignee option by default. An account's role or grant in another tenant does
+not make it assignable. A push-notification device is optional and does not
+determine assignment eligibility.
 
 ## Evidence Links
 

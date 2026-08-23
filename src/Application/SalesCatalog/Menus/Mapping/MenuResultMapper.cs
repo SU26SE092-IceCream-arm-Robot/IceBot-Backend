@@ -50,7 +50,6 @@ internal static class MenuResultMapper
             Currency = item.Currency,
             DisplayOrder = item.DisplayOrder,
             PreparationTimeSeconds = item.PreparationTimeSeconds,
-            ImageUrl = item.ImageUrl,
             EffectiveFrom = item.EffectiveFrom,
             EffectiveTo = item.EffectiveTo,
             CreatedAt = item.CreatedAt,

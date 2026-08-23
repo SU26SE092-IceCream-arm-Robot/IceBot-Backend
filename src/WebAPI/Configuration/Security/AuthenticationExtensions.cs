@@ -1,4 +1,7 @@
+using Application.ClientDevices.Abstractions;
+using Application.ClientDevices.Security;
 using Application.Identity.Abstractions;
+using Domain.Devices.ClientDevices;
 using Domain.Identity.Enums;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.DataProtection;
@@ -28,24 +31,44 @@ public static class AuthenticationExtensions
         IConfiguration configuration,
         IHostEnvironment environment)
     {
-        var publicOrderAccessKeyRingDirectory = configuration["PublicOrderAccess:KeyRingDirectory"];
-        if (environment.IsProduction() && string.IsNullOrWhiteSpace(publicOrderAccessKeyRingDirectory))
+        var orderAccessKeyRingDirectory = configuration["ClientRuntime:OrderAccessKeyRingDirectory"];
+        if (environment.IsProduction() && string.IsNullOrWhiteSpace(orderAccessKeyRingDirectory))
         {
             throw new InvalidOperationException(
-                "PublicOrderAccess:KeyRingDirectory is required in Production to preserve order access tokens across restarts and instances.");
+                "ClientRuntime:OrderAccessKeyRingDirectory is required in Production to preserve client order access tokens across restarts and instances.");
         }
 
         var dataProtection = services.AddDataProtection().SetApplicationName("IceBot.WebAPI");
-        if (!string.IsNullOrWhiteSpace(publicOrderAccessKeyRingDirectory))
+        if (!string.IsNullOrWhiteSpace(orderAccessKeyRingDirectory))
         {
-            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(publicOrderAccessKeyRingDirectory));
+            dataProtection.PersistKeysToFileSystem(new DirectoryInfo(orderAccessKeyRingDirectory));
         }
 
-        services.AddSingleton<IPublicOrderAccessTokenService, PublicOrderAccessTokenService>();
+        services.AddSingleton<IOrderAccessTokenService, OrderAccessTokenService>();
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection("Authentication:Jwt"))
             .Validate(o => !string.IsNullOrWhiteSpace(o.Secret), "JWT Secret is required.")
+            .ValidateOnStart();
+
+        services.AddOptions<ClientDeviceSecurityOptions>()
+            .Bind(configuration.GetSection(ClientDeviceSecurityOptions.SectionName))
+            .Validate(options =>
+                !string.IsNullOrWhiteSpace(options.CurrentHashKeyVersion) &&
+                options.HashKeys.TryGetValue(options.CurrentHashKeyVersion, out var key) &&
+                !string.IsNullOrWhiteSpace(key),
+                "A current client-device credential hash key is required.")
+            .Validate(options => options.HashKeys.Count != 0 && options.HashKeys.All(pair =>
+                    !string.IsNullOrWhiteSpace(pair.Key) && !string.IsNullOrWhiteSpace(pair.Value)),
+                "Every configured client-device credential hash-key version must have a non-empty key.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.JwtSecret) && options.JwtSecret.Length >= 32,
+                "A client-device JWT secret of at least 32 characters is required.")
+            .Validate(options => !string.IsNullOrWhiteSpace(options.Issuer) && !string.IsNullOrWhiteSpace(options.Audience),
+                "A client-device JWT issuer and audience are required.")
+            .Validate(options => options.TokenLifetimeMinutes is >= 1 and <= 60,
+                "Client-device token lifetime must be between 1 and 60 minutes.")
+            .Validate(options => options.LastSeenMinimumIntervalMinutes is >= 1 and <= 60,
+                "Client-device last-seen interval must be between 1 and 60 minutes.")
             .ValidateOnStart();
 
         services.AddOptions<ExecutionEndpointSecurityOptions>()
@@ -62,7 +85,16 @@ public static class AuthenticationExtensions
         services.AddScoped<ExecutionEndpointRequestAuthenticator>();
 
         var jwt = configuration.GetSection("Authentication:Jwt").Get<JwtOptions>()!;
+        var clientDevice = configuration.GetSection(ClientDeviceSecurityOptions.SectionName).Get<ClientDeviceSecurityOptions>()!;
+        if (string.Equals(jwt.Secret, clientDevice.JwtSecret, StringComparison.Ordinal) ||
+            string.Equals(jwt.Issuer, clientDevice.Issuer, StringComparison.Ordinal) ||
+            string.Equals(jwt.Audience, clientDevice.Audience, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("Account and client-device JWT configurations must use distinct secret, issuer, and audience values.");
+        }
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret));
+        var clientDeviceKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(clientDevice.JwtSecret));
+        services.AddSingleton<IClientDeviceTokenIssuer, ClientDeviceTokenIssuer>();
 
         services.AddAuthentication(options =>
         {
@@ -113,6 +145,65 @@ public static class AuthenticationExtensions
                     if (account is null || account.Status != AccountStatus.Active || account.AuthorizationVersion != tokenVersion)
                     {
                         context.Fail("The access token is no longer authorized.");
+                    }
+                }
+            };
+        })
+        .AddJwtBearer(ClientDeviceAuthenticationDefaults.Scheme, options =>
+        {
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = clientDeviceKey,
+                ValidateIssuer = true,
+                ValidIssuer = clientDevice.Issuer,
+                ValidateAudience = true,
+                ValidAudience = clientDevice.Audience,
+                RequireExpirationTime = true,
+                ValidateLifetime = true,
+                ClockSkew = TimeSpan.Zero
+            };
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var principal = context.Principal;
+                    var deviceIdValue = principal?.FindFirst(ClientDeviceAuthenticationDefaults.ClientDeviceIdClaim)?.Value;
+                    var credentialVersionValue = principal?.FindFirst(ClientDeviceAuthenticationDefaults.CredentialVersionClaim)?.Value;
+                    var sessionVersionValue = principal?.FindFirst(ClientDeviceAuthenticationDefaults.SessionVersionClaim)?.Value;
+                    if (!Guid.TryParse(deviceIdValue, out var deviceId) ||
+                        !int.TryParse(credentialVersionValue, out var credentialVersion) ||
+                        !int.TryParse(sessionVersionValue, out var sessionVersion))
+                    {
+                        context.Fail("The client-device token is invalid.");
+                        return;
+                    }
+
+                    var store = context.HttpContext.RequestServices.GetRequiredService<IClientDeviceStore>();
+                    var device = await store.GetByIdAsync(deviceId, tracking: false, context.HttpContext.RequestAborted);
+                    if (device is null || device.Type != ClientDeviceType.SelfOrderTablet ||
+                        !device.MatchesAuthentication(credentialVersion, sessionVersion))
+                    {
+                        context.Fail("The client-device token is no longer authorized.");
+                        return;
+                    }
+
+                    context.HttpContext.RequestServices.GetRequiredService<ICurrentClientDeviceContext>()
+                        .Set(device.Id, device.OrganizationId, device.StoreId, device.KioskId);
+
+                    try
+                    {
+                        var observationOptions = context.HttpContext.RequestServices
+                            .GetRequiredService<Microsoft.Extensions.Options.IOptions<ClientDeviceSecurityOptions>>().Value;
+                        await store.TryObserveAsync(
+                            device.Id,
+                            DateTimeOffset.UtcNow,
+                            TimeSpan.FromMinutes(observationOptions.LastSeenMinimumIntervalMinutes),
+                            context.HttpContext.RequestAborted);
+                    }
+                    catch
+                    {
+                        // Presence telemetry never changes runtime authentication or request correctness.
                     }
                 }
             };

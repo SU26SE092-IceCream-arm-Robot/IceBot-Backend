@@ -227,7 +227,7 @@ Application names describe what the system does. WebAPI names describe what the 
 Controller names should follow resource/capability names:
 
 ```csharp
-OrdersController
+RuntimeOrdersController
 PaymentsController
 ConfigurationDeploymentsController
 KiosksController
@@ -236,7 +236,7 @@ KiosksController
 Route names should be stable and resource-oriented:
 
 ```text
-/api/v1/orders
+/api/v1/runtime/orders
 /api/v1/robot-jobs
 /api/v1/me
 ```
@@ -246,8 +246,8 @@ API surface categories and route prefix ownership live in [API Surface Rules](..
 Action method names may map to use cases:
 
 ```text
-OrdersController.PlaceOrder -> PlaceOrderCommand
-OrdersController.Cancel -> CancelOrderCommand
+RuntimeOrdersController.PlaceOrder -> PlaceOrderCommand
+RuntimeOrdersController.Cancel -> CancelOrderCommand
 ConfigurationDeploymentsController.Deploy -> RequestConfigurationDeploymentCommand
 ```
 

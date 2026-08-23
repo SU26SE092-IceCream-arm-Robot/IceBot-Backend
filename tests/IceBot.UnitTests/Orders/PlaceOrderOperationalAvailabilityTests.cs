@@ -1,12 +1,13 @@
-using Application.Devices.Telemetry;
 using Application.Orders.Abstractions;
 using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Services;
-using Application.SalesCatalog.Availability;
+using Application.SalesCatalog.Admission;
+using Application.SalesCatalog.Admission.Abstractions;
+using Domain.Catalog.Enums;
+using Domain.Catalog.Entities;
 using Domain.Orders.Entities;
 using Domain.SalesCatalog.Entities;
 using Domain.Tenants.Entities;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace IceBot.UnitTests.Orders;
@@ -25,18 +26,41 @@ public sealed class PlaceOrderOperationalAvailabilityTests
         var menuItem = new MenuItem
         {
             Id = Guid.NewGuid(),
-            DisplayName = "Vanilla soft serve"
+            DisplayName = "Vanilla soft serve",
+            ProductVariant = new ProductVariant
+            {
+                FulfillmentType = FulfillmentType.MachineProduced
+            }
         };
         var orderStore = Substitute.For<IOrderStore>();
         orderStore.GetMenuItemForKioskAsync(
                 menuItem.Id, kiosk.OrganizationId, kiosk.StoreId, kiosk.Id, Arg.Any<CancellationToken>())
             .Returns(menuItem);
-        var availability = Substitute.For<IMenuItemOperationalAvailabilityReader>();
-        availability.IsPausedAsync(kiosk.Id, menuItem.Id, Arg.Any<CancellationToken>()).Returns(true);
-        var appender = new PlaceOrderItemAppender(
-            orderStore,
-            availability,
-            Options.Create(new EdgeTelemetryIngestionOptions()));
+        orderStore.ListMenuItemProductOptionsAsync(menuItem.Id, Arg.Any<CancellationToken>())
+            .Returns([]);
+        orderStore.ListMenuItemOptionGroupsAsync(menuItem.Id, Arg.Any<CancellationToken>())
+            .Returns([]);
+        orderStore.ListProductOptionIngredientRequirementsAsync(
+                Arg.Any<IReadOnlyCollection<Guid>>(),
+                Arg.Any<CancellationToken>())
+            .Returns([]);
+        var admission = Substitute.For<IMenuItemOperationalAdmissionEvaluator>();
+        admission.EvaluateAsync(
+                kiosk,
+                menuItem.Id,
+                1,
+                Arg.Any<IReadOnlyCollection<Application.Inventory.Abstractions.InventoryIngredientRequirementInput>?>(),
+                Arg.Any<DateTimeOffset>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new MenuItemOperationalDecision(
+                menuItem.Id,
+                false,
+                [new SalesAdmissionBlocker(
+                    SalesAdmissionBlockerCode.MenuItemPaused,
+                    SalesAdmissionBlockerScope.MenuItem)],
+                [],
+                new HashSet<string>()));
+        var appender = new PlaceOrderItemAppender(orderStore, admission);
 
         var failure = await appender.AppendAsync(
             new Order(),
@@ -48,7 +72,5 @@ public sealed class PlaceOrderOperationalAvailabilityTests
         Assert.NotNull(failure);
         Assert.Equal(409, failure.StatusCode);
         Assert.Contains("paused", failure.Message, StringComparison.OrdinalIgnoreCase);
-        await orderStore.DidNotReceive().ListMenuItemProductOptionsAsync(
-            Arg.Any<Guid>(), Arg.Any<CancellationToken>());
     }
 }

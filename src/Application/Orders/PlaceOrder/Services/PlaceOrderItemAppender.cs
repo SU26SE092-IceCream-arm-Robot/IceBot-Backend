@@ -6,11 +6,8 @@ using Application.SalesCatalog.Rules;
 using Domain.Catalog.Enums;
 using Domain.Orders.Entities;
 using Domain.Tenants.Entities;
-using Application.Devices.Telemetry;
 using Application.Inventory.Abstractions;
-using Application.SalesCatalog.Availability;
-using Application.SalesCatalog.Admission.Services;
-using Microsoft.Extensions.Options;
+using Application.SalesCatalog.Admission.Abstractions;
 
 namespace Application.Orders.PlaceOrder.Services;
 
@@ -18,13 +15,8 @@ public sealed record PlaceOrderItemAppendFailure(string Message, int StatusCode)
 
 public sealed class PlaceOrderItemAppender(
     IOrderStore orderStore,
-    IMenuItemOperationalAvailabilityReader operationalAvailability,
-    IOptions<EdgeTelemetryIngestionOptions> options,
-    MachineProductionInventoryGate? inventoryGate = null,
-    MenuItemOperationalAdmissionEvaluator? operationalAdmission = null)
+    IMenuItemOperationalAdmissionEvaluator operationalAdmission)
 {
-    private readonly EdgeTelemetryIngestionOptions _options = options.Value;
-
     public async Task<PlaceOrderItemAppendFailure?> AppendAsync(
         Order order,
         Kiosk kiosk,
@@ -41,31 +33,9 @@ public sealed class PlaceOrderItemAppender(
         if (menuItem is null)
             return new($"Menu item '{itemRequest.MenuItemId}' not found.", 404);
 
-        if (await operationalAvailability.IsPausedAsync(kiosk.Id, menuItem.Id, cancellationToken))
-            return new($"Menu item '{menuItem.DisplayName}' is paused for this kiosk.", 409);
-
         var product = menuItem.Product;
         var productVariant = menuItem.ProductVariant;
         var recipe = menuItem.Recipe;
-
-        ActiveProductionRouteOptionPolicy? routePolicy = null;
-        if (productVariant.FulfillmentType == FulfillmentType.MachineProduced && recipe is not null)
-        {
-            routePolicy = await orderStore.GetActiveProductionRouteOptionPolicyAsync(
-                kiosk.Id,
-                productVariant.Id,
-                recipe.Id,
-                now.AddSeconds(-_options.ReadinessTimeoutSeconds),
-                cancellationToken);
-        }
-
-        var sellabilityError = MenuItemSellabilityRules.Validate(
-            menuItem,
-            kiosk,
-            now,
-            routePolicy is not null);
-        if (sellabilityError is not null)
-            return new(sellabilityError, 409);
 
         if (!order.OrderItems.Any())
             order.SetCurrency(menuItem.Currency);
@@ -90,59 +60,36 @@ public sealed class PlaceOrderItemAppender(
                 $"Packaged menu item '{menuItem.DisplayName}' cannot use production-affecting options. Use a product variant for physical packaged choices.",
                 409);
 
-        if (productVariant.FulfillmentType == FulfillmentType.MachineProduced)
-        {
-            if (selectedOptions.Any(option =>
-                    option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting &&
-                    !routePolicy!.SupportedOptionCodes.Contains(option.Code)))
-                return new(
-                    $"One or more selected options are not supported by the active production route for '{menuItem.DisplayName}'.",
-                    409);
-        }
-
         var optionIngredientRequirements = await orderStore.ListProductOptionIngredientRequirementsAsync(
             selectedOptions.Select(option => option.ProductOptionId).ToArray(), cancellationToken);
         if (optionIngredientRequirements.Any(requirement => !requirement.IsIngredientActive))
             return new("One or more selected options require an inactive ingredient.", 409);
 
-        if (operationalAdmission is not null)
+        var decision = await operationalAdmission.EvaluateAsync(
+            kiosk,
+            menuItem.Id,
+            itemRequest.Quantity,
+            optionIngredientRequirements.Select(requirement => new InventoryIngredientRequirementInput(
+                requirement.IngredientId,
+                requirement.IngredientCode,
+                requirement.IngredientName,
+                requirement.Quantity,
+                requirement.Unit)).ToArray(),
+            now,
+            cancellationToken);
+        if (!decision.CanSell)
         {
-            var decision = await operationalAdmission.EvaluateAsync(
-                kiosk,
-                menuItem.Id,
-                itemRequest.Quantity,
-                optionIngredientRequirements.Select(requirement => new InventoryIngredientRequirementInput(
-                    requirement.IngredientId,
-                    requirement.IngredientCode,
-                    requirement.IngredientName,
-                    requirement.Quantity,
-                    requirement.Unit)).ToArray(),
-                now,
-                cancellationToken);
-            if (!decision.CanSell)
-            {
-                return new(decision.ToDisplayMessage(menuItem.DisplayName)!, 409);
-            }
+            return new(decision.ToDisplayMessage(menuItem.DisplayName)!, 409);
         }
 
-        var inventoryDecision = operationalAdmission is not null || inventoryGate is null
-            ? MachineProductionInventoryGateResult.Sellable
-            : await inventoryGate.EvaluateAsync(
-                kiosk,
-                menuItem,
-                routePolicy,
-                itemRequest.Quantity,
-                optionIngredientRequirements.Select(requirement => new InventoryIngredientRequirementInput(
-                    requirement.IngredientId,
-                    requirement.IngredientCode,
-                    requirement.IngredientName,
-                    requirement.Quantity,
-                    requirement.Unit)).ToArray(),
-                now,
-                cancellationToken);
-        if (!inventoryDecision.CanSell)
+        if (productVariant.FulfillmentType == FulfillmentType.MachineProduced &&
+            selectedOptions.Any(option =>
+                option.ExecutionImpact == ProductOptionExecutionImpact.ProductionAffecting &&
+                !decision.SupportedProductionOptionCodes.Contains(option.Code)))
         {
-            return new(inventoryDecision.Reason!, 409);
+            return new(
+                $"One or more selected options are not supported by the active production route for '{menuItem.DisplayName}'.",
+                409);
         }
 
         var orderItem = order.AddItem(

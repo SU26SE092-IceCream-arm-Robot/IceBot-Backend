@@ -40,12 +40,15 @@ ICEBOT-DEMO
 
 | Role | Demo identity | Scope assigned when seeded |
 | --- | --- | --- |
-| `OrgAdmin` | `orgadmin@icebot.local` | `ICEBOT-DEMO` organization |
-| `Manager` | `manager@icebot.local` | `ICEBOT-DEMO` organization and `ICEBOT-DEMO-STORE` |
-| `Staff` | `staff@icebot.local` | `ICEBOT-DEMO` organization and `ICEBOT-DEMO-STORE` |
-| `Technician` | `technician@icebot.local` | `ICEBOT-DEMO` organization, `ICEBOT-DEMO-STORE`, and `ICEBOT-DEMO-KIOSK` |
+| `OrgAdmin` | `demo-orgadmin@icebot.local` | `ICEBOT-DEMO` organization |
+| `Manager` | `demo-manager@icebot.local` | `ICEBOT-DEMO` organization and `ICEBOT-DEMO-STORE` |
+| `Staff` | `demo-staff@icebot.local` | `ICEBOT-DEMO` organization and `ICEBOT-DEMO-STORE` |
 
 All newly created demo identities use local login and the configured bootstrap password.
+
+`Technician` is not seeded as a tenant account. It is a platform-owned identity
+managed through the Platform Technician API and receives Store/Kiosk access only
+through `TechnicianSupportGrant`.
 
 `DevelopmentExecutionEndpointSeed:Enabled` controls the endpoint seed in
 Development. The endpoint is idempotent by kiosk and endpoint code. It remains
@@ -55,14 +58,19 @@ deployment target.
 
 ## Idempotency Rule
 
-The seed is role-based, not username-based. For each configured role, it creates a demo identity only when **no non-deleted account has an active assignment for that role**.
+The seed is identity-based. For each configured demo identity, it reuses the
+matching `UserName` or email and ensures the exact active role/scope assignment
+exists.
 
-- If any non-deleted account already has an active `Manager` assignment, the manager demo account is skipped, even when its username is different.
-- Restarting the backend does not reset passwords, replace scopes, or add a second account for a role already represented.
-- The demo tenant tree is not created solely for this seed when all four roles already have active assignments.
-- A deleted account or inactive role assignment does not count as an existing role holder.
+- Restarting the backend does not reset an existing account password or replace
+  its existing scopes.
+- An existing demo account without its configured active role/scope receives that
+  missing assignment.
+- The demo tenant tree is created by the tenant seed, not inferred from whether
+  an unrelated account already has the same role.
 
-To deliberately seed a role again, remove or deactivate every active assignment for that role, or reset the local database. Do this only for local development data.
+To recreate a demo identity, reset the local database or remove that exact demo
+account. Do this only for local development data.
 
 ## Scope Boundary
 

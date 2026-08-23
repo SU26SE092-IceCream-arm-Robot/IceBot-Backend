@@ -187,7 +187,9 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
             new DispatchOrderExecutionCommandHandler(
                 new OrderExecutionDispatchStore(dbContext),
                 Options.Create(new OrderExecutionDispatchOptions()),
-                new NoOpEdgeCommandWakeUpPublisher()),
+                new NoOpEdgeCommandWakeUpPublisher(),
+                Options.Create(new Application.Devices.Telemetry.EdgeTelemetryIngestionOptions()),
+                new AlwaysActiveOrganizationAccessStateReader()),
             NullLogger<HandlePaymentProviderNotificationCommandHandler>.Instance);
         return await handler.HandleAsync(new HandlePaymentProviderNotificationCommand
         {
@@ -224,6 +226,7 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
             OrganizationId = organization.Id,
             StoreId = store.Id,
             KioskId = kiosk.Id,
+            Channel = OrderChannel.Admin,
             OrderNumber = $"ORDER-{Guid.NewGuid():N}"
         };
         order.SetCurrency("VND");

@@ -1,4 +1,5 @@
 using Application.Abstractions.Realtime;
+using Application.ClientDevices;
 using Application.Abstractions.Realtime.Events;
 using Application.Orders.Abstractions;
 using Application.Orders.PlaceOrder.Mapping;
@@ -24,19 +25,22 @@ public sealed class PlaceOrderCommandHandler
     private readonly PlaceOrderItemAppender _itemAppender;
     private readonly OrderPaymentWindowOptions _paymentWindow;
     private readonly KioskSalesAdmissionEvaluator _admissionEvaluator;
+    private readonly ClientDeviceRuntimeOptions _runtimeLimits;
 
     public PlaceOrderCommandHandler(
         IOrderStore orderStore,
         IRealtimeNotificationPublisher publisher,
         PlaceOrderItemAppender itemAppender,
         IOptions<OrderPaymentWindowOptions> paymentWindow,
-        KioskSalesAdmissionEvaluator admissionEvaluator)
+        KioskSalesAdmissionEvaluator admissionEvaluator,
+        IOptions<ClientDeviceRuntimeOptions> runtimeLimits)
     {
         _orderStore = orderStore;
         _publisher = publisher;
         _itemAppender = itemAppender;
         _paymentWindow = paymentWindow.Value;
         _admissionEvaluator = admissionEvaluator;
+        _runtimeLimits = runtimeLimits.Value;
     }
 
     public async Task<ApiResult<OrderResult>> HandleAsync(
@@ -45,7 +49,12 @@ public sealed class PlaceOrderCommandHandler
     {
         var request = command.Request;
 
-        var validationError = PlaceOrderRequestValidator.Validate(request);
+        if (command.KioskId == Guid.Empty || command.SourceClientDeviceId == Guid.Empty)
+        {
+            return ApiResult<OrderResult>.Fail("An authenticated client device scope is required.", 401);
+        }
+
+        var validationError = PlaceOrderRequestValidator.Validate(request, _runtimeLimits);
         if (validationError is not null)
         {
             return ApiResult<OrderResult>.Fail(validationError);
@@ -57,11 +66,11 @@ public sealed class PlaceOrderCommandHandler
                 $"Idempotency-Key is required and must be at most {ScopedIdempotencyKey.MaxClientKeyLength} characters.",
                 400);
         }
-        var scopedIdempotencyKey = ScopedIdempotencyKey.ForKiosk(request.KioskId, idempotencyKey);
+        var scopedIdempotencyKey = ScopedIdempotencyKey.ForClientDevice(command.SourceClientDeviceId, idempotencyKey);
         var clientOrderId = NormalizeOptional(request.ClientOrderId);
         var clientOrderLockKey = clientOrderId is null
             ? null
-            : $"client-order:{request.KioskId:N}:{clientOrderId}";
+            : $"client-order:{command.KioskId:N}:{clientOrderId}";
 
         OrderStatusChangedEvent? statusChangedEvent = null;
         var result = await _orderStore.ExecuteCheckoutTransactionAsync(async ct =>
@@ -78,23 +87,23 @@ public sealed class PlaceOrderCommandHandler
             var existingByIdempotencyKey = await _orderStore.GetOrderByIdempotencyKeyAsync(scopedIdempotencyKey, ct);
             if (existingByIdempotencyKey is not null)
             {
-                return IsEquivalentIdempotentRequest(existingByIdempotencyKey, request)
+                return IsEquivalentIdempotentRequest(existingByIdempotencyKey, command, request)
                     ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByIdempotencyKey), "Order already created.")
                     : ApiResult<OrderResult>.Fail("Idempotency key was already used for a different order request.", 409);
             }
 
             if (clientOrderId is not null)
             {
-                var existingByClientOrderId = await _orderStore.GetOrderByClientOrderIdAsync(request.KioskId, clientOrderId, ct);
+                var existingByClientOrderId = await _orderStore.GetOrderByClientOrderIdAsync(command.KioskId, clientOrderId, ct);
                 if (existingByClientOrderId is not null)
                 {
-                    return IsEquivalentIdempotentRequest(existingByClientOrderId, request)
+                    return IsEquivalentIdempotentRequest(existingByClientOrderId, command, request)
                         ? ApiResult<OrderResult>.Success(OrderResultMapper.ToResult(existingByClientOrderId), "Order already created.")
                         : ApiResult<OrderResult>.Fail("Client order id was already used for a different order request.", 409);
                 }
             }
 
-            var kiosk = await _orderStore.GetKioskByIdAsync(request.KioskId, ct);
+            var kiosk = await _orderStore.GetKioskByIdAsync(command.KioskId, ct);
             if (kiosk is null)
             {
                 return ApiResult<OrderResult>.Fail("Kiosk not found.", 404);
@@ -114,6 +123,7 @@ public sealed class PlaceOrderCommandHandler
                 OrganizationId = kiosk.OrganizationId,
                 StoreId = kiosk.StoreId,
                 KioskId = kiosk.Id,
+                SourceClientDeviceId = command.SourceClientDeviceId,
                 OrderNumber = OrderNumberGenerator.GenerateOrderNumber(now),
                 IdempotencyKey = scopedIdempotencyKey,
                 ClientOrderId = clientOrderId,
@@ -191,9 +201,10 @@ public sealed class PlaceOrderCommandHandler
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    private static bool IsEquivalentIdempotentRequest(Order order, PlaceOrderRequest request)
+    private static bool IsEquivalentIdempotentRequest(Order order, PlaceOrderCommand command, PlaceOrderRequest request)
     {
-        if (order.KioskId != request.KioskId ||
+        if (order.KioskId != command.KioskId ||
+            order.SourceClientDeviceId != command.SourceClientDeviceId ||
             !string.Equals(order.ClientOrderId, NormalizeOptional(request.ClientOrderId), StringComparison.Ordinal) ||
             !string.Equals(order.CustomerName, NormalizeOptional(request.CustomerName), StringComparison.Ordinal) ||
             !string.Equals(order.CustomerPhoneNumber, NormalizeOptional(request.CustomerPhoneNumber), StringComparison.Ordinal) ||

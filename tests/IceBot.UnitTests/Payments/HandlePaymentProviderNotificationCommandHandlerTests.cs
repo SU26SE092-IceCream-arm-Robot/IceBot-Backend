@@ -3,6 +3,8 @@ using Application.EdgeIntegration.Abstractions;
 using Application.EdgeIntegration.Dispatch;
 using Application.EdgeIntegration.Dispatch.Commands;
 using Application.EdgeIntegration.Dispatch.Services;
+using Application.Devices.Telemetry;
+using Application.Tenants.Abstractions;
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
@@ -513,7 +515,9 @@ public sealed class HandlePaymentProviderNotificationCommandHandlerTests
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             dispatchStore ?? Substitute.For<IOrderExecutionDispatchStore>(),
             Options.Create(new OrderExecutionDispatchOptions { Enabled = true }),
-            Substitute.For<IEdgeCommandWakeUpPublisher>());
+            Substitute.For<IEdgeCommandWakeUpPublisher>(),
+            Options.Create(new EdgeTelemetryIngestionOptions()),
+            Substitute.For<IOrganizationAccessStateReader>());
         return new HandlePaymentProviderNotificationCommandHandler(
             store,
             gateway,

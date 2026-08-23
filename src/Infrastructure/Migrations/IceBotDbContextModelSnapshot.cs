@@ -37,6 +37,80 @@ namespace Infrastructure.Migrations
                     b.ToTable("AccountStores", (string)null);
                 });
 
+            modelBuilder.Entity("Domain.Catalog.Entities.CatalogImageAsset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("Bytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DeliveryUrl")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Format")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Height")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("ProviderAssetId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Width")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Provider", "ProviderAssetId")
+                        .IsUnique();
+
+                    b.HasIndex("Provider", "PublicId")
+                        .IsUnique();
+
+                    b.ToTable("CatalogImageAssets", (string)null);
+                });
+
             modelBuilder.Entity("Domain.Catalog.Entities.Ingredient", b =>
                 {
                     b.Property<Guid>("Id")
@@ -220,9 +294,12 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
-                    b.Property<string>("ImageUrl")
+                    b.Property<string>("ImageAltText")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ImageAssetId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("boolean");
@@ -250,6 +327,10 @@ namespace Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
                     b.Property<int>("ScopeType")
                         .HasColumnType("integer");
 
@@ -268,6 +349,8 @@ namespace Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CategoryId");
+
+                    b.HasIndex("ImageAssetId");
 
                     b.HasIndex("KioskId");
 
@@ -516,9 +599,12 @@ namespace Infrastructure.Migrations
                     b.Property<int>("FulfillmentType")
                         .HasColumnType("integer");
 
-                    b.Property<string>("ImageUrl")
+                    b.Property<string>("ImageAltText")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<Guid?>("ImageAssetId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsAvailable")
                         .HasColumnType("boolean");
@@ -538,6 +624,10 @@ namespace Infrastructure.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Revision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer");
+
                     b.Property<string>("SizeCode")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
@@ -554,6 +644,8 @@ namespace Infrastructure.Migrations
                         .HasColumnType("character varying(500)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("ImageAssetId");
 
                     b.HasIndex("ProductId", "Code")
                         .IsUnique()
@@ -1037,6 +1129,226 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("DeviceTypes", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Devices.ClientDevices.ClientDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("ActivatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("AppVersion")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("CredentialVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DisabledAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("InstallationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("LastSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Platform")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset?>("RetiredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Revision")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SessionVersion")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InstallationId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" <> 3");
+
+                    b.HasIndex("OrganizationId");
+
+                    b.HasIndex("StoreId");
+
+                    b.HasIndex("KioskId", "Status");
+
+                    b.HasIndex("KioskId", "Type")
+                        .IsUnique()
+                        .HasFilter("\"Type\" = 1 AND \"Status\" <> 3");
+
+                    b.ToTable("ClientDevices", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ClientDevices_PositiveVersions", "\"CredentialVersion\" > 0 AND \"SessionVersion\" > 0 AND \"Revision\" > 0");
+                        });
+                });
+
+            modelBuilder.Entity("Domain.Devices.ClientDevices.ClientDeviceCredential", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ClientDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("HashKeyVersion")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTimeOffset>("IssuedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("RotatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("SecretHash")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientDeviceId")
+                        .IsUnique()
+                        .HasFilter("\"Status\" = 1");
+
+                    b.HasIndex("ClientDeviceId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("ClientDeviceCredentials", (string)null);
+                });
+
+            modelBuilder.Entity("Domain.Devices.ClientDevices.ClientDeviceOperationReplay", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("ClientDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("DeletedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("KioskId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Operation")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<string>("RequestFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid>("ResultClientDeviceId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("UpdatedByAccountId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ResultClientDeviceId");
+
+                    b.HasIndex("ClientDeviceId", "Operation", "IdempotencyKey")
+                        .IsUnique()
+                        .HasFilter("\"ClientDeviceId\" IS NOT NULL");
+
+                    b.HasIndex("KioskId", "Operation", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.ToTable("ClientDeviceOperationReplays", (string)null);
                 });
 
             modelBuilder.Entity("Domain.Devices.Connectivity.KioskConnectivityProjection", b =>
@@ -3969,6 +4281,9 @@ namespace Infrastructure.Migrations
                     b.Property<Guid?>("RuntimeSnapshotId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("SourceClientDeviceId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("Status")
                         .HasColumnType("integer");
 
@@ -4007,6 +4322,8 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId");
 
+                    b.HasIndex("SourceClientDeviceId");
+
                     b.HasIndex("StoreId");
 
                     b.HasIndex("KioskId", "ClientOrderId")
@@ -4015,7 +4332,10 @@ namespace Infrastructure.Migrations
 
                     b.HasIndex("OrganizationId", "StoreId", "KioskId", "PlacedAt");
 
-                    b.ToTable("Orders", (string)null);
+                    b.ToTable("Orders", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_Orders_TabletRequiresClientDevice", "\"Channel\" <> 1 OR \"SourceClientDeviceId\" IS NOT NULL");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Orders.Entities.OrderItem", b =>
@@ -8171,10 +8491,6 @@ namespace Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("EffectiveTo")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("ImageUrl")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
                     b.Property<Guid>("MenuId")
                         .HasColumnType("uuid");
 
@@ -9480,6 +9796,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("CategoryId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Domain.Catalog.Entities.CatalogImageAsset", "ImageAsset")
+                        .WithMany()
+                        .HasForeignKey("ImageAssetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
                         .WithMany()
                         .HasForeignKey("KioskId")
@@ -9501,6 +9822,8 @@ namespace Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Category");
+
+                    b.Navigation("ImageAsset");
 
                     b.Navigation("Kiosk");
 
@@ -9543,11 +9866,18 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Catalog.Entities.ProductVariant", b =>
                 {
+                    b.HasOne("Domain.Catalog.Entities.CatalogImageAsset", "ImageAsset")
+                        .WithMany()
+                        .HasForeignKey("ImageAssetId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Catalog.Entities.Product", "Product")
                         .WithMany("ProductVariants")
                         .HasForeignKey("ProductId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("ImageAsset");
 
                     b.Navigation("Product");
                 });
@@ -9662,6 +9992,64 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("DeviceType");
+                });
+
+            modelBuilder.Entity("Domain.Devices.ClientDevices.ClientDevice", b =>
+                {
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", "Kiosk")
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Organization", "Organization")
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Tenants.Entities.Store", "Store")
+                        .WithMany()
+                        .HasForeignKey("StoreId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Kiosk");
+
+                    b.Navigation("Organization");
+
+                    b.Navigation("Store");
+                });
+
+            modelBuilder.Entity("Domain.Devices.ClientDevices.ClientDeviceCredential", b =>
+                {
+                    b.HasOne("Domain.Devices.ClientDevices.ClientDevice", "ClientDevice")
+                        .WithMany("Credentials")
+                        .HasForeignKey("ClientDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ClientDevice");
+                });
+
+            modelBuilder.Entity("Domain.Devices.ClientDevices.ClientDeviceOperationReplay", b =>
+                {
+                    b.HasOne("Domain.Devices.ClientDevices.ClientDevice", null)
+                        .WithMany()
+                        .HasForeignKey("ClientDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Domain.Tenants.Entities.Kiosk", null)
+                        .WithMany()
+                        .HasForeignKey("KioskId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Devices.ClientDevices.ClientDevice", null)
+                        .WithMany()
+                        .HasForeignKey("ResultClientDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Domain.Devices.Connectivity.KioskConnectivityProjection", b =>
@@ -10347,6 +10735,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("OrganizationId")
                         .OnDelete(DeleteBehavior.Restrict);
 
+                    b.HasOne("Domain.Devices.ClientDevices.ClientDevice", "SourceClientDevice")
+                        .WithMany()
+                        .HasForeignKey("SourceClientDeviceId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Domain.Tenants.Entities.Store", "Store")
                         .WithMany()
                         .HasForeignKey("StoreId")
@@ -10355,6 +10748,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Kiosk");
 
                     b.Navigation("Organization");
+
+                    b.Navigation("SourceClientDevice");
 
                     b.Navigation("Store");
                 });
@@ -11547,6 +11942,11 @@ namespace Infrastructure.Migrations
             modelBuilder.Entity("Domain.Devices.Catalog.DeviceType", b =>
                 {
                     b.Navigation("DeviceModels");
+                });
+
+            modelBuilder.Entity("Domain.Devices.ClientDevices.ClientDevice", b =>
+                {
+                    b.Navigation("Credentials");
                 });
 
             modelBuilder.Entity("Domain.Devices.ExecutionEndpoints.KioskExecutionEndpoint", b =>

@@ -42,6 +42,8 @@ internal sealed class ProductConfiguration : IEntityTypeConfiguration<Product>
         entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.TemplateProduct).WithMany().HasForeignKey(x => x.TemplateProductId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.ImageAsset).WithMany().HasForeignKey(x => x.ImageAssetId).OnDelete(DeleteBehavior.Restrict);
+        entity.Property(x => x.Revision).IsConcurrencyToken();
         entity.HasMany(x => x.OptionGroups).WithOne(x => x.Product).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
 
     }
@@ -55,7 +57,20 @@ internal sealed class ProductVariantConfiguration : IEntityTypeConfiguration<Pro
         entity.HasIndex(x => new { x.ProductId, x.Code }).IsUnique().HasFilter(EfModelConfigurationConstants.ActiveRowFilter);
         entity.HasIndex(x => new { x.ProductId, x.DisplayOrder });
         entity.HasOne(x => x.Product).WithMany(x => x.ProductVariants).HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.ImageAsset).WithMany().HasForeignKey(x => x.ImageAssetId).OnDelete(DeleteBehavior.Restrict);
+        entity.Property(x => x.Revision).IsConcurrencyToken();
 
+    }
+}
+
+internal sealed class CatalogImageAssetConfiguration : IEntityTypeConfiguration<CatalogImageAsset>
+{
+    public void Configure(EntityTypeBuilder<CatalogImageAsset> entity)
+    {
+        entity.ToTable("CatalogImageAssets");
+        entity.Property(x => x.Status).HasConversion<int>();
+        entity.HasIndex(x => new { x.Provider, x.ProviderAssetId }).IsUnique();
+        entity.HasIndex(x => new { x.Provider, x.PublicId }).IsUnique();
     }
 }
 

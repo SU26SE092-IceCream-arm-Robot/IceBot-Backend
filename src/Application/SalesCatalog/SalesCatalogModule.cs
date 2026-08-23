@@ -4,6 +4,7 @@ using Application.SalesCatalog.RuntimeMenus.Queries;
 using Application.SalesCatalog.RuntimeMenus.Services;
 using Application.SalesCatalog.Availability;
 using Application.SalesCatalog.Admission.Services;
+using Application.SalesCatalog.Admission.Abstractions;
 using Application.SalesCatalog.Admission.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -28,7 +29,7 @@ public static class SalesCatalogModule
         services.AddScoped<IMenuItemOperationalAvailabilityReader, MenuItemOperationalAvailabilityReader>();
         services.AddScoped<MachineProductionInventoryGate>();
         services.AddScoped<KioskSalesAdmissionEvaluator>();
-        services.AddScoped<MenuItemOperationalAdmissionEvaluator>();
+        services.AddScoped<IMenuItemOperationalAdmissionEvaluator, MenuItemOperationalAdmissionEvaluator>();
         services.AddScoped<GetKioskSalesReadinessQueryHandler>();
 
         services.AddScoped<RuntimeMenuProjectionBuilder>();

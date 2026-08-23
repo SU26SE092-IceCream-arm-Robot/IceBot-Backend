@@ -32,8 +32,6 @@ public partial class MenuItem : BusinessEntity
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
-
     public DateTimeOffset? EffectiveFrom { get; set; }
 
     public DateTimeOffset? EffectiveTo { get; set; }

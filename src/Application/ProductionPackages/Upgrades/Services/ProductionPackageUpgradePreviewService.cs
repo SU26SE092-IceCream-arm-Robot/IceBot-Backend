@@ -230,7 +230,8 @@ public sealed class ProductionPackageUpgradePreviewService(
                 item.Value.Description,
                 item.Value.BasePrice,
                 item.Value.Currency,
-                item.Value.ImageUrl,
+                item.Value.ImageAssetId,
+                item.Value.ImageAltText,
                 item.Value.CategoryId,
                 item.Value.IsAvailable,
                 Variants = item.Value.ProductVariants.OrderBy(value => value.Code).Select(value => new
@@ -241,7 +242,8 @@ public sealed class ProductionPackageUpgradePreviewService(
                     value.Description,
                     value.BasePrice,
                     value.Currency,
-                    value.ImageUrl,
+                    value.ImageAssetId,
+                    value.ImageAltText,
                     value.DisplayOrder,
                     value.IsAvailable
                 }),

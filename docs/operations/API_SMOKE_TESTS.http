@@ -2,6 +2,8 @@
 
 @baseUrl = http://localhost:5000/api/v1
 @accessToken = YOUR_ACCESS_TOKEN
+@clientDeviceToken = YOUR_CLIENT_DEVICE_ACCESS_TOKEN
+@orderAccessToken = YOUR_ORDER_ACCESS_TOKEN
 @sampleGuid = 00000000-0000-0000-0000-000000000000
 
 # ==========================================
@@ -100,8 +102,22 @@ Accept: application/json
 # 5. Product & Menu
 # ==========================================
 
-### Get Customer Kiosk Runtime Menu
-GET {{baseUrl}}/kiosks/{{sampleGuid}}/runtime-menu
+### Exchange an already provisioned tablet credential for a runtime session
+POST {{baseUrl}}/client-device-sessions
+Content-Type: application/json
+X-Client-Device-Id: {{sampleGuid}}
+
+{
+  "clientDeviceId": "{{sampleGuid}}",
+  "installationId": "{{sampleGuid}}",
+  "credential": "BASE64_ENCODED_32_BYTE_SECRET",
+  "appVersion": "1.0.0",
+  "platform": "windows"
+}
+
+### Get Customer Runtime Menu
+GET {{baseUrl}}/runtime/menu
+Authorization: Bearer {{clientDeviceToken}}
 Accept: application/json
 
 ### List Management Products
@@ -115,12 +131,12 @@ Accept: application/json
 # ==========================================
 
 ### Place Kiosk Order
-POST {{baseUrl}}/orders
+POST {{baseUrl}}/runtime/orders
+Authorization: Bearer {{clientDeviceToken}}
 Idempotency-Key: PlaceOrder_Unique_Idempotency_Key
 Content-Type: application/json
 
 {
-  "kioskId": "{{sampleGuid}}",
   "items": [
     {
       "menuItemId": "{{sampleGuid}}",
@@ -131,7 +147,9 @@ Content-Type: application/json
 }
 
 ### Create Order Payment Session
-POST {{baseUrl}}/orders/{{sampleGuid}}/payment-sessions
+POST {{baseUrl}}/runtime/orders/{{sampleGuid}}/payment-sessions
+Authorization: Bearer {{clientDeviceToken}}
+Order-Access-Token: {{orderAccessToken}}
 Idempotency-Key: PaymentSession_Unique_Idempotency_Key
 Content-Type: application/json
 

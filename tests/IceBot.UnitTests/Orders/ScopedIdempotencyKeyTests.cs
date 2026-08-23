@@ -5,12 +5,12 @@ namespace IceBot.UnitTests.Orders;
 public sealed class ScopedIdempotencyKeyTests
 {
     [Fact]
-    public void ScopeBuilders_IsolateTheSameClientKeyByOwner()
+    public void ClientDeviceScope_IsolatesTheSameClientKeyByDevice()
     {
         const string key = "retry-1";
 
-        var first = ScopedIdempotencyKey.ForKiosk(Guid.NewGuid(), key);
-        var second = ScopedIdempotencyKey.ForKiosk(Guid.NewGuid(), key);
+        var first = ScopedIdempotencyKey.ForClientDevice(Guid.NewGuid(), key);
+        var second = ScopedIdempotencyKey.ForClientDevice(Guid.NewGuid(), key);
 
         Assert.NotEqual(first, second);
     }

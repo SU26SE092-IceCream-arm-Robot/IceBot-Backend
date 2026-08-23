@@ -1,6 +1,7 @@
 using Domain.Catalog.Entities;
 using Domain.Common;
 using Domain.Devices.Catalog;
+using Domain.Devices.ClientDevices;
 using Domain.Devices.ExecutionEndpoints;
 using Domain.Devices.ExecutionEndpoints.Projections;
 using Domain.Devices.Telemetry;
@@ -27,14 +28,20 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
 {
     public void Configure(EntityTypeBuilder<Order> entity)
     {
-        entity.ToTable("Orders");
+        entity.ToTable("Orders", table =>
+        {
+            table.HasCheckConstraint("CK_Orders_TabletRequiresClientDevice",
+                "\"Channel\" <> 1 OR \"SourceClientDeviceId\" IS NOT NULL");
+        });
         entity.HasIndex(x => x.OrderNumber).IsUnique();
         entity.HasIndex(x => x.IdempotencyKey).IsUnique().HasFilter("\"IdempotencyKey\" IS NOT NULL");
         entity.HasIndex(x => new { x.KioskId, x.ClientOrderId }).IsUnique().HasFilter("\"ClientOrderId\" IS NOT NULL");
         entity.HasIndex(x => new { x.OrganizationId, x.StoreId, x.KioskId, x.PlacedAt });
+        entity.HasIndex(x => x.SourceClientDeviceId);
         entity.HasOne(x => x.Organization).WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Store).WithMany().HasForeignKey(x => x.StoreId).OnDelete(DeleteBehavior.Restrict);
         entity.HasOne(x => x.Kiosk).WithMany().HasForeignKey(x => x.KioskId).OnDelete(DeleteBehavior.Restrict);
+        entity.HasOne(x => x.SourceClientDevice).WithMany().HasForeignKey(x => x.SourceClientDeviceId).OnDelete(DeleteBehavior.Restrict);
 
     }
 }

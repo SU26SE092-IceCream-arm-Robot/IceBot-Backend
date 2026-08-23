@@ -460,7 +460,8 @@ public sealed class DevelopmentIceBotDemoReset(
             Currency = template.Currency,
             IsAvailable = false,
             PreparationTimeSeconds = template.PreparationTimeSeconds,
-            ImageUrl = template.ImageUrl,
+            ImageAssetId = template.ImageAssetId,
+            ImageAltText = template.ImageAltText,
             MetadataJson = template.MetadataJson,
             CreatedAt = now
         };
@@ -481,7 +482,8 @@ public sealed class DevelopmentIceBotDemoReset(
                 IsAvailable = false,
                 DisplayOrder = sourceVariant.DisplayOrder,
                 PreparationTimeSeconds = sourceVariant.PreparationTimeSeconds,
-                ImageUrl = sourceVariant.ImageUrl,
+                ImageAssetId = sourceVariant.ImageAssetId,
+                ImageAltText = sourceVariant.ImageAltText,
                 MetadataJson = sourceVariant.MetadataJson,
                 CreatedAt = now
             };

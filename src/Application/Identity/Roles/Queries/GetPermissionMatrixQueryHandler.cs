@@ -121,6 +121,41 @@ public static class PermissionCatalog
         },
         new()
         {
+            Policy = "client-devices.view",
+            Description = "View kiosk-scoped customer tablet identities and their lifecycle state.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "client-devices.provision",
+            Description = "Provision a kiosk customer tablet identity and credential.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "client-devices.operations.manage",
+            Description = "Disable or reactivate a kiosk customer tablet identity.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "client-devices.credentials.manage",
+            Description = "Rotate kiosk customer tablet credentials.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
+            Policy = "client-devices.rebind",
+            Description = "Rebind, replace, or retire a kiosk customer tablet identity.",
+            Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },
+            ScopeRequired = true
+        },
+        new()
+        {
             Policy = "tenant-tree.view",
             Description = "View tenant hierarchy for scope selection and navigation.",
             Roles = new[] { "SystemAdmin", "OrgAdmin", "Manager", "Technician" },

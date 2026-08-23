@@ -18,7 +18,6 @@ public sealed class MenuItemResult
     public string Currency { get; set; } = null!;
     public int DisplayOrder { get; set; }
     public int? PreparationTimeSeconds { get; set; }
-    public string? ImageUrl { get; set; }
     public DateTimeOffset? EffectiveFrom { get; set; }
     public DateTimeOffset? EffectiveTo { get; set; }
     public DateTimeOffset CreatedAt { get; set; }

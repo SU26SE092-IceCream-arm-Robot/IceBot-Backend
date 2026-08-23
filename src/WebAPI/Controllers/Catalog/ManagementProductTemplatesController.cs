@@ -24,6 +24,7 @@ public sealed class ManagementProductTemplatesController : ControllerBase
     private readonly UpdateProductVariantCommandHandler _updateVariant;
     private readonly SetProductVariantAvailabilityCommandHandler _setVariantAvailability;
     private readonly DeleteProductVariantCommandHandler _deleteVariant;
+    private readonly ReplaceCatalogImageCommandHandler _replaceImage;
 
     public ManagementProductTemplatesController(
         ListProductsQueryHandler list,
@@ -35,7 +36,8 @@ public sealed class ManagementProductTemplatesController : ControllerBase
         AddProductVariantCommandHandler addVariant,
         UpdateProductVariantCommandHandler updateVariant,
         SetProductVariantAvailabilityCommandHandler setVariantAvailability,
-        DeleteProductVariantCommandHandler deleteVariant)
+        DeleteProductVariantCommandHandler deleteVariant,
+        ReplaceCatalogImageCommandHandler replaceImage)
     {
         _list = list;
         _get = get;
@@ -47,6 +49,7 @@ public sealed class ManagementProductTemplatesController : ControllerBase
         _updateVariant = updateVariant;
         _setVariantAvailability = setVariantAvailability;
         _deleteVariant = deleteVariant;
+        _replaceImage = replaceImage;
     }
 
     [HttpGet]
@@ -136,6 +139,20 @@ public sealed class ManagementProductTemplatesController : ControllerBase
         return StatusCode(result.StatusCode, result);
     }
 
+    [HttpPut("{productId:guid}/image")]
+    [Authorize(Policy = "product-templates.manage")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(5_500_000)]
+    public async Task<IActionResult> ReplaceImage(Guid productId, [FromForm] CatalogImageUploadForm form, CancellationToken cancellationToken)
+    {
+        if (form.File is null) return BadRequest("An image file is required.");
+        await using var stream = new MemoryStream();
+        await form.File.CopyToAsync(stream, cancellationToken);
+        var result = await _replaceImage.ReplaceProductAsync(Scope(), productId, form.ExpectedRevision, form.AltText,
+            stream.ToArray(), form.File.FileName, form.File.ContentType, User.GetUserContext().AccountId, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
     [HttpPost("{productId:guid}/variants")]
     [Authorize(Policy = "product-templates.manage")]
     public async Task<IActionResult> AddVariant(Guid productId, [FromBody] UpsertProductVariantRequest request, CancellationToken cancellationToken)
@@ -191,6 +208,21 @@ public sealed class ManagementProductTemplatesController : ControllerBase
             VariantId = variantId,
             DeletedByAccountId = User.GetUserContext().AccountId
         }, cancellationToken);
+        return StatusCode(result.StatusCode, result);
+    }
+
+    [HttpPut("{productId:guid}/variants/{variantId:guid}/image")]
+    [Authorize(Policy = "product-templates.manage")]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(5_500_000)]
+    public async Task<IActionResult> ReplaceVariantImage(Guid productId, Guid variantId, [FromForm] CatalogImageUploadForm form, CancellationToken cancellationToken)
+    {
+        if (form.File is null) return BadRequest("An image file is required.");
+        await using var stream = new MemoryStream();
+        await form.File.CopyToAsync(stream, cancellationToken);
+        var result = await _replaceImage.ReplaceVariantAsync(Scope(), productId, variantId, form.ExpectedRevision,
+            form.AltText, stream.ToArray(), form.File.FileName, form.File.ContentType, User.GetUserContext().AccountId,
+            cancellationToken);
         return StatusCode(result.StatusCode, result);
     }
 

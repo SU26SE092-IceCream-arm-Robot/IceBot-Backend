@@ -31,11 +31,11 @@ public sealed class AcknowledgeEdgeCommandCommandHandler
     public AcknowledgeEdgeCommandCommandHandler(
         IEdgeCommandStore edgeCommandStore,
         IRealtimeNotificationPublisher publisher,
-        IOptions<ExecutionReportIngestionOptions>? options = null)
+        IOptions<ExecutionReportIngestionOptions> options)
     {
         _edgeCommandStore = edgeCommandStore;
         _publisher = publisher;
-        _options = options?.Value ?? new ExecutionReportIngestionOptions();
+        _options = options.Value;
     }
 
     public async Task<ApiResult<EdgeCommandAckResult>> HandleAsync(

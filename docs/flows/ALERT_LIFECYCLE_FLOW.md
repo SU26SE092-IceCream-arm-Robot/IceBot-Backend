@@ -96,9 +96,10 @@ push.
 
 Recipient policy:
 
-1. Select distinct active platform Technician and Manager accounts whose active role
-   scope matches the Alert kiosk, store, or organization and which have an
-   active notification-device registration.
+1. Select distinct active platform Technician accounts with a matching active
+   `TechnicianSupportGrant`, and active Manager accounts with a matching tenant
+   `AccountRole`, for the Alert kiosk, store, or organization. Recipients must
+   also have an active notification-device registration.
 2. If that set is empty, select active OrgAdmin accounts assigned to the exact
    organization and having an active notification-device registration.
 3. Do not broadcast to SystemAdmin, Staff, unrelated tenant scopes, or every
@@ -133,7 +134,8 @@ recipient policy, and idempotent delivery key; it does not become an Alert.
 
 Failed configuration deployments are reconciled from committed Full Edge and
 Low-cost deployment state, including executor failures and timeout failures.
-They notify scoped Technician/Manager accounts and fall back to OrgAdmin.
+They notify `TechnicianSupportGrant`-scoped Technicians and `AccountRole`-scoped
+Managers, then fall back to OrgAdmin.
 Candidates from both execution profiles share one failure-time-ordered batch,
 so one profile cannot starve the other. A failure with no currently eligible
 recipient remains pending and becomes deliverable if a matching account and
@@ -142,10 +144,12 @@ recipient or mark it notified without a delivery. Recipient-less failures are
 excluded before the bounded batch is selected, so they cannot starve later
 deliverable failures. One failed candidate is isolated and does not stop the
 remaining items in the batch.
-Maintenance assignment accepts only an active platform Technician, Manager, or OrgAdmin
-in the ticket tenant scope. It notifies that assignee when an active notification
-device exists. Requeueing a permanently failed delivery repeats delivery only;
-it never repeats the source business transition.
+Maintenance assignment accepts only an active platform Technician with a matching
+`TechnicianSupportGrant`, or a Manager with a matching tenant `AccountRole`.
+OrgAdmin coordinates assignment within tenant scope but is not an assignee option
+by default. It notifies that assignee when an active notification device exists.
+Requeueing a permanently failed delivery repeats delivery only; it never repeats
+the source business transition.
 
 Payment-session reconciliation creates a `payment_intervention` delivery only
 when the session enters manual intervention: retry exhaustion, a provider

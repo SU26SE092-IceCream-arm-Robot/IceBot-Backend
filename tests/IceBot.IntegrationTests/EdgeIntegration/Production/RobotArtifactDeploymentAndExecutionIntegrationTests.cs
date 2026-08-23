@@ -57,6 +57,7 @@ using Domain.Catalog.Entities;
 using Domain.Catalog.Enums;
 using Domain.Common.Enums;
 using Domain.Devices.Catalog;
+using Domain.Devices.ClientDevices;
 using Domain.Identity.Entities;
 using Domain.Inventory.Entities;
 using Domain.Inventory.Enums;
@@ -287,21 +288,43 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             new InventoryReadinessEvaluator(new InventoryStore(dbContext)),
             telemetryOptions);
         var admissionStore = new OperationalAdmissionReadStore(dbContext);
+        var sourceClientDevice = await dbContext.ClientDevices
+            .SingleOrDefaultAsync(device => device.KioskId == graph.KioskId && device.Status == ClientDeviceStatus.Active);
+        if (sourceClientDevice is null)
+        {
+            var kiosk = await dbContext.Kiosks.SingleAsync(candidate => candidate.Id == graph.KioskId);
+            sourceClientDevice = ClientDevice.Provision(
+                kiosk,
+                ClientDeviceType.SelfOrderTablet,
+                Guid.NewGuid(),
+                "Integration test tablet",
+                null,
+                "Test",
+                DateTimeOffset.UtcNow,
+                Guid.Empty);
+            sourceClientDevice.AddInitialCredential(new byte[32], "test", DateTimeOffset.UtcNow, Guid.Empty);
+            dbContext.ClientDevices.Add(sourceClientDevice);
+            await dbContext.SaveChangesAsync();
+        }
         var handler = new PlaceOrderCommandHandler(
             orders,
             new NoOpRealtimeNotificationPublisher(),
-            new PlaceOrderItemAppender(orders, availability, telemetryOptions, inventory),
+            new PlaceOrderItemAppender(
+                orders,
+                new MenuItemOperationalAdmissionEvaluator(admissionStore, inventory, telemetryOptions)),
             Options.Create(new OrderPaymentWindowOptions()),
             new KioskSalesAdmissionEvaluator(
                 admissionStore,
                 Options.Create(new KioskSalesAdmissionOptions()),
-                telemetryOptions));
+                telemetryOptions),
+            Options.Create(new Application.ClientDevices.ClientDeviceRuntimeOptions()));
         var result = await handler.HandleAsync(new PlaceOrderCommand
         {
+            KioskId = graph.KioskId,
+            SourceClientDeviceId = sourceClientDevice.Id,
             IdempotencyKey = $"customer-attended-{Guid.NewGuid():N}",
             Request = new PlaceOrderRequest
             {
-                KioskId = graph.KioskId,
                 ClientOrderId = $"customer-{Guid.NewGuid():N}",
                 Items = [new PlaceOrderItemRequest { MenuItemId = graph.MenuItemId, Quantity = 1 }]
             }
@@ -324,7 +347,11 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var handler = new CreatePaymentSessionCommandHandler(
             new PaymentStore(dbContext),
             new UnusedPaymentGateway(),
-            new OrderPaymentSellabilityGuard(orders, availability, inventory, telemetryOptions),
+            new OrderPaymentSellabilityGuard(
+                new MenuItemOperationalAdmissionEvaluator(
+                    new OperationalAdmissionReadStore(dbContext),
+                    inventory,
+                    telemetryOptions)),
             new KioskSalesAdmissionEvaluator(
                 new OperationalAdmissionReadStore(dbContext),
                 Options.Create(new KioskSalesAdmissionOptions()),
@@ -358,7 +385,9 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             new DispatchOrderExecutionCommandHandler(
                 new OrderExecutionDispatchStore(dbContext),
                 Options.Create(new OrderExecutionDispatchOptions()),
-                new NoOpEdgeCommandWakeUpPublisher()),
+                new NoOpEdgeCommandWakeUpPublisher(),
+                Options.Create(new EdgeTelemetryIngestionOptions()),
+                new AlwaysActiveOrganizationAccessStateReader()),
             NullLogger<ConfirmCashPaymentCommandHandler>.Instance);
         var result = await handler.HandleAsync(new ConfirmCashPaymentCommand
         {
@@ -428,7 +457,9 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             new OrderExecutionDispatchStore(dispatchContext),
             Options.Create(new OrderExecutionDispatchOptions()),
-            dispatchWakeUpPublisher);
+            dispatchWakeUpPublisher,
+            Options.Create(new EdgeTelemetryIngestionOptions()),
+            new AlwaysActiveOrganizationAccessStateReader());
         var firstDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
         {
             OrderId = orderId,
@@ -580,7 +611,9 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             new OrderExecutionDispatchStore(dispatchContext),
             Options.Create(new OrderExecutionDispatchOptions()),
-            new NoOpEdgeCommandWakeUpPublisher { PublishResult = false });
+            new NoOpEdgeCommandWakeUpPublisher { PublishResult = false },
+            Options.Create(new EdgeTelemetryIngestionOptions()),
+            new AlwaysActiveOrganizationAccessStateReader());
 
         var partialOrderId = await CreatePaidOrderAsync(graph, quantity: 3);
         var partialDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
@@ -648,7 +681,9 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             var remakeHandler = new DispatchOrderExecutionCommandHandler(
                 new OrderExecutionDispatchStore(remakeContext),
                 Options.Create(new OrderExecutionDispatchOptions()),
-                new NoOpEdgeCommandWakeUpPublisher { PublishResult = false });
+                new NoOpEdgeCommandWakeUpPublisher { PublishResult = false },
+                Options.Create(new EdgeTelemetryIngestionOptions()),
+                new AlwaysActiveOrganizationAccessStateReader());
             var unsafeRemake = await remakeHandler.HandleRemakeAsync(
                 Guid.NewGuid(),
                 partialOrderId,
@@ -717,7 +752,9 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             new OrderExecutionDispatchStore(dispatchContext),
             Options.Create(new OrderExecutionDispatchOptions()),
-            new NoOpEdgeCommandWakeUpPublisher { PublishResult = false });
+            new NoOpEdgeCommandWakeUpPublisher { PublishResult = false },
+            Options.Create(new EdgeTelemetryIngestionOptions()),
+            new AlwaysActiveOrganizationAccessStateReader());
 
         var rejectedOrderId = await CreatePaidOrderAsync(graph);
         var rejectedDispatch = await dispatchHandler.HandleAsync(new DispatchOrderExecutionCommand
@@ -1048,7 +1085,9 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
         var dispatchHandler = new DispatchOrderExecutionCommandHandler(
             new OrderExecutionDispatchStore(dispatchContext),
             Options.Create(new OrderExecutionDispatchOptions()),
-            new NoOpEdgeCommandWakeUpPublisher { PublishResult = false });
+            new NoOpEdgeCommandWakeUpPublisher { PublishResult = false },
+            Options.Create(new EdgeTelemetryIngestionOptions()),
+            new AlwaysActiveOrganizationAccessStateReader());
 
         var expiryOrderId = await CreatePaidOrderAsync(graph);
         var expiryBase = DateTimeOffset.UtcNow;

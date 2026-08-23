@@ -42,7 +42,8 @@ internal static class ProductionPackageInstallationMaterializer
                 Currency = source.Currency,
                 IsAvailable = false,
                 PreparationTimeSeconds = source.PreparationTimeSeconds,
-                ImageUrl = source.ImageUrl,
+                ImageAssetId = source.ImageAssetId,
+                ImageAltText = source.ImageAltText,
                 ScopeType = scopeType,
                 CreatedAt = now,
                 CreatedByAccountId = command.UserContext.AccountId
@@ -69,7 +70,8 @@ internal static class ProductionPackageInstallationMaterializer
                     IsAvailable = false,
                     DisplayOrder = variantSource.DisplayOrder,
                     PreparationTimeSeconds = variantSource.PreparationTimeSeconds,
-                    ImageUrl = variantSource.ImageUrl,
+                    ImageAssetId = variantSource.ImageAssetId,
+                    ImageAltText = variantSource.ImageAltText,
                     CreatedAt = now,
                     CreatedByAccountId = command.UserContext.AccountId
                 };

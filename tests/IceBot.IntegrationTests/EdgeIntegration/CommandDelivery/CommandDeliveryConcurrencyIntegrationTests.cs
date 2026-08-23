@@ -129,7 +129,8 @@ public sealed class CommandDeliveryConcurrencyIntegrationTests(IntegrationTestFi
             await using var db = _fixture.CreateDbContext();
             return await new AcknowledgeEdgeCommandCommandHandler(
                 new EdgeCommandStore(db),
-                new NoOpRealtimeNotificationPublisher())
+                new NoOpRealtimeNotificationPublisher(),
+                Options.Create(new ExecutionReportIngestionOptions()))
                 .HandleAsync(new AcknowledgeEdgeCommandCommand
                 {
                     KioskId = graph.KioskId,

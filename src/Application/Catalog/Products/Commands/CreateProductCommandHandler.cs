@@ -76,7 +76,6 @@ public sealed class CreateProductCommandHandler
             Currency = ProductNormalizer.NormalizeOptionalCode(request.Currency, "VND"),
             IsAvailable = false,
             PreparationTimeSeconds = request.PreparationTimeSeconds,
-            ImageUrl = ProductNormalizer.TrimToNull(request.ImageUrl),
             ScopeType = scopeType,
             CreatedAt = now,
             CreatedByAccountId = createdByAccountId

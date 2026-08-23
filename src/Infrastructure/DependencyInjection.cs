@@ -8,6 +8,7 @@ using Infrastructure.Devices.Connectivity.Persistence;
 using Infrastructure.Devices.Telemetry.Persistence;
 using Infrastructure.Sync.Persistence;
 using Infrastructure.Devices.ExecutionEndpoints.Persistence;
+using Infrastructure.Devices.ClientDevices;
 using Application.Abstractions.Persistence;
 using Application.Dashboard.Abstractions;
 using Application.Devices.Catalog.Abstractions;
@@ -15,6 +16,7 @@ using Application.Devices.ExecutionEndpoints.Abstractions;
 using Application.Devices.Telemetry.Abstractions;
 using Application.Devices.Connectivity.Abstractions;
 using Application.Devices.Credentials.Abstractions;
+using Application.ClientDevices.Abstractions;
 using Application.Sync.Ingestion.Abstractions;
 using Application.Email;
 using Application.Inventory.Abstractions;
@@ -100,10 +102,11 @@ namespace Infrastructure
                     "Email invitation base URL must be an absolute URL.")
                 .ValidateOnStart();
             services.AddScoped<IEmailSender, MailKitEmailSender>();
-            services.AddCatalogInfrastructure();
+            services.AddCatalogInfrastructure(config);
             services.AddIdentityInfrastructure(config);
             services.AddScoped<DevelopmentIceBotDemoReset>();
             services.AddScoped<IceBotDemoRuntimeRepair>();
+            services.AddHostedService<Devices.ClientDevices.ClientDeviceCredentialKeyValidatorHostedService>();
             if (IceBotDemoTenantSeedHostedService.IsEnabled(config))
             {
                 services.AddHostedService<VanillaSoftServeCatalogTemplateSeedHostedService>();
@@ -171,6 +174,7 @@ namespace Infrastructure
                 .ValidateOnStart();
             services.AddHostedService<KioskConnectivityReconciliationJob>();
             services.AddScoped<IDeviceManagementStore, DeviceManagementStore>();
+            services.AddScoped<IClientDeviceStore, ClientDeviceStore>();
             services.AddScoped<IExecutionEndpointStore, ExecutionEndpointStore>();
             services.AddScoped<IDashboardStore, DashboardStore>();
             services.AddScoped<IMaintenanceTicketStore, MaintenanceTicketStore>();

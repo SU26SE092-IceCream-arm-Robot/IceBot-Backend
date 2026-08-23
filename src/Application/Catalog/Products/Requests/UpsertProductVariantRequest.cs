@@ -24,6 +24,4 @@ public sealed class UpsertProductVariantRequest
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
-
 }

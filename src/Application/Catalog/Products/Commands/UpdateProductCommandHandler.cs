@@ -108,7 +108,6 @@ public sealed class UpdateProductCommandHandler
             variant.Currency = product.Currency;
         }
         product.PreparationTimeSeconds = request.PreparationTimeSeconds ?? product.PreparationTimeSeconds;
-        product.ImageUrl = request.ImageUrl is null ? product.ImageUrl : ProductNormalizer.TrimToNull(request.ImageUrl);
         product.UpdatedAt = DateTimeOffset.UtcNow;
         product.UpdatedByAccountId = updatedByAccountId;
 

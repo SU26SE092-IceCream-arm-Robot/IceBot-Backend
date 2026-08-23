@@ -15,14 +15,9 @@ namespace Application.Catalog.Products.Commands;
 public sealed class CloneProductTemplateCommandHandler
 {
     private readonly IProductStore _products;
-    private readonly ICatalogAuthoringStore? _catalogAuthoring;
+    private readonly ICatalogAuthoringStore _catalogAuthoring;
 
-    public CloneProductTemplateCommandHandler(IProductStore products)
-        : this(products, null)
-    {
-    }
-
-    public CloneProductTemplateCommandHandler(IProductStore products, ICatalogAuthoringStore? catalogAuthoring)
+    public CloneProductTemplateCommandHandler(IProductStore products, ICatalogAuthoringStore catalogAuthoring)
     {
         _products = products;
         _catalogAuthoring = catalogAuthoring;
@@ -67,7 +62,6 @@ public sealed class CloneProductTemplateCommandHandler
             BasePrice = template.BasePrice,
             Currency = template.Currency,
             PreparationTimeSeconds = template.PreparationTimeSeconds,
-            ImageUrl = template.ImageUrl,
             Variants = template.ProductVariants.Select(variant => new UpsertProductVariantRequest
             {
                 Code = variant.Code,
@@ -79,8 +73,7 @@ public sealed class CloneProductTemplateCommandHandler
                 SizeCode = variant.SizeCode,
                 BasePrice = variant.BasePrice,
                 DisplayOrder = variant.DisplayOrder,
-                PreparationTimeSeconds = variant.PreparationTimeSeconds,
-                ImageUrl = variant.ImageUrl
+                PreparationTimeSeconds = variant.PreparationTimeSeconds
             }).ToList()
         };
 
@@ -108,7 +101,12 @@ public sealed class CloneProductTemplateCommandHandler
             Currency = createRequest.Currency,
             IsAvailable = false,
             PreparationTimeSeconds = createRequest.PreparationTimeSeconds,
-            ImageUrl = createRequest.ImageUrl,
+            ImageAssetId = template.ImageAsset?.Status == Domain.Catalog.Enums.CatalogImageAssetStatus.Active
+                ? template.ImageAssetId
+                : null,
+            ImageAltText = template.ImageAsset?.Status == Domain.Catalog.Enums.CatalogImageAssetStatus.Active
+                ? template.ImageAltText
+                : null,
             MetadataJson = template.MetadataJson,
             ScopeType = scopeType,
             CreatedAt = now,
@@ -130,12 +128,16 @@ public sealed class CloneProductTemplateCommandHandler
                 command.Scope.UserContext.AccountId,
                 sourceVariant.MetadataJson);
             product.ProductVariants.Add(clonedVariant);
+            clonedVariant.ImageAssetId = sourceVariant.ImageAsset?.Status == Domain.Catalog.Enums.CatalogImageAssetStatus.Active
+                ? sourceVariant.ImageAssetId
+                : null;
+            clonedVariant.ImageAltText = sourceVariant.ImageAsset?.Status == Domain.Catalog.Enums.CatalogImageAssetStatus.Active
+                ? sourceVariant.ImageAltText
+                : null;
             clonedVariantsByTemplateId[sourceVariant.Id] = clonedVariant;
         }
 
-        var templateRecipes = _catalogAuthoring is null
-            ? []
-            : await _catalogAuthoring.ListPublishedRecipesForProductCloneAsync(template.Id, cancellationToken);
+        var templateRecipes = await _catalogAuthoring.ListPublishedRecipesForProductCloneAsync(template.Id, cancellationToken);
         var latestTemplateRecipes = templateRecipes
             .GroupBy(recipe => new { recipe.ProductVariantId, recipe.Code })
             .Select(group => group.OrderByDescending(recipe => recipe.Version).First())

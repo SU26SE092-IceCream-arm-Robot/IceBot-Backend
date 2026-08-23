@@ -139,7 +139,6 @@ public sealed class UpdateMenuItemCommandHandler
         item.Currency = MenuNormalizer.NormalizeCode(newCurrency);
         item.DisplayOrder = request.DisplayOrder ?? item.DisplayOrder;
         item.PreparationTimeSeconds = newPreparationTime;
-        item.ImageUrl = request.ImageUrl is null ? item.ImageUrl : MenuNormalizer.TrimToNull(request.ImageUrl);
         item.EffectiveFrom = newEffectiveFrom;
         item.EffectiveTo = newEffectiveTo;
         item.UpdatedAt = DateTimeOffset.UtcNow;

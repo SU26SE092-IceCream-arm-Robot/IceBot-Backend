@@ -23,7 +23,8 @@ Application services and stores may still reuse lower-level query/persistence lo
 
 | Surface | Route pattern | Primary clients | Auth direction |
 | --- | --- | --- | --- |
-| Tablet/customer | `/api/v1/kiosks/...`, `/api/v1/orders...` | Flutter tablet/customer checkout flow | Public v1 endpoints with idempotency and validation |
+| Tablet/customer runtime | `/api/v1/runtime/...` | Provisioned Flutter self-order tablet | Short-lived `ClientDeviceBearer` JWT; order-specific calls also require `Order-Access-Token` |
+| Client-device session | `/api/v1/client-device-sessions` | Provisioned Flutter self-order tablet | Per-installation credential exchange over HTTPS; rate limited and not an account session |
 | Internal management | `/api/v1/management/...` | Back-office UI for SystemAdmin, Manager, Staff, Technician, OrgAdmin depending on policy | JWT + scoped RBAC policy |
 | Current account | `/api/v1/me...` | Logged-in internal user managing own profile/security | JWT |
 | Authentication | `/api/v1/authentication...` | Internal login/password recovery clients | Mixed public/login and token flows |
@@ -55,11 +56,13 @@ Application services and stores may still reuse lower-level query/persistence lo
 | Robot configuration management | `/api/v1/management/organizations/{organizationId}/robot-authoring-imports/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts`, `/api/v1/management/organizations/{organizationId}/robot-programs/*`, `/api/v1/management/organizations/{organizationId}/production-program-bindings/*`, `/api/v1/management/organizations/{organizationId}/configuration-releases/*`, `/api/v1/management/kiosks/{kioskId}/configuration-deployments/*` | upload a manifest bundle or raw Lua ZIP and automatically materialize Draft robot resources; review/publish program resources, explicitly bind Recipe to Program, then author/review a release and request/read/rollback deployment |
 | Global robot artifact templates | `/api/v1/management/robot-artifact-templates/*`, `/api/v1/management/robot-artifact-template-contracts/*`, `/api/v1/management/organizations/{organizationId}/robot-artifacts/from-template` | manage reusable global Lua templates and their platform-owned technical contracts, then clone a Published template into an organization-owned Draft artifact |
 | Back-office order operations | GraphQL `orders`, `order`, `orderStatusHistory`, `orderExecutionAttempts`; REST `/api/v1/management/orders/*`, `/api/v1/management/refunds/*` | scoped order reads in GraphQL; cancellation, redispatch, refund-required, Staff-confirmed cash settlement, manual refund commands, and restricted execution diagnostics in REST |
+| Daily payment reconciliation | `/api/v1/management/payment-reconciliation/*` | read-only daily local-versus-provider evidence summary and discrepancy queue for OrgAdmin/Manager; not provider payout or bank-settlement reconciliation |
 | Inventory management | `/api/v1/management/inventory/*`, `/api/v1/management/kiosks/{kioskId}/inventory/workspace`, `/api/v1/management/kiosks/{kioskId}/inventory/*`, `/api/v1/management/kiosks/{kioskId}/configuration-releases/{releaseId}/inventory-readiness` | workspace returns current inventory records, active refill tasks, inventory-level counts, and allowed actions. `InStock` is inventory evidence only, not a sellability decision; separate routes own topology, release readiness, stock movement history, and refill/estimate mutations |
 | Operations telemetry | `/api/v1/management/kiosks/{kioskId}/operations/workspace`, `/api/v1/management/kiosks/{kioskId}/heartbeats`, `/api/v1/management/kiosks/{kioskId}/device-events`, `/api/v1/management/kiosks/{kioskId}/operation-logs` | workspace returns current safe operational context. `soleReadyEndpoint` is emitted only when exactly one endpoint is Ready; it is not a dispatch-routing decision. Paged routes retain kiosk connectivity history, device warnings/errors, and Edge local operation logs |
 | Sync dead-letter operations | `/api/v1/management/sync-dead-letters` | SystemAdmin inspection, typed retry, retry audit, resolve, and ignore |
 | Maintenance support | `/api/v1/management/maintenance-tickets/*` | manual operations/support tickets for kiosk/device/order/event issues; ticket-scoped assignee lookup returns only eligible active maintenance operators |
-| Tablet checkout | `/api/v1/kiosks/...`, `/api/v1/orders...` | runtime menu, place order, payment session, payment status |
+| Client-device management | `/api/v1/management/kiosks/{kioskId}/client-devices`, `/api/v1/management/client-devices/{clientDeviceId}/...` | provision, revoke, rotate, rebind, and replace a managed self-order tablet under scoped RBAC |
+| Tablet checkout | `/api/v1/runtime/menu`, `/api/v1/runtime/orders...` | authenticated runtime menu, order, payment session, payment status, and cancellation |
 | Edge integration | `/api/v1/iot/...` | command pull, command ack, execution reports, event replay, heartbeat, configuration sync |
 | Operations probes | `/health`, `/health/ready`, `/info` | liveness, readiness, build/service info |
 
@@ -123,12 +126,13 @@ Tablet/customer APIs model the checkout and order-status workflow. They must not
 Current examples:
 
 ```text
-GET /api/v1/kiosks/{kioskId}/runtime-menu
-POST /api/v1/orders
-GET /api/v1/orders/{orderId}
-POST /api/v1/orders/{orderId}/payment-sessions
-GET /api/v1/orders/{orderId}/payment-status
-POST /api/v1/orders/{orderId}/cancel
+POST /api/v1/client-device-sessions
+GET /api/v1/runtime/menu
+POST /api/v1/runtime/orders
+GET /api/v1/runtime/orders/{orderId}
+POST /api/v1/runtime/orders/{orderId}/payment-sessions
+GET /api/v1/runtime/orders/{orderId}/payment-status
+POST /api/v1/runtime/orders/{orderId}/cancel
 ```
 
 Rules:
@@ -137,7 +141,8 @@ Rules:
 - Do not expose internal management fields or back-office-only metadata.
 - Use idempotency for retried checkout/payment commands.
 - `Idempotency-Key` is required for order placement, payment-session creation, and refund requests. The backend scopes it to the kiosk, order, or payment transaction; clients must not reuse one key for a different request body.
-- `POST /orders` returns an `orderAccessToken` bearer capability. `GET /orders/{orderId}`, payment-session creation, payment-status polling, and customer cancellation require that token in the `Order-Access-Token` header. The token is scoped to one order and expires after 24 hours.
+- Every runtime call requires the distinct `ClientDeviceBearer` scheme. The server resolves Kiosk, Store, Organization, credential/session versions, and device lifecycle from the current database row; the request cannot select those values.
+- `POST /runtime/orders` returns an `orderAccessToken` bearer capability. Order status, payment-session creation, payment-status polling, and customer cancellation require that token in the `Order-Access-Token` header. The token is scoped to both one order and its source ClientDevice and expires after 24 hours.
 - Online sales require `KioskStatus.Active`, `KioskOperationalState.Operational`, active parent tenant scope, and a current kiosk connectivity projection of `Online` or `Degraded`.
 - `KioskStatus` is lifecycle state. `KioskOperationalState` controls whether an otherwise active kiosk accepts new work. Connectivity is a separate observed projection and never changes either state automatically.
 - `PATCH /api/v1/management/stores/{storeId}/kiosks/{kioskId}/operational-state` requires `kiosks.operations.manage`, a typed state, and an audit reason. `Maintenance`, `Cleaning`, and `Restocking` are rejected while an execution is running; `EmergencyStopRequested` remains available to hold new work and request immediate safety intervention.
@@ -296,7 +301,7 @@ To ensure stability, performance, and security, read-model endpoints are strictl
 * **Ownership:** Excluded metrics belong to dashboard or reporting-specific APIs.
 
 ### 2. Kiosk Sales Menu Boundaries
-* **Endpoint:** `GET /api/v1/kiosks/{kioskId}/runtime-menu`
+* **Endpoint:** `GET /api/v1/runtime/menu`
 * **Purpose:** Rendering customer-facing catalog pricing and availability on the order tablet.
 * **Includes:** Product name, variant codes, prices, discount figures, images, and recipe versions.
 * **EXCLUDES:** Recipe preparation details (coordinates, Fairino robot points), manufacturing cost margin data, and live dispenser levels.
@@ -304,8 +309,8 @@ To ensure stability, performance, and security, read-model endpoints are strictl
 
 ### 3. Customer Order Tracking Boundaries
 * **Endpoints:**
-  - `GET /api/v1/orders/{orderId}`
-  - `GET /api/v1/orders/{orderId}/payment-status`
+  - `GET /api/v1/runtime/orders/{orderId}`
+  - `GET /api/v1/runtime/orders/{orderId}/payment-status`
 * **Purpose:** Real-time customer receipt and preparation status tracking.
 * **Includes:** Quantity, billing totals, payment confirmation, preparation state, and tablet-friendly status projections (`CustomerStatus`, `CustomerStatusMessage`, `CanRetryPayment`, `RequiresStaffSupport`).
 * **EXCLUDES:** Internal order-item, order-payment, payment-transaction, and order state-machine enums; raw payment provider callback bodies; device error codes; robot joint telemetry.

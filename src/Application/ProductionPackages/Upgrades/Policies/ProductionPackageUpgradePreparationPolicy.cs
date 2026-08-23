@@ -143,7 +143,8 @@ public static class ProductionPackageUpgradePreparationPolicy
         target.Description = source.Description;
         target.BasePrice = source.BasePrice;
         target.Currency = source.Currency;
-        target.ImageUrl = source.ImageUrl;
+        target.ImageAssetId = source.ImageAssetId;
+        target.ImageAltText = source.ImageAltText;
         target.CategoryId = source.CategoryId;
         target.UpdatedAt = now;
         target.UpdatedByAccountId = actorId;
@@ -157,7 +158,8 @@ public static class ProductionPackageUpgradePreparationPolicy
         target.Description = source.Description;
         target.BasePrice = source.BasePrice;
         target.Currency = source.Currency;
-        target.ImageUrl = source.ImageUrl;
+        target.ImageAssetId = source.ImageAssetId;
+        target.ImageAltText = source.ImageAltText;
         target.DisplayOrder = source.DisplayOrder;
         target.UpdatedAt = now;
         target.UpdatedByAccountId = actorId;

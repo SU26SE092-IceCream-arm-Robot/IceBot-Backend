@@ -24,7 +24,8 @@ internal static class ProductResultMapper
             Currency = product.Currency,
             IsAvailable = product.IsAvailable,
             PreparationTimeSeconds = product.PreparationTimeSeconds,
-            ImageUrl = product.ImageUrl,
+            Image = ToImageResult(product.ImageAsset, product.ImageAltText),
+            Revision = product.Revision,
             ScopeType = product.ScopeType,
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt,
@@ -111,9 +112,27 @@ internal static class ProductResultMapper
                     Domain.Catalog.Enums.RecipeStatus.Active),
             DisplayOrder = variant.DisplayOrder,
             PreparationTimeSeconds = variant.PreparationTimeSeconds,
-            ImageUrl = variant.ImageUrl,
+            Image = ToImageResult(variant.ImageAsset, variant.ImageAltText),
+            Revision = variant.Revision,
             CreatedAt = variant.CreatedAt,
             UpdatedAt = variant.UpdatedAt
+        };
+    }
+
+    private static CatalogImageResult? ToImageResult(CatalogImageAsset? asset, string? altText)
+    {
+        if (asset is null || asset.Status != Domain.Catalog.Enums.CatalogImageAssetStatus.Active)
+        {
+            return null;
+        }
+
+        return new CatalogImageResult
+        {
+            AssetId = asset.Id,
+            CardUrl = asset.DeliveryUrl,
+            DetailUrl = asset.DeliveryUrl,
+            AltText = altText,
+            Version = asset.Version
         };
     }
 }

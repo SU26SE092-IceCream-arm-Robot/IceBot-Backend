@@ -352,7 +352,8 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
             Currency = template.Currency,
             IsAvailable = true,
             PreparationTimeSeconds = template.PreparationTimeSeconds,
-            ImageUrl = template.ImageUrl,
+            ImageAssetId = template.ImageAssetId,
+            ImageAltText = template.ImageAltText,
             MetadataJson = template.MetadataJson,
             CreatedAt = now
         };
@@ -374,7 +375,8 @@ public sealed class VanillaSoftServeCatalogTemplateSeedHostedService : IHostedSe
                 IsAvailable = true,
                 DisplayOrder = templateVariant.DisplayOrder,
                 PreparationTimeSeconds = templateVariant.PreparationTimeSeconds,
-                ImageUrl = templateVariant.ImageUrl,
+                ImageAssetId = templateVariant.ImageAssetId,
+                ImageAltText = templateVariant.ImageAltText,
                 MetadataJson = templateVariant.MetadataJson,
                 CreatedAt = now
             };

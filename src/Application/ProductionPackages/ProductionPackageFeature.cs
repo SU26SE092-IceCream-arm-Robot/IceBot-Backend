@@ -297,7 +297,8 @@ internal static class ProductionPackageProductSnapshotCodec
                 product.BasePrice,
                 product.Currency,
                 product.PreparationTimeSeconds,
-                product.ImageUrl,
+                product.ImageAssetId,
+                product.ImageAltText,
                 product.CategoryId,
                 Variants = product.ProductVariants.Where(x => x.DeletedAt == null).OrderBy(x => x.DisplayOrder).Select(variant => new
                 {
@@ -312,7 +313,8 @@ internal static class ProductionPackageProductSnapshotCodec
                     variant.BasePrice,
                     variant.DisplayOrder,
                     variant.PreparationTimeSeconds,
-                    variant.ImageUrl,
+                    variant.ImageAssetId,
+                    variant.ImageAltText,
                     Recipes = variant.Recipes.Where(x => x.DeletedAt == null && x.Status != Domain.Catalog.Enums.RecipeStatus.Draft)
                         .OrderBy(x => x.Code).ThenByDescending(x => x.Version).Select(recipe => new
                         {
@@ -401,7 +403,8 @@ internal sealed class ProductionPackageProductSnapshot
     public decimal BasePrice { get; init; }
     public string Currency { get; init; } = string.Empty;
     public int? PreparationTimeSeconds { get; init; }
-    public string? ImageUrl { get; init; }
+    public Guid? ImageAssetId { get; init; }
+    public string? ImageAltText { get; init; }
     public long? CategoryId { get; init; }
     public IReadOnlyCollection<ProductionPackageVariantSnapshot> Variants { get; init; } = [];
     public IReadOnlyCollection<ProductionPackageOptionGroupSnapshot> OptionGroups { get; init; } = [];
@@ -420,7 +423,8 @@ internal sealed class ProductionPackageVariantSnapshot
     public decimal BasePrice { get; init; }
     public int DisplayOrder { get; init; }
     public int? PreparationTimeSeconds { get; init; }
-    public string? ImageUrl { get; init; }
+    public Guid? ImageAssetId { get; init; }
+    public string? ImageAltText { get; init; }
     public IReadOnlyCollection<ProductionPackageRecipeSnapshot> Recipes { get; init; } = [];
 }
 

@@ -34,7 +34,11 @@ public partial class Product : BusinessEntity, IKioskScoped
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
+    public Guid? ImageAssetId { get; set; }
+
+    public string? ImageAltText { get; set; }
+
+    public int Revision { get; set; } = 1;
 
     public string? MetadataJson { get; set; }
 
@@ -49,6 +53,8 @@ public partial class Product : BusinessEntity, IKioskScoped
     public virtual Product? TemplateProduct { get; set; }
 
     public virtual ProductCategory? Category { get; set; }
+
+    public virtual CatalogImageAsset? ImageAsset { get; set; }
 
     public virtual ICollection<ProductVariant> ProductVariants { get; set; } = new List<ProductVariant>();
 

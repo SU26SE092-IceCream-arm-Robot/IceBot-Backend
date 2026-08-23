@@ -24,7 +24,5 @@ public sealed class CreateProductRequest
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
-
     public List<UpsertProductVariantRequest> Variants { get; set; } = new();
 }

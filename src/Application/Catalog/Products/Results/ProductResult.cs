@@ -34,7 +34,9 @@ public sealed class ProductResult
 
     public int? PreparationTimeSeconds { get; set; }
 
-    public string? ImageUrl { get; set; }
+    public CatalogImageResult? Image { get; set; }
+
+    public int Revision { get; set; }
 
     public TenantScopeType ScopeType { get; set; }
 

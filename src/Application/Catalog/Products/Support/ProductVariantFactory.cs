@@ -28,7 +28,6 @@ internal static class ProductVariantFactory
             IsAvailable = false,
             DisplayOrder = request.DisplayOrder,
             PreparationTimeSeconds = request.PreparationTimeSeconds,
-            ImageUrl = ProductNormalizer.TrimToNull(request.ImageUrl),
             MetadataJson = ProductNormalizer.TrimToNull(metadataJson),
             CreatedAt = now,
             CreatedByAccountId = createdByAccountId

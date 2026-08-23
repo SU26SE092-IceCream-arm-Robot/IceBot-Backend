@@ -85,7 +85,6 @@ public sealed class UpdateProductVariantCommandHandler
         variant.Currency = product.Currency;
         variant.DisplayOrder = request.DisplayOrder ?? variant.DisplayOrder;
         variant.PreparationTimeSeconds = request.PreparationTimeSeconds ?? variant.PreparationTimeSeconds;
-        variant.ImageUrl = request.ImageUrl is null ? variant.ImageUrl : ProductNormalizer.TrimToNull(request.ImageUrl);
         variant.UpdatedAt = DateTimeOffset.UtcNow;
         variant.UpdatedByAccountId = updatedByAccountId;
 

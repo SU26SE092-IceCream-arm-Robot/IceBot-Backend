@@ -16,6 +16,8 @@ using WebAPI.GraphQL;
 using WebAPI.Middlewares;
 using WebAPI.SignalR;
 using Application.Tenants.Kiosks.Rules;
+using Application.ClientDevices;
+using Application.ClientDevices.Contracts;
 
 
 Log.Logger = new LoggerConfiguration()
@@ -84,11 +86,38 @@ try
     builder.Services.AddIceBotCors(builder.Configuration, builder.Environment);
     builder.Services.AddOptions<KioskSalesAdmissionOptions>()
         .Bind(builder.Configuration.GetSection(KioskSalesAdmissionOptions.SectionName));
+    builder.Services.AddOptions<ClientDeviceRuntimeOptions>()
+        .Bind(builder.Configuration.GetSection(ClientDeviceRuntimeOptions.SectionName))
+        .Validate(options => options.MaxOrderLines is >= 1 and <= 100 &&
+                             options.MaxQuantityPerLine is >= 1 and <= 100 &&
+                             options.MaxTotalUnits >= options.MaxQuantityPerLine &&
+                             options.MaxSelectedOptionsPerLine is >= 0 and <= 100 &&
+                             options.MaxClientOrderIdLength is >= 1 and <= 200 &&
+                             options.MaxCustomerNameLength is >= 1 and <= 200 &&
+                             options.MaxCustomerPhoneNumberLength is >= 1 and <= 100 &&
+                             options.MaxNotesLength is >= 1 and <= 4_000 &&
+                             options.MaxClientLineIdLength is >= 1 and <= 200,
+            "Client-device runtime order limits are invalid.")
+        .ValidateOnStart();
     builder.Services.AddIceBotAuthentication(builder.Configuration, builder.Environment);
     builder.Services.AddAuthorization(options => options.AddIceBotAuthorizationPolicies());
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+        {
+            if (!context.Request.Path.StartsWithSegments("/api/v1/client-device-sessions"))
+                return RateLimitPartition.GetNoLimiter("non-client-device-session");
+
+            var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter(address, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+        });
         options.AddPolicy("service-registration-submission", context =>
         {
             var address = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -96,6 +125,57 @@ try
             {
                 PermitLimit = 5,
                 Window = TimeSpan.FromMinutes(10),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+        });
+        options.AddPolicy("client-device-session", context =>
+        {
+            var clientDeviceId = context.Request.Headers[ClientDeviceSessionHeaderNames.ClientDeviceId].ToString();
+            return RateLimitPartition.GetFixedWindowLimiter(clientDeviceId, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+        });
+        options.AddPolicy("client-device-menu", context =>
+        {
+            var partition = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.ClientDeviceIdClaim)?.Value
+                ?? context.Connection.RemoteIpAddress?.ToString()
+                ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter(partition, _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 120,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+        });
+        options.AddPolicy("client-device-order", context =>
+        {
+            var deviceId = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.ClientDeviceIdClaim)?.Value
+                ?? "unknown";
+            var kioskId = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.KioskIdClaim)?.Value
+                ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter($"{deviceId}:{kioskId}", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 12,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            });
+        });
+        options.AddPolicy("client-device-payment", context =>
+        {
+            var deviceId = context.User.FindFirst(Application.ClientDevices.Security.ClientDeviceAuthenticationDefaults.ClientDeviceIdClaim)?.Value
+                ?? "unknown";
+            var orderId = context.Request.RouteValues["orderId"]?.ToString() ?? "unknown";
+            return RateLimitPartition.GetFixedWindowLimiter($"{deviceId}:{orderId}", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 8,
+                Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0,
                 AutoReplenishment = true
             });
@@ -173,8 +253,6 @@ try
 
     app.UseCors("FrontendOnly");
 
-    app.UseRateLimiter();
-
     app.UseMiddleware<CorrelationIdMiddleware>();
 
     app.UseMiddleware<GlobalExceptionMiddleware>();
@@ -187,6 +265,8 @@ try
     }
 
     app.UseAuthentication();
+
+    app.UseRateLimiter();
 
     app.UseMiddleware<OrganizationAccessScopeMiddleware>();
 
