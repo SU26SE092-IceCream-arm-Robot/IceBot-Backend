@@ -23,6 +23,22 @@ public interface IPaymentStore
 
     Task<PaymentTransaction?> GetPaymentTransactionSnapshotAsync(Guid id, CancellationToken cancellationToken = default);
 
+    Task<Guid?> GetPaymentProviderExchangePaymentTransactionIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default);
+
+    Task<PaymentProviderExchange?> GetPaymentProviderExchangeByIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    Task<PaymentProviderExchange?> GetStartedPaymentProviderExchangeAsync(
+        Guid paymentTransactionId,
+        Domain.Payments.Enums.PaymentProviderExchangeOperation operation,
+        CancellationToken cancellationToken = default);
+
+    Task<int> GetNextPaymentProviderExchangeAttemptNumberAsync(
+        Guid paymentTransactionId,
+        Domain.Payments.Enums.PaymentProviderExchangeOperation operation,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<Guid>> ListPendingPaymentSessionReconciliationIdsAsync(
         DateTimeOffset requestedBefore,
         DateTimeOffset retryDueAt,
@@ -105,6 +121,8 @@ public interface IPaymentStore
     Task AddPaymentMethodAsync(PaymentMethod paymentMethod, CancellationToken cancellationToken = default);
 
     Task AddPaymentTransactionAsync(PaymentTransaction paymentTransaction, CancellationToken cancellationToken = default);
+
+    Task AddPaymentProviderExchangeAsync(PaymentProviderExchange exchange, CancellationToken cancellationToken = default);
 
     Task AddPaymentCallbackAsync(PaymentCallback paymentCallback, CancellationToken cancellationToken = default);
 

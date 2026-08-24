@@ -20,5 +20,5 @@ public sealed class ProviderPaymentSession
 
     public decimal? PaidAmount { get; init; }
 
-    public string RawResponseJson { get; init; } = "{}";
+    public ProviderExchangeEvidence? Evidence { get; init; }
 }

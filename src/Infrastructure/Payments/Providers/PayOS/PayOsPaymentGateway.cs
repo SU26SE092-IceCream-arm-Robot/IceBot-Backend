@@ -99,14 +99,16 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             PayOsResilienceMetrics.RecordTimeout();
             throw new ProviderPaymentSessionCreationException(
                 "PayOS payment-session creation timed out.",
-                ProviderPaymentSessionFailureKind.OutcomeUnknown);
+                ProviderPaymentSessionFailureKind.OutcomeUnknown,
+                ProviderExchangeEvidence.FromRaw(requestJson, null, null));
         }
         catch (BrokenCircuitException)
         {
             PayOsResilienceMetrics.RecordCircuitOpen();
             throw new ProviderPaymentSessionCreationException(
                 "PayOS payment-session creation was blocked by the open circuit.",
-                ProviderPaymentSessionFailureKind.Unavailable);
+                ProviderPaymentSessionFailureKind.Unavailable,
+                ProviderExchangeEvidence.FromRaw(requestJson, null, null));
         }
         catch (HttpRequestException ex)
         {
@@ -114,6 +116,7 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             throw new ProviderPaymentSessionCreationException(
                 "PayOS payment-session creation failed at transport level.",
                 ProviderPaymentSessionFailureKind.OutcomeUnknown,
+                ProviderExchangeEvidence.FromRaw(requestJson, null, null),
                 ex);
         }
 
@@ -128,32 +131,35 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
                     PayOsResilienceMetrics.RecordTransientFailure();
                 }
 
-                _logger.LogError("PayOS create payment link failed. Status={StatusCode}, Body={Body}", response.StatusCode, responseJson);
+                _logger.LogError("PayOS create payment link failed. Status={StatusCode}", response.StatusCode);
                 throw new ProviderPaymentSessionCreationException(
                     "PayOS create payment link failed.",
                     (int)response.StatusCode is 408 or 429 or >= 500
                         ? ProviderPaymentSessionFailureKind.OutcomeUnknown
-                        : ProviderPaymentSessionFailureKind.Rejected);
+                        : ProviderPaymentSessionFailureKind.Rejected,
+                    ProviderExchangeEvidence.FromRaw(requestJson, responseJson, (int)response.StatusCode));
             }
 
             var apiResponse = JsonSerializer.Deserialize<PayOsApiResponse<PaymentLinkData>>(responseJson, JsonOptions);
             if (apiResponse?.Code != "00" || apiResponse.Data is null)
             {
                 var message = apiResponse?.Description ?? "Invalid PayOS response.";
-                _logger.LogError("PayOS create payment link returned error: {Message}. Body={Body}", message, responseJson);
+                _logger.LogError("PayOS create payment link returned error: {Message}", message);
                 throw new ProviderPaymentSessionCreationException(
                     message,
-                    ProviderPaymentSessionFailureKind.Rejected);
+                    ProviderPaymentSessionFailureKind.Rejected,
+                    ProviderExchangeEvidence.FromRaw(requestJson, responseJson, (int)response.StatusCode));
             }
 
             if (apiResponse.Data.OrderCode != orderCode ||
                 (string.IsNullOrWhiteSpace(apiResponse.Data.CheckoutUrl) &&
                  string.IsNullOrWhiteSpace(apiResponse.Data.QrCode)))
             {
-                _logger.LogError("PayOS create payment link returned incomplete data. Body={Body}", responseJson);
-            throw new ProviderPaymentSessionCreationException(
-                "PayOS returned an invalid or incomplete payment session.",
-                ProviderPaymentSessionFailureKind.OutcomeUnknown);
+                _logger.LogError("PayOS create payment link returned incomplete data.");
+                throw new ProviderPaymentSessionCreationException(
+                    "PayOS returned an invalid or incomplete payment session.",
+                    ProviderPaymentSessionFailureKind.OutcomeUnknown,
+                    ProviderExchangeEvidence.FromRaw(requestJson, responseJson, (int)response.StatusCode));
             }
 
             return new ProviderPaymentSession
@@ -164,12 +170,12 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
                 QrCodePayload = apiResponse.Data.QrCode,
                 ExpiresAt = expiresAt,
                 ProviderStatus = apiResponse.Data.Status,
-                RawResponseJson = responseJson
+                Evidence = ProviderExchangeEvidence.FromRaw(requestJson, responseJson, (int)response.StatusCode)
             };
         }
     }
 
-    public async Task<ProviderPaymentSession?> GetPaymentSessionAsync(
+    public async Task<ProviderPaymentSessionLookupResult> GetPaymentSessionAsync(
         string providerOrderCode,
         CancellationToken cancellationToken = default)
     {
@@ -180,6 +186,7 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             throw new InvalidOperationException("Payment transaction provider order code is invalid.");
         }
 
+        var requestJson = JsonSerializer.Serialize(new { providerOrderCode }, JsonOptions);
         HttpResponseMessage response;
         try
         {
@@ -190,27 +197,35 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
         catch (TimeoutRejectedException)
         {
             PayOsResilienceMetrics.RecordTimeout("get_payment_session");
-            throw;
+            throw new ProviderPaymentSessionLookupException(
+                "PayOS payment-session lookup timed out.",
+                ProviderExchangeEvidence.FromRaw(requestJson, null, null));
         }
         catch (BrokenCircuitException)
         {
             PayOsResilienceMetrics.RecordCircuitOpen("get_payment_session");
-            throw;
+            throw new ProviderPaymentSessionLookupException(
+                "PayOS payment-session lookup was blocked by the open circuit.",
+                ProviderExchangeEvidence.FromRaw(requestJson, null, null));
         }
-        catch (HttpRequestException)
+        catch (HttpRequestException ex)
         {
             PayOsResilienceMetrics.RecordTransientFailure("get_payment_session");
-            throw;
+            throw new ProviderPaymentSessionLookupException(
+                "PayOS payment-session lookup failed at transport level.",
+                ProviderExchangeEvidence.FromRaw(requestJson, null, null),
+                ex);
         }
 
         using (response)
         {
+            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            var evidence = ProviderExchangeEvidence.FromRaw(requestJson, responseJson, (int)response.StatusCode);
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
             {
-                return null;
+                return ProviderPaymentSessionLookupResult.NotFound(evidence);
             }
 
-            var responseJson = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 if ((int)response.StatusCode is 408 or 429 or >= 500)
@@ -218,7 +233,9 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
                     PayOsResilienceMetrics.RecordTransientFailure("get_payment_session");
                 }
 
-                throw new InvalidOperationException("PayOS get payment link failed.");
+                throw new ProviderPaymentSessionLookupException(
+                    "PayOS get payment link failed.",
+                    evidence);
             }
 
             var apiResponse = JsonSerializer.Deserialize<PayOsApiResponse<PaymentLinkInformationData>>(
@@ -227,10 +244,12 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
             if (apiResponse?.Code != "00" || apiResponse.Data is null ||
                 apiResponse.Data.OrderCode != expectedOrderCode)
             {
-                throw new InvalidOperationException("PayOS returned invalid payment-link information.");
+                throw new ProviderPaymentSessionLookupException(
+                    "PayOS returned invalid payment-link information.",
+                    evidence);
             }
 
-            return new ProviderPaymentSession
+            return ProviderPaymentSessionLookupResult.Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = apiResponse.Data.OrderCode.ToString(CultureInfo.InvariantCulture),
                 ProviderPaymentLinkId = apiResponse.Data.PaymentLinkId,
@@ -239,8 +258,8 @@ public sealed class PayOsPaymentGateway : IPaymentGateway
                 ProviderStatus = apiResponse.Data.Status,
                 Amount = apiResponse.Data.Amount,
                 PaidAmount = apiResponse.Data.AmountPaid,
-                RawResponseJson = responseJson
-            };
+                Evidence = evidence
+            }, evidence);
         }
     }
 

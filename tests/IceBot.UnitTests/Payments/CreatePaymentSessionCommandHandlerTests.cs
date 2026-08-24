@@ -5,6 +5,7 @@ using Application.Orders.Admission;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
 using Application.Payments.PaymentSessions.Results;
+using Application.Payments.PaymentSessions.Support;
 using Application.Payments.Providers;
 using Application.Shared.Wrappers;
 using Domain.Orders.Entities;
@@ -356,7 +357,7 @@ public sealed class CreatePaymentSessionCommandHandlerTests
 
     private sealed class ProviderCreateScenario
     {
-        public required CreatePaymentSessionCommandHandler Handler { get; init; }
+        public CreatePaymentSessionCommandHandler Handler { get; set; } = null!;
         public required IPaymentStore Store { get; init; }
         public required IPaymentGateway Gateway { get; init; }
         public required Order Order { get; init; }
@@ -439,11 +440,11 @@ public sealed class CreatePaymentSessionCommandHandlerTests
 
             var scenario = new ProviderCreateScenario
             {
-                Handler = CreateHandler(paymentStore, gateway),
                 Store = paymentStore,
                 Gateway = gateway,
                 Order = order
             };
+            scenario.Handler = CreateHandler(paymentStore, gateway, () => scenario.Payment);
             paymentStore.AddPaymentTransactionAsync(
                     Arg.Do<PaymentTransaction>(payment =>
                     {
@@ -474,7 +475,8 @@ public sealed class CreatePaymentSessionCommandHandlerTests
 
     private static CreatePaymentSessionCommandHandler CreateHandler(
         IPaymentStore paymentStore,
-        IPaymentGateway paymentGateway)
+        IPaymentGateway paymentGateway,
+        Func<PaymentTransaction?>? currentPayment = null)
     {
         var itemAdmission = Substitute.For<IMenuItemOperationalAdmissionEvaluator>();
         itemAdmission.EvaluateAsync(
@@ -498,6 +500,29 @@ public sealed class CreatePaymentSessionCommandHandlerTests
             new KioskSalesAdmissionEvaluator(
                 Substitute.For<IOperationalAdmissionReadStore>(),
                 Options.Create(new KioskSalesAdmissionOptions { RequireConnectivity = false }),
-                Options.Create(new EdgeTelemetryIngestionOptions())));
+                Options.Create(new EdgeTelemetryIngestionOptions())),
+            ExchangeCoordinator(currentPayment),
+            TimeProvider.System);
+    }
+
+    private static IPaymentProviderExchangeCoordinator ExchangeCoordinator(
+        Func<PaymentTransaction?>? currentPayment = null)
+    {
+        var coordinator = Substitute.For<IPaymentProviderExchangeCoordinator>();
+        coordinator.StartCreateAsync(Arg.Any<Guid>(), Arg.Any<ProviderExchangeEvidence?>(), Arg.Any<CancellationToken>())
+            .Returns(new PaymentProviderExchangeStartResult(PaymentProviderExchangeStartState.Started, Guid.NewGuid()));
+        coordinator.CompleteAsync(
+                Arg.Any<Guid>(), Arg.Any<PaymentProviderExchangeOutcome>(), Arg.Any<ProviderExchangeEvidence?>(),
+                Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<Action<PaymentTransaction>?>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var payment = currentPayment?.Invoke();
+                if (payment is not null)
+                {
+                    call.Arg<Action<PaymentTransaction>?>()?.Invoke(payment);
+                }
+                return payment is not null;
+            });
+        return coordinator;
     }
 }

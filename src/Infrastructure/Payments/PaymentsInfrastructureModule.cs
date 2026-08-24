@@ -10,6 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Application.Orders.PlaceOrder;
 using Application.Payments.Reconciliation;
+using Application.Payments.Options;
 
 namespace Infrastructure.Payments;
 
@@ -47,6 +48,13 @@ public static class PaymentsInfrastructureModule
                 options => options.DurationMinutes is >= 1 and <= 120,
                 "Order payment window must be between 1 and 120 minutes.")
             .ValidateOnStart();
+        services.AddOptions<PaymentProviderExchangeOptions>()
+            .Bind(config.GetSection(PaymentProviderExchangeOptions.SectionName))
+            .Validate(options =>
+                    options.StartedTimeoutSeconds is >= 20 and <= 3600 &&
+                    options.StartedTimeoutSeconds > resilienceSettings.TotalTimeoutSeconds,
+                "Payment provider exchange started timeout must exceed the PayOS total timeout and be between 20 and 3600 seconds.")
+            .ValidateOnStart();
         services.AddOptions<PaymentReconciliationOptions>()
             .Bind(config.GetSection(PaymentReconciliationOptions.SectionName))
             .Validate(options =>
@@ -70,6 +78,7 @@ public static class PaymentsInfrastructureModule
             .AddPayOsResilience(resilienceSettings);
 
         services.AddScoped<IPaymentStore, PaymentStore>();
+        services.AddSingleton(TimeProvider.System);
         services.AddScoped<IPaymentReconciliationStore, PaymentReconciliationStore>();
         services.AddScoped<IPaymentInterventionNotificationRecipientStore,
             PaymentInterventionNotificationRecipientStore>();

@@ -2,6 +2,7 @@ using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Queries;
 using Application.Payments.PaymentSessions.Diagnostics;
 using Application.Payments.PaymentSessions.Notifications;
+using Application.Payments.PaymentSessions.Support;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Application.Payments.PaymentSessions;
@@ -11,6 +12,9 @@ public static class PaymentSessionsModule
     public static IServiceCollection AddPaymentSessionsModule(this IServiceCollection services)
     {
         services.AddScoped<CreatePaymentSessionCommandHandler>();
+        services.AddScoped<PaymentProviderExchangeCoordinator>();
+        services.AddScoped<IPaymentProviderExchangeCoordinator>(provider =>
+            provider.GetRequiredService<PaymentProviderExchangeCoordinator>());
         services.AddScoped<ConfirmCashPaymentCommandHandler>();
         services.AddScoped<HandlePaymentProviderNotificationCommandHandler>();
         services.AddScoped<ReconcilePendingPaymentSessionCommandHandler>();

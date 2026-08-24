@@ -14,7 +14,6 @@ using Domain.Orders.Enums;
 using Domain.Orders.Entities;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
-using System.Text.Json;
 
 namespace Application.Payments.PaymentSessions.Commands;
 
@@ -25,17 +24,23 @@ public sealed class CreatePaymentSessionCommandHandler
 
     private readonly OrderPaymentSellabilityGuard _sellabilityGuard;
     private readonly KioskSalesAdmissionEvaluator _admissionEvaluator;
+    private readonly IPaymentProviderExchangeCoordinator _exchangeCoordinator;
+    private readonly TimeProvider _timeProvider;
 
     public CreatePaymentSessionCommandHandler(
         IPaymentStore paymentStore,
         IPaymentGateway paymentGateway,
         OrderPaymentSellabilityGuard sellabilityGuard,
-        KioskSalesAdmissionEvaluator admissionEvaluator)
+        KioskSalesAdmissionEvaluator admissionEvaluator,
+        IPaymentProviderExchangeCoordinator exchangeCoordinator,
+        TimeProvider timeProvider)
     {
         _paymentStore = paymentStore;
         _paymentGateway = paymentGateway;
         _sellabilityGuard = sellabilityGuard;
         _admissionEvaluator = admissionEvaluator;
+        _exchangeCoordinator = exchangeCoordinator;
+        _timeProvider = timeProvider;
     }
 
     public async Task<ApiResult<PaymentSessionResult>> HandleAsync(
@@ -88,7 +93,7 @@ public sealed class CreatePaymentSessionCommandHandler
                         PaymentErrors.IdempotencyConflict);
                 }
 
-                if (HasExpiredOrderPaymentWindow(order, DateTimeOffset.UtcNow))
+                if (HasExpiredOrderPaymentWindow(order, _timeProvider.GetUtcNow()))
                 {
                     return ApiResult<PaymentSessionResult>.BusinessFailure(
                         PaymentErrors.WindowExpired);
@@ -120,7 +125,7 @@ public sealed class CreatePaymentSessionCommandHandler
 
             var admission = await _admissionEvaluator.EvaluateAsync(
                 order.Kiosk,
-                new KioskSalesAdmissionRequest(DateTimeOffset.UtcNow, order.Id),
+                new KioskSalesAdmissionRequest(_timeProvider.GetUtcNow(), order.Id),
                 ct);
             if (!admission.CanOpenPayment)
             {
@@ -130,7 +135,7 @@ public sealed class CreatePaymentSessionCommandHandler
                     SalesAdmissionErrors.For(blocker.Code));
             }
 
-            var sellabilityFailure = await _sellabilityGuard.ValidateAsync(order, DateTimeOffset.UtcNow, ct);
+            var sellabilityFailure = await _sellabilityGuard.ValidateAsync(order, _timeProvider.GetUtcNow(), ct);
             if (sellabilityFailure is not null)
             {
                 return ApiResult<PaymentSessionResult>.BusinessFailure(
@@ -206,14 +211,7 @@ public sealed class CreatePaymentSessionCommandHandler
                 Amount = order.TotalAmount,
                 Currency = order.Currency,
                 Status = PaymentTransactionStatus.Pending,
-                RequestedAt = now,
-                RawRequestJson = JsonSerializer.Serialize(new
-                {
-                    orderId,
-                    orderNumber = order.OrderNumber,
-                    paymentMethodCode,
-                    idempotencyKey
-                })
+                RequestedAt = now
             };
             if (!isCashPayment)
             {
@@ -245,7 +243,7 @@ public sealed class CreatePaymentSessionCommandHandler
             return ApiResult<PaymentSessionResult>.Fail("Payment transaction not found after creation.", 500);
         }
 
-        var providerRequestStartedAt = DateTimeOffset.UtcNow;
+        var providerRequestStartedAt = _timeProvider.GetUtcNow();
         if (HasExpiredOrderPaymentWindow(payment.Order, providerRequestStartedAt))
         {
             payment.MarkExpired(providerRequestStartedAt);
@@ -255,22 +253,33 @@ public sealed class CreatePaymentSessionCommandHandler
                 PaymentErrors.WindowExpired);
         }
 
+        var exchangeStart = await _exchangeCoordinator.StartCreateAsync(
+            payment.Id,
+            cancellationToken: cancellationToken);
+        if (exchangeStart.State != PaymentProviderExchangeStartState.Started || exchangeStart.ExchangeId is not { } exchangeId)
+        {
+            return ApiResult<PaymentSessionResult>.BusinessFailure(PaymentErrors.SessionCreationInProgress);
+        }
+
         try
         {
             var providerSession = await _paymentGateway.CreatePaymentSessionAsync(payment, payment.Order, cancellationToken);
+            var completed = await _exchangeCoordinator.CompleteAsync(
+                exchangeId,
+                PaymentProviderExchangeOutcome.Succeeded,
+                providerSession.Evidence,
+                null,
+                null,
+                persisted => ApplyProviderSession(persisted, providerSession),
+                cancellationToken);
+            if (!completed)
+            {
+                return ApiResult<PaymentSessionResult>.BusinessFailure(PaymentErrors.ProviderOutcomeUnknown);
+            }
 
-            payment.ProviderOrderCode = providerSession.ProviderOrderCode;
-            payment.ProviderPaymentLinkId = providerSession.ProviderPaymentLinkId;
-            payment.ProviderTransactionId = providerSession.ProviderTransactionId;
-            payment.CheckoutUrl = providerSession.CheckoutUrl;
-            payment.QrCodePayload = providerSession.QrCodePayload;
-            payment.ExpiresAt = providerSession.ExpiresAt;
-            payment.ProviderStatus = providerSession.ProviderStatus;
-            payment.RawResponseJson = providerSession.RawResponseJson;
-
-            await _paymentStore.SaveChangesAsync(cancellationToken);
-
-            return ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(payment), "Payment session created.");
+            var persisted = await _paymentStore.GetPaymentTransactionByIdAsync(payment.Id, cancellationToken)
+                ?? throw new InvalidOperationException("Payment transaction disappeared after provider session creation.");
+            return ApiResult<PaymentSessionResult>.Success(PaymentSessionResultMapper.ToSessionResult(persisted), "Payment session created.");
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -278,32 +287,33 @@ public sealed class CreatePaymentSessionCommandHandler
         }
         catch (ProviderPaymentSessionCreationException ex)
         {
-            var now = DateTimeOffset.UtcNow;
+            var now = _timeProvider.GetUtcNow();
             switch (ex.FailureKind)
             {
                 case ProviderPaymentSessionFailureKind.OutcomeUnknown:
-                    payment.MarkAttempted(now);
-                    payment.ScheduleRetry(
-                        "PROVIDER_SESSION_CREATE_OUTCOME_UNKNOWN",
-                        ex.Message,
-                        now.AddSeconds(30));
-                    await _paymentStore.SaveChangesAsync(cancellationToken);
+                    await _exchangeCoordinator.CompleteAsync(
+                        exchangeId, PaymentProviderExchangeOutcome.OutcomeUnknown, ex.Evidence,
+                        "PROVIDER_SESSION_CREATE_OUTCOME_UNKNOWN", ex.Message,
+                        persisted => ScheduleCreateRetry(persisted, "PROVIDER_SESSION_CREATE_OUTCOME_UNKNOWN", ex.Message, now),
+                        cancellationToken);
                     return ApiResult<PaymentSessionResult>.BusinessFailure(
                         PaymentErrors.ProviderOutcomeUnknown);
 
                 case ProviderPaymentSessionFailureKind.Unavailable:
-                    payment.MarkAttempted(now);
-                    payment.ScheduleRetry(
-                        "PROVIDER_SESSION_CREATE_UNAVAILABLE",
-                        ex.Message,
-                        now.AddSeconds(30));
-                    await _paymentStore.SaveChangesAsync(cancellationToken);
+                    await _exchangeCoordinator.CompleteAsync(
+                        exchangeId, PaymentProviderExchangeOutcome.Unavailable, ex.Evidence,
+                        "PROVIDER_SESSION_CREATE_UNAVAILABLE", ex.Message,
+                        persisted => ScheduleCreateRetry(persisted, "PROVIDER_SESSION_CREATE_UNAVAILABLE", ex.Message, now),
+                        cancellationToken);
                     return ApiResult<PaymentSessionResult>.BusinessFailure(
                         PaymentErrors.ProviderUnavailable);
 
                 case ProviderPaymentSessionFailureKind.Rejected:
-                    payment.MarkFailed("PROVIDER_SESSION_CREATE_REJECTED", ex.Message, now);
-                    await _paymentStore.SaveChangesAsync(cancellationToken);
+                    await _exchangeCoordinator.CompleteAsync(
+                        exchangeId, PaymentProviderExchangeOutcome.Rejected, ex.Evidence,
+                        "PROVIDER_SESSION_CREATE_REJECTED", ex.Message,
+                        persisted => persisted.MarkFailed("PROVIDER_SESSION_CREATE_REJECTED", ex.Message, now),
+                        cancellationToken);
                     return ApiResult<PaymentSessionResult>.BusinessFailure(
                         PaymentErrors.ProviderRejected);
 
@@ -313,13 +323,12 @@ public sealed class CreatePaymentSessionCommandHandler
         }
         catch (Exception ex)
         {
-            var now = DateTimeOffset.UtcNow;
-            payment.MarkAttempted(now);
-            payment.ScheduleRetry(
-                "PROVIDER_SESSION_CREATE_UNEXPECTED_FAILURE",
-                ex.Message,
-                now.AddSeconds(30));
-            await _paymentStore.SaveChangesAsync(cancellationToken);
+            var now = _timeProvider.GetUtcNow();
+            await _exchangeCoordinator.CompleteAsync(
+                exchangeId, PaymentProviderExchangeOutcome.OutcomeUnknown, null,
+                "PROVIDER_SESSION_CREATE_UNEXPECTED_FAILURE", ex.Message,
+                persisted => ScheduleCreateRetry(persisted, "PROVIDER_SESSION_CREATE_UNEXPECTED_FAILURE", ex.Message, now),
+                cancellationToken);
             throw;
         }
     }
@@ -341,6 +350,23 @@ public sealed class CreatePaymentSessionCommandHandler
     private static bool HasPaymentInstructions(PaymentTransaction transaction) =>
         !string.IsNullOrWhiteSpace(transaction.CheckoutUrl) ||
         !string.IsNullOrWhiteSpace(transaction.QrCodePayload);
+
+    private static void ApplyProviderSession(PaymentTransaction payment, ProviderPaymentSession session)
+    {
+        payment.ProviderOrderCode = session.ProviderOrderCode;
+        payment.ProviderPaymentLinkId = session.ProviderPaymentLinkId;
+        payment.ProviderTransactionId = session.ProviderTransactionId;
+        payment.CheckoutUrl = session.CheckoutUrl;
+        payment.QrCodePayload = session.QrCodePayload;
+        payment.ExpiresAt = session.ExpiresAt;
+        payment.ProviderStatus = session.ProviderStatus;
+    }
+
+    private static void ScheduleCreateRetry(PaymentTransaction payment, string errorCode, string message, DateTimeOffset now)
+    {
+        payment.MarkAttempted(now);
+        payment.ScheduleRetry(errorCode, message, now.AddSeconds(30));
+    }
 
     private static bool IsPendingCashConfirmation(PaymentTransaction transaction) =>
         CashPaymentMethodResolver.IsCash(transaction.PaymentMethod?.Code) &&

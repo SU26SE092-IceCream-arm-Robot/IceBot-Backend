@@ -4,6 +4,7 @@ using Application.EdgeIntegration.Dispatch.Commands;
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Notifications;
+using Application.Payments.PaymentSessions.Support;
 using Application.Identity.Tokens.Claims;
 using Application.Payments.PaymentSessions.Requests;
 using Application.Payments.Providers;
@@ -215,7 +216,15 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
         var handler = new ManuallyReconcilePaymentSessionCommandHandler(
             paymentStore,
             new OperationLogStore(dbContext),
-            new ReconcilePendingPaymentSessionCommandHandler(paymentStore, gateway, new NoOpPaymentInterventionNotifier()));
+            new ReconcilePendingPaymentSessionCommandHandler(
+                paymentStore,
+                gateway,
+                new NoOpPaymentInterventionNotifier(),
+                new PaymentProviderExchangeCoordinator(
+                    paymentStore,
+                    Options.Create(new Application.Payments.Options.PaymentProviderExchangeOptions()),
+                    TimeProvider.System),
+                TimeProvider.System));
 
         var result = await handler.HandleAsync(new ManuallyReconcilePaymentSessionCommand(
             seed.OrderId,
@@ -230,6 +239,126 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
         Assert.False(result.Succeeded);
         Assert.Equal(403, result.StatusCode);
         Assert.Empty(await dbContext.OperationLogs.Where(log => log.OrderId == seed.OrderId).ToListAsync());
+    }
+
+    [IntegrationFact]
+    public async Task ProviderExchangeLifecycleConstraint_RejectsCompletedStatusWithoutOutcome()
+    {
+        var seed = await SeedAsync();
+        await using var dbContext = fixture.CreateDbContext();
+        var exchange = PaymentProviderExchange.Start(
+            seed.PaymentId,
+            "PayOS",
+            PaymentProviderExchangeOperation.CreateSession,
+            1,
+            seed.ProviderOrderCode,
+            DateTimeOffset.UtcNow);
+        dbContext.PaymentProviderExchanges.Add(exchange);
+        await dbContext.SaveChangesAsync();
+
+        var exception = await Assert.ThrowsAnyAsync<Exception>(() =>
+            dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"PaymentProviderExchanges\" SET \"Status\" = 2 WHERE \"Id\" = {exchange.Id}"));
+
+        Assert.Contains("CK_PaymentProviderExchanges_Lifecycle", exception.ToString(), StringComparison.Ordinal);
+    }
+
+    [IntegrationFact]
+    public async Task ProviderExchangeConstraints_RejectInvalidAttemptHttpStatusAndCompletionTime()
+    {
+        var seed = await SeedAsync();
+        await using var dbContext = fixture.CreateDbContext();
+        var exchange = PaymentProviderExchange.Start(
+            seed.PaymentId,
+            "PayOS",
+            PaymentProviderExchangeOperation.LookupSession,
+            1,
+            seed.ProviderOrderCode,
+            DateTimeOffset.UtcNow);
+        dbContext.PaymentProviderExchanges.Add(exchange);
+        await dbContext.SaveChangesAsync();
+
+        var invalidAttempt = await Assert.ThrowsAnyAsync<Exception>(() =>
+            dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"PaymentProviderExchanges\" SET \"AttemptNumber\" = 0 WHERE \"Id\" = {exchange.Id}"));
+        Assert.Contains("CK_PaymentProviderExchanges_AttemptNumber_Positive", invalidAttempt.ToString(), StringComparison.Ordinal);
+
+        var invalidHttpStatus = await Assert.ThrowsAnyAsync<Exception>(() =>
+            dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"PaymentProviderExchanges\" SET \"HttpStatusCode\" = 99 WHERE \"Id\" = {exchange.Id}"));
+        Assert.Contains("CK_PaymentProviderExchanges_HttpStatusCode_Valid", invalidHttpStatus.ToString(), StringComparison.Ordinal);
+
+        var invalidCompletion = await Assert.ThrowsAnyAsync<Exception>(() =>
+            dbContext.Database.ExecuteSqlInterpolatedAsync(
+                $"UPDATE \"PaymentProviderExchanges\" SET \"Status\" = 2, \"Outcome\" = 1, \"CompletedAt\" = \"StartedAt\" - interval '1 second' WHERE \"Id\" = {exchange.Id}"));
+        Assert.Contains("CK_PaymentProviderExchanges_CompletionAfterStart", invalidCompletion.ToString(), StringComparison.Ordinal);
+    }
+
+    [IntegrationFact]
+    public async Task ConcurrentLookupRecovery_ClosesOneStaleCreateAttemptAndStartsOneLookup()
+    {
+        var seed = await SeedAsync();
+        Guid staleExchangeId;
+        await using (var mutation = fixture.CreateDbContext())
+        {
+            var staleCreate = PaymentProviderExchange.Start(
+                seed.PaymentId,
+                "PayOS",
+                PaymentProviderExchangeOperation.CreateSession,
+                1,
+                seed.ProviderOrderCode,
+                DateTimeOffset.UtcNow.AddMinutes(-2));
+            staleExchangeId = staleCreate.Id;
+            mutation.PaymentProviderExchanges.Add(staleCreate);
+            await mutation.SaveChangesAsync();
+        }
+
+        var results = await Task.WhenAll(
+            StartLookupAsync(seed.PaymentId),
+            StartLookupAsync(seed.PaymentId));
+
+        Assert.Single(results, result => result.State == PaymentProviderExchangeStartState.Started);
+        Assert.Single(results, result => result.State == PaymentProviderExchangeStartState.InProgress);
+
+        await using (var assertion = fixture.CreateDbContext())
+        {
+            var exchanges = await assertion.PaymentProviderExchanges
+                .Where(exchange => exchange.PaymentTransactionId == seed.PaymentId)
+                .OrderBy(exchange => exchange.Operation)
+                .ThenBy(exchange => exchange.AttemptNumber)
+                .ToListAsync();
+
+            Assert.Collection(exchanges,
+                create =>
+                {
+                    Assert.Equal(PaymentProviderExchangeOperation.CreateSession, create.Operation);
+                    Assert.Equal(PaymentProviderExchangeStatus.Completed, create.Status);
+                    Assert.Equal(PaymentProviderExchangeOutcome.OutcomeUnknown, create.Outcome);
+                },
+                lookup =>
+                {
+                    Assert.Equal(PaymentProviderExchangeOperation.LookupSession, lookup.Operation);
+                    Assert.Equal(PaymentProviderExchangeStatus.Started, lookup.Status);
+                });
+        }
+
+        await using var lateWorkerContext = fixture.CreateDbContext();
+        var lateWorker = new PaymentProviderExchangeCoordinator(
+            new PaymentStore(lateWorkerContext),
+            Options.Create(new Application.Payments.Options.PaymentProviderExchangeOptions()),
+            TimeProvider.System);
+        var applied = await lateWorker.CompleteAsync(
+            staleExchangeId,
+            PaymentProviderExchangeOutcome.Succeeded,
+            null,
+            null,
+            null,
+            payment => payment.MarkFailed("LATE_PROVIDER_CREATE", "Late provider response must not apply.", DateTimeOffset.UtcNow));
+
+        Assert.False(applied);
+        await using var finalAssertion = fixture.CreateDbContext();
+        var payment = await finalAssertion.PaymentTransactions.SingleAsync(candidate => candidate.Id == seed.PaymentId);
+        Assert.Equal(PaymentTransactionStatus.Pending, payment.Status);
     }
 
     private async Task<Application.Shared.Wrappers.ApiResult<Application.Payments.PaymentSessions.Results.PaymentNotificationResult>>
@@ -263,6 +392,16 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
         {
             Request = new HandlePaymentProviderNotificationRequest { RawPayload = rawPayload }
         });
+    }
+
+    private async Task<PaymentProviderExchangeStartResult> StartLookupAsync(Guid paymentTransactionId)
+    {
+        await using var dbContext = fixture.CreateDbContext();
+        var coordinator = new PaymentProviderExchangeCoordinator(
+            new PaymentStore(dbContext),
+            Options.Create(new Application.Payments.Options.PaymentProviderExchangeOptions()),
+            TimeProvider.System);
+        return await coordinator.StartLookupAsync(paymentTransactionId);
     }
 
     private async Task<Seed> SeedAsync()
@@ -386,7 +525,7 @@ public sealed class PaymentWebhookConcurrencyIntegrationTests(IntegrationTestFix
             PaymentTransaction paymentTransaction,
             Order order,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
-        public Task<ProviderPaymentSession?> GetPaymentSessionAsync(
+        public Task<ProviderPaymentSessionLookupResult> GetPaymentSessionAsync(
             string providerOrderCode,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
         public Task<ProviderPaymentNotification> ParseAndVerifyNotificationAsync(

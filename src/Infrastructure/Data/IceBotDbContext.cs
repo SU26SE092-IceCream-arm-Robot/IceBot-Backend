@@ -200,6 +200,7 @@ public class IceBotDbContext : DbContext
 
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<PaymentTransaction> PaymentTransactions => Set<PaymentTransaction>();
+    public DbSet<PaymentProviderExchange> PaymentProviderExchanges => Set<PaymentProviderExchange>();
     public DbSet<PaymentCallback> PaymentCallbacks => Set<PaymentCallback>();
     public DbSet<PaymentProviderObservation> PaymentProviderObservations => Set<PaymentProviderObservation>();
     public DbSet<Refund> Refunds => Set<Refund>();

@@ -46,7 +46,6 @@ internal static class PaymentNotificationApplier
         paymentTransaction.ProviderStatus = notification.ProviderStatus;
         paymentTransaction.PaidAmount = notification.PaidAmount ?? paymentTransaction.PaidAmount;
         paymentTransaction.ProviderPaidAt = notification.ProviderPaidAt ?? paymentTransaction.ProviderPaidAt;
-        paymentTransaction.RawResponseJson = notification.RawPayloadJson;
 
         if (notification.IsPaid)
         {
@@ -56,7 +55,7 @@ internal static class PaymentNotificationApplier
             }
 
             var paidAt = notification.ProviderPaidAt ?? DateTimeOffset.UtcNow;
-            paymentTransaction.MarkPaid(notification.ProviderTransactionId, paidAt, notification.RawPayloadJson);
+            paymentTransaction.MarkPaid(notification.ProviderTransactionId, paidAt);
             return;
         }
 

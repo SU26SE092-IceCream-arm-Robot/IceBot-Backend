@@ -33,6 +33,7 @@ using Application.Orders.PlaceOrder.Commands;
 using Application.Orders.PlaceOrder.Requests;
 using Application.Orders.PlaceOrder.Services;
 using Application.Orders.Admission;
+using Application.Payments.PaymentSessions.Support;
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Requests;
@@ -402,7 +403,12 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             new KioskSalesAdmissionEvaluator(
                 new OperationalAdmissionReadStore(dbContext),
                 Options.Create(new KioskSalesAdmissionOptions()),
-                telemetryOptions));
+                telemetryOptions),
+            new PaymentProviderExchangeCoordinator(
+                new PaymentStore(dbContext),
+                Options.Create(new Application.Payments.Options.PaymentProviderExchangeOptions()),
+                TimeProvider.System),
+            TimeProvider.System);
         var result = await handler.HandleAsync(new CreatePaymentSessionCommand
         {
             OrderId = order.Id,
@@ -480,7 +486,7 @@ public sealed class RobotArtifactDeploymentAndExecutionIntegrationTests(Integrat
             Order order,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public Task<Application.Payments.Providers.ProviderPaymentSession?> GetPaymentSessionAsync(
+        public Task<Application.Payments.Providers.ProviderPaymentSessionLookupResult> GetPaymentSessionAsync(
             string providerOrderCode,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 

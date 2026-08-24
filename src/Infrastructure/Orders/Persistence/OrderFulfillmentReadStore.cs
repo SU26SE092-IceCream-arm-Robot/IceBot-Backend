@@ -63,9 +63,7 @@ public sealed class OrderFulfillmentReadStore(IceBotDbContext dbContext) : IOrde
                 item.FulfillmentType,
                 item.Status,
                 item.Order.PaidAt,
-                item.MenuItem.PreparationTimeSeconds ??
-                item.ProductVariant.PreparationTimeSeconds ??
-                item.Product.PreparationTimeSeconds))
+                item.PreparationTimeSecondsSnapshot))
             .ToListAsync(cancellationToken);
 
         var itemIds = rows.Select(row => row.OrderItemId).ToArray();

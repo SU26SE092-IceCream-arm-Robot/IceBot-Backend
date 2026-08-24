@@ -50,6 +50,8 @@ public partial class OrderItem : BusinessEntity
 
     public string? RecipeSnapshotJson { get; set; }
 
+    public int? PreparationTimeSecondsSnapshot { get; private set; }
+
     public virtual Order Order { get; set; } = null!;
 
     public virtual MenuItem MenuItem { get; set; } = null!;
@@ -79,7 +81,8 @@ public partial class OrderItem : BusinessEntity
         decimal unitPrice,
         decimal discountAmount = 0,
         string? clientLineId = null,
-        string? recipeSnapshotJson = null)
+        string? recipeSnapshotJson = null,
+        int? preparationTimeSecondsSnapshot = null)
     {
         if (menuItemId == Guid.Empty)
         {
@@ -146,6 +149,11 @@ public partial class OrderItem : BusinessEntity
             throw new DomainRuleException("Order item discount cannot be negative.");
         }
 
+        if (preparationTimeSecondsSnapshot is <= 0)
+        {
+            preparationTimeSecondsSnapshot = null;
+        }
+
         var item = new OrderItem
         {
             MenuItemId = menuItemId,
@@ -164,7 +172,8 @@ public partial class OrderItem : BusinessEntity
             Quantity = quantity,
             UnitPrice = unitPrice,
             DiscountAmount = discountAmount,
-            RecipeSnapshotJson = recipeSnapshotJson
+            RecipeSnapshotJson = recipeSnapshotJson,
+            PreparationTimeSecondsSnapshot = preparationTimeSecondsSnapshot
         };
 
         item.RecalculateTotal();

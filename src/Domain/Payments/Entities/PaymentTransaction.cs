@@ -72,10 +72,6 @@ public partial class PaymentTransaction : BusinessEntity
 
     public string? FailureMessage { get; set; }
 
-    public string? RawRequestJson { get; set; }
-
-    public string? RawResponseJson { get; set; }
-
     public virtual Order Order { get; set; } = null!;
 
     public virtual PaymentMethod PaymentMethod { get; set; } = null!;
@@ -103,7 +99,7 @@ public partial class PaymentTransaction : BusinessEntity
         ClearRetryState();
     }
 
-    public void MarkPaid(string? providerTransactionId, DateTimeOffset paidAt, string? rawResponseJson = null)
+    public void MarkPaid(string? providerTransactionId, DateTimeOffset paidAt)
     {
         if (Amount <= 0)
         {
@@ -117,7 +113,6 @@ public partial class PaymentTransaction : BusinessEntity
 
         ProviderTransactionId = providerTransactionId ?? ProviderTransactionId;
         PaidAt = paidAt;
-        RawResponseJson = rawResponseJson ?? RawResponseJson;
         Status = PaymentTransactionStatus.Paid;
         ClearRetryState();
     }

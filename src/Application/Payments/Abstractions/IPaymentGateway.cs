@@ -15,7 +15,7 @@ public interface IPaymentGateway
         Order order,
         CancellationToken cancellationToken = default);
 
-    Task<ProviderPaymentSession?> GetPaymentSessionAsync(
+    Task<ProviderPaymentSessionLookupResult> GetPaymentSessionAsync(
         string providerOrderCode,
         CancellationToken cancellationToken = default);
 

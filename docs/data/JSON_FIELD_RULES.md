@@ -4,7 +4,7 @@ JSON columns are acceptable in this domain because the system runs across edge k
 
 ## Search Keywords
 
-`JSON fields`, `JSONB`, `ConfigJson`, `SettingsJson`, `ParametersJson`, `SnapshotJson`, `PayloadJson`, `HeadersJson`, `RawRequestJson`, `RawResponseJson`, `MetadataJson`, `schema version`, `source of truth JSON`, `immutable snapshot`, `append-only payload`, `provider payload`, `robot parameters`, `sync payload`, `JSON conflict resolution`
+`JSON fields`, `JSONB`, `ConfigJson`, `SettingsJson`, `ParametersJson`, `SnapshotJson`, `PayloadJson`, `HeadersJson`, `PaymentProviderExchange`, `MetadataJson`, `schema version`, `source of truth JSON`, `immutable snapshot`, `append-only payload`, `provider payload`, `robot parameters`, `sync payload`, `JSON conflict resolution`
 
 ## Roles
 
@@ -51,14 +51,23 @@ Fields:
 - Product-option selections are stored as typed `OrderItemOption` snapshots. Anonymous checkout payloads and Edge execution commands must not carry arbitrary option JSON.
 - `OrderItem.RecipeSnapshotJson` with `RecipeSnapshotSchemaVersion`
 - `OrderExecutionRecord` and `ProductionExecutionRecord` keep typed projection fields rather than raw executor payloads.
-- `PaymentTransaction.RawRequestJson`
-- `PaymentTransaction.RawResponseJson`
+- `OrderItem.RecipeSnapshotJson` is immutable order-time recipe evidence.
 
 Rules:
 
 - Treat as immutable once the order item, robot job, or payment attempt is created.
 - If product, product variant, recipe, or option configuration changes later, do not rewrite historical snapshots.
 - Reports may read snapshots for historical truth, but current catalog pages should read typed product/product variant/recipe tables.
+
+`PaymentTransaction` deliberately has no raw provider JSON fields. Outbound create
+and lookup evidence belongs to `PaymentProviderExchange`, while verified inbound
+webhook evidence belongs to `PaymentCallback`. Provider JSON is redacted and
+bounded before persistence and is never a payment-state decision input.
+Known provider business outcomes, including a payment-session lookup `NotFound`,
+must retain their redacted request evidence and HTTP status; absence of a session
+is not a reason to omit the outbound-attempt record.
+Provider evidence must redact credentials, signatures, tokens, checksums, QR
+payloads, account numbers/names, and buyer name/email/phone/address fields.
 
 ### Append-only payload/debug
 
@@ -67,6 +76,7 @@ These fields are evidence from external systems, sync, or runtime events. They a
 Fields:
 
 - `PaymentCallback.PayloadJson`
+- `PaymentProviderExchange.RequestPayloadJson` and `ResponsePayloadJson`
 - `SyncEventInbox.PayloadJson`
 - `SyncEventInbox.HeadersJson`
 - `SyncDeadLetter.PayloadJson`
@@ -82,6 +92,8 @@ Rules:
 - Idempotency must use typed keys such as provider event id, event id, source node id, or correlation id.
 - Retry logic must use typed retry/status columns, not parsed JSON state.
 - If a value becomes operationally important, add a typed column and backfill from payloads if needed.
+- `PaymentProviderExchange` is payment-owned, monotonic outbound evidence: one
+  Started/Completed lifecycle per attempt. It is not a generic external-event store.
 
 ### Metadata
 

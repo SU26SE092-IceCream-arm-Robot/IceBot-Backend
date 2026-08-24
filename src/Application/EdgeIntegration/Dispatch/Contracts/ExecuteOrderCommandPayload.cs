@@ -180,6 +180,63 @@ public static class ExecuteOrderCommandPayloadCodec
                     program.Artifacts.Any(artifact => artifact.RobotArtifactId == Guid.Empty || artifact.RunOrder <= 0 ||
                         string.IsNullOrWhiteSpace(artifact.ArtifactChecksum)))))
             throw new DomainRuleException("Execute-order command payload contains an invalid order line or robot program manifest.");
+
+        if (payload.SchemaVersion == 5)
+        {
+            ValidateSchemaV5(payload);
+        }
+    }
+
+    private static void ValidateSchemaV5(ExecuteOrderCommandPayload payload)
+    {
+        if (payload.ReleaseManifestSchemaVersion <= 0 || string.IsNullOrWhiteSpace(payload.ManifestJson))
+        {
+            throw new DomainRuleException("Schema V5 execute-order payload requires release manifest provenance.");
+        }
+
+        foreach (var line in payload.OrderLines)
+        {
+            if (string.IsNullOrWhiteSpace(line.ProductCodeSnapshot) ||
+                string.IsNullOrWhiteSpace(line.ProductVariantCodeSnapshot) ||
+                string.IsNullOrWhiteSpace(line.RouteCode) ||
+                string.IsNullOrWhiteSpace(line.ProductionDefinitionChecksum))
+            {
+                throw new DomainRuleException("Schema V5 execute-order payload requires immutable order-line provenance.");
+            }
+
+            if (line.RecipeId.HasValue &&
+                (line.RecipeSnapshotSchemaVersion <= 0 || string.IsNullOrWhiteSpace(line.RecipeSnapshotJson)))
+            {
+                throw new DomainRuleException("Schema V5 execute-order payload requires a recipe snapshot for a recipe-backed line.");
+            }
+
+            if (line.RobotPrograms.Select(program => program.BindingOrder).Distinct().Count() != line.RobotPrograms.Count)
+            {
+                throw new DomainRuleException("Schema V5 execute-order payload contains duplicate robot-program binding orders.");
+            }
+
+            foreach (var program in line.RobotPrograms)
+            {
+                if (program.ProgramManifestSchemaVersion <= 0 ||
+                    string.IsNullOrWhiteSpace(program.ProgramManifestChecksum))
+                {
+                    throw new DomainRuleException("Schema V5 execute-order payload requires robot-program manifest provenance.");
+                }
+
+                if (program.Artifacts.Select(artifact => artifact.RunOrder).Distinct().Count() != program.Artifacts.Count)
+                {
+                    throw new DomainRuleException("Schema V5 execute-order payload contains duplicate artifact run orders.");
+                }
+
+                if (program.Artifacts.Any(artifact => artifact.ParametersSchemaVersion <= 0 ||
+                    string.IsNullOrWhiteSpace(artifact.RuntimeTargetCode) ||
+                    string.IsNullOrWhiteSpace(artifact.MachineModelCode) ||
+                    artifact.TechnicalContractId.HasValue != !string.IsNullOrWhiteSpace(artifact.TechnicalContractChecksum)))
+                {
+                    throw new DomainRuleException("Schema V5 execute-order payload contains incomplete artifact technical provenance.");
+                }
+            }
+        }
     }
 }
 

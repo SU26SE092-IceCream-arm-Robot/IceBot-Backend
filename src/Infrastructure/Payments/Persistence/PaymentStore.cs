@@ -85,6 +85,41 @@ public sealed class PaymentStore : IPaymentStore
         _dbContext.PaymentTransactions.WhereNotDeleted().AsNoTracking()
             .FirstOrDefaultAsync(payment => payment.Id == id, cancellationToken);
 
+    public Task<Guid?> GetPaymentProviderExchangePaymentTransactionIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.PaymentProviderExchanges.AsNoTracking()
+            .Where(exchange => exchange.Id == id)
+            .Select(exchange => (Guid?)exchange.PaymentTransactionId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+    public Task<PaymentProviderExchange?> GetPaymentProviderExchangeByIdAsync(
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.PaymentProviderExchanges
+            .Include(exchange => exchange.PaymentTransaction)
+                .ThenInclude(payment => payment.Order)
+            .FirstOrDefaultAsync(exchange => exchange.Id == id, cancellationToken);
+
+    public Task<PaymentProviderExchange?> GetStartedPaymentProviderExchangeAsync(
+        Guid paymentTransactionId,
+        Domain.Payments.Enums.PaymentProviderExchangeOperation operation,
+        CancellationToken cancellationToken = default) =>
+        _dbContext.PaymentProviderExchanges
+            .Where(exchange => exchange.PaymentTransactionId == paymentTransactionId &&
+                exchange.Operation == operation &&
+                exchange.Status == Domain.Payments.Enums.PaymentProviderExchangeStatus.Started)
+            .SingleOrDefaultAsync(cancellationToken);
+
+    public async Task<int> GetNextPaymentProviderExchangeAttemptNumberAsync(
+        Guid paymentTransactionId,
+        Domain.Payments.Enums.PaymentProviderExchangeOperation operation,
+        CancellationToken cancellationToken = default) =>
+        (await _dbContext.PaymentProviderExchanges
+            .Where(exchange => exchange.PaymentTransactionId == paymentTransactionId && exchange.Operation == operation)
+            .Select(exchange => (int?)exchange.AttemptNumber)
+            .MaxAsync(cancellationToken) ?? 0) + 1;
+
     public async Task<IReadOnlyList<Guid>> ListPendingPaymentSessionReconciliationIdsAsync(
         DateTimeOffset requestedBefore,
         DateTimeOffset retryDueAt,
@@ -339,6 +374,13 @@ public sealed class PaymentStore : IPaymentStore
     public async Task AddPaymentTransactionAsync(PaymentTransaction paymentTransaction, CancellationToken cancellationToken = default)
     {
         await _dbContext.PaymentTransactions.AddAsync(paymentTransaction, cancellationToken);
+    }
+
+    public async Task AddPaymentProviderExchangeAsync(
+        PaymentProviderExchange exchange,
+        CancellationToken cancellationToken = default)
+    {
+        await _dbContext.PaymentProviderExchanges.AddAsync(exchange, cancellationToken);
     }
 
     public async Task AddPaymentCallbackAsync(PaymentCallback paymentCallback, CancellationToken cancellationToken = default)

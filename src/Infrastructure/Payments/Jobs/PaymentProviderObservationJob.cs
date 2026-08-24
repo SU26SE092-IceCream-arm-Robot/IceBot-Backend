@@ -1,5 +1,7 @@
 using Application.Payments.Abstractions;
 using Application.Payments.Reconciliation;
+using Application.Payments.PaymentSessions.Support;
+using Application.Payments.Providers;
 using Domain.Payments.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -56,6 +58,7 @@ public sealed class PaymentProviderObservationJob : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var gateway = scope.ServiceProvider.GetRequiredService<IPaymentGateway>();
         var store = scope.ServiceProvider.GetRequiredService<IPaymentReconciliationStore>();
+        var exchanges = scope.ServiceProvider.GetRequiredService<IPaymentProviderExchangeCoordinator>();
         var options = _options.Value;
         var candidates = await store.ListProviderObservationCandidatesAsync(
             gateway.ProviderCode,
@@ -68,22 +71,50 @@ public sealed class PaymentProviderObservationJob : BackgroundService
         foreach (var candidate in candidates)
         {
             var observedAt = DateTimeOffset.UtcNow;
+            var exchangeStart = await exchanges.StartLookupAsync(
+                candidate.PaymentTransactionId,
+                cancellationToken: cancellationToken);
+            if (exchangeStart.State != PaymentProviderExchangeStartState.Started || exchangeStart.ExchangeId is not { } exchangeId)
+            {
+                continue;
+            }
+
             try
             {
-                var session = await gateway.GetPaymentSessionAsync(candidate.ProviderOrderCode, cancellationToken);
+                var lookup = await gateway.GetPaymentSessionAsync(candidate.ProviderOrderCode, cancellationToken);
+                var session = lookup.Session;
+                await exchanges.CompleteAsync(
+                    exchangeId,
+                    lookup.IsFound ? PaymentProviderExchangeOutcome.Succeeded : PaymentProviderExchangeOutcome.Rejected,
+                    lookup.Evidence,
+                    lookup.IsFound ? null : "PROVIDER_SESSION_NOT_FOUND",
+                    lookup.IsFound ? null : "Provider did not return a payment session.",
+                    null,
+                    cancellationToken);
                 await store.RecordProviderObservationAsync(
                     candidate.PaymentTransactionId, candidate.Provider, candidate.ProviderOrderCode,
-                    session is null ? PaymentProviderObservationOutcome.NotFound : PaymentProviderObservationOutcome.Succeeded,
+                    lookup.IsFound ? PaymentProviderObservationOutcome.Succeeded : PaymentProviderObservationOutcome.NotFound,
                     session?.ProviderStatus, session?.Amount, session?.PaidAmount, session?.ProviderTransactionId,
-                    session is null ? "PROVIDER_SESSION_NOT_FOUND" : null,
-                    session is null ? "Provider did not return a payment session." : null,
+                    lookup.IsFound ? null : "PROVIDER_SESSION_NOT_FOUND",
+                    lookup.IsFound ? null : "Provider did not return a payment session.",
                     observedAt, cancellationToken);
                 PaymentReconciliationMetrics.RecordOutcome(
-                    session is null ? PaymentProviderObservationOutcome.NotFound : PaymentProviderObservationOutcome.Succeeded,
+                    lookup.IsFound ? PaymentProviderObservationOutcome.Succeeded : PaymentProviderObservationOutcome.NotFound,
                     candidate.Provider);
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
+                var evidence = exception is ProviderPaymentSessionLookupException lookupException
+                    ? lookupException.Evidence
+                    : null;
+                await exchanges.CompleteAsync(
+                    exchangeId,
+                    PaymentProviderExchangeOutcome.OutcomeUnknown,
+                    evidence,
+                    "PROVIDER_LOOKUP_FAILED",
+                    Truncate(exception.Message, 500),
+                    null,
+                    cancellationToken);
                 await store.RecordProviderObservationAsync(
                     candidate.PaymentTransactionId, candidate.Provider, candidate.ProviderOrderCode,
                     PaymentProviderObservationOutcome.Failed, null, null, null, null,

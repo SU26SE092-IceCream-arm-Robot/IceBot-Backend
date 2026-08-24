@@ -8,7 +8,7 @@ This document owns the curated internal management REST and GraphQL route catalo
 
 ## Route Catalog
 
-Management APIs are for internal operations, not only the `Manager` role.
+Management APIs are for internal operations, not only the `Manager` role. Payment diagnostics expose typed status, failure code, provider references, and reconciliation outcomes only; raw provider request/response evidence in `PaymentProviderExchange` and verified callback payloads are not management or GraphQL response fields.
 
 ### Catalog And Sales Catalog Routes
 

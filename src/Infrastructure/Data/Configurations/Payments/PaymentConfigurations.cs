@@ -69,6 +69,49 @@ internal sealed class PaymentCallbackConfiguration : IEntityTypeConfiguration<Pa
     }
 }
 
+internal sealed class PaymentProviderExchangeConfiguration : IEntityTypeConfiguration<PaymentProviderExchange>
+{
+    public void Configure(EntityTypeBuilder<PaymentProviderExchange> entity)
+    {
+        entity.ToTable("PaymentProviderExchanges", table =>
+        {
+            table.HasCheckConstraint(
+                "CK_PaymentProviderExchanges_AttemptNumber_Positive",
+                "\"AttemptNumber\" > 0");
+            table.HasCheckConstraint(
+                "CK_PaymentProviderExchanges_Lifecycle",
+                "(\"Status\" = 1 AND \"Outcome\" IS NULL AND \"CompletedAt\" IS NULL) OR " +
+                "(\"Status\" = 2 AND \"Outcome\" IS NOT NULL AND \"CompletedAt\" IS NOT NULL)");
+            table.HasCheckConstraint(
+                "CK_PaymentProviderExchanges_CompletionAfterStart",
+                "\"CompletedAt\" IS NULL OR \"CompletedAt\" >= \"StartedAt\"");
+            table.HasCheckConstraint(
+                "CK_PaymentProviderExchanges_HttpStatusCode_Valid",
+                "\"HttpStatusCode\" IS NULL OR \"HttpStatusCode\" BETWEEN 100 AND 599");
+            table.HasCheckConstraint(
+                "CK_PaymentProviderExchanges_RequestPayload_Bounded",
+                "\"RequestPayloadJson\" IS NULL OR octet_length(\"RequestPayloadJson\"::text) <= 262144");
+            table.HasCheckConstraint(
+                "CK_PaymentProviderExchanges_ResponsePayload_Bounded",
+                "\"ResponsePayloadJson\" IS NULL OR octet_length(\"ResponsePayloadJson\"::text) <= 262144");
+        });
+
+        entity.HasIndex(x => new { x.PaymentTransactionId, x.Operation, x.AttemptNumber }).IsUnique();
+        entity.HasIndex(x => new { x.PaymentTransactionId, x.Operation })
+            .IsUnique()
+            .HasFilter("\"Status\" = 1");
+        entity.HasIndex(x => new { x.PaymentTransactionId, x.StartedAt });
+        entity.Property(x => x.Provider).HasMaxLength(50);
+        entity.Property(x => x.ProviderOrderCodeSnapshot).HasMaxLength(100);
+        entity.Property(x => x.FailureCode).HasMaxLength(100);
+        entity.Property(x => x.FailureMessage).HasMaxLength(500);
+        entity.Property(x => x.RequestPayloadJson).HasColumnType("jsonb").HasMaxLength(256 * 1024);
+        entity.Property(x => x.ResponsePayloadJson).HasColumnType("jsonb").HasMaxLength(256 * 1024);
+        entity.HasOne(x => x.PaymentTransaction).WithMany().HasForeignKey(x => x.PaymentTransactionId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 internal sealed class PaymentProviderObservationConfiguration : IEntityTypeConfiguration<PaymentProviderObservation>
 {
     public void Configure(EntityTypeBuilder<PaymentProviderObservation> entity)

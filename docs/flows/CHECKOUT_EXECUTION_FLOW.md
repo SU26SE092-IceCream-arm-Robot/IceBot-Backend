@@ -41,8 +41,11 @@ The public checkout error code, validation, and retry contract lives in
 10. Tablet calls Cloud Backend to create a payment session for the order.
 11. For PayOS, Cloud creates:
    - PaymentTransaction
-   - provider payment session
+   - a durable `PaymentProviderExchange` Started record for the outbound create
+     call, completed once with bounded/redacted adapter evidence
    Cloud persists the deterministic provider order code before calling the provider. A retry reconciles that same provider identity and must not create a second provider session.
+   `PaymentCallback` remains the separate append-only inbound webhook boundary;
+   callbacks never overwrite outbound exchange evidence.
 12. For cash in Development only, Cloud creates a pending `PaymentTransaction`
     with no gateway request. The kiosk remains in the active customer session
     until a scoped Staff, Manager, or OrgAdmin confirms the physical cash receipt.
@@ -118,7 +121,7 @@ creating a second payment or dispatch.
 
 Store sales admission and active fulfillment are also separate concerns. Scheduled closing or an explicit sales pause stops runtime-menu access and new order placement, but does not cancel paid queue entries or stop accepted/running production. An Order placed before closure may create its payment session until its snapshotted `paymentDeadlineAt`; provider expiry is capped by that deadline. Once the deadline passes, no new session is created and the tablet must start a new Order. A verified late `Paid` webhook remains authoritative because money may already have moved.
 
-If the provider accepted session creation but the original response was lost, a background reconciliation worker queries the persisted provider order code and restores the checkout URL or QR payload. This read-side recovery never replaces webhook verification: a provider lookup reporting `PAID` remains pending until a signed webhook authoritatively commits payment and order state. Reconciliation failures and exhausted retries are available through the scoped payment diagnostics read.
+If the provider accepted session creation but the original response was lost, a background reconciliation worker queries the persisted provider order code and restores the checkout URL or QR payload. Every lookup, including a provider-confirmed `NotFound`, records redacted request/response evidence and its HTTP status in the payment exchange attempt. This read-side recovery never replaces webhook verification: a provider lookup reporting `PAID` remains pending until a signed webhook authoritatively commits payment and order state. Reconciliation failures and exhausted retries are available through the scoped payment diagnostics read.
 
 A known provider rejection marks the payment attempt failed and allows a new customer attempt. A timeout, transport failure, transient provider response, or incomplete successful response has an unknown creation outcome: Cloud keeps the transaction pending, schedules read-side reconciliation, and does not issue another create request. Operators use the scoped intervention queue and audited manual reconcile command when automatic recovery is exhausted or a signed webhook remains missing.
 

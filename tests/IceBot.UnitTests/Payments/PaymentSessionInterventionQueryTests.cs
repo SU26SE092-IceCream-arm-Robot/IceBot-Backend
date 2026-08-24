@@ -33,7 +33,6 @@ public sealed class PaymentSessionInterventionQueryTests
             Amount = 30_000,
             Currency = "VND",
             LastErrorCode = "AWAITING_SIGNED_WEBHOOK",
-            RawResponseJson = "sensitive"
         };
         var store = Substitute.For<IPaymentStore>();
         store.CountPaymentSessionInterventionsAsync(

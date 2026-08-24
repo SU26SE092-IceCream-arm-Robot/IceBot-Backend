@@ -35,10 +35,7 @@ public sealed class FulfillmentReminderStore(IceBotDbContext db) : IFulfillmentR
                 item.Order.Kiosk.StoreId,
                 item.Order.KioskId,
                 item.Order.PaidAt!.Value,
-                item.Order.PaidAt.Value.AddSeconds(
-                    item.MenuItem.PreparationTimeSeconds ??
-                    item.ProductVariant.PreparationTimeSeconds ??
-                    item.Product.PreparationTimeSeconds ?? 0)))
+                item.Order.PaidAt.Value.AddSeconds(item.PreparationTimeSecondsSnapshot ?? 0)))
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<IReadOnlyCollection<Guid>> ListRecipientAccountIdsAsync(
@@ -77,11 +74,6 @@ public sealed class FulfillmentReminderStore(IceBotDbContext db) : IFulfillmentR
                    accountRole.OrganizationId == item.Order.Kiosk.OrganizationId)) ||
                  (accountRole.Role.Code == "OrgAdmin" &&
                   accountRole.OrganizationId == item.Order.Kiosk.OrganizationId))) &&
-            (item.MenuItem.PreparationTimeSeconds ??
-             item.ProductVariant.PreparationTimeSeconds ??
-             item.Product.PreparationTimeSeconds) > 0 &&
-            item.Order.PaidAt.Value.AddSeconds(
-                item.MenuItem.PreparationTimeSeconds ??
-                item.ProductVariant.PreparationTimeSeconds ??
-                item.Product.PreparationTimeSeconds ?? 0) <= observedAt);
+            item.PreparationTimeSecondsSnapshot > 0 &&
+            item.Order.PaidAt.Value.AddSeconds(item.PreparationTimeSecondsSnapshot.Value) <= observedAt);
 }

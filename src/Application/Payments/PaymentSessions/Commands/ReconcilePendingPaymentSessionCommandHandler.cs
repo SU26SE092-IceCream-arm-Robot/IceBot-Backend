@@ -11,7 +11,9 @@ namespace Application.Payments.PaymentSessions.Commands;
 public sealed class ReconcilePendingPaymentSessionCommandHandler(
     IPaymentStore paymentStore,
     IPaymentGateway paymentGateway,
-    IPaymentInterventionNotifier interventionNotifier)
+    IPaymentInterventionNotifier interventionNotifier,
+    IPaymentProviderExchangeCoordinator exchangeCoordinator,
+    TimeProvider timeProvider)
 {
     public async Task<PaymentSessionReconciliationOutcome> HandleAsync(
         ReconcilePendingPaymentSessionCommand command,
@@ -25,10 +27,18 @@ public sealed class ReconcilePendingPaymentSessionCommandHandler(
             return PaymentSessionReconciliationOutcome.Skipped;
         }
 
-        ProviderPaymentSession? providerSession;
+        var exchangeStart = await exchangeCoordinator.StartLookupAsync(
+            command.PaymentTransactionId,
+            cancellationToken: cancellationToken);
+        if (exchangeStart.State != PaymentProviderExchangeStartState.Started || exchangeStart.ExchangeId is not { } exchangeId)
+        {
+            return PaymentSessionReconciliationOutcome.Skipped;
+        }
+
+        ProviderPaymentSessionLookupResult providerLookup;
         try
         {
-            providerSession = await paymentGateway.GetPaymentSessionAsync(
+            providerLookup = await paymentGateway.GetPaymentSessionAsync(
                 snapshot!.ProviderOrderCode!,
                 cancellationToken);
         }
@@ -38,7 +48,11 @@ public sealed class ReconcilePendingPaymentSessionCommandHandler(
         }
         catch (Exception ex)
         {
-            return await ScheduleRetryAsync(command, "PROVIDER_LOOKUP_FAILED", ex.Message, cancellationToken);
+            var evidence = ex is ProviderPaymentSessionLookupException lookupException
+                ? lookupException.Evidence
+                : null;
+            return await ScheduleRetryAsync(
+                command, exchangeId, evidence, "PROVIDER_LOOKUP_FAILED", ex.Message, cancellationToken);
         }
 
         return await paymentStore.ExecuteInTransactionAsync(async ct =>
@@ -50,8 +64,24 @@ public sealed class ReconcilePendingPaymentSessionCommandHandler(
                 return PaymentSessionReconciliationOutcome.Skipped;
             }
 
+            var exchange = await paymentStore.GetPaymentProviderExchangeByIdAsync(exchangeId, ct);
+            if (exchange?.Status != PaymentProviderExchangeStatus.Started)
+            {
+                return PaymentSessionReconciliationOutcome.Skipped;
+            }
+
             await paymentStore.AcquireOrderWorkflowLockAsync(payment!.OrderId, ct);
             await paymentStore.ReloadOrderAsync(payment.Order, ct);
+            var providerSession = providerLookup.Session;
+
+            exchange.Complete(
+                providerLookup.IsFound ? PaymentProviderExchangeOutcome.Succeeded : PaymentProviderExchangeOutcome.Rejected,
+                timeProvider.GetUtcNow(),
+                providerLookup.Evidence.RequestPayloadJson,
+                providerLookup.Evidence.ResponsePayloadJson,
+                providerLookup.Evidence.HttpStatusCode,
+                providerLookup.IsFound ? null : "PROVIDER_SESSION_NOT_FOUND",
+                providerLookup.IsFound ? null : "Provider did not return a payment session.");
 
             payment.MarkAttempted(command.ObservedAt);
             if (providerSession is null)
@@ -146,6 +176,8 @@ public sealed class ReconcilePendingPaymentSessionCommandHandler(
 
     private async Task<PaymentSessionReconciliationOutcome> ScheduleRetryAsync(
         ReconcilePendingPaymentSessionCommand command,
+        Guid exchangeId,
+        ProviderExchangeEvidence? evidence,
         string errorCode,
         string errorMessage,
         CancellationToken cancellationToken) =>
@@ -157,6 +189,21 @@ public sealed class ReconcilePendingPaymentSessionCommandHandler(
             {
                 return PaymentSessionReconciliationOutcome.Skipped;
             }
+
+            var exchange = await paymentStore.GetPaymentProviderExchangeByIdAsync(exchangeId, ct);
+            if (exchange?.Status != PaymentProviderExchangeStatus.Started)
+            {
+                return PaymentSessionReconciliationOutcome.Skipped;
+            }
+
+            exchange.Complete(
+                PaymentProviderExchangeOutcome.OutcomeUnknown,
+                timeProvider.GetUtcNow(),
+                evidence?.RequestPayloadJson,
+                evidence?.ResponsePayloadJson,
+                evidence?.HttpStatusCode,
+                errorCode,
+                errorMessage);
 
             payment!.MarkAttempted(command.ObservedAt);
             var outcome = ScheduleRetry(payment, command, errorCode, errorMessage);
@@ -217,6 +264,5 @@ public sealed class ReconcilePendingPaymentSessionCommandHandler(
     {
         payment.ProviderPaymentLinkId = providerSession.ProviderPaymentLinkId ?? payment.ProviderPaymentLinkId;
         payment.ProviderStatus = providerSession.ProviderStatus;
-        payment.RawResponseJson = providerSession.RawResponseJson;
     }
 }

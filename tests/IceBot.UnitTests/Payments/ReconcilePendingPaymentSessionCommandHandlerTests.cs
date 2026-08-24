@@ -1,6 +1,7 @@
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Notifications;
+using Application.Payments.PaymentSessions.Support;
 using Application.Payments.Providers;
 using Domain.Payments.Entities;
 using Domain.Payments.Enums;
@@ -15,8 +16,9 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
     {
         var payment = PendingPayment();
         var (handler, store, gateway, _) = Handler(payment);
+        var evidence = ProviderExchangeEvidence.FromRaw("{\"providerOrderCode\":\"1234567890123\"}", "{}", 404);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns((ProviderPaymentSession?)null);
+            .Returns(ProviderPaymentSessionLookupResult.NotFound(evidence));
 
         var outcome = await handler.HandleAsync(Command(payment.Id));
 
@@ -32,14 +34,14 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
         var payment = PendingPayment();
         var (handler, _, gateway, _) = Handler(payment);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns(new ProviderPaymentSession
+            .Returns(Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = payment.ProviderOrderCode,
                 ProviderPaymentLinkId = "link-1",
                 QrCodePayload = "qr-restored",
                 ProviderStatus = "PENDING",
                 Amount = payment.Amount
-            });
+            }));
 
         var outcome = await handler.HandleAsync(Command(payment.Id));
 
@@ -55,13 +57,13 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
         var payment = PendingPayment();
         var (handler, _, gateway, notifier) = Handler(payment);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns(new ProviderPaymentSession
+            .Returns(Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = "9999999999999",
                 CheckoutUrl = "https://pay.test/wrong-session",
                 ProviderStatus = "PENDING",
                 Amount = payment.Amount
-            });
+            }));
 
         var outcome = await handler.HandleAsync(Command(payment.Id));
 
@@ -81,13 +83,13 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
         var payment = PendingPayment();
         var (handler, _, gateway, _) = Handler(payment);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns(new ProviderPaymentSession
+            .Returns(Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = payment.ProviderOrderCode,
                 ProviderStatus = "PAID",
                 Amount = payment.Amount,
                 PaidAmount = payment.Amount
-            });
+            }));
 
         var outcome = await handler.HandleAsync(Command(payment.Id));
 
@@ -105,12 +107,12 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
         payment.CheckoutUrl = "https://pay.test/session";
         var (handler, _, gateway, _) = Handler(payment);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns(new ProviderPaymentSession
+            .Returns(Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = payment.ProviderOrderCode,
                 ProviderStatus = "EXPIRED",
                 Amount = payment.Amount
-            });
+            }));
 
         var outcome = await handler.HandleAsync(Command(payment.Id));
 
@@ -127,13 +129,13 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
         payment.CheckoutUrl = "https://pay.test/session";
         var (handler, _, gateway, _) = Handler(payment);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns(new ProviderPaymentSession
+            .Returns(Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = payment.ProviderOrderCode,
                 ProviderStatus = "PENDING",
                 Amount = payment.Amount,
                 CheckoutUrl = payment.CheckoutUrl
-            });
+            }));
 
         var outcome = await handler.HandleAsync(Command(payment.Id));
 
@@ -149,7 +151,7 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
         payment.RetryCount = payment.MaxRetries - 1;
         var (handler, _, gateway, notifier) = Handler(payment);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns<Task<ProviderPaymentSession?>>(_ => throw new HttpRequestException("provider unavailable"));
+            .Returns<Task<ProviderPaymentSessionLookupResult>>(_ => throw new HttpRequestException("provider unavailable"));
 
         var outcome = await handler.HandleAsync(Command(payment.Id));
 
@@ -169,11 +171,11 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
         var payment = PendingPayment();
         var (handler, store, gateway, notifier) = Handler(payment);
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode!, Arg.Any<CancellationToken>())
-            .Returns(new ProviderPaymentSession
+            .Returns(Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = "different-provider-order",
                 Amount = payment.Amount
-            });
+            }));
         notifier.NotifyIfRequiredAsync(
                 payment,
                 PaymentSessionReconciliationOutcome.IdentityMismatch,
@@ -202,8 +204,27 @@ public sealed class ReconcilePendingPaymentSessionCommandHandlerTests
                 CancellationToken.None));
         var gateway = Substitute.For<IPaymentGateway>();
         var notifier = Substitute.For<IPaymentInterventionNotifier>();
-        return (new ReconcilePendingPaymentSessionCommandHandler(store, gateway, notifier), store, gateway, notifier);
+        var exchangeCoordinator = ExchangeCoordinator(store);
+        return (new ReconcilePendingPaymentSessionCommandHandler(
+            store, gateway, notifier, exchangeCoordinator, TimeProvider.System), store, gateway, notifier);
     }
+
+    private static IPaymentProviderExchangeCoordinator ExchangeCoordinator(IPaymentStore store)
+    {
+        var exchange = PaymentProviderExchange.Start(
+            Guid.NewGuid(), "PayOS", PaymentProviderExchangeOperation.LookupSession, 1, "1234567890123", DateTimeOffset.UtcNow);
+        store.GetPaymentProviderExchangeByIdAsync(exchange.Id, Arg.Any<CancellationToken>()).Returns(exchange);
+        var coordinator = Substitute.For<IPaymentProviderExchangeCoordinator>();
+        coordinator.StartLookupAsync(Arg.Any<Guid>(), Arg.Any<ProviderExchangeEvidence?>(), Arg.Any<CancellationToken>())
+            .Returns(new PaymentProviderExchangeStartResult(PaymentProviderExchangeStartState.Started, exchange.Id));
+        return coordinator;
+    }
+
+    private static ProviderPaymentSessionLookupResult Found(ProviderPaymentSession session) =>
+        ProviderPaymentSessionLookupResult.Found(
+            session,
+            ProviderExchangeEvidence.FromRaw("{\"providerOrderCode\":\"1234567890123\"}", "{}", 200));
+
 
     private static PaymentTransaction PendingPayment(bool withOrder = false) => new()
     {

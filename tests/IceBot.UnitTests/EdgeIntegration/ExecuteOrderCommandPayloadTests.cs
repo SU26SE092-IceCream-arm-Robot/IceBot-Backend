@@ -50,6 +50,7 @@ public sealed class ExecuteOrderCommandPayloadTests
                     ProductCodeSnapshot = "P",
                     ProductVariantCodeSnapshot = "V",
                     RecipeSnapshotSchemaVersion = 1,
+                    RecipeSnapshotJson = "{}",
                     SelectedOptions =
                     [
                         new ExecuteOrderLineOptionPayload
@@ -64,6 +65,7 @@ public sealed class ExecuteOrderCommandPayloadTests
                     ],
                     ExecutionRouteId = Guid.NewGuid(),
                     RouteCode = "ROUTE",
+                    ProductionDefinitionChecksum = "definition-checksum",
                     RobotPrograms =
                     [
                         new ExecuteOrderRobotProgramPayload
@@ -187,14 +189,17 @@ public sealed class ExecuteOrderCommandPayloadTests
                 ProductCodeSnapshot = "P",
                 ProductVariantCodeSnapshot = "V",
                 RecipeSnapshotSchemaVersion = 1,
+                RecipeSnapshotJson = "{}",
                 ExecutionRouteId = Guid.NewGuid(),
                 RouteCode = "ROUTE",
+                ProductionDefinitionChecksum = "definition-checksum",
                 RobotPrograms =
                 [
                     new ExecuteOrderRobotProgramPayload
                     {
                         BindingOrder = 1,
                         RobotProgramId = Guid.NewGuid(),
+                        ProgramManifestSchemaVersion = 1,
                         ProgramManifestChecksum = "program-checksum",
                         Artifacts =
                         [
@@ -202,7 +207,10 @@ public sealed class ExecuteOrderCommandPayloadTests
                             {
                                 RobotArtifactId = Guid.NewGuid(),
                                 RunOrder = 1,
-                                ArtifactChecksum = "artifact-checksum"
+                                ParametersSchemaVersion = 1,
+                                ArtifactChecksum = "artifact-checksum",
+                                RuntimeTargetCode = "FairinoLuaV1",
+                                MachineModelCode = "FR5"
                             }
                         ]
                     }

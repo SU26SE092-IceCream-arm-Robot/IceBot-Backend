@@ -59,6 +59,16 @@ Tooling infrastructure such as Qdrant, RAG services, local model caches, and age
 | Dedicated Edge mTLS endpoint name | `ExecutionEndpointTransport__MutualTlsListener__EndpointName` | **P0 Feature** | Defaults to `EdgeMtls`. Configure `Kestrel__Endpoints__EdgeMtls__Url=https://+:8443` and either endpoint/default Kestrel certificate settings through the deployment secret store. Do not put PFX passwords or certificate files in source control. |
 | Public hosting port | `PORT` | **P0 Feature** | Provide only when the hosting platform injects a public port; otherwise use normal ASP.NET hosting configuration. |
 | Diagnostics API key | `Diagnostics__ApiKey` | **P0 Feature** | **Secret/env required** before exposing management diagnostics outside Development. |
+| Payment exchange started timeout | `Payments__ProviderExchanges__StartedTimeoutSeconds` | **P1** | Defaults to `60`; must be greater than `PayOS__Resilience__TotalTimeoutSeconds` and between 20 and 3600 seconds. A stale Started exchange is closed as outcome-unknown and recovered by lookup, never by blindly repeating provider creation. |
+
+## Historical Snapshot Migration Preflight
+
+Before applying `AddHistoricalSnapshotIntegrity`, take a database backup. The
+migration logs the count of `PaymentTransactions` with overloaded legacy raw
+JSON before removing those columns; those values cannot be safely reclassified
+as create, lookup, or callback evidence. The migration also stops if an
+existing schema-V5 `ExecuteOrder` command lacks release manifest provenance.
+Repair or retire such commands rather than rewriting their historical bytes.
 
 ## Initial SystemAdmin Bootstrap
 

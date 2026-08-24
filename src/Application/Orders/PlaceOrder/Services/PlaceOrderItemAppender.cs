@@ -122,7 +122,8 @@ public sealed class PlaceOrderItemAppender(
             menuItem.Price + selectedOptions.Sum(option => option.PriceDelta),
             menuItem.DiscountAmount,
             NormalizeOptional(itemRequest.ClientLineId),
-            recipeSnapshotJson: recipe is null ? null : RecipeSnapshotBuilder.BuildRecipeSnapshotJson(recipe));
+            recipeSnapshotJson: recipe is null ? null : RecipeSnapshotBuilder.BuildRecipeSnapshotJson(recipe),
+            preparationTimeSecondsSnapshot: ResolvePreparationTimeSeconds(menuItem, productVariant, product));
 
         orderItem.CreatedAt = now;
         foreach (var selectedOption in selectedOptions)
@@ -160,4 +161,15 @@ public sealed class PlaceOrderItemAppender(
 
     private static string? NormalizeOptional(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static int? ResolvePreparationTimeSeconds(
+        Domain.SalesCatalog.Entities.MenuItem menuItem,
+        Domain.Catalog.Entities.ProductVariant productVariant,
+        Domain.Catalog.Entities.Product product)
+    {
+        var selected = menuItem.PreparationTimeSeconds
+            ?? productVariant.PreparationTimeSeconds
+            ?? product.PreparationTimeSeconds;
+        return selected is > 0 ? selected : null;
+    }
 }

@@ -170,12 +170,28 @@ public sealed class PayOsResilienceTests
             """;
         var gateway = CreateGateway(new JsonResponseHandler(responseJson));
 
-        var session = await gateway.GetPaymentSessionAsync("1234567890123");
+        var lookup = await gateway.GetPaymentSessionAsync("1234567890123");
+        var session = lookup.Session;
 
+        Assert.True(lookup.IsFound);
+        Assert.Equal(200, lookup.Evidence.HttpStatusCode);
         Assert.NotNull(session);
-        Assert.Equal("link-1", session.ProviderPaymentLinkId);
+        Assert.Equal("link-1", session!.ProviderPaymentLinkId);
         Assert.Equal(10_000, session.Amount);
         Assert.Equal("https://pay.test/link-1", session.CheckoutUrl);
+    }
+
+    [Fact]
+    public async Task GatewayReturnsNotFoundLookupWithProviderEvidence()
+    {
+        var gateway = CreateGateway(new CountingHandler(HttpStatusCode.NotFound));
+
+        var lookup = await gateway.GetPaymentSessionAsync("1234567890123");
+
+        Assert.False(lookup.IsFound);
+        Assert.Null(lookup.Session);
+        Assert.Equal(404, lookup.Evidence.HttpStatusCode);
+        Assert.Contains("1234567890123", lookup.Evidence.RequestPayloadJson, StringComparison.Ordinal);
     }
 
     [Fact]

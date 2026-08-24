@@ -2,6 +2,7 @@ using Application.Operations.OperationLogs.Abstractions;
 using Application.Payments.Abstractions;
 using Application.Payments.PaymentSessions.Commands;
 using Application.Payments.PaymentSessions.Notifications;
+using Application.Payments.PaymentSessions.Support;
 using Application.Payments.Providers;
 using Application.Identity.Tokens.Claims;
 using Domain.Orders.Entities;
@@ -24,7 +25,7 @@ public sealed class ManualPaymentSessionReconciliationTests
             store,
             operationLogs,
             new ReconcilePendingPaymentSessionCommandHandler(
-                store, gateway, Substitute.For<IPaymentInterventionNotifier>()));
+                store, gateway, Substitute.For<IPaymentInterventionNotifier>(), ExchangeCoordinator(store), TimeProvider.System));
 
         var result = await handler.HandleAsync(new ManuallyReconcilePaymentSessionCommand(
             Guid.NewGuid(), Guid.NewGuid(), " ", new CurrentUserContext()));
@@ -68,19 +69,19 @@ public sealed class ManualPaymentSessionReconciliationTests
                 CancellationToken.None));
         var gateway = Substitute.For<IPaymentGateway>();
         gateway.GetPaymentSessionAsync(payment.ProviderOrderCode, Arg.Any<CancellationToken>())
-            .Returns(new ProviderPaymentSession
+            .Returns(ProviderPaymentSessionLookupResult.Found(new ProviderPaymentSession
             {
                 ProviderOrderCode = payment.ProviderOrderCode,
                 CheckoutUrl = "https://pay.test/session",
                 ProviderStatus = "PENDING",
                 Amount = payment.Amount
-            });
+            }, ProviderExchangeEvidence.FromRaw("{\"providerOrderCode\":\"1234567890123\"}", "{}", 200)));
         var operationLogs = Substitute.For<IOperationLogStore>();
         var handler = new ManuallyReconcilePaymentSessionCommandHandler(
             store,
             operationLogs,
             new ReconcilePendingPaymentSessionCommandHandler(
-                store, gateway, Substitute.For<IPaymentInterventionNotifier>()));
+                store, gateway, Substitute.For<IPaymentInterventionNotifier>(), ExchangeCoordinator(store), TimeProvider.System));
 
         var result = await handler.HandleAsync(new ManuallyReconcilePaymentSessionCommand(
             order.Id,
@@ -117,7 +118,7 @@ public sealed class ManualPaymentSessionReconciliationTests
             store,
             operationLogs,
             new ReconcilePendingPaymentSessionCommandHandler(
-                store, gateway, Substitute.For<IPaymentInterventionNotifier>()));
+                store, gateway, Substitute.For<IPaymentInterventionNotifier>(), ExchangeCoordinator(store), TimeProvider.System));
 
         var result = await handler.HandleAsync(new ManuallyReconcilePaymentSessionCommand(
             Guid.NewGuid(),
@@ -138,4 +139,15 @@ public sealed class ManualPaymentSessionReconciliationTests
         AccountId = Guid.NewGuid(),
         RoleScopes = [new UserRoleScope("Manager", null, null, order.KioskId)]
     };
+
+    private static IPaymentProviderExchangeCoordinator ExchangeCoordinator(IPaymentStore store)
+    {
+        var exchange = PaymentProviderExchange.Start(
+            Guid.NewGuid(), "PayOS", PaymentProviderExchangeOperation.LookupSession, 1, "1234567890123", DateTimeOffset.UtcNow);
+        store.GetPaymentProviderExchangeByIdAsync(exchange.Id, Arg.Any<CancellationToken>()).Returns(exchange);
+        var coordinator = Substitute.For<IPaymentProviderExchangeCoordinator>();
+        coordinator.StartLookupAsync(Arg.Any<Guid>(), Arg.Any<ProviderExchangeEvidence?>(), Arg.Any<CancellationToken>())
+            .Returns(new PaymentProviderExchangeStartResult(PaymentProviderExchangeStartState.Started, exchange.Id));
+        return coordinator;
+    }
 }

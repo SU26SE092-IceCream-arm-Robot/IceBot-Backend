@@ -71,6 +71,31 @@ public sealed class FulfillmentReminderIntegrationTests(IntegrationTestFixture f
         Assert.DoesNotContain(itemId, pending);
     }
 
+    [IntegrationFact]
+    public async Task CatalogPreparationChanges_AfterPayment_DoNotMoveTheReminderDeadline()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var itemId = await SeedOverdueOrderAsync(paidAt: now.AddSeconds(-2));
+
+        await using (var mutation = fixture.CreateDbContext())
+        {
+            var item = await mutation.OrderItems
+                .Include(candidate => candidate.MenuItem)
+                .Include(candidate => candidate.ProductVariant)
+                .Include(candidate => candidate.Product)
+                .SingleAsync(candidate => candidate.Id == itemId);
+            item.MenuItem.PreparationTimeSeconds = 3_600;
+            item.ProductVariant.PreparationTimeSeconds = 3_600;
+            item.Product.PreparationTimeSeconds = 3_600;
+            await mutation.SaveChangesAsync();
+        }
+
+        await using var assertion = fixture.CreateDbContext();
+        var pending = await new FulfillmentReminderStore(assertion).ListOverdueItemIdsAsync(now, 20);
+
+        Assert.Contains(itemId, pending);
+    }
+
     private async Task<Guid> SeedOverdueOrderAsync(
         bool includeRecipient = true,
         DateTimeOffset? paidAt = null,
@@ -194,7 +219,7 @@ public sealed class FulfillmentReminderIntegrationTests(IntegrationTestFixture f
         order.SetCurrency("VND");
         var item = order.AddItem(menuItem.Id, product.Id, variant.Id, null,
             menuItem.Code, menuItem.DisplayName, product.Code, product.Name, variant.Code, variant.Name,
-            null, FulfillmentType.Packaged, 1, 10_000);
+            null, FulfillmentType.Packaged, 1, 10_000, preparationTimeSecondsSnapshot: 1);
         var paymentTimestamp = paidAt ?? DateTimeOffset.UtcNow.AddMinutes(-10);
         order.Place(paymentTimestamp, paymentTimestamp.AddMinutes(15));
         order.MarkPaid(order.TotalAmount, paymentTimestamp);

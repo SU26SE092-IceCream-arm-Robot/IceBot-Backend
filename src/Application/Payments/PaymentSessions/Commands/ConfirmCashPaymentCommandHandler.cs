@@ -117,13 +117,7 @@ public sealed class ConfirmCashPaymentCommandHandler(
                 payment.PaidAmount = payment.Amount;
                 payment.ProviderPaidAt = now;
                 payment.ProviderStatus = "ConfirmedByStaff";
-                payment.MarkPaid($"cash:{payment.Id:N}", now, JsonSerializer.Serialize(new
-                {
-                    eventType = "CashPaymentConfirmed",
-                    confirmedByAccountId = command.UserContext.AccountId,
-                    confirmedAt = now,
-                    note
-                }));
+                payment.MarkPaid($"cash:{payment.Id:N}", now);
                 payment.AssignPrimarySettlement();
                 payment.Order.MarkPaid(payment.Amount, now);
             }

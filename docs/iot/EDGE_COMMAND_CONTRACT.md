@@ -42,6 +42,16 @@ Rules:
 - Broker ACLs bind each MQTT subscriber to its own execution-endpoint topic. Edge calls command pull after every wake-up and also after reconnect/on its polling interval. Operational setup is defined in [MQTT Operations](../operations/MQTT_OPERATIONS.md).
 - MQTT subscriber identity is provisioned separately from HTTPS execution authentication. Username and client id equal `executionEndpointId`; the generated password is returned once, held by the broker/Edge secret stores, and never persisted in the application database. Rotation immediately invalidates the old password; revoke disables and disconnects the broker client.
 
+## ExecuteOrder Historical Provenance
+
+Schema V5 `ExecuteOrder` payloads are immutable execution history. Cloud
+rejects a new payload unless it contains release manifest/checksum provenance,
+product and variant code snapshots, route and production-definition checksums,
+program manifest checksums, unique binding/artifact order, runtime target and
+machine model, and complete technical-contract id/checksum pairs. Recipe-backed
+machine lines require their recipe snapshot. Edge must execute the persisted
+payload and must not resolve a later release, program, or catalog definition.
+
 ## Edge To Cloud
 
 ### Pull Commands

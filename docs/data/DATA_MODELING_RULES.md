@@ -52,6 +52,7 @@ Do not apply soft-delete filters to immutable evidence or retry keys:
 - `JobNumber`
 - `TokenHash`
 - payment provider callback ids
+- payment provider exchange attempt numbers
 
 Reason: those keys protect audit, deduplication, retry, and historical evidence. They should not be reused after deletion.
 
@@ -79,6 +80,21 @@ Normal operational stores must start their query with
 cleanup, and provider callback paths may deliberately read all rows. Such an
 unfiltered path must be named or commented by its evidence/operational purpose;
 it is not a convenience bypass.
+
+## Historical Workflow Facts
+
+When a workflow decides a customer-facing or execution-relevant fact from
+mutable authoring data, store the resolved value on the workflow-owned row.
+`OrderItem.PreparationTimeSecondsSnapshot` is the order-time preparation promise;
+fulfillment queue and reminder calculations must not read current menu, product
+variant, or product preparation settings. `EdgeCommand.PayloadJson` is the
+immutable dispatched artifact/runtime instruction; do not rebuild it from a
+later release or program revision.
+
+Payment current state remains on `PaymentTransaction`. Outbound provider calls
+are append-only `PaymentProviderExchange` rows, and inbound callback payloads
+remain `PaymentCallback` rows. Do not add catch-all raw request/response fields
+back onto the mutable payment projection.
 
 All other `ISoftDeletable` entities continue to use the DbContext global
 filter. When adding a required relationship from a non-soft-deleted dependent,
