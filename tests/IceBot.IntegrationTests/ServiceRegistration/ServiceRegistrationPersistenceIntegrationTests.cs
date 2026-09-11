@@ -29,7 +29,12 @@ public sealed class ServiceRegistrationPersistenceIntegrationTests(IntegrationTe
 
         await using var db = fixture.CreateDbContext();
         var store = new ServiceRegistrationStore(db);
-        var service = new ServiceRegistrationService(store, new NoopProvisioner());
+        var acknowledgementEmailSender = new RecordingEmailSender();
+        var service = new ServiceRegistrationService(
+            store,
+            new NoopProvisioner(),
+            acknowledgementEmailSender,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<ServiceRegistrationService>.Instance);
         var request = new SubmitServiceRegistrationRequest
         {
             ContactName = "Service owner",

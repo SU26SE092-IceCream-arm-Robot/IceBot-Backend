@@ -1,17 +1,22 @@
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Application.Email;
 using Application.ServiceRegistration.Abstractions;
 using Application.Shared.Wrappers;
 using Domain.Common;
 using ServiceRegistrationEntity = Domain.ServiceRegistration.Entities.ServiceRegistration;
 using Domain.ServiceRegistration.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace Application.ServiceRegistration;
 
 public sealed class ServiceRegistrationService(
     IServiceRegistrationStore store,
-    IServiceRegistrationProvisioner provisioner)
+    IServiceRegistrationProvisioner provisioner,
+    IEmailSender emailSender,
+    ILogger<ServiceRegistrationService> logger)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -46,6 +51,8 @@ public sealed class ServiceRegistrationService(
             if (!existing.Matches(checksum)) return ApiResult<ServiceRegistrationReceiptResult>.Fail("Idempotency key was already used with a different submission.", 409);
             return ApiResult<ServiceRegistrationReceiptResult>.Success(ToReceipt(existing), "Service registration already submitted.");
         }
+
+        await TrySendAcknowledgementEmailAsync(registration, cancellationToken);
         return ApiResult<ServiceRegistrationReceiptResult>.Success(ToReceipt(registration), "Service registration submitted.", 201);
     }
 
@@ -124,6 +131,34 @@ public sealed class ServiceRegistrationService(
         return null;
     }
     private static string? NormalizePhone(string? phone) => string.IsNullOrWhiteSpace(phone) ? null : new string(phone.Where(char.IsDigit).ToArray());
+    private async Task TrySendAcknowledgementEmailAsync(ServiceRegistrationEntity registration, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var contactName = WebUtility.HtmlEncode(registration.ContactName);
+            var businessName = WebUtility.HtmlEncode(registration.BusinessName);
+            var htmlBody = $"""
+                <p>Xin chào {contactName},</p>
+                <p>IceBot đã tiếp nhận đơn đăng ký dịch vụ của <strong>{businessName}</strong>.</p>
+                <p><strong>Trạng thái hiện tại:</strong> Đã tiếp nhận, đang chờ xem xét.</p>
+                <p>Đội ngũ IceBot sẽ xem xét và phản hồi qua email này trong thời gian sớm nhất.</p>
+                <p>Trân trọng,<br/>Đội ngũ IceBot</p>
+                """;
+
+            await emailSender.SendAsync(
+                registration.Email,
+                "IceBot đã tiếp nhận đăng ký dịch vụ của bạn",
+                htmlBody,
+                cancellationToken);
+        }
+        catch (Exception exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            logger.LogError(
+                exception,
+                "Failed to send service registration acknowledgement for {RegistrationId}",
+                registration.Id);
+        }
+    }
     private static bool TryParseStatus(string? value, out ServiceRegistrationStatus? status) { status = null; if (string.IsNullOrWhiteSpace(value)) return true; if (!Enum.TryParse<ServiceRegistrationStatus>(value, true, out var parsed) || !Enum.IsDefined(parsed)) return false; status = parsed; return true; }
     private static ServiceRegistrationReceiptResult ToReceipt(ServiceRegistrationEntity value) => new() { Id = value.Id, ReferenceCode = value.ReferenceCode, Status = value.Status, SubmittedAt = value.CreatedAt };
     internal static ServiceRegistrationResult ToResult(ServiceRegistrationEntity x) => new() { Id = x.Id, ReferenceCode = x.ReferenceCode, ContactName = x.ContactName, Email = x.Email, PhoneNumber = x.PhoneNumber, BusinessName = x.BusinessName, LegalName = x.LegalName, TaxCode = x.TaxCode, Address = x.Address, ExpectedLocationCount = x.ExpectedLocationCount, Message = x.Message, PrivacyPolicyRevisionId = x.PrivacyPolicyRevisionId, Status = x.Status, ReviewReason = x.ReviewReason, ReviewedByAccountId = x.ReviewedByAccountId, ReviewedAt = x.ReviewedAt, ProvisionedOrganizationId = x.ProvisionedOrganizationId, ProvisionedOrgAdminAccountId = x.ProvisionedOrgAdminAccountId, ProvisionedInvitationId = x.ProvisionedInvitationId, ProvisioningFailureCode = x.ProvisioningFailureCode, ProvisioningFailureMessage = x.ProvisioningFailureMessage, Revision = x.Revision, CreatedAt = x.CreatedAt, UpdatedAt = x.UpdatedAt };

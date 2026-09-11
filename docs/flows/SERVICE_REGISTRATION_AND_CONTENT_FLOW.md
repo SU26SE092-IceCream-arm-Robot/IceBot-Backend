@@ -23,6 +23,14 @@ The registration request includes contact and business details plus the exact
 published privacy-policy revision accepted by the visitor. A later policy
 publication never rewrites that consent record.
 
+After a new registration is committed, the backend attempts to send a concise
+acknowledgement to the submitted email address. The email confirms only that the
+request was received and is awaiting review; it does not include the reference
+code, tax code, credentials, or other sensitive registration details. Delivery
+failure is logged and does not roll back or fail the accepted registration.
+Idempotent replays return the existing receipt without sending another
+acknowledgement email.
+
 ## Management APIs
 
 All routes below are SystemAdmin-only.
